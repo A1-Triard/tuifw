@@ -11,6 +11,7 @@ use std::num::NonZeroU16;
 use std::ops::Range;
 use std::ptr::{null, null_mut};
 use std::str::{self};
+use std::thread::{self};
 use tuifw_screen_base::*;
 use tuifw_screen_base::Screen as base_Screen;
 use either::{Either, Right, Left};
@@ -23,10 +24,10 @@ use winapi::um::wincon::*;
 use winapi::um::winnt::*;
 use winapi::um::fileapi::*;
 use winapi::um::consoleapi::*;
+use winapi::um::handleapi::*;
 use winapi::um::stringapiset::WideCharToMultiByte;
 use winapi::um::winnls::*;
 use winapi::um::winuser::*;
-use winapi::um::handleapi::INVALID_HANDLE_VALUE;
 use num_traits::identities::Zero;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -48,9 +49,7 @@ fn valid_handle(h: HANDLE) -> io::Result<HANDLE> {
 
 pub struct Screen {
     h_input: HANDLE,
-    input_mode: DWORD,
     h_output: HANDLE,
-    output_mode: DWORD,
     output_cp: UINT,
     wctmb_flags: DWORD,
     buf: Vec<CHAR_INFO>,
@@ -62,7 +61,16 @@ impl Screen {
     pub fn new() -> io::Result<Self> {
         unsafe { FreeConsole() };
         no_zero(unsafe { AllocConsole() })?;
-        let h_input = valid_handle(unsafe { CreateFileA(
+        let mut s = Screen {
+            h_input: INVALID_HANDLE_VALUE,
+            h_output: INVALID_HANDLE_VALUE,
+            output_cp: 0,
+            wctmb_flags: WC_COMPOSITECHECK | WC_DISCARDNS,
+            buf: Vec::new(),
+            size: Vector::null(),
+            invalidated: Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() }
+        };
+        s.h_input = valid_handle(unsafe { CreateFileA(
             "CONIN$\0".as_ptr() as _,
             GENERIC_READ | GENERIC_WRITE,
             FILE_SHARE_READ | FILE_SHARE_WRITE,
@@ -71,7 +79,7 @@ impl Screen {
             FILE_ATTRIBUTE_NORMAL,
             null_mut())
         })?;
-        let h_output = valid_handle(unsafe { CreateFileA(
+        s.h_output = valid_handle(unsafe { CreateFileA(
             "CONOUT$\0".as_ptr() as _,
             GENERIC_READ | GENERIC_WRITE,
             FILE_SHARE_READ | FILE_SHARE_WRITE,
@@ -80,26 +88,8 @@ impl Screen {
             FILE_ATTRIBUTE_NORMAL,
             null_mut())
         })?;
-        let mut input_mode: DWORD = 0;
-        no_zero(unsafe { GetConsoleMode(h_input, &mut input_mode as *mut _) })?;
-        let mut output_mode: DWORD = 0;
-        no_zero(unsafe { GetConsoleMode(h_output, &mut output_mode as *mut _) })?;
-        no_zero(unsafe { SetConsoleMode(h_input, ENABLE_EXTENDED_FLAGS | ENABLE_WINDOW_INPUT) })?;
-        if let Err(e) = no_zero(unsafe { SetConsoleMode(h_output, 0) }) {
-            no_zero(unsafe { SetConsoleMode(h_input, input_mode) }).unwrap();
-            return Err(e);
-        }
-        let mut s = Screen {
-            h_input,
-            h_output,
-            input_mode,
-            output_mode,
-            output_cp: 0,
-            wctmb_flags: WC_COMPOSITECHECK | WC_DISCARDNS,
-            buf: Vec::new(),
-            size: Vector::null(),
-            invalidated: Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() }
-        };
+        no_zero(unsafe { SetConsoleMode(s.h_input, ENABLE_EXTENDED_FLAGS | ENABLE_WINDOW_INPUT) })?;
+        no_zero(unsafe { SetConsoleMode(s.h_output, 0) })?;
         s.output_cp = no_zero(unsafe { GetConsoleOutputCP() })?;
         let test_char = 0u16;
         if unsafe { WideCharToMultiByte(
@@ -114,11 +104,12 @@ impl Screen {
         ) } == 0 {
             s.wctmb_flags = 0;
         }
+        s.init_screen_buffer()?;
         s.resize()?;
         Ok(s)
     }
-
-    fn resize(&mut self) -> io::Result<()> {
+    
+    fn init_screen_buffer(&mut self) -> io::Result<()> {
         let mut ci = CONSOLE_SCREEN_BUFFER_INFO {
             dwSize: COORD { X: 0, Y: 0 },
             dwCursorPosition: COORD { X: 0, Y: 0 },
@@ -131,18 +122,31 @@ impl Screen {
         ci.srWindow.Left = 0;
         ci.srWindow.Bottom = ci.srWindow.Bottom.saturating_sub(ci.srWindow.Top).saturating_add(1) - 1;
         ci.srWindow.Top = 0;
+        let size = Vector { x: ci.srWindow.Right + 1, y: ci.srWindow.Bottom + 1 };
+        no_zero(unsafe { SetConsoleWindowInfo(self.h_output, 1, &ci.srWindow as *const _) })?;
+        no_zero(unsafe { SetConsoleScreenBufferSize(self.h_output, COORD { X: size.x, Y: size.y }) })?;
+        no_zero(unsafe { FlushConsoleInputBuffer(self.h_input) })?;
+        Ok(())
+    }
+
+    fn resize(&mut self) -> io::Result<()> {
+        let mut ci = CONSOLE_SCREEN_BUFFER_INFO {
+            dwSize: COORD { X: 0, Y: 0 },
+            dwCursorPosition: COORD { X: 0, Y: 0 },
+            wAttributes: 0,
+            srWindow: SMALL_RECT { Left: 0, Top: 0, Right: 0, Bottom: 0 },
+            dwMaximumWindowSize: COORD { X: 0, Y: 0 }
+        };
+        no_zero(unsafe { GetConsoleScreenBufferInfo(self.h_output, &mut ci as *mut _) })?;
         let mut space = CHAR_INFO {
             Attributes: 0,
             Char: CHAR_INFO_Char::default()
         };
         *unsafe {space.Char.AsciiChar_mut() } = b' ' as CHAR;
         assert!(size_of::<usize>() >= 4);
-        self.size = Vector { x: ci.srWindow.Right + 1, y: ci.srWindow.Bottom + 1 };
+        self.size = Vector { x: ci.dwSize.X, y: ci.dwSize.Y };
         self.buf.resize(self.size.rect_area() as usize, space);
         self.invalidated = Rect { tl: Point { x: 0, y: 0 }, size: self.size };
-        no_zero(unsafe { SetConsoleWindowInfo(self.h_output, 1, &ci.srWindow as *const _) })?;
-        no_zero(unsafe { SetConsoleScreenBufferSize(self.h_output, COORD { X: self.size.x, Y: self.size.y }) })?;
-        no_zero(unsafe { FlushConsoleInputBuffer(self.h_input) })?;
         Ok(())
     }
 
@@ -191,14 +195,23 @@ impl Screen {
             x
         }
     }
+
+    unsafe fn drop_raw(&mut self) -> io::Result<()> {
+        if self.h_input != INVALID_HANDLE_VALUE {
+            no_zero(CloseHandle(self.h_input))?;
+        }
+        if self.h_output != INVALID_HANDLE_VALUE {
+            no_zero(CloseHandle(self.h_output))?;
+        }
+        no_zero(FreeConsole())?;
+        Ok(())
+    }
 }
 
 impl Drop for Screen {
     fn drop(&mut self) {
-        unsafe {
-            no_zero(SetConsoleMode(self.h_output, self.output_mode)).unwrap();
-            no_zero(SetConsoleMode(self.h_input, self.input_mode)).unwrap();
-        }
+        let e = unsafe { self.drop_raw() };
+        if e.is_err() && !thread::panicking() { e.unwrap(); }
     }
 }
 

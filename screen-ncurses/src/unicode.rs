@@ -4,6 +4,7 @@ use std::io::{self};
 use std::mem::{size_of};
 use std::ops::Range;
 use std::ptr::NonNull;
+use std::thread::{self};
 use libc::*;
 use tuifw_screen_base::*;
 use tuifw_screen_base::Screen as base_Screen;
@@ -91,9 +92,8 @@ impl Screen {
 
 impl Drop for Screen {
     fn drop(&mut self) {
-        unsafe {
-            no_err(endwin()).unwrap();
-        }
+        let e = unsafe { no_err(endwin()) };
+        if e.is_err() && !thread::panicking() { e.unwrap(); }
     }
 }
 

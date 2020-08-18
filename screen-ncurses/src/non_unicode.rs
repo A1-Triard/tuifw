@@ -3,6 +3,7 @@ use std::io::{self};
 use std::ops::Range;
 use std::ptr::NonNull;
 use std::str::{self};
+use std::thread::{self};
 use libc::*;
 use tuifw_screen_base::*;
 use tuifw_screen_base::Screen as base_Screen;
@@ -62,15 +63,23 @@ impl Screen {
         }
         Ok(())
     }
+
+    unsafe fn drop_raw(&mut self) -> io::Result<()> {
+        if self.cd != -1 && iconv_close(self.cd) == -1 {
+            return Err(io::Error::last_os_error());
+        }
+        if self.dc != -1 && iconv_close(self.dc) == -1 {
+            return Err(io::Error::last_os_error());
+        }
+        no_err(endwin())?;
+        Ok(())
+    }
 }
 
 impl Drop for Screen {
     fn drop(&mut self) {
-        unsafe {
-            if self.cd != -1 { assert_eq!(iconv_close(self.cd), 0); }
-            if self.dc != -1 { assert_eq!(iconv_close(self.dc), 0); }
-            no_err(endwin()).unwrap();
-        }
+        let e = unsafe { self.drop_raw() };
+        if e.is_err() && !thread::panicking() { e.unwrap(); }
     }
 }
 
