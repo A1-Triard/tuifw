@@ -60,6 +60,7 @@ pub struct Screen {
 
 impl Screen {
     pub fn new() -> io::Result<Self> {
+        unsafe { FreeConsole() };
         no_zero(unsafe { AllocConsole() })?;
         let h_input = valid_handle(unsafe { CreateFileA(
             "CONIN$\0".as_ptr() as _,
