@@ -1,0 +1,23 @@
+[package]
+edition = "2018"
+name = "tuifw-screen-base"
+version = "0.1.9"
+authors = ["warlock <internalmike@gmail.com>"]
+description = "Text User Interface Framework. Basic platform-independent text screen interface."
+readme = "README.md"
+documentation = "https://docs.rs/tuifw-screen-base/"
+keywords = ["tui", "ncurses", "notcurses", "screen"]
+categories = ["command-line-interface", "no-std"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/A1-Triard/tuifw"
+
+[dependencies]
+enum_derive = { version = "0.1.7", features = [] }
+macro-attr = { version = "0.2.0", features = [] }
+bitflags = "1.2.1"
+either = { version = "1.5.3", features = [] }
+num-traits = { version = "0.2.12", features = [] }
+
+[dev-dependencies]
+quickcheck = "0.9.2"
+quickcheck_macros = "0.9.1"

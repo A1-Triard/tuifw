@@ -1,0 +1,9 @@
+[workspace]
+members = [
+    "screen-base",
+    "screen-ncurses",
+    "screen-winapi",
+    "screen",
+    "screen-test",
+    "window",
+]

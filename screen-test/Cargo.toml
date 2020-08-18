@@ -1,0 +1,16 @@
+[package]
+edition = "2018"
+name = "tuifw-screen-test"
+version = "0.1.9"
+authors = ["warlock <internalmike@gmail.com>"]
+description = "Text User Interface Framework. Basic text screen implementation for testing purposes."
+readme = "README.md"
+documentation = "https://docs.rs/tuifw-screen-test/"
+keywords = ["tui", "test", "screen"]
+categories = ["command-line-interface"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/A1-Triard/tuifw"
+
+[dependencies]
+tuifw-screen-base = { path = "../screen-base", version = "0.1.9" }
+unicode-segmentation = "1.6.0"
