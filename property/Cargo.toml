@@ -1,0 +1,12 @@
+[package]
+edition = "2018"
+name = "tuifw-property"
+version = "0.1.10"
+authors = ["warlock <internalmike@gmail.com>"]
+description = "Text User Interface Framework. Reactive property: basic element of UI behavior."
+readme = "README.md"
+documentation = "https://docs.rs/tuifw-property/"
+keywords = ["tui", "property", "reactive", "changed"]
+categories = ["command-line-interface"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/A1-Triard/tuifw"
