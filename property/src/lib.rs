@@ -1,46 +1,64 @@
+#[macro_use]
+extern crate tylift;
+
+pub mod context;
+
 use std::mem::replace;
+use context::{Context, ContextToken};
 
-pub struct Property<O, T> {
-    value: T,
-    signals: Vec<fn(o: &mut O, old: &T)>,
+pub struct Property<Owner, Type, Token: ContextToken> {
+    value: Type,
+    on_changed: Vec<fn(owner: &mut Owner, context: &mut Context<Token>, old: &Type)>,
 }
 
-pub struct PropertyOnChanged<O, T> {
-    signals: Vec<fn(o: &mut O, old: &T)>,
-}
+pub struct PropertyOnChanged<Owner, Type, Token: ContextToken>(
+    Vec<fn(owner: &mut Owner, context: &mut Context<Token>, old: &Type)>
+);
 
-impl<O, T> PropertyOnChanged<O, T> {
-    pub fn raise(self, o: &mut O, old: &T) {
-        for signal in self.signals {
-            signal(o, old);
+impl<Owner, Type, Token: ContextToken> PropertyOnChanged<Owner, Type, Token> {
+    pub fn raise(self, owner: &mut Owner, context: &mut Context<Token>, old: &Type) {
+        for on_changed in self.0 {
+            on_changed(owner, context, old);
         }
     }
 }
 
-impl<O, T> Property<O, T> {
-    pub fn set(&mut self, value: T) -> (T, PropertyOnChanged<O, T>) {
-        let r = replace(&mut self.value, value);
-        (r, PropertyOnChanged { signals: self.signals.clone() })
+impl<Owner, Type, Token: ContextToken> Property<Owner, Type, Token> {
+    pub fn new(value: Type) -> Self {
+        Property { value, on_changed: Vec::new() }
     }
 
-    pub fn get(&self) -> &T { &self.value }
+    pub fn set(&mut self, value: Type) -> (Type, PropertyOnChanged<Owner, Type, Token>) {
+        let old = replace(&mut self.value, value);
+        (old, PropertyOnChanged(self.on_changed.clone()))
+    }
 
-    pub fn on_changed(&mut self, s: fn(o: &mut O, old: &T)) { self.signals.push(s); }
+    pub fn get(&self) -> &Type { &self.value }
+
+    pub fn on_changed(
+        &mut self,
+        callback: fn(owner: &mut Owner, context: &mut Context<Token>, old: &Type)
+    ) {
+        self.on_changed.push(callback);
+    }
 }
 
 #[macro_export]
 macro_rules! property {
-    ($t:ty, $name:ident, $set_name:ident, $name_on_changed:ident) => {
-        pub fn $name(&self) -> &$t { self.$name.get() }
+    ($type_:ty, $name:ident, $set_name:ident, $on_changed_name:ident) => {
+        pub fn $name(&self) -> &$type_ { self.$name.get() }
 
-        pub fn $name_on_changed(&mut self, s: fn(o: &mut Self, old: &$t)) {
-            self.$name.on_changed(s);
-        }
-
-        pub fn $set_name(&mut self, value: $t) -> $t { 
+        pub fn $set_name(&mut self, value: $type_) -> $type_ { 
             let (old, on_changed) = self.$name.set(value);
             on_changed.raise(self, &old);
             old
+        }
+
+        pub fn $on_changed_name(
+            &mut self,
+            callback: fn(owner: &mut Self, context: &mut Context<$context>, old: &$type_)
+        ) {
+            self.$name.on_changed(callback);
         }
     }
 }
