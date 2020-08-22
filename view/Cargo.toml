@@ -1,0 +1,15 @@
+[package]
+edition = "2018"
+name = "tuifw-view"
+version = "0.1.10"
+authors = ["warlock <internalmike@gmail.com>"]
+description = "Text User Interface Framework. UI primitives."
+readme = "README.md"
+documentation = "https://docs.rs/tuifw-view/"
+keywords = ["tui", "view", "layout"]
+categories = ["command-line-interface"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/A1-Triard/tuifw"
+
+[dependencies]
+derivative = "2.1.1"

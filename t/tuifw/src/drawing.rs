@@ -2,10 +2,10 @@ use boow::Bow;
 use tuifw_screen_base::{Color, Attr, Point, Vector, Rect};
 use tuifw_property::Property;
 use tuifw_property::context::{ContextMut};
-use tuifw_window::{DrawingPort, Window, WindowTree};
+use tuifw_window::{DrawingPort, Window, WindowTree, OptionWindowExt};
 
-pub trait Drawing<WindowTag, Error> {
-    fn draw(&self, tree: &WindowTree<WindowTag, Error>, port: &mut DrawingPort<Error>);
+pub trait Drawing<Error> {
+    fn draw(&self, tree: &WindowTree<Box<dyn Drawing<Error>>, Error>, port: &mut DrawingPort<Error>);
 }
 
 #[derive(Debug)]
@@ -16,26 +16,26 @@ pub struct Grapheme {
     pub text: Bow<'static, &'static str>,
 }
 
-pub type DrawingContext<WindowTag, Error> = ContextMut<WindowTree<WindowTag, Error>>;
+pub type DrawingContext<Error> = ContextMut<WindowTree<Box<dyn Drawing<Error>>, Error>>;
 
 macro_attr! {
     #[derive(Debug)]
     #[derive(Component!(class=BorderComponent))]
-    pub struct Border<WindowTag, Error> {
-        window: Window<WindowTag>,
-        tl: Property<Self, Option<Grapheme>, DrawingContext<WindowTag, Error>>,
-        tr: Property<Self, Option<Grapheme>, DrawingContext<WindowTag, Error>>,
-        bl: Property<Self, Option<Grapheme>, DrawingContext<WindowTag, Error>>,
-        br: Property<Self, Option<Grapheme>, DrawingContext<WindowTag, Error>>,
-        l: Property<Self, Option<Grapheme>, DrawingContext<WindowTag, Error>>,
-        t: Property<Self, Option<Grapheme>, DrawingContext<WindowTag, Error>>,
-        r: Property<Self, Option<Grapheme>, DrawingContext<WindowTag, Error>>,
-        b: Property<Self, Option<Grapheme>, DrawingContext<WindowTag, Error>>
+    pub struct Border<Error> {
+        window: Option<Window<Box<dyn Drawing<Error>>>>,
+        tl: Property<Self, Option<Grapheme>, DrawingContext<Error>>,
+        tr: Property<Self, Option<Grapheme>, DrawingContext<Error>>,
+        bl: Property<Self, Option<Grapheme>, DrawingContext<Error>>,
+        br: Property<Self, Option<Grapheme>, DrawingContext<Error>>,
+        l: Property<Self, Option<Grapheme>, DrawingContext<Error>>,
+        t: Property<Self, Option<Grapheme>, DrawingContext<Error>>,
+        r: Property<Self, Option<Grapheme>, DrawingContext<Error>>,
+        b: Property<Self, Option<Grapheme>, DrawingContext<Error>>
     }
 }
 
-impl<WindowTag, Error> Border<WindowTag, Error> {
-    fn invalidate_tl(&mut self, context: &mut DrawingContext<WindowTag, Error>, _old: &Option<Grapheme>) {
+impl<Error> Border<Error> {
+    fn invalidate_tl(&mut self, context: &mut DrawingContext<Error>, _old: &Option<Grapheme>) {
         let tree = context.get_1();
         self.window.invalidate_rect(tree, Rect {
             tl: Point { x: 0, y: 0 },
@@ -43,7 +43,7 @@ impl<WindowTag, Error> Border<WindowTag, Error> {
         });
     }
 
-    fn invalidate_tr(&mut self, context: &mut DrawingContext<WindowTag, Error>, _old: &Option<Grapheme>) {
+    fn invalidate_tr(&mut self, context: &mut DrawingContext<Error>, _old: &Option<Grapheme>) {
         let tree = context.get_1();
         let size = self.window.size(tree);
         self.window.invalidate_rect(tree, Rect {
@@ -52,7 +52,7 @@ impl<WindowTag, Error> Border<WindowTag, Error> {
         });
     }
 
-    fn invalidate_bl(&mut self, context: &mut DrawingContext<WindowTag, Error>, _old: &Option<Grapheme>) {
+    fn invalidate_bl(&mut self, context: &mut DrawingContext<Error>, _old: &Option<Grapheme>) {
         let tree = context.get_1();
         let size = self.window.size(tree);
         self.window.invalidate_rect(tree, Rect {
@@ -61,7 +61,7 @@ impl<WindowTag, Error> Border<WindowTag, Error> {
         });
     }
 
-    fn invalidate_br(&mut self, context: &mut DrawingContext<WindowTag, Error>, _old: &Option<Grapheme>) {
+    fn invalidate_br(&mut self, context: &mut DrawingContext<Error>, _old: &Option<Grapheme>) {
         let tree = context.get_1();
         let size = self.window.size(tree);
         self.window.invalidate_rect(tree, Rect {
@@ -70,7 +70,7 @@ impl<WindowTag, Error> Border<WindowTag, Error> {
         });
     }
 
-    fn invalidate_l(&mut self, context: &mut DrawingContext<WindowTag, Error>, _old: &Option<Grapheme>) {
+    fn invalidate_l(&mut self, context: &mut DrawingContext<Error>, _old: &Option<Grapheme>) {
         let tree = context.get_1();
         let size = self.window.size(tree);
         self.window.invalidate_rect(tree, Rect {
@@ -79,7 +79,7 @@ impl<WindowTag, Error> Border<WindowTag, Error> {
         });
     }
 
-    fn invalidate_t(&mut self, context: &mut DrawingContext<WindowTag, Error>, _old: &Option<Grapheme>) {
+    fn invalidate_t(&mut self, context: &mut DrawingContext<Error>, _old: &Option<Grapheme>) {
         let tree = context.get_1();
         let size = self.window.size(tree);
         self.window.invalidate_rect(tree, Rect {
@@ -88,7 +88,7 @@ impl<WindowTag, Error> Border<WindowTag, Error> {
         });
     }
 
-    fn invalidate_r(&mut self, context: &mut DrawingContext<WindowTag, Error>, _old: &Option<Grapheme>) {
+    fn invalidate_r(&mut self, context: &mut DrawingContext<Error>, _old: &Option<Grapheme>) {
         let tree = context.get_1();
         let size = self.window.size(tree);
         self.window.invalidate_rect(tree, Rect {
@@ -97,7 +97,7 @@ impl<WindowTag, Error> Border<WindowTag, Error> {
         });
     }
 
-    fn invalidate_b(&mut self, context: &mut DrawingContext<WindowTag, Error>, _old: &Option<Grapheme>) {
+    fn invalidate_b(&mut self, context: &mut DrawingContext<Error>, _old: &Option<Grapheme>) {
         let tree = context.get_1();
         let size = self.window.size(tree);
         self.window.invalidate_rect(tree, Rect {
@@ -106,9 +106,12 @@ impl<WindowTag, Error> Border<WindowTag, Error> {
         });
     }
 
-    pub fn new(window: Window<WindowTag>) -> Self {
+    pub fn new(
+        tree: &mut WindowTree<Tag, Error>,
+        parent_bounds: Option<(Option<Window<Box<dyn Drawing<Error>>>>, Rect)>,
+    ) -> Self {
         let mut d = Border {
-            window,
+            None,
             tl: Property::new(None),
             tr: Property::new(None),
             bl: Property::new(None),
@@ -118,6 +121,7 @@ impl<WindowTag, Error> Border<WindowTag, Error> {
             r: Property::new(None),
             b: Property::new(None),
         };
+        let window = parent_bounds.map(|(parent, bounds)| Window::new(tree, parent, bounds, ))
         d.on_changed_tl(Self::invalidate_tl);
         d.on_changed_tr(Self::invalidate_tr);
         d.on_changed_bl(Self::invalidate_bl);
@@ -129,18 +133,18 @@ impl<WindowTag, Error> Border<WindowTag, Error> {
         d
     }
 
-    property!(Option<Grapheme>, tl, set_tl, on_changed_tl, DrawingContext<WindowTag, Error>);
-    property!(Option<Grapheme>, tr, set_tr, on_changed_tr, DrawingContext<WindowTag, Error>);
-    property!(Option<Grapheme>, bl, set_bl, on_changed_bl, DrawingContext<WindowTag, Error>);
-    property!(Option<Grapheme>, br, set_br, on_changed_br, DrawingContext<WindowTag, Error>);
-    property!(Option<Grapheme>, l, set_l, on_changed_l, DrawingContext<WindowTag, Error>);
-    property!(Option<Grapheme>, t, set_t, on_changed_t, DrawingContext<WindowTag, Error>);
-    property!(Option<Grapheme>, r, set_r, on_changed_r, DrawingContext<WindowTag, Error>);
-    property!(Option<Grapheme>, b, set_b, on_changed_b, DrawingContext<WindowTag, Error>);
+    property!(Option<Grapheme>, tl, set_tl, on_changed_tl, DrawingContext<Error>);
+    property!(Option<Grapheme>, tr, set_tr, on_changed_tr, DrawingContext<Error>);
+    property!(Option<Grapheme>, bl, set_bl, on_changed_bl, DrawingContext<Error>);
+    property!(Option<Grapheme>, br, set_br, on_changed_br, DrawingContext<Error>);
+    property!(Option<Grapheme>, l, set_l, on_changed_l, DrawingContext<Error>);
+    property!(Option<Grapheme>, t, set_t, on_changed_t, DrawingContext<Error>);
+    property!(Option<Grapheme>, r, set_r, on_changed_r, DrawingContext<Error>);
+    property!(Option<Grapheme>, b, set_b, on_changed_b, DrawingContext<Error>);
 }
 
-impl<WindowTag, Error> Drawing<WindowTag, Error> for Border<WindowTag, Error> {
-    fn draw(&self, tree: &WindowTree<WindowTag, Error>, port: &mut DrawingPort<Error>) {
+impl<Error> Drawing<Error> for Border<Error> {
+    fn draw(&self, tree: &WindowTree<Box<dyn Drawing<Error>>, Error>, port: &mut DrawingPort<Error>) {
         let size = self.window.size(tree);
         if let Some(l) = self.l() {
             for y in 0 .. size.y as u16 {

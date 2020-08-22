@@ -220,6 +220,38 @@ impl<Tag> Window<Tag> {
     }
 }
 
+pub trait OptionWindowExt<Tag> {
+    fn size<Error>(self, tree: &WindowTree<Tag, Error>) -> Vector;
+    fn invalidate_rect<Error>(self, tree: &mut WindowTree<Tag, Error>, rect: Rect);
+    fn invalidate<Error>(self, tree: &mut WindowTree<Tag, Error>);
+}
+
+impl<Tag> OptionWindowExt<Tag> for Option<Window<Tag>> {
+    fn size<Error>(self, tree: &WindowTree<Tag, Error>) -> Vector {
+        if let Some(window) = self {
+            window.size(tree)
+        } else {
+            tree.screen_size()
+        }
+    }
+
+    fn invalidate_rect<Error>(self, tree: &mut WindowTree<Tag, Error>, rect: Rect) {
+        if let Some(window) = self {
+            window.invalidate_rect(tree, rect)
+        } else {
+            tree.invalidate_rect(rect)
+        }
+    }
+
+    fn invalidate<Error>(self, tree: &mut WindowTree<Tag, Error>) {
+        if let Some(window) = self {
+            window.invalidate(tree)
+        } else {
+            tree.invalidate_screen()
+        }
+    }
+}
+
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct WindowTree<Tag, Error> {
@@ -264,6 +296,15 @@ impl<Tag, Error> WindowTree<Tag, Error> {
     }
 
     pub fn screen_size(&self) -> Vector { self.screen_size }
+
+    pub fn invalidate_rect(&mut self, rect: Rect) {
+        invalidate_rect(self.invalidated(), rect);
+    }
+ 
+    pub fn invalidate_screen(&mut self) {
+        let size = self.screen_size;
+        invalidate_rect(self.invalidated(), Rect { tl: Point { x: 0, y: 0 }, size });
+    }
 
     fn invalidated(&mut self) -> (&mut Vec<Range<i16>>, Vector) {
         let (screen, invalidated) = self.screen.as_mut().unwrap_or_else(|| unsafe { unreachable_unchecked() });
@@ -321,9 +362,7 @@ mod tests {
 
     #[test]
     fn window_tree_new_window() {
-        fn draw(_: &WindowTree<u8, !>, _: Option<Window<u8>>, _: &mut DrawingPort, _: &u8) -> Result<(), !> {
-            Ok(())
-        }
+        fn draw(_: &WindowTree<u8, !>, _: Option<Window<u8>>, _: &mut DrawingPort<!>, _: &u8) { }
         let screen = tuifw_screen_test::Screen::new(Vector::null());
         let screen = Box::new(screen) as _;
         let tree = &mut WindowTree::new(screen, draw, 0u8);
