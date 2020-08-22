@@ -8,6 +8,7 @@ pub trait Drawing<WindowTag, Error> {
     fn draw(&self, tree: &WindowTree<WindowTag, Error>, port: &mut DrawingPort<Error>);
 }
 
+#[derive(Debug)]
 pub struct Grapheme {
     pub fg: Color,
     pub bg: Option<Color>,
@@ -17,20 +18,23 @@ pub struct Grapheme {
 
 pub type DrawingContext<WindowTag, Error> = ContextMut<WindowTree<WindowTag, Error>>;
 
-pub struct Border<Tag, WindowTag, Error> {
-    pub tag: Tag,
-    pub window: Window<WindowTag>,
-    tl: Property<Self, Option<Grapheme>, DrawingContext<WindowTag, Error>>,
-    tr: Property<Self, Option<Grapheme>, DrawingContext<WindowTag, Error>>,
-    bl: Property<Self, Option<Grapheme>, DrawingContext<WindowTag, Error>>,
-    br: Property<Self, Option<Grapheme>, DrawingContext<WindowTag, Error>>,
-    l: Property<Self, Option<Grapheme>, DrawingContext<WindowTag, Error>>,
-    t: Property<Self, Option<Grapheme>, DrawingContext<WindowTag, Error>>,
-    r: Property<Self, Option<Grapheme>, DrawingContext<WindowTag, Error>>,
-    b: Property<Self, Option<Grapheme>, DrawingContext<WindowTag, Error>>,
+macro_attr! {
+    #[derive(Debug)]
+    #[derive(Component!(class=BorderComponent))]
+    pub struct Border<WindowTag, Error> {
+        window: Window<WindowTag>,
+        tl: Property<Self, Option<Grapheme>, DrawingContext<WindowTag, Error>>,
+        tr: Property<Self, Option<Grapheme>, DrawingContext<WindowTag, Error>>,
+        bl: Property<Self, Option<Grapheme>, DrawingContext<WindowTag, Error>>,
+        br: Property<Self, Option<Grapheme>, DrawingContext<WindowTag, Error>>,
+        l: Property<Self, Option<Grapheme>, DrawingContext<WindowTag, Error>>,
+        t: Property<Self, Option<Grapheme>, DrawingContext<WindowTag, Error>>,
+        r: Property<Self, Option<Grapheme>, DrawingContext<WindowTag, Error>>,
+        b: Property<Self, Option<Grapheme>, DrawingContext<WindowTag, Error>>
+    }
 }
 
-impl<Tag, WindowTag, Error> Border<Tag, WindowTag, Error> {
+impl<WindowTag, Error> Border<WindowTag, Error> {
     fn invalidate_tl(&mut self, context: &mut DrawingContext<WindowTag, Error>, _old: &Option<Grapheme>) {
         let tree = context.get_1();
         self.window.invalidate_rect(tree, Rect {
@@ -102,9 +106,8 @@ impl<Tag, WindowTag, Error> Border<Tag, WindowTag, Error> {
         });
     }
 
-    pub fn new(tag: Tag, window: Window<WindowTag>) -> Self {
+    pub fn new(window: Window<WindowTag>) -> Self {
         let mut d = Border {
-            tag,
             window,
             tl: Property::new(None),
             tr: Property::new(None),
@@ -136,7 +139,7 @@ impl<Tag, WindowTag, Error> Border<Tag, WindowTag, Error> {
     property!(Option<Grapheme>, b, set_b, on_changed_b, DrawingContext<WindowTag, Error>);
 }
 
-impl<Tag, WindowTag, Error> Drawing<WindowTag, Error> for Border<Tag, WindowTag, Error> {
+impl<WindowTag, Error> Drawing<WindowTag, Error> for Border<WindowTag, Error> {
     fn draw(&self, tree: &WindowTree<WindowTag, Error>, port: &mut DrawingPort<Error>) {
         let size = self.window.size(tree);
         if let Some(l) = self.l() {

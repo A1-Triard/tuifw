@@ -8,4 +8,6 @@ edition = "2018"
 tuifw-screen-base = { path = "../screen-base", version = "0.1.10" }
 tuifw-property = { path = "../property", version = "0.1.10" }
 tuifw-window = { path = "../window", version = "0.1.10" }
+components-arena = "0.0.9"
+macro-attr = { version = "0.2.0", features = [] }
 boow = "0.1.3"

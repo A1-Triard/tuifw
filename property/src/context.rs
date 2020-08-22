@@ -8,7 +8,7 @@ pub struct ContextMutRef<T1, T2>(*mut T1, *const T2);
 
 pub struct ContextRefRef<T1, T2>(*const T1, *const T2);
 
-pub struct Context(());
+pub enum Context { }
 
 impl Context {
     pub fn with_mut<

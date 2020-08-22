@@ -10,3 +10,6 @@ keywords = ["tui", "property", "reactive", "changed"]
 categories = ["command-line-interface"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/A1-Triard/tuifw"
+
+[dependencies]
+derivative = "2.1.1"

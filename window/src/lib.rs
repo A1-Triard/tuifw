@@ -123,7 +123,7 @@ struct WindowData<Tag> {
     tag: Tag,
 }
 
-Component!((class=WindowDataComponent) struct WindowData<Draw> { ... });
+Component!((class=WindowDataComponent) struct WindowData<Tag> { ... });
 
 static WINDOW_DATA: ComponentClassMutex<WindowDataComponent> = ComponentClassMutex::new();
 

@@ -1,11 +1,17 @@
 #![deny(warnings)]
 
+#[macro_use]
+extern crate derivative;
+
 pub mod context;
 
 use std::mem::replace;
 
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct Property<Owner, Type, Context> {
     value: Type,
+    #[derivative(Debug="ignore")]
     on_changed: Vec<fn(owner: &mut Owner, context: &mut Context, old: &Type)>,
 }
 
