@@ -1,0 +1,10 @@
+[package]
+name = "tuifw"
+version = "0.1.10"
+authors = ["Warlock <internalmike@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+tuifw-property = { path = "../property", version = "0.1.10" }
+tuifw-window = { path = "../window", version = "0.1.10" }
+boow = "0.1.3"
