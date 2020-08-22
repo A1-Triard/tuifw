@@ -199,6 +199,25 @@ impl<Tag> Window<Tag> {
         let screen_bounds = this.bounds.offset(offset_from_root(parent, tree));
         invalidate_rect(tree.invalidated(), screen_bounds);
     }
+
+    pub fn size<Error>(self, tree: &WindowTree<Tag, Error>) -> Vector {
+        tree.arena[self.0].bounds.size
+    }
+
+    pub fn invalidate_rect<Error>(self, tree: &mut WindowTree<Tag, Error>, rect: Rect) {
+        let bounds = tree.arena[self.0].bounds;
+        let rect = rect.offset(bounds.tl.offset_from(Point { x: 0, y: 0 })).intersect(bounds);
+        let parent = tree.arena[self.0].parent.unwrap_or_else(|| unsafe { unreachable_unchecked() });
+        let screen_rect = rect.offset(offset_from_root(parent, tree));
+        invalidate_rect(tree.invalidated(), screen_rect);
+    }
+ 
+    pub fn invalidate<Error>(self, tree: &mut WindowTree<Tag, Error>) {
+        let bounds = tree.arena[self.0].bounds;
+        let parent = tree.arena[self.0].parent.unwrap_or_else(|| unsafe { unreachable_unchecked() });
+        let screen_bounds = bounds.offset(offset_from_root(parent, tree));
+        invalidate_rect(tree.invalidated(), screen_bounds);
+    }
 }
 
 #[derive(Derivative)]
