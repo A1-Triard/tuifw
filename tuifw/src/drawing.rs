@@ -7,18 +7,20 @@ pub trait Drawing {
     fn draw<Error>(&self, port: &mut DrawingPort<Error>);
 }
 
+pub type Str = Bow<'static, &'static str>;
+
 pub type DrawingContext<WindowTag, Error> = ContextMutRef<WindowTree<WindowTag, Error>, Window<WindowTag>>;
 
 pub struct Box<Tag, WindowTag, Error> {
     pub tag: Tag,
-    tl: Property<Self, Option<Bow<'static, &'static str>>, DrawingContext<WindowTag, Error>>,
-/*    tr: Property<Self, Option<Bow<'static, &'static str>>>,
-    bl: Property<Self, Option<Bow<'static, &'static str>>>,
-    br: Property<Self, Option<Bow<'static, &'static str>>>,
-    l: Property<Self, Option<Bow<'static, &'static str>>>,
-    t: Property<Self, Option<Bow<'static, &'static str>>>,
-    r: Property<Self, Option<Bow<'static, &'static str>>>,
-    b: Property<Self, Option<Bow<'static, &'static str>>>,*/
+    tl: Property<Self, Option<Str>, DrawingContext<WindowTag, Error>>,
+    tr: Property<Self, Option<Str>, DrawingContext<WindowTag, Error>>,
+    bl: Property<Self, Option<Str>, DrawingContext<WindowTag, Error>>,
+    br: Property<Self, Option<Str>, DrawingContext<WindowTag, Error>>,
+    l: Property<Self, Option<Str>, DrawingContext<WindowTag, Error>>,
+    t: Property<Self, Option<Str>, DrawingContext<WindowTag, Error>>,
+    r: Property<Self, Option<Str>, DrawingContext<WindowTag, Error>>,
+    b: Property<Self, Option<Str>, DrawingContext<WindowTag, Error>>,
 }
 
 impl<Tag, WindowTag, Error> Box<Tag, WindowTag, Error> {
@@ -31,24 +33,24 @@ impl<Tag, WindowTag, Error> Box<Tag, WindowTag, Error> {
         let mut d = Box {
             tag,
             tl: Property::new(None),
-            /*tr: Property::new(None),
+            tr: Property::new(None),
             bl: Property::new(None),
             br: Property::new(None),
             l: Property::new(None),
             t: Property::new(None),
             r: Property::new(None),
-            b: Property::new(None),*/
+            b: Property::new(None),
         };
-        d.on_changed_tl(Self::invalidate_window::<Option<Bow<'static, &'static str>>>);
+        d.on_changed_tl(Self::invalidate_window::<Option<Str>>);
         d
     }
 
-    property!(Option<Bow<'static, &'static str>>, tl, set_tl, on_changed_tl, DrawingContext<WindowTag, Error>);
-/*    property!(Option<Bow<'static, &'static str>>, tr, set_tr, on_changed_tr);
-    property!(Option<Bow<'static, &'static str>>, bl, set_bl, on_changed_bl);
-    property!(Option<Bow<'static, &'static str>>, br, set_br, on_changed_br);
-    property!(Option<Bow<'static, &'static str>>, l, set_l, on_changed_l);
-    property!(Option<Bow<'static, &'static str>>, t, set_t, on_changed_t);
-    property!(Option<Bow<'static, &'static str>>, r, set_r, on_changed_r);
-    property!(Option<Bow<'static, &'static str>>, b, set_b, on_changed_b);*/
+    property!(Option<Str>, tl, set_tl, on_changed_tl, DrawingContext<WindowTag, Error>);
+    property!(Option<Str>, tr, set_tr, on_changed_tr, DrawingContext<WindowTag, Error>);
+    property!(Option<Str>, bl, set_bl, on_changed_bl, DrawingContext<WindowTag, Error>);
+    property!(Option<Str>, br, set_br, on_changed_br, DrawingContext<WindowTag, Error>);
+    property!(Option<Str>, l, set_l, on_changed_l, DrawingContext<WindowTag, Error>);
+    property!(Option<Str>, t, set_t, on_changed_t, DrawingContext<WindowTag, Error>);
+    property!(Option<Str>, r, set_r, on_changed_r, DrawingContext<WindowTag, Error>);
+    property!(Option<Str>, b, set_b, on_changed_b, DrawingContext<WindowTag, Error>);
 }
