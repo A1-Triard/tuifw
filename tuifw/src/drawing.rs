@@ -3,15 +3,15 @@ use tuifw_property::Property;
 use tuifw_property::context::{ContextMutRef};
 use tuifw_window::{DrawingPort, Window, WindowTree};
 
-pub trait Drawing {
-    fn draw<Error>(&self, port: &mut DrawingPort<Error>);
+pub trait Drawing<Error> {
+    fn draw(&self, tree: &WindowTree<WindowTag, Error>, window: Window<WindowTag>, port: &mut DrawingPort<Error>);
 }
 
 pub type Str = Bow<'static, &'static str>;
 
 pub type DrawingContext<WindowTag, Error> = ContextMutRef<WindowTree<WindowTag, Error>, Window<WindowTag>>;
 
-pub struct Box<Tag, WindowTag, Error> {
+pub struct Border<Tag, WindowTag, Error> {
     pub tag: Tag,
     tl: Property<Self, Option<Str>, DrawingContext<WindowTag, Error>>,
     tr: Property<Self, Option<Str>, DrawingContext<WindowTag, Error>>,
@@ -23,14 +23,14 @@ pub struct Box<Tag, WindowTag, Error> {
     b: Property<Self, Option<Str>, DrawingContext<WindowTag, Error>>,
 }
 
-impl<Tag, WindowTag, Error> Box<Tag, WindowTag, Error> {
+impl<Tag, WindowTag, Error> Border<Tag, WindowTag, Error> {
     fn invalidate_window<T>(&mut self, context: &mut DrawingContext<WindowTag, Error>, _old: &T) {
         let _window = &mut *context.get_1();
         let _tree = context.get_2();
     }
 
     pub fn new(tag: Tag) -> Self {
-        let mut d = Box {
+        let mut d = Border {
             tag,
             tl: Property::new(None),
             tr: Property::new(None),
@@ -53,4 +53,10 @@ impl<Tag, WindowTag, Error> Box<Tag, WindowTag, Error> {
     property!(Option<Str>, t, set_t, on_changed_t, DrawingContext<WindowTag, Error>);
     property!(Option<Str>, r, set_r, on_changed_r, DrawingContext<WindowTag, Error>);
     property!(Option<Str>, b, set_b, on_changed_b, DrawingContext<WindowTag, Error>);
+}
+
+impl<Tag, WindowTag, Error> Drawing<Error> for Border<Tag, WindowTag, Error> {
+    fn draw(&self, tree: &WindowTree<WindowTag, Error>, window: Window<WindowTag>, port: &mut DrawingPort<Error>) {
+        port.out(
+    }
 }
