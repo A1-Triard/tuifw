@@ -26,7 +26,7 @@ macro_attr! {
     #[derive(Debug)]
     #[derive(Component!)]
     struct ViewNode {
-        properties: Box<dyn ViewProperties + 'static>,
+        properties: Box<dyn ViewProperties>,
         window: Option<(Box<dyn Draw>, Window<View>)>,
         layout: Option<Box<dyn Layout>>,
         parent: Option<View>,
