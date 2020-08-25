@@ -1,15 +1,17 @@
 [package]
 edition = "2018"
-name = "tuifw-view"
+name = "tuifw-widget"
 version = "0.1.10"
 authors = ["warlock <internalmike@gmail.com>"]
-description = "Text User Interface Framework. UI primitives."
+description = "Text User Interface Framework. UI primitives and widgets."
 readme = "README.md"
 documentation = "https://docs.rs/tuifw-view/"
-keywords = ["tui", "view", "layout"]
+keywords = ["tui", "view", "layout", "property", "widget"]
 categories = ["command-line-interface"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/A1-Triard/tuifw"
 
 [dependencies]
+tuifw-screen-base = { path = "../screen-base", version = "0.1.10" }
+components-arena = "0.0.10"
 derivative = "2.1.1"
