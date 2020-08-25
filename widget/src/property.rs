@@ -1,10 +1,3 @@
-#![deny(warnings)]
-
-#[macro_use]
-extern crate derivative;
-
-pub mod context;
-
 use std::mem::replace;
 
 #[derive(Derivative)]

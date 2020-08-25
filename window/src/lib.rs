@@ -126,7 +126,7 @@ struct WindowNode<Tag> {
 
 Component!((class=WindowNodeComponent) struct WindowNode<Tag> { ... });
 
-static WINDOW_DATA: ComponentClassMutex<WindowNodeComponent> = ComponentClassMutex::new();
+static WINDOW_NODE: ComponentClassMutex<WindowNodeComponent> = ComponentClassMutex::new();
 
 fn offset_from_root<Tag>(mut window: Id<WindowNode<Tag>>, tree: &WindowTree<Tag>) -> Vector {
     let mut offset = Vector::null();
@@ -284,7 +284,7 @@ impl<Tag> WindowTree<Tag> {
         ),
         tag: Tag
     ) -> Self {
-        let mut arena = Arena::new(&mut WINDOW_DATA.lock().unwrap());
+        let mut arena = Arena::new(&mut WINDOW_NODE.lock().unwrap());
         let root = arena.insert(|this| WindowNode {
             parent: None,
             next: this,
