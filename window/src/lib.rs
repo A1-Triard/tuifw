@@ -384,7 +384,7 @@ mod tests {
 
     #[test]
     fn window_tree_new_window() {
-        fn draw(_: &WindowTree<u8>, _: Option<Window<u8>>, _: &mut DrawingPort, _: &u8) { }
+        fn draw(_: &WindowTree<u8, ()>, _: Option<Window<u8, ()>>, _: &mut DrawingPort, _: &u8, _: &mut ()) { }
         let screen = tuifw_screen_test::Screen::new(Vector::null());
         let screen = Box::new(screen) as _;
         let tree = &mut WindowTree::new(screen, draw, 0u8);

@@ -71,10 +71,15 @@ impl ViewTree {
 fn draw_view(
     _tree: &WindowTree<View, DrawContext>,
     _window: Option<Window<View, DrawContext>>,
-    _port: &mut DrawingPort,
-    _tag: &View,
-    _context: &mut DrawContext
+    port: &mut DrawingPort,
+    tag: &View,
+    context: &mut DrawContext
 ) {
+    let view_tree = context.get_1();
+    if *tag == view_tree.root {
+    } else {
+        view_tree.arena[tag.0].window.as_ref().unwrap().0.draw(view_tree, *tag, port);
+    }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]

@@ -5,10 +5,11 @@ use tuifw_screen_base::{Point, Color, Attr, Vector, Event, Key, Rect};
 use tuifw_window::{WindowTree, Window, DrawingPort};
 
 fn draw(
-    _tree: &WindowTree<()>,
-    window: Option<Window<()>>,
+    _tree: &WindowTree<(), ()>,
+    window: Option<Window<(), ()>>,
     port: &mut DrawingPort,
-    _tag: &()
+    _tag: &(),
+    _context: &mut ()
 ) {
     if window.is_none() {
         port.fill(|port, p| port.out(p, Color::Black, None, Attr::empty(), " "));
@@ -32,7 +33,7 @@ fn main() {
     };
     let window = Window::new(tree, None, bounds, |window| ((), window));
     loop {
-        if let Some(e) = tree.update(true).unwrap() {
+        if let Some(e) = tree.update(true, &mut ()).unwrap() {
             let d = match e {
                 Event::Key(n, Key::Left) => -Vector { x: n.get() as i16, y: 0 },
                 Event::Key(n, Key::Right) => Vector { x: n.get() as i16, y: 0 },
