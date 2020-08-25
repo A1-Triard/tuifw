@@ -6,6 +6,7 @@ extern crate components_arena;
 #[macro_use]
 extern crate derivative;
 
+use std::any::Any;
 use std::cmp::{min, max};
 use std::hint::unreachable_unchecked;
 use std::mem::replace;
@@ -46,16 +47,16 @@ fn rect_invalidated(invalidated: (&Vec<Range<i16>>, Vector), rect: Rect) -> bool
 
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct DrawingPort<Error> {
+pub struct DrawingPort {
     #[derivative(Debug="ignore")]
-    screen: Box<dyn Screen<Error=Error>>,
+    screen: Box<dyn Screen>,
     invalidated: Vec<Range<i16>>,
     offset: Vector,
     size: Vector,
     cursor: Option<Point>,
 }
 
-impl<Error> DrawingPort<Error> {
+impl DrawingPort {
     pub fn out(&mut self, p: Point, fg: Color, bg: Option<Color>, attr: Attr, text: &str) {
         if p.y as u16 >= self.size.y as u16 || self.size.x == 0 { return; }
         let p = p.offset(self.offset);
@@ -114,20 +115,20 @@ impl<Error> DrawingPort<Error> {
 
 #[derive(Derivative)]
 #[derivative(Debug(bound=""))]
-struct WindowData<Tag> {
-    parent: Option<Id<WindowData<Tag>>>,
-    next: Id<WindowData<Tag>>,
-    last_child: Option<Id<WindowData<Tag>>>,
+struct WindowNode<Tag> {
+    parent: Option<Id<WindowNode<Tag>>>,
+    next: Id<WindowNode<Tag>>,
+    last_child: Option<Id<WindowNode<Tag>>>,
     bounds: Rect,
     #[derivative(Debug="ignore")]
     tag: Tag,
 }
 
-Component!((class=WindowDataComponent) struct WindowData<Tag> { ... });
+Component!((class=WindowNodeComponent) struct WindowNode<Tag> { ... });
 
-static WINDOW_DATA: ComponentClassMutex<WindowDataComponent> = ComponentClassMutex::new();
+static WINDOW_DATA: ComponentClassMutex<WindowNodeComponent> = ComponentClassMutex::new();
 
-fn offset_from_root<Tag, Error>(mut window: Id<WindowData<Tag>>, tree: &WindowTree<Tag, Error>) -> Vector {
+fn offset_from_root<Tag>(mut window: Id<WindowNode<Tag>>, tree: &WindowTree<Tag>) -> Vector {
     let mut offset = Vector::null();
     loop {
         offset += tree.arena[window].bounds.tl.offset_from(Point { x: 0, y: 0 });
@@ -143,22 +144,22 @@ fn offset_from_root<Tag, Error>(mut window: Id<WindowData<Tag>>, tree: &WindowTr
 #[derive(Derivative)]
 #[derivative(Debug(bound=""), Copy(bound=""), Clone(bound=""), Eq(bound=""), PartialEq(bound=""))]
 #[derivative(Hash(bound=""), Ord(bound=""), PartialOrd(bound=""))]
-pub struct Window<Tag>(Id<WindowData<Tag>>);
+pub struct Window<Tag>(Id<WindowNode<Tag>>);
 
 impl<Tag> Window<Tag> {
-    pub fn new<Error>(
-        tree: &mut WindowTree<Tag, Error>,
+    pub fn new(
+        tree: &mut WindowTree<Tag>,
         parent: Option<Self>,
         bounds: Rect,
-        tag: Tag
+        tag: impl FnOnce(Self) -> Tag
     ) -> Self {
         let parent = parent.map_or(tree.root, |w| w.0);
-        let window = tree.arena.push(|this| WindowData {
+        let window = tree.arena.insert(|this| WindowNode {
             parent: Some(parent),
             next: this,
             last_child: None,
             bounds,
-            tag
+            tag: tag(Window(this))
         });
         if let Some(prev) = tree.arena[parent].last_child.replace(window) {
             let next = replace(&mut tree.arena[prev].next, window);
@@ -169,7 +170,7 @@ impl<Tag> Window<Tag> {
         Window(window)
     }
 
-    pub fn move_<Error>(self, tree: &mut WindowTree<Tag, Error>, bounds: Rect) {
+    pub fn move_(self, tree: &mut WindowTree<Tag>, bounds: Rect) {
         let parent = tree.arena[self.0].parent.unwrap_or_else(|| unsafe { unreachable_unchecked() });
         let screen_bounds = bounds.offset(offset_from_root(parent, tree));
         invalidate_rect(tree.invalidated(), screen_bounds);
@@ -178,8 +179,8 @@ impl<Tag> Window<Tag> {
         invalidate_rect(tree.invalidated(), screen_bounds);
     }
 
-    pub fn drop<Error>(self, tree: &mut WindowTree<Tag, Error>) {
-        let this = tree.arena.pop(self.0);
+    pub fn drop(self, tree: &mut WindowTree<Tag>) {
+        let this = tree.arena.remove(self.0);
         let parent = this.parent.unwrap_or_else(|| unsafe { unreachable_unchecked() });
         if tree.arena[parent].last_child.unwrap_or_else(|| unsafe { unreachable_unchecked() }) == self.0 {
             tree.arena[parent].last_child = if this.next == self.0 {
@@ -200,11 +201,11 @@ impl<Tag> Window<Tag> {
         invalidate_rect(tree.invalidated(), screen_bounds);
     }
 
-    pub fn size<Error>(self, tree: &WindowTree<Tag, Error>) -> Vector {
+    pub fn size(self, tree: &WindowTree<Tag>) -> Vector {
         tree.arena[self.0].bounds.size
     }
 
-    pub fn invalidate_rect<Error>(self, tree: &mut WindowTree<Tag, Error>, rect: Rect) {
+    pub fn invalidate_rect(self, tree: &mut WindowTree<Tag>, rect: Rect) {
         let bounds = tree.arena[self.0].bounds;
         let rect = rect.offset(bounds.tl.offset_from(Point { x: 0, y: 0 })).intersect(bounds);
         let parent = tree.arena[self.0].parent.unwrap_or_else(|| unsafe { unreachable_unchecked() });
@@ -212,7 +213,7 @@ impl<Tag> Window<Tag> {
         invalidate_rect(tree.invalidated(), screen_rect);
     }
  
-    pub fn invalidate<Error>(self, tree: &mut WindowTree<Tag, Error>) {
+    pub fn invalidate(self, tree: &mut WindowTree<Tag>) {
         let bounds = tree.arena[self.0].bounds;
         let parent = tree.arena[self.0].parent.unwrap_or_else(|| unsafe { unreachable_unchecked() });
         let screen_bounds = bounds.offset(offset_from_root(parent, tree));
@@ -220,14 +221,15 @@ impl<Tag> Window<Tag> {
     }
 }
 
+/*
 pub trait OptionWindowExt<Tag> {
-    fn size<Error>(self, tree: &WindowTree<Tag, Error>) -> Vector;
-    fn invalidate_rect<Error>(self, tree: &mut WindowTree<Tag, Error>, rect: Rect);
-    fn invalidate<Error>(self, tree: &mut WindowTree<Tag, Error>);
+    fn size(self, tree: &WindowTree<Tag>) -> Vector;
+    fn invalidate_rect(self, tree: &mut WindowTree<Tag>, rect: Rect);
+    fn invalidate(self, tree: &mut WindowTree<Tag>);
 }
 
 impl<Tag> OptionWindowExt<Tag> for Option<Window<Tag>> {
-    fn size<Error>(self, tree: &WindowTree<Tag, Error>) -> Vector {
+    fn size(self, tree: &WindowTree<Tag>) -> Vector {
         if let Some(window) = self {
             window.size(tree)
         } else {
@@ -235,7 +237,7 @@ impl<Tag> OptionWindowExt<Tag> for Option<Window<Tag>> {
         }
     }
 
-    fn invalidate_rect<Error>(self, tree: &mut WindowTree<Tag, Error>, rect: Rect) {
+    fn invalidate_rect(self, tree: &mut WindowTree<Tag>, rect: Rect) {
         if let Some(window) = self {
             window.invalidate_rect(tree, rect)
         } else {
@@ -243,7 +245,7 @@ impl<Tag> OptionWindowExt<Tag> for Option<Window<Tag>> {
         }
     }
 
-    fn invalidate<Error>(self, tree: &mut WindowTree<Tag, Error>) {
+    fn invalidate(self, tree: &mut WindowTree<Tag>) {
         if let Some(window) = self {
             window.invalidate(tree)
         } else {
@@ -251,38 +253,39 @@ impl<Tag> OptionWindowExt<Tag> for Option<Window<Tag>> {
         }
     }
 }
+*/
 
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct WindowTree<Tag, Error> {
+pub struct WindowTree<Tag> {
     #[derivative(Debug="ignore")]
-    screen: Option<(Box<dyn Screen<Error=Error>>, Vec<Range<i16>>)>,
-    arena: Arena<WindowData<Tag>>,
-    root: Id<WindowData<Tag>>,
+    screen: Option<(Box<dyn Screen>, Vec<Range<i16>>)>,
+    arena: Arena<WindowNode<Tag>>,
+    root: Id<WindowNode<Tag>>,
     #[derivative(Debug="ignore")]
     draw: fn(
-        tree: &WindowTree<Tag, Error>,
+        tree: &WindowTree<Tag>,
         window: Option<Window<Tag>>,
-        port: &mut DrawingPort<Error>,
+        port: &mut DrawingPort,
         tag: &Tag
     ),
     cursor: Option<Point>,
     screen_size: Vector,
 }
 
-impl<Tag, Error> WindowTree<Tag, Error> {
+impl<Tag> WindowTree<Tag> {
     pub fn new(
-        screen: Box<dyn Screen<Error=Error>>,
+        screen: Box<dyn Screen>,
         draw: fn(
-            tree: &WindowTree<Tag, Error>,
+            tree: &WindowTree<Tag>,
             window: Option<Window<Tag>>,
-            port: &mut DrawingPort<Error>,
+            port: &mut DrawingPort,
             tag: &Tag
         ),
         tag: Tag
     ) -> Self {
         let mut arena = Arena::new(&mut WINDOW_DATA.lock().unwrap());
-        let root = arena.push(|this| WindowData {
+        let root = arena.insert(|this| WindowNode {
             parent: None,
             next: this,
             last_child: None,
@@ -311,7 +314,7 @@ impl<Tag, Error> WindowTree<Tag, Error> {
         (invalidated, screen.size())
     }
 
-    fn draw_window(&mut self, window: Id<WindowData<Tag>>, offset: Vector) {
+    fn draw_window(&mut self, window: Id<WindowNode<Tag>>, offset: Vector) {
         let bounds = self.arena[window].bounds.offset(offset);
         let (invalidated, screen_size) = self.invalidated();
         if !rect_invalidated((invalidated, screen_size), bounds) { return; }
@@ -337,7 +340,7 @@ impl<Tag, Error> WindowTree<Tag, Error> {
         }
     }
 
-    pub fn update(&mut self, wait: bool) -> Result<Option<Event>, Error> {
+    pub fn update(&mut self, wait: bool) -> Result<Option<Event>, Box<dyn Any>> {
         if let Some(cursor) = self.cursor {
             let (invalidated, screen_size) = self.invalidated();
             if rect_invalidated((invalidated, screen_size), Rect { tl: cursor, size: Vector { x: 1, y: 1 } }) {
@@ -362,30 +365,30 @@ mod tests {
 
     #[test]
     fn window_tree_new_window() {
-        fn draw(_: &WindowTree<u8, !>, _: Option<Window<u8>>, _: &mut DrawingPort<!>, _: &u8) { }
+        fn draw(_: &WindowTree<u8>, _: Option<Window<u8>>, _: &mut DrawingPort, _: &u8) { }
         let screen = tuifw_screen_test::Screen::new(Vector::null());
         let screen = Box::new(screen) as _;
         let tree = &mut WindowTree::new(screen, draw, 0u8);
         assert!(tree.arena[tree.root].last_child.is_none());
-        let one = Window::new(tree, None, true, 1);
+        let one = Window::new(tree, None, Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() }, |_| 1);
         assert!(tree.arena[one.0].last_child.is_none());
         assert_eq!(tree.arena[one.0].parent, Some(tree.root));
         assert_eq!(tree.arena[tree.root].last_child, Some(one.0));
         assert_eq!(tree.arena[one.0].next, one.0);
-        let two = Window::new(tree, None, true, 2);
+        let two = Window::new(tree, None, Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() }, |_| 2);
         assert!(tree.arena[two.0].last_child.is_none());
         assert_eq!(tree.arena[two.0].parent, Some(tree.root));
         assert_eq!(tree.arena[tree.root].last_child, Some(two.0));
         assert_eq!(tree.arena[one.0].next, two.0);
         assert_eq!(tree.arena[two.0].next, one.0);
-        let three = Window::new(tree, None, true, 2);
+        let three = Window::new(tree, None, Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() }, |_| 2);
         assert!(tree.arena[three.0].last_child.is_none());
         assert_eq!(tree.arena[three.0].parent, Some(tree.root));
         assert_eq!(tree.arena[tree.root].last_child, Some(three.0));
         assert_eq!(tree.arena[one.0].next, two.0);
         assert_eq!(tree.arena[two.0].next, three.0);
         assert_eq!(tree.arena[three.0].next, one.0);
-        let four = Window::new(tree, None, true, 2);
+        let four = Window::new(tree, None, Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() }, |_| 2);
         assert!(tree.arena[four.0].last_child.is_none());
         assert_eq!(tree.arena[four.0].parent, Some(tree.root));
         assert_eq!(tree.arena[tree.root].last_child, Some(four.0));

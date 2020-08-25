@@ -29,13 +29,13 @@ use tuifw_screen_base::{Screen};
 ///
 /// It is impossible to garantee this conditions on a library level.
 /// So this unsafity should be propagated through all wrappers to the final application.
-pub unsafe fn init() -> io::Result<Box<dyn Screen<Error=io::Error>>> {
+pub unsafe fn init() -> io::Result<Box<dyn Screen>> {
     setlocale(LC_ALL, "\0".as_ptr() as _);
     let unicode = strcmp(nl_langinfo(CODESET), b"UTF-8\0".as_ptr() as _) == 0;
     let screen = if unicode {
-        Box::new(unicode::Screen::new()?) as Box<dyn Screen<Error=io::Error>>
+        Box::new(unicode::Screen::new()?) as Box<dyn Screen>
     } else {
-        Box::new(non_unicode::Screen::new()?) as Box<dyn Screen<Error=io::Error>>
+        Box::new(non_unicode::Screen::new()?) as Box<dyn Screen>
     };
     Ok(screen)
 }

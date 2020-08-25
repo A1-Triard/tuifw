@@ -1,8 +1,10 @@
-#![feature(stmt_expr_attributes)]
-#![no_std]
 #![deny(warnings)]
 #![allow(clippy::collapsible_if)]
 #![allow(clippy::many_single_char_names)]
+#![feature(stmt_expr_attributes)]
+
+#![no_std]
+extern crate alloc;
 
 #[macro_use]
 extern crate enum_derive;
@@ -17,6 +19,8 @@ extern crate quickcheck_macros;
 #[macro_use]
 mod bitflags_ext;
 
+use alloc::boxed::Box;
+use core::any::Any;
 use core::num::{NonZeroU16, NonZeroI16};
 use core::ops::{Add, AddAssign, Sub, SubAssign, Neg, Range};
 use core::option::{Option};
@@ -373,7 +377,6 @@ impl Arbitrary for Rect {
 }
 
 pub trait Screen {
-    type Error;
     fn size(&self) -> Vector;
     fn out(
         &mut self,
@@ -385,7 +388,7 @@ pub trait Screen {
         hard: Range<i16>,
         soft: Range<i16>,
     ) -> Range<i16>;
-    fn update(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Self::Error>;
+    fn update(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Box<dyn Any>>;
 }
 
 #[cfg(test)]

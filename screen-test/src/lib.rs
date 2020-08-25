@@ -1,21 +1,21 @@
 #![deny(warnings)]
+
+use std::any::Any;
 use std::cmp::{min, max};
-use std::marker::PhantomData;
 use std::ops::Range;
 use tuifw_screen_base::*;
 use tuifw_screen_base::Screen as base_Screen;
 use unicode_segmentation::UnicodeSegmentation;
 
-pub struct Screen<Error> {
+pub struct Screen {
     buf: Vec<(char, Color, Option<Color>, Attr)>,
     out: Vec<(char, Color, Option<Color>, Attr)>,
     size: Vector,
     invalidated: Rect,
     cursor: Option<Point>,
-    phantom: PhantomData<Error>,
 }
 
-impl<Error> Screen<Error> {
+impl Screen {
     pub fn new(size: Vector) -> Self {
         let mut s = Screen {
             buf: Vec::new(),
@@ -23,7 +23,6 @@ impl<Error> Screen<Error> {
             size: Vector::null(),
             invalidated: Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() },
             cursor: None,
-            phantom: PhantomData,
         };
         s.resize(size);
         s
@@ -37,9 +36,7 @@ impl<Error> Screen<Error> {
     }
 }
 
-impl<Error> base_Screen for Screen<Error> {
-    type Error = Error;
-
+impl base_Screen for Screen {
     fn size(&self) -> Vector { self.size }
 
     fn out(
@@ -91,7 +88,7 @@ impl<Error> base_Screen for Screen<Error> {
         x0 .. x
     }
 
-    fn update(&mut self, cursor: Option<Point>, _wait: bool) -> Result<Option<Event>, Self::Error> {
+    fn update(&mut self, cursor: Option<Point>, _wait: bool) -> Result<Option<Event>, Box<dyn Any>> {
         for y in self.invalidated.t() .. self.invalidated.b() {
             let line = (y as u16 as usize) * (self.size.x as u16 as usize);
             let s = line + self.invalidated.l() as u16 as usize;

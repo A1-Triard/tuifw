@@ -206,142 +206,8 @@ impl Screen {
         no_zero(FreeConsole())?;
         Ok(())
     }
-}
 
-impl Drop for Screen {
-    fn drop(&mut self) {
-        let e = unsafe { self.drop_raw() };
-        if e.is_err() && !thread::panicking() { e.unwrap(); }
-    }
-}
-
-fn attr_w(fg: Color, bg: Option<Color>, attr: Attr) -> WORD {
-    let bg = bg.unwrap_or(Color::Black);
-    let (fg, bg) = if attr.contains(Attr::REVERSE) { (bg, fg) } else { (fg, bg) };
-    let fg = match fg {
-        Color::Black => 0,
-        Color::Red => FOREGROUND_RED,
-        Color::Green => FOREGROUND_GREEN,
-        Color::Yellow => FOREGROUND_RED | FOREGROUND_GREEN,
-        Color::Blue => FOREGROUND_BLUE,
-        Color::Magenta => FOREGROUND_RED | FOREGROUND_BLUE,
-        Color::Cyan => FOREGROUND_BLUE | FOREGROUND_GREEN,
-        Color::White => FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED
-    };
-    let bg = match bg {
-        Color::Black => 0,
-        Color::Red => BACKGROUND_RED,
-        Color::Green => BACKGROUND_GREEN,
-        Color::Yellow => BACKGROUND_RED | BACKGROUND_GREEN,
-        Color::Blue => BACKGROUND_BLUE,
-        Color::Magenta => BACKGROUND_RED | BACKGROUND_BLUE,
-        Color::Cyan => BACKGROUND_BLUE | BACKGROUND_GREEN,
-        Color::White => BACKGROUND_BLUE | BACKGROUND_GREEN | BACKGROUND_RED
-    };
-    const REVERSE_INTENSITY: Attr = unsafe { Attr::from_bits_unchecked(Attr::INTENSITY.bits() | Attr::REVERSE.bits()) };
-    let attr = match attr {
-        Attr::INTENSITY => FOREGROUND_INTENSITY,
-        REVERSE_INTENSITY => BACKGROUND_INTENSITY,
-        _ => 0
-    };
-    fg | bg | attr
-}
-
-impl base_Screen for Screen {
-    type Error = io::Error;
-
-    fn size(&self) -> Vector { self.size }
-
-    fn out(
-        &mut self,
-        p: Point,
-        fg: Color,
-        bg: Option<Color>,
-        attr: Attr,
-        text: &str,
-        hard: Range<i16>,
-        soft: Range<i16>
-    ) -> Range<i16> {
-        debug_assert!(p.y >= 0 && p.y < self.size().y);
-        debug_assert!(hard.start >= 0 && hard.end > hard.start && hard.end <= self.size().x);
-        debug_assert!(soft.start >= 0 && soft.end > soft.start && soft.end <= self.size().x);
-        let text_end = if soft.end <= p.x { return 0 .. 0 } else { soft.end.saturating_sub(p.x) };
-        let text_start = if soft.start <= p.x { 0 } else { soft.start.saturating_sub(p.x) };
-        let size = self.size;
-        let output_cp = self.output_cp;
-        let wctmb_flags = self.wctmb_flags;
-        let line = (p.y as u16 as usize) * (size.x as u16 as usize);
-        let line = &mut self.buf[line .. line + size.x as u16 as usize];
-        let attr = attr_w(fg, bg, attr);
-        let mut x0 = None;
-        let mut x = p.x;
-        let mut n = 0i16;
-        for g in text.graphemes(true).map(|g| Self::encode_grapheme(output_cp, wctmb_flags, g)) {
-            if x >= hard.end { break; }
-            if n >= text_end { break; }
-            let w = if g.is_left() { 1 } else { 2 };
-            n = n.saturating_add(w);
-            let before_text_start = n <= text_start;
-            if before_text_start {
-                x = min(hard.end, x.saturating_add(w));
-                continue;
-            }
-            if x < hard.start {
-                x = min(hard.end, x.saturating_add(w));
-                if x > hard.start {
-                    debug_assert!(x0.is_none());
-                    let invalidated_l = Self::start_text(size.x, line, hard.start);
-                    x0 = Some((invalidated_l, hard.start));
-                    let col = &mut line[hard.start as u16 as usize];
-                    col.Attributes = 0;
-                    *unsafe { col.Char.AsciiChar_mut() } = b' ' as CHAR;
-                }
-                continue;
-            }
-            if x0.is_none() {
-                let invalidated_l = Self::start_text(size.x, line, x);
-                x0 = Some((invalidated_l, x));
-            }
-            let next_x = min(hard.end, x.saturating_add(w));
-            if next_x - x < w {
-                let col = &mut line[x as u16 as usize];
-                col.Attributes = 0;
-                *unsafe { col.Char.AsciiChar_mut() } = b' ' as CHAR;
-                x = next_x;
-                break;
-            }
-            match g {
-                Left(c) => {
-                    let col = &mut line[x as u16 as usize];
-                    col.Attributes = attr;
-                    *unsafe { col.Char.AsciiChar_mut() } = c as CHAR;
-                    x += 1;
-                },
-                Right((l, t)) => {
-                    let col = &mut line[x as u16 as usize];
-                    col.Attributes = attr | COMMON_LVB_LEADING_BYTE;
-                    *unsafe { col.Char.AsciiChar_mut() } = l as CHAR;
-                    x += 1;
-                    let col = &mut line[x as u16 as usize];
-                    col.Attributes = attr | COMMON_LVB_TRAILING_BYTE;
-                    *unsafe { col.Char.AsciiChar_mut() } = t as CHAR;
-                    x += 1;
-                }
-            }
-        }
-        if let Some((invalidated_l, x0)) = x0 {
-            let invalidated_r = Self::end_text(size.x, line, x);
-            self.invalidated = self.invalidated
-                .union(Rect::with_tl_br(Point { x: invalidated_l, y: p.y }, Point { x: invalidated_r, y: p.y + 1 }))
-                .unwrap().right().unwrap()
-            ;
-            x0 .. x
-        } else {
-            0 .. 0
-        }
-    }
-
-    fn update(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Self::Error> {
+    fn update_raw(&mut self, cursor: Option<Point>, wait: bool) -> io::Result<Option<Event>> {
         if !self.invalidated.is_empty() {
             let mut region = SMALL_RECT {
                 Top: self.invalidated.t(),
@@ -498,5 +364,141 @@ impl base_Screen for Screen {
                 }
             }
         })
+    }
+}
+
+impl Drop for Screen {
+    fn drop(&mut self) {
+        let e = unsafe { self.drop_raw() };
+        if e.is_err() && !thread::panicking() { e.unwrap(); }
+    }
+}
+
+fn attr_w(fg: Color, bg: Option<Color>, attr: Attr) -> WORD {
+    let bg = bg.unwrap_or(Color::Black);
+    let (fg, bg) = if attr.contains(Attr::REVERSE) { (bg, fg) } else { (fg, bg) };
+    let fg = match fg {
+        Color::Black => 0,
+        Color::Red => FOREGROUND_RED,
+        Color::Green => FOREGROUND_GREEN,
+        Color::Yellow => FOREGROUND_RED | FOREGROUND_GREEN,
+        Color::Blue => FOREGROUND_BLUE,
+        Color::Magenta => FOREGROUND_RED | FOREGROUND_BLUE,
+        Color::Cyan => FOREGROUND_BLUE | FOREGROUND_GREEN,
+        Color::White => FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED
+    };
+    let bg = match bg {
+        Color::Black => 0,
+        Color::Red => BACKGROUND_RED,
+        Color::Green => BACKGROUND_GREEN,
+        Color::Yellow => BACKGROUND_RED | BACKGROUND_GREEN,
+        Color::Blue => BACKGROUND_BLUE,
+        Color::Magenta => BACKGROUND_RED | BACKGROUND_BLUE,
+        Color::Cyan => BACKGROUND_BLUE | BACKGROUND_GREEN,
+        Color::White => BACKGROUND_BLUE | BACKGROUND_GREEN | BACKGROUND_RED
+    };
+    const REVERSE_INTENSITY: Attr = unsafe { Attr::from_bits_unchecked(Attr::INTENSITY.bits() | Attr::REVERSE.bits()) };
+    let attr = match attr {
+        Attr::INTENSITY => FOREGROUND_INTENSITY,
+        REVERSE_INTENSITY => BACKGROUND_INTENSITY,
+        _ => 0
+    };
+    fg | bg | attr
+}
+
+impl base_Screen for Screen {
+    fn size(&self) -> Vector { self.size }
+
+    fn out(
+        &mut self,
+        p: Point,
+        fg: Color,
+        bg: Option<Color>,
+        attr: Attr,
+        text: &str,
+        hard: Range<i16>,
+        soft: Range<i16>
+    ) -> Range<i16> {
+        debug_assert!(p.y >= 0 && p.y < self.size().y);
+        debug_assert!(hard.start >= 0 && hard.end > hard.start && hard.end <= self.size().x);
+        debug_assert!(soft.start >= 0 && soft.end > soft.start && soft.end <= self.size().x);
+        let text_end = if soft.end <= p.x { return 0 .. 0 } else { soft.end.saturating_sub(p.x) };
+        let text_start = if soft.start <= p.x { 0 } else { soft.start.saturating_sub(p.x) };
+        let size = self.size;
+        let output_cp = self.output_cp;
+        let wctmb_flags = self.wctmb_flags;
+        let line = (p.y as u16 as usize) * (size.x as u16 as usize);
+        let line = &mut self.buf[line .. line + size.x as u16 as usize];
+        let attr = attr_w(fg, bg, attr);
+        let mut x0 = None;
+        let mut x = p.x;
+        let mut n = 0i16;
+        for g in text.graphemes(true).map(|g| Self::encode_grapheme(output_cp, wctmb_flags, g)) {
+            if x >= hard.end { break; }
+            if n >= text_end { break; }
+            let w = if g.is_left() { 1 } else { 2 };
+            n = n.saturating_add(w);
+            let before_text_start = n <= text_start;
+            if before_text_start {
+                x = min(hard.end, x.saturating_add(w));
+                continue;
+            }
+            if x < hard.start {
+                x = min(hard.end, x.saturating_add(w));
+                if x > hard.start {
+                    debug_assert!(x0.is_none());
+                    let invalidated_l = Self::start_text(size.x, line, hard.start);
+                    x0 = Some((invalidated_l, hard.start));
+                    let col = &mut line[hard.start as u16 as usize];
+                    col.Attributes = 0;
+                    *unsafe { col.Char.AsciiChar_mut() } = b' ' as CHAR;
+                }
+                continue;
+            }
+            if x0.is_none() {
+                let invalidated_l = Self::start_text(size.x, line, x);
+                x0 = Some((invalidated_l, x));
+            }
+            let next_x = min(hard.end, x.saturating_add(w));
+            if next_x - x < w {
+                let col = &mut line[x as u16 as usize];
+                col.Attributes = 0;
+                *unsafe { col.Char.AsciiChar_mut() } = b' ' as CHAR;
+                x = next_x;
+                break;
+            }
+            match g {
+                Left(c) => {
+                    let col = &mut line[x as u16 as usize];
+                    col.Attributes = attr;
+                    *unsafe { col.Char.AsciiChar_mut() } = c as CHAR;
+                    x += 1;
+                },
+                Right((l, t)) => {
+                    let col = &mut line[x as u16 as usize];
+                    col.Attributes = attr | COMMON_LVB_LEADING_BYTE;
+                    *unsafe { col.Char.AsciiChar_mut() } = l as CHAR;
+                    x += 1;
+                    let col = &mut line[x as u16 as usize];
+                    col.Attributes = attr | COMMON_LVB_TRAILING_BYTE;
+                    *unsafe { col.Char.AsciiChar_mut() } = t as CHAR;
+                    x += 1;
+                }
+            }
+        }
+        if let Some((invalidated_l, x0)) = x0 {
+            let invalidated_r = Self::end_text(size.x, line, x);
+            self.invalidated = self.invalidated
+                .union(Rect::with_tl_br(Point { x: invalidated_l, y: p.y }, Point { x: invalidated_r, y: p.y + 1 }))
+                .unwrap().right().unwrap()
+            ;
+            x0 .. x
+        } else {
+            0 .. 0
+        }
+    }
+
+    fn update(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Box<dyn Any>> {
+        self.update_raw(cursor, wait).map_err(|e| Box::new(e) as _)
     }
 }

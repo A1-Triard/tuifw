@@ -1,5 +1,6 @@
 use std::io::{self};
-use tuifw_screen_base::{Screen};
+
+pub use tuifw_screen_base::*;
 
 /// # Safety
 ///
@@ -10,8 +11,8 @@ use tuifw_screen_base::{Screen};
 /// It is impossible to garantee this conditions on a library level.
 /// So this unsafity should be propagated through all wrappers to the final application.
 #[cfg(windows)]
-pub unsafe fn init() -> io::Result<Box<dyn Screen<Error=io::Error>>> {
-    Ok(Box::new(tuifw_screen_winapi::Screen::new()?) as Box<dyn Screen<Error=io::Error>>)
+pub unsafe fn init() -> io::Result<Box<dyn Screen>> {
+    Ok(Box::new(tuifw_screen_winapi::Screen::new()?) as _)
 }
 
 /// # Safety
@@ -23,6 +24,6 @@ pub unsafe fn init() -> io::Result<Box<dyn Screen<Error=io::Error>>> {
 /// It is impossible to garantee this conditions on a library level.
 /// So this unsafity should be propagated through all wrappers to the final application.
 #[cfg(not(windows))]
-pub unsafe fn init() -> io::Result<Box<dyn Screen<Error=io::Error>>> {
+pub unsafe fn init() -> io::Result<Box<dyn Screen>> {
     tuifw_screen_ncurses::init()
 }

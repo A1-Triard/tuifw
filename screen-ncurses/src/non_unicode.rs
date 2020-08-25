@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::cmp::{max, min};
 use std::io::{self};
 use std::ops::Range;
@@ -74,6 +75,58 @@ impl Screen {
         no_err(endwin())?;
         Ok(())
     }
+
+    fn update_raw(&mut self, cursor: Option<Point>, wait: bool) -> io::Result<Option<Event>> {
+        no_err(unsafe { curs_set(0) })?;
+        for line in self.lines.iter_mut().filter(|l| l.invalidated) {
+            line.invalidated = false;
+            if line.cols.is_empty() { continue; }
+            no_err(unsafe { wmove(line.window.as_ptr(), 0, 0) })?;
+            for &col in &line.cols {
+                let _ = unsafe { waddch(line.window.as_ptr(), col) };
+            }
+            no_err(unsafe { wnoutrefresh(line.window.as_ptr()) })?;
+        }
+        no_err(unsafe { doupdate() })?;
+        let cursor = cursor.and_then(|cursor| {
+            if (Rect { tl: Point { x: 0, y: 0 }, size: self.size() }).contains(cursor) {
+                Some(cursor)
+            } else {
+                None
+            }
+        });
+        let window = if let Some(cursor) = cursor {
+            let window = self.lines[cursor.y as u16 as usize].window;
+            no_err(unsafe { wmove(window.as_ptr(), 0, cursor.x as _) })?;
+            no_err(unsafe { curs_set(1) })?;
+            Some(window)
+        } else if let Some(line) = self.lines.first() {
+            if line.cols.is_empty() {
+                None
+            } else {
+                let window = line.window;
+                no_err(unsafe { wmove(window.as_ptr(), 0, 0) })?;
+                Some(window)
+            }
+        } else {
+            None
+        };
+        let window = window.unwrap_or_else(|| unsafe { NonNull::new(stdscr).unwrap() });
+        unsafe { no_err(nodelay(window.as_ptr(), !wait)) }?;
+        let dc = self.dc;
+        let e = read_event(window, |w| {
+            let c = unsafe { wgetch(w.as_ptr()) };
+            if c == ERR { return None; }
+            if c & KEY_CODE_YES == 0 { return Some(Right(decode_char(dc, c as c_char as u8))); }
+            Some(Left(c & !KEY_CODE_YES))
+        })?;
+        match e {
+            Some(Event::Resize) => self.resize()?,
+            Some(Event::Key(_, Key::Ctrl(Ctrl::L))) => unsafe { clearok(curscr, true); },
+            _ => { }
+        }
+        Ok(e)
+    }
 }
 
 impl Drop for Screen {
@@ -123,8 +176,6 @@ fn decode_char(dc: iconv_t, c: u8) -> char {
 }
 
 impl base_Screen for Screen {
-    type Error = io::Error;
-
     fn size(&self) -> Vector {
         Vector {
             x: max(0, min(unsafe { COLS }, i16::MAX as _)) as i16,
@@ -181,55 +232,7 @@ impl base_Screen for Screen {
         x0 .. x
     }
 
-    fn update(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Self::Error> {
-        no_err(unsafe { curs_set(0) })?;
-        for line in self.lines.iter_mut().filter(|l| l.invalidated) {
-            line.invalidated = false;
-            if line.cols.is_empty() { continue; }
-            no_err(unsafe { wmove(line.window.as_ptr(), 0, 0) })?;
-            for &col in &line.cols {
-                let _ = unsafe { waddch(line.window.as_ptr(), col) };
-            }
-            no_err(unsafe { wnoutrefresh(line.window.as_ptr()) })?;
-        }
-        no_err(unsafe { doupdate() })?;
-        let cursor = cursor.and_then(|cursor| {
-            if (Rect { tl: Point { x: 0, y: 0 }, size: self.size() }).contains(cursor) {
-                Some(cursor)
-            } else {
-                None
-            }
-        });
-        let window = if let Some(cursor) = cursor {
-            let window = self.lines[cursor.y as u16 as usize].window;
-            no_err(unsafe { wmove(window.as_ptr(), 0, cursor.x as _) })?;
-            no_err(unsafe { curs_set(1) })?;
-            Some(window)
-        } else if let Some(line) = self.lines.first() {
-            if line.cols.is_empty() {
-                None
-            } else {
-                let window = line.window;
-                no_err(unsafe { wmove(window.as_ptr(), 0, 0) })?;
-                Some(window)
-            }
-        } else {
-            None
-        };
-        let window = window.unwrap_or_else(|| unsafe { NonNull::new(stdscr).unwrap() });
-        unsafe { no_err(nodelay(window.as_ptr(), !wait)) }?;
-        let dc = self.dc;
-        let e = read_event(window, |w| {
-            let c = unsafe { wgetch(w.as_ptr()) };
-            if c == ERR { return None; }
-            if c & KEY_CODE_YES == 0 { return Some(Right(decode_char(dc, c as c_char as u8))); }
-            Some(Left(c & !KEY_CODE_YES))
-        })?;
-        match e {
-            Some(Event::Resize) => self.resize()?,
-            Some(Event::Key(_, Key::Ctrl(Ctrl::L))) => unsafe { clearok(curscr, true); },
-            _ => { }
-        }
-        Ok(e)
+    fn update(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Box<dyn Any>> {
+        self.update_raw(cursor, wait).map_err(|e| Box::new(e) as _)
     }
 }
