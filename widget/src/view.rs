@@ -51,8 +51,15 @@ impl ViewTree {
         let mut arena = Arena::new(&mut VIEW_NODE.lock().unwrap());
         let (window_tree, root) = arena.insert(|this| {
             let window_tree = WindowTree::new(screen, draw_view, View(this));
+            let mut root = RootView { this: View(this), bg: Property::new(Grapheme {
+                fg: Color::Black,
+                bg: None,
+                attr: Attr::empty(),
+                text: Bow::Borrowed(&" ")
+            }) };
+            root.on_changed_bg(RootView::invalidate_bg);
             (ViewNode {
-                properties: Box::new(RootView { this: View(this) }) as _,
+                properties: Box::new(root) as _,
                 window: None,
                 layout: Some(Box::new(RootLayout) as _),
                 parent: None,
@@ -77,6 +84,9 @@ fn draw_view(
 ) {
     let view_tree = context.get_1();
     if *tag == view_tree.root {
+        let root = view_tree.arena[tag.0].properties.downcast_ref::<RootView>();
+        let bg = root.as_ref().unwrap().bg();
+        port.fill(|port, p| port.out(p, bg.fg, bg.bg, bg.attr, &bg.text));
     } else {
         view_tree.arena[tag.0].window.as_ref().unwrap().0.draw(view_tree, *tag, port);
     }
@@ -102,9 +112,19 @@ pub type ViewContext = ContextMut<ViewTree>;
 #[derive(Debug)]
 pub struct RootView {
     this: View,
+    bg: Property<Self, Grapheme, ViewContext>,
 }
 
 impl ViewProperties for RootView { }
+
+impl RootView {
+    property!(Grapheme, bg, set_bg, on_changed_bg, ViewContext);
+
+    fn invalidate_bg(&mut self, context: &mut ViewContext, _old: &Grapheme) {
+        let tree = context.get_1();
+        tree.window_tree.invalidate_screen();
+    }
+}
 
 #[derive(Debug)]
 struct RootLayout;
