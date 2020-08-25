@@ -6,7 +6,7 @@ use components_arena::{Id, Arena, ComponentClassMutex};
 use downcast::Any;
 use tuifw_screen_base::{Screen, Vector, Point, Rect, Attr, Color};
 use tuifw_window::{DrawingPort, WindowTree, Window};
-use crate::context::ContextMut;
+use crate::context::{ContextRef, ContextMut};
 use crate::property::Property;
 
 pub trait Layout: Debug + Send + Sync {
@@ -22,12 +22,14 @@ pub trait ViewProperties: Any + Debug + Sync + Send { }
 
 downcast!(dyn ViewProperties);
 
+pub type DrawContext = ContextRef<ViewTree>;
+
 macro_attr! {
     #[derive(Debug)]
     #[derive(Component!)]
     struct ViewNode {
         properties: Box<dyn ViewProperties>,
-        window: Option<(Box<dyn Draw>, Window<View>)>,
+        window: Option<(Box<dyn Draw>, Window<View, DrawContext>)>,
         layout: Option<Box<dyn Layout>>,
         parent: Option<View>,
         next: View,
@@ -40,7 +42,7 @@ static VIEW_NODE: ComponentClassMutex<ViewNode> = ComponentClassMutex::new();
 #[derive(Debug)]
 pub struct ViewTree {
     arena: Arena<ViewNode>,
-    window_tree: WindowTree<View>,
+    window_tree: WindowTree<View, DrawContext>,
     root: View,
 }
 
@@ -67,10 +69,11 @@ impl ViewTree {
 }
 
 fn draw_view(
-    _tree: &WindowTree<View>,
-    _window: Option<Window<View>>,
+    _tree: &WindowTree<View, DrawContext>,
+    _window: Option<Window<View, DrawContext>>,
     _port: &mut DrawingPort,
-    _tag: &View
+    _tag: &View,
+    _context: &mut DrawContext
 ) {
 }
 

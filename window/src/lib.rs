@@ -9,8 +9,10 @@ extern crate derivative;
 use std::any::Any;
 use std::cmp::{min, max};
 use std::hint::unreachable_unchecked;
+use std::marker::PhantomData;
 use std::mem::replace;
 use std::ops::Range;
+use std::panic::{UnwindSafe, RefUnwindSafe};
 use components_arena::{Arena, Id, ComponentClassMutex};
 use tuifw_screen_base::{Screen, Rect, Point, Vector, Attr, Color, Event};
 
@@ -128,7 +130,7 @@ Component!((class=WindowNodeComponent) struct WindowNode<Tag> { ... });
 
 static WINDOW_NODE: ComponentClassMutex<WindowNodeComponent> = ComponentClassMutex::new();
 
-fn offset_from_root<Tag>(mut window: Id<WindowNode<Tag>>, tree: &WindowTree<Tag>) -> Vector {
+fn offset_from_root<Tag, DrawContext>(mut window: Id<WindowNode<Tag>>, tree: &WindowTree<Tag, DrawContext>) -> Vector {
     let mut offset = Vector::null();
     loop {
         offset += tree.arena[window].bounds.tl.offset_from(Point { x: 0, y: 0 });
@@ -144,18 +146,24 @@ fn offset_from_root<Tag>(mut window: Id<WindowNode<Tag>>, tree: &WindowTree<Tag>
 #[derive(Derivative)]
 #[derivative(Debug(bound=""), Copy(bound=""), Clone(bound=""), Eq(bound=""), PartialEq(bound=""))]
 #[derivative(Hash(bound=""), Ord(bound=""), PartialOrd(bound=""))]
-pub struct Window<Tag>(Id<WindowNode<Tag>>);
+pub struct Window<Tag, DrawContext>(Id<WindowNode<Tag>>, PhantomData<DrawContext>);
 
-impl<Tag> Window<Tag> {
+impl<Tag, DrawContext> RefUnwindSafe for Window<Tag, DrawContext> { }
+unsafe impl<Tag, DrawContext> Send for Window<Tag, DrawContext> { }
+unsafe impl<Tag, DrawContext> Sync for Window<Tag, DrawContext> { }
+impl<Tag, DrawContext> Unpin for Window<Tag, DrawContext> { }
+impl<Tag, DrawContext> UnwindSafe for Window<Tag, DrawContext> { }
+
+impl<Tag, DrawContext> Window<Tag, DrawContext> {
     pub fn new<T>(
-        tree: &mut WindowTree<Tag>,
+        tree: &mut WindowTree<Tag, DrawContext>,
         parent: Option<Self>,
         bounds: Rect,
         tag: impl FnOnce(Self) -> (Tag, T)
     ) -> T {
         let parent = parent.map_or(tree.root, |w| w.0);
         let (window, result) = tree.arena.insert(|this| {
-            let (tag, result) = tag(Window(this));
+            let (tag, result) = tag(Window(this, PhantomData));
             (WindowNode {
                 parent: Some(parent),
                 next: this,
@@ -173,7 +181,7 @@ impl<Tag> Window<Tag> {
         result
     }
 
-    pub fn move_(self, tree: &mut WindowTree<Tag>, bounds: Rect) {
+    pub fn move_(self, tree: &mut WindowTree<Tag, DrawContext>, bounds: Rect) {
         let parent = tree.arena[self.0].parent.unwrap_or_else(|| unsafe { unreachable_unchecked() });
         let screen_bounds = bounds.offset(offset_from_root(parent, tree));
         invalidate_rect(tree.invalidated(), screen_bounds);
@@ -182,7 +190,7 @@ impl<Tag> Window<Tag> {
         invalidate_rect(tree.invalidated(), screen_bounds);
     }
 
-    pub fn drop(self, tree: &mut WindowTree<Tag>) {
+    pub fn drop(self, tree: &mut WindowTree<Tag, DrawContext>) {
         let this = tree.arena.remove(self.0);
         let parent = this.parent.unwrap_or_else(|| unsafe { unreachable_unchecked() });
         if tree.arena[parent].last_child.unwrap_or_else(|| unsafe { unreachable_unchecked() }) == self.0 {
@@ -204,11 +212,11 @@ impl<Tag> Window<Tag> {
         invalidate_rect(tree.invalidated(), screen_bounds);
     }
 
-    pub fn size(self, tree: &WindowTree<Tag>) -> Vector {
+    pub fn size(self, tree: &WindowTree<Tag, DrawContext>) -> Vector {
         tree.arena[self.0].bounds.size
     }
 
-    pub fn invalidate_rect(self, tree: &mut WindowTree<Tag>, rect: Rect) {
+    pub fn invalidate_rect(self, tree: &mut WindowTree<Tag, DrawContext>, rect: Rect) {
         let bounds = tree.arena[self.0].bounds;
         let rect = rect.offset(bounds.tl.offset_from(Point { x: 0, y: 0 })).intersect(bounds);
         let parent = tree.arena[self.0].parent.unwrap_or_else(|| unsafe { unreachable_unchecked() });
@@ -216,7 +224,7 @@ impl<Tag> Window<Tag> {
         invalidate_rect(tree.invalidated(), screen_rect);
     }
  
-    pub fn invalidate(self, tree: &mut WindowTree<Tag>) {
+    pub fn invalidate(self, tree: &mut WindowTree<Tag, DrawContext>) {
         let bounds = tree.arena[self.0].bounds;
         let parent = tree.arena[self.0].parent.unwrap_or_else(|| unsafe { unreachable_unchecked() });
         let screen_bounds = bounds.offset(offset_from_root(parent, tree));
@@ -226,13 +234,13 @@ impl<Tag> Window<Tag> {
 
 /*
 pub trait OptionWindowExt<Tag> {
-    fn size(self, tree: &WindowTree<Tag>) -> Vector;
-    fn invalidate_rect(self, tree: &mut WindowTree<Tag>, rect: Rect);
-    fn invalidate(self, tree: &mut WindowTree<Tag>);
+    fn size(self, tree: &WindowTree<Tag, DrawContext>) -> Vector;
+    fn invalidate_rect(self, tree: &mut WindowTree<Tag, DrawContext>, rect: Rect);
+    fn invalidate(self, tree: &mut WindowTree<Tag, DrawContext>);
 }
 
-impl<Tag> OptionWindowExt<Tag> for Option<Window<Tag>> {
-    fn size(self, tree: &WindowTree<Tag>) -> Vector {
+impl<Tag> OptionWindowExt<Tag> for Option<Window<Tag, DrawContext>> {
+    fn size(self, tree: &WindowTree<Tag, DrawContext>) -> Vector {
         if let Some(window) = self {
             window.size(tree)
         } else {
@@ -240,7 +248,7 @@ impl<Tag> OptionWindowExt<Tag> for Option<Window<Tag>> {
         }
     }
 
-    fn invalidate_rect(self, tree: &mut WindowTree<Tag>, rect: Rect) {
+    fn invalidate_rect(self, tree: &mut WindowTree<Tag, DrawContext>, rect: Rect) {
         if let Some(window) = self {
             window.invalidate_rect(tree, rect)
         } else {
@@ -248,7 +256,7 @@ impl<Tag> OptionWindowExt<Tag> for Option<Window<Tag>> {
         }
     }
 
-    fn invalidate(self, tree: &mut WindowTree<Tag>) {
+    fn invalidate(self, tree: &mut WindowTree<Tag, DrawContext>) {
         if let Some(window) = self {
             window.invalidate(tree)
         } else {
@@ -260,30 +268,32 @@ impl<Tag> OptionWindowExt<Tag> for Option<Window<Tag>> {
 
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct WindowTree<Tag> {
+pub struct WindowTree<Tag, DrawContext> {
     #[derivative(Debug="ignore")]
     screen: Option<(Box<dyn Screen>, Vec<Range<i16>>)>,
     arena: Arena<WindowNode<Tag>>,
     root: Id<WindowNode<Tag>>,
     #[derivative(Debug="ignore")]
     draw: fn(
-        tree: &WindowTree<Tag>,
-        window: Option<Window<Tag>>,
+        tree: &WindowTree<Tag, DrawContext>,
+        window: Option<Window<Tag, DrawContext>>,
         port: &mut DrawingPort,
-        tag: &Tag
+        tag: &Tag,
+        context: &mut DrawContext,
     ),
     cursor: Option<Point>,
     screen_size: Vector,
 }
 
-impl<Tag> WindowTree<Tag> {
+impl<Tag, DrawContext> WindowTree<Tag, DrawContext> {
     pub fn new(
         screen: Box<dyn Screen>,
         draw: fn(
-            tree: &WindowTree<Tag>,
-            window: Option<Window<Tag>>,
+            tree: &WindowTree<Tag, DrawContext>,
+            window: Option<Window<Tag, DrawContext>>,
             port: &mut DrawingPort,
-            tag: &Tag
+            tag: &Tag,
+            context: &mut DrawContext,
         ),
         tag: Tag
     ) -> Self {
@@ -317,7 +327,7 @@ impl<Tag> WindowTree<Tag> {
         (invalidated, screen.size())
     }
 
-    fn draw_window(&mut self, window: Id<WindowNode<Tag>>, offset: Vector) {
+    fn draw_window(&mut self, window: Id<WindowNode<Tag>>, offset: Vector, draw_context: &mut DrawContext) {
         let bounds = self.arena[window].bounds.offset(offset);
         let (invalidated, screen_size) = self.invalidated();
         if !rect_invalidated((invalidated, screen_size), bounds) { return; }
@@ -330,27 +340,33 @@ impl<Tag> WindowTree<Tag> {
             offset,
             size: bounds.size,
         };
-        (self.draw)(self, if window == self.root { None } else { Some(Window(window)) }, &mut port, &self.arena[window].tag);
+        (self.draw)(
+            self,
+            if window == self.root { None } else { Some(Window(window, PhantomData)) },
+            &mut port,
+            &self.arena[window].tag,
+            draw_context
+        );
         self.screen.replace((port.screen, port.invalidated));
         self.cursor = port.cursor;
         if let Some(last_child) = self.arena[window].last_child {
             let mut child = last_child;
             loop {
                 child = self.arena[child].next;
-                self.draw_window(child, offset);
+                self.draw_window(child, offset, draw_context);
                 if child == last_child { break; }
             }
         }
     }
 
-    pub fn update(&mut self, wait: bool) -> Result<Option<Event>, Box<dyn Any>> {
+    pub fn update(&mut self, wait: bool, draw_context: &mut DrawContext) -> Result<Option<Event>, Box<dyn Any>> {
         if let Some(cursor) = self.cursor {
             let (invalidated, screen_size) = self.invalidated();
             if rect_invalidated((invalidated, screen_size), Rect { tl: cursor, size: Vector { x: 1, y: 1 } }) {
                 self.cursor = None;
             }
         }
-        self.draw_window(self.root, Vector::null());
+        self.draw_window(self.root, Vector::null(), draw_context);
         let (screen, invalidated) = self.screen.as_mut().unwrap_or_else(|| unsafe { unreachable_unchecked() });
         let event = screen.update(self.cursor, wait)?;
         if event == Some(Event::Resize) {
