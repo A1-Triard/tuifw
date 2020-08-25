@@ -1,30 +1,32 @@
-use std::any::Any;
 use std::fmt::Debug;
 use std::iter::{self};
 use std::mem::{replace};
 use boow::Bow;
 use components_arena::{Id, Arena, ComponentClassMutex};
-use tuifw_screen_base::{Vector, Point, Rect, Attr, Color};
+use downcast::Any;
+use tuifw_screen_base::{Screen, Vector, Point, Rect, Attr, Color};
 use tuifw_window::{DrawingPort, WindowTree, Window};
 use crate::context::ContextMut;
 use crate::property::Property;
 
-pub trait Layout: Debug {
+pub trait Layout: Debug + Send + Sync {
     fn measure(&self, tree: &mut ViewTree, view: View, w: Option<i16>, h: Option<i16>) -> Vector;
     fn arrange(&self, tree: &mut ViewTree, view: View, size: Vector) -> Vector;
 }
 
-pub trait Draw: Debug {
+pub trait Draw: Debug + Send + Sync {
     fn draw(&self, tree: &ViewTree, view: View, port: &mut DrawingPort);
 }
 
-pub trait ViewProperties: Any + Debug { }
+pub trait ViewProperties: Any + Debug + Sync + Send { }
+
+downcast!(dyn ViewProperties);
 
 macro_attr! {
     #[derive(Debug)]
     #[derive(Component!)]
     struct ViewNode {
-        properties: Box<dyn ViewProperties>,
+        properties: Box<dyn ViewProperties + 'static>,
         window: Option<(Box<dyn Draw>, Window<View>)>,
         layout: Option<Box<dyn Layout>>,
         parent: Option<View>,
@@ -39,6 +41,37 @@ static VIEW_NODE: ComponentClassMutex<ViewNode> = ComponentClassMutex::new();
 pub struct ViewTree {
     arena: Arena<ViewNode>,
     window_tree: WindowTree<View>,
+    root: View,
+}
+
+impl ViewTree {
+    pub fn new(screen: Box<dyn Screen>) -> Self {
+        let mut arena = Arena::new(&mut VIEW_NODE.lock().unwrap());
+        let (window_tree, root) = arena.insert(|this| {
+            let window_tree = WindowTree::new(screen, draw_view, View(this));
+            (ViewNode {
+                properties: Box::new(RootView { this: View(this) }) as _,
+                window: None,
+                layout: Some(Box::new(RootLayout) as _),
+                parent: None,
+                next: View(this),
+                last_child: None
+            }, (window_tree, View(this)))
+        });
+        ViewTree {
+            arena,
+            window_tree,
+            root
+        }
+    }
+}
+
+fn draw_view(
+    _tree: &WindowTree<View>,
+    _window: Option<Window<View>>,
+    _port: &mut DrawingPort,
+    _tag: &View
+) {
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
@@ -57,6 +90,26 @@ impl View {
 }
 
 pub type ViewContext = ContextMut<ViewTree>;
+
+#[derive(Debug)]
+pub struct RootView {
+    this: View,
+}
+
+impl ViewProperties for RootView { }
+
+#[derive(Debug)]
+struct RootLayout;
+
+impl Layout for RootLayout {
+    fn measure(&self, _tree: &mut ViewTree, _view: View, _w: Option<i16>, _h: Option<i16>) -> Vector {
+        panic!()
+    }
+
+    fn arrange(&self, _tree: &mut ViewTree, _view: View, _size: Vector) -> Vector {
+        panic!()
+    }
+}
 
 #[derive(Debug)]
 struct BorderDraw;
@@ -89,9 +142,11 @@ impl BorderView {
     ) -> View {
         let parent_window = parent
             .self_and_parents(tree)
-            .find_map(|view| tree.arena[view.0].window.map(|x| x.1))
+            .find_map(|view| tree.arena[view.0].window.as_ref().map(|x| x.1))
         ;
-        View(tree.arena.insert(|this| {
+        let arena = &mut tree.arena;
+        let window_tree = &mut tree.window_tree;
+        arena.insert(|this| {
             let mut properties = BorderView {
                 this: View(this),
                 tl: Property::new(None),
@@ -112,20 +167,20 @@ impl BorderView {
             properties.on_changed_r(Self::invalidate_r);
             properties.on_changed_b(Self::invalidate_b);
             let window = Window::new(
-                &mut tree.window_tree,
+                window_tree,
                 parent_window,
                 Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() },
-                |_| View(this)
+                |window| (View(this), window)
             );
-            ViewNode {
+            (ViewNode {
                 properties: Box::new(properties) as _,
                 window: Some((Box::new(BorderDraw) as _, window)),
                 layout: None,
                 parent: Some(parent),
                 next: View(this),
                 last_child: None
-            }
-        }))
+            }, View(this))
+        })
     }
 
     property!(Option<Grapheme>, tl, set_tl, on_changed_tl, ViewContext);
@@ -221,7 +276,7 @@ impl ViewProperties for BorderView { }
 
 impl Draw for BorderDraw {
     fn draw(&self, tree: &ViewTree, view: View, port: &mut DrawingPort) {
-        let node = tree.arena[view.0];
+        let node = &tree.arena[view.0];
         let size = node.window.as_ref().unwrap().1.size(&tree.window_tree);
         let properties = node.properties.as_ref().downcast_ref::<BorderView>().unwrap();
         if let Some(l) = properties.l() {

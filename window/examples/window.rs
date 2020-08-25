@@ -30,7 +30,7 @@ fn main() {
         tl: Point { x: (tree.screen_size().x - 13) / 2, y: (tree.screen_size().y - 7) / 2 },
         size: Vector { x: 13, y: 7 }
     };
-    let window = Window::new(tree, None, bounds, |_| ());
+    let window = Window::new(tree, None, bounds, |window| ((), window));
     loop {
         if let Some(e) = tree.update(true).unwrap() {
             let d = match e {

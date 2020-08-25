@@ -6,6 +6,8 @@ extern crate derivative;
 extern crate macro_attr;
 #[macro_use]
 extern crate components_arena;
+#[macro_use]
+extern crate downcast;
 
 pub mod context;
 #[macro_use]
