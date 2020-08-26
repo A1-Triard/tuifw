@@ -42,7 +42,7 @@ impl<Owner, Type, Context> Property<Owner, Type, Context> {
 
 #[macro_export]
 macro_rules! property {
-    ($type_:ty, $name:ident, $set_name:ident, $on_changed_name:ident, $context:ty) => {
+    ($type_:ty, $name:ident, $set_name:ident, $on_name_changed:ident, $context:ty) => {
         pub fn $name(&self) -> &$type_ { self.$name.get() }
 
         pub fn $set_name(&mut self, value: $type_, context: &mut $context) -> $type_ { 
@@ -51,7 +51,7 @@ macro_rules! property {
             old
         }
 
-        pub fn $on_changed_name(
+        pub fn $on_name_changed(
             &mut self,
             callback: fn(owner: &mut Self, context: &mut $context, old: &$type_)
         ) {
