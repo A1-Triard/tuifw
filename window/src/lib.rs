@@ -162,15 +162,15 @@ impl<Tag, DrawContext> Window<Tag, DrawContext> {
         tag: impl FnOnce(Self) -> (Tag, T)
     ) -> T {
         let parent = parent.map_or(tree.root, |w| w.0);
-        let (window, result) = tree.arena.insert(|this| {
-            let (tag, result) = tag(Window(this, PhantomData));
+        let (window, result) = tree.arena.insert(|window| {
+            let (tag, result) = tag(Window(window, PhantomData));
             (WindowNode {
                 parent: Some(parent),
-                next: this,
+                next: window,
                 last_child: None,
                 bounds,
                 tag
-            }, (this, result))
+            }, (window, result))
         });
         if let Some(prev) = tree.arena[parent].last_child.replace(window) {
             let next = replace(&mut tree.arena[prev].next, window);
@@ -191,13 +191,13 @@ impl<Tag, DrawContext> Window<Tag, DrawContext> {
     }
 
     pub fn drop(self, tree: &mut WindowTree<Tag, DrawContext>) {
-        let this = tree.arena.remove(self.0);
-        let parent = this.parent.unwrap_or_else(|| unsafe { unreachable_unchecked() });
+        let node = tree.arena.remove(self.0);
+        let parent = node.parent.unwrap_or_else(|| unsafe { unreachable_unchecked() });
         if tree.arena[parent].last_child.unwrap_or_else(|| unsafe { unreachable_unchecked() }) == self.0 {
-            tree.arena[parent].last_child = if this.next == self.0 {
+            tree.arena[parent].last_child = if node.next == self.0 {
                 None
             } else {
-                Some(this.next)
+                Some(node.next)
             };
         }
         if let Some(mut prev) = tree.arena[parent].last_child {
@@ -206,9 +206,9 @@ impl<Tag, DrawContext> Window<Tag, DrawContext> {
                 if next == self.0 { break; }
                 prev = next;
             }
-            tree.arena[prev].next = this.next;
+            tree.arena[prev].next = node.next;
         }
-        let screen_bounds = this.bounds.offset(offset_from_root(parent, tree));
+        let screen_bounds = node.bounds.offset(offset_from_root(parent, tree));
         invalidate_rect(tree.invalidated(), screen_bounds);
     }
 
@@ -231,40 +231,6 @@ impl<Tag, DrawContext> Window<Tag, DrawContext> {
         invalidate_rect(tree.invalidated(), screen_bounds);
     }
 }
-
-/*
-pub trait OptionWindowExt<Tag> {
-    fn size(self, tree: &WindowTree<Tag, DrawContext>) -> Vector;
-    fn invalidate_rect(self, tree: &mut WindowTree<Tag, DrawContext>, rect: Rect);
-    fn invalidate(self, tree: &mut WindowTree<Tag, DrawContext>);
-}
-
-impl<Tag> OptionWindowExt<Tag> for Option<Window<Tag, DrawContext>> {
-    fn size(self, tree: &WindowTree<Tag, DrawContext>) -> Vector {
-        if let Some(window) = self {
-            window.size(tree)
-        } else {
-            tree.screen_size()
-        }
-    }
-
-    fn invalidate_rect(self, tree: &mut WindowTree<Tag, DrawContext>, rect: Rect) {
-        if let Some(window) = self {
-            window.invalidate_rect(tree, rect)
-        } else {
-            tree.invalidate_rect(rect)
-        }
-    }
-
-    fn invalidate(self, tree: &mut WindowTree<Tag, DrawContext>) {
-        if let Some(window) = self {
-            window.invalidate(tree)
-        } else {
-            tree.invalidate_screen()
-        }
-    }
-}
-*/
 
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -298,13 +264,13 @@ impl<Tag, DrawContext> WindowTree<Tag, DrawContext> {
         tag: Tag
     ) -> Self {
         let mut arena = Arena::new(&mut WINDOW_NODE.lock().unwrap());
-        let root = arena.insert(|this| (WindowNode {
+        let root = arena.insert(|window| (WindowNode {
             parent: None,
-            next: this,
+            next: window,
             last_child: None,
             bounds: Rect { tl: Point { x: 0, y: 0 }, size: screen.size() },
             tag
-        }, this));
+        }, window));
         let screen_size = screen.size();
         let rows = screen_size.y as u16 as usize;
         let cols = screen_size.x;
