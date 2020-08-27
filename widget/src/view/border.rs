@@ -1,11 +1,11 @@
 use std::fmt::Debug;
 use tuifw_screen_base::{Vector, Point, Rect};
-use tuifw_window::{DrawingPort};
+use tuifw_window::{RenderPort};
 use crate::property::Property;
 use crate::view::base::*;
 
 #[derive(Debug)]
-struct BorderDraw;
+struct BorderRender;
 
 #[derive(Debug)]
 pub struct BorderView {
@@ -25,7 +25,7 @@ impl BorderView {
         tree: &mut ViewTree,
         parent: View,
     ) -> View {
-        View::new(tree, parent, Some(Box::new(BorderDraw) as _), |view| {
+        View::new(tree, parent, Some(Box::new(BorderRender) as _), |view| {
             let mut obj = BorderView {
                 view,
                 tl: Property::new(None),
@@ -144,8 +144,8 @@ impl ViewObj for BorderView {
     }
 }
 
-impl Draw for BorderDraw {
-    fn draw(&self, tree: &ViewTree, view: View, port: &mut DrawingPort) {
+impl Render for BorderRender {
+    fn render(&self, tree: &ViewTree, view: View, port: &mut RenderPort) {
         let size = view.size(tree).unwrap();
         let obj = view.obj(tree).downcast_ref::<BorderView>().unwrap();
         let l = obj.l().as_ref().or_else(|| if obj.tl().is_some() || obj.bl().is_some() { Some(&Text::SPACE) } else { None });
