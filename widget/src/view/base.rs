@@ -36,6 +36,7 @@ macro_attr! {
         parent: Option<View>,
         next: View,
         last_child: Option<View>,
+        measure_invalidated: bool,
     }
 }
 
@@ -61,7 +62,8 @@ impl ViewTree {
                 layout: None,
                 parent: None,
                 next: View(view),
-                last_child: None
+                last_child: None,
+                measure_invalidated: false,
             }, (window_tree, View(view)))
         });
         ViewTree {
@@ -109,7 +111,7 @@ impl View {
         ));
         let arena = &mut tree.arena;
         let window_tree = &mut tree.window_tree;
-        arena.insert(|view| {
+        let (view, result) = arena.insert(|view| {
             let (obj, result) = obj(View(view));
             let render = render_and_parent_window.map(|(render, parent_window)| (render, Window::new(
                 window_tree,
@@ -123,9 +125,12 @@ impl View {
                 layout: None,
                 parent: Some(parent),
                 next: View(view),
-                last_child: None
-            }, result)
-        })
+                last_child: None,
+                measure_invalidated: false,
+            }, (view, result))
+        });
+        View(view).invalidate_measure(tree);
+        result
     }
 
     pub fn parent(self, tree: &ViewTree) -> Option<View> { tree.arena[self.0].parent }
@@ -166,6 +171,18 @@ impl View {
         if self == tree.root { return Some(tree.window_tree.invalidate_screen()); }
         let window = tree.arena[self.0].render.as_ref().map(|x| x.1);
         window.map(|window| window.invalidate(&mut tree.window_tree))
+    }
+    
+    pub fn invalidate_measure(self, tree: &mut ViewTree) {
+        let mut view = self;
+        loop {
+            tree.arena[view.0].measure_invalidated = true;
+            if let Some(parent) = view.parent(tree) {
+                view = parent;
+            } else {
+                break;
+            }
+        }
     }
 }
 
