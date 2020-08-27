@@ -8,7 +8,7 @@ extern crate derivative;
 
 use std::any::Any;
 use std::cmp::{min, max};
-use std::hint::unreachable_unchecked;
+use std::hint::{unreachable_unchecked};
 use std::marker::PhantomData;
 use std::mem::replace;
 use std::ops::Range;
@@ -289,7 +289,7 @@ impl<Tag, RenderContext> WindowTree<Tag, RenderContext> {
     }
 
     fn invalidated(&mut self) -> (&mut Vec<Range<i16>>, Vector) {
-        let (screen, invalidated) = self.screen.as_mut().unwrap_or_else(|| unsafe { unreachable_unchecked() });
+        let (screen, invalidated) = self.screen.as_mut().expect("WindowTree is in invalid state");
         (invalidated, screen.size())
     }
 
@@ -298,7 +298,7 @@ impl<Tag, RenderContext> WindowTree<Tag, RenderContext> {
         let (invalidated, screen_size) = self.invalidated();
         if !rect_invalidated((invalidated, screen_size), bounds) { return; }
         let offset = offset + bounds.tl.offset_from(Point { x: 0, y: 0 });
-        let (screen, invalidated) = self.screen.take().unwrap_or_else(|| unsafe { unreachable_unchecked() });
+        let (screen, invalidated) = self.screen.take().expect("WindowTree is in invalid state");
         let mut port = RenderPort {
             screen,
             invalidated,
@@ -333,7 +333,7 @@ impl<Tag, RenderContext> WindowTree<Tag, RenderContext> {
             }
         }
         self.render_window(self.root, Vector::null(), render_context);
-        let (screen, invalidated) = self.screen.as_mut().unwrap_or_else(|| unsafe { unreachable_unchecked() });
+        let (screen, invalidated) = self.screen.as_mut().expect("WindowTree is in invalid state");
         let event = screen.update(self.cursor, wait)?;
         if event == Some(Event::Resize) {
             invalidated.clear();
