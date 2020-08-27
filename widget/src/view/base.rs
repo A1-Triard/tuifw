@@ -199,7 +199,9 @@ impl View {
     pub fn invalidate_measure(self, tree: &mut ViewTree) {
         let mut view = self;
         loop {
-            tree.arena[view.0].measure_size = None;
+            if replace(&mut tree.arena[view.0].measure_size, None).is_none() {
+                break;
+            }
             if let Some(parent) = view.parent(tree) {
                 view = parent;
             } else {
