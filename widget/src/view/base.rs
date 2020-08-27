@@ -1,12 +1,13 @@
 use std::fmt::Debug;
+use std::hint::unreachable_unchecked;
 use std::iter::{self};
 use std::mem::{replace};
 use boow::Bow;
 use components_arena::{Id, Arena, ComponentClassMutex};
 use downcast::Any;
-use tuifw_screen_base::{Screen, Vector, Point, Rect, Attr, Color};
+use tuifw_screen_base::{Event, Screen, Vector, Point, Rect, Attr, Color};
 use tuifw_window::{RenderPort, WindowTree, Window};
-use crate::context::{ContextRef, ContextMut};
+use crate::context::{Context, ContextRef, ContextMut};
 use crate::property::Property;
 
 pub trait Layout: Debug + Send + Sync {
@@ -31,7 +32,7 @@ macro_attr! {
     #[derive(Component!)]
     struct ViewNode {
         obj: Box<dyn ViewObj>,
-        render: Option<(Box<dyn Render>, Window<View, RenderContext>)>,
+        render: Option<(Box<dyn Render>, Window<View, RenderContext>, Vector)>,
         layout: Option<Box<dyn Layout>>,
         parent: Option<View>,
         next: View,
@@ -45,7 +46,8 @@ static VIEW_NODE: ComponentClassMutex<ViewNode> = ComponentClassMutex::new();
 #[derive(Debug)]
 pub struct ViewTree {
     arena: Arena<ViewNode>,
-    window_tree: WindowTree<View, RenderContext>,
+    window_tree: Option<WindowTree<View, RenderContext>>,
+    screen_size: Vector,
     root: View,
 }
 
@@ -66,14 +68,32 @@ impl ViewTree {
                 measure_invalidated: false,
             }, (window_tree, View(view)))
         });
+        let screen_size = window_tree.screen_size();
         ViewTree {
             arena,
-            window_tree,
+            window_tree: Some(window_tree),
+            screen_size,
             root
         }
     }
 
+    fn window_tree(&mut self) -> &mut WindowTree<View, RenderContext> {
+        self.window_tree.as_mut().unwrap_or_else(|| unsafe { unreachable_unchecked() })
+    }
+
     pub fn root(&self) -> View { self.root }
+
+    pub fn update(&mut self, wait: bool) -> Result<Option<Event>, Box<dyn std::any::Any>> {
+        let mut window_tree = self.window_tree.take().unwrap_or_else(|| unsafe { unreachable_unchecked() });
+        let result = Context::with_ref(self, |render_context| window_tree.update(wait, render_context));
+        if let Ok(result) = &result {
+            if result == &Some(Event::Resize) {
+                self.screen_size = window_tree.screen_size();
+            }
+        }
+        self.window_tree = Some(window_tree);
+        result
+    }
 }
 
 fn render_view(
@@ -110,7 +130,7 @@ impl View {
                 .find_map(|view| tree.arena[view.0].render.as_ref().map(|x| x.1))
         ));
         let arena = &mut tree.arena;
-        let window_tree = &mut tree.window_tree;
+        let window_tree = tree.window_tree.as_mut().unwrap_or_else(|| unsafe { unreachable_unchecked() });
         let (view, result) = arena.insert(|view| {
             let (obj, result) = obj(View(view));
             let render = render_and_parent_window.map(|(render, parent_window)| (render, Window::new(
@@ -118,7 +138,7 @@ impl View {
                 parent_window,
                 Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() },
                 |window| (View(view), window)
-            )));
+            ), Vector::null()));
             (ViewNode {
                 obj,
                 render,
@@ -154,23 +174,22 @@ impl View {
     }
 
     pub fn size(self, tree: &ViewTree) -> Option<Vector> {
-        if self == tree.root { return Some(tree.window_tree.screen_size()); }
-        let window = tree.arena[self.0].render.as_ref().map(|x| x.1);
-        window.map(|window| window.size(&tree.window_tree))
+        if self == tree.root { return Some(tree.screen_size); }
+        tree.arena[self.0].render.as_ref().map(|x| x.2)
     }
 
     #[must_use]
     pub fn invalidate_rect(self, tree: &mut ViewTree, rect: Rect) -> Option<()> {
-        if self == tree.root { return Some(tree.window_tree.invalidate_rect(rect)); }
+        if self == tree.root { return Some(tree.window_tree().invalidate_rect(rect)); }
         let window = tree.arena[self.0].render.as_ref().map(|x| x.1);
-        window.map(|window| window.invalidate_rect(&mut tree.window_tree, rect))
+        window.map(|window| window.invalidate_rect(&mut tree.window_tree(), rect))
     }
 
     #[must_use]
     pub fn invalidate_render(self, tree: &mut ViewTree) -> Option<()> {
-        if self == tree.root { return Some(tree.window_tree.invalidate_screen()); }
+        if self == tree.root { return Some(tree.window_tree().invalidate_screen()); }
         let window = tree.arena[self.0].render.as_ref().map(|x| x.1);
-        window.map(|window| window.invalidate(&mut tree.window_tree))
+        window.map(|window| window.invalidate(&mut tree.window_tree()))
     }
     
     pub fn invalidate_measure(self, tree: &mut ViewTree) {
@@ -205,7 +224,7 @@ impl RootView {
 
     fn invalidate_bg(&mut self, context: &mut ViewContext, _old: &Text) {
         let tree = context.get_1();
-        tree.window_tree.invalidate_screen();
+        tree.window_tree().invalidate_screen();
     }
 }
 
