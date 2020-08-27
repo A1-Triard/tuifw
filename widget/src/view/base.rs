@@ -1,5 +1,4 @@
 use std::fmt::Debug;
-use std::hint::unreachable_unchecked;
 use std::iter::{self};
 use std::mem::{replace};
 use boow::Bow;
@@ -37,7 +36,8 @@ macro_attr! {
         parent: Option<View>,
         next: View,
         last_child: Option<View>,
-        measure_invalidated: bool,
+        measure_size: Option<(Option<i16>, Option<i16>)>,
+        desired_size: Vector,
     }
 }
 
@@ -58,6 +58,7 @@ impl ViewTree {
             let window_tree = WindowTree::new(screen, render_view, View(view));
             let mut root = RootView { view: View(view), bg: Property::new(Text::SPACE.clone()) };
             root.on_bg_changed(RootView::invalidate_bg);
+            let screen_size = window_tree.screen_size();
             (ViewNode {
                 obj: Box::new(root) as _,
                 render: None,
@@ -65,7 +66,8 @@ impl ViewTree {
                 parent: None,
                 next: View(view),
                 last_child: None,
-                measure_invalidated: false,
+                measure_size: Some((Some(screen_size.x), Some(screen_size.y))),
+                desired_size: screen_size,
             }, (window_tree, View(view)))
         });
         let screen_size = window_tree.screen_size();
@@ -78,20 +80,21 @@ impl ViewTree {
     }
 
     fn window_tree(&mut self) -> &mut WindowTree<View, RenderContext> {
-        self.window_tree.as_mut().unwrap_or_else(|| unsafe { unreachable_unchecked() })
+        self.window_tree.as_mut().expect("ViewTree is in invalid state")
     }
 
     pub fn root(&self) -> View { self.root }
 
     pub fn update(&mut self, wait: bool) -> Result<Option<Event>, Box<dyn std::any::Any>> {
-        let mut window_tree = self.window_tree.take().unwrap_or_else(|| unsafe { unreachable_unchecked() });
+        self.root.measure(self, Some(self.screen_size.x), Some(self.screen_size.y));
+        let mut window_tree = self.window_tree.take().expect("ViewTree is in invalid state");
         let result = Context::with_ref(self, |render_context| window_tree.update(wait, render_context));
         if let Ok(result) = &result {
             if result == &Some(Event::Resize) {
                 self.screen_size = window_tree.screen_size();
             }
         }
-        self.window_tree = Some(window_tree);
+        self.window_tree.replace(window_tree);
         result
     }
 }
@@ -130,7 +133,7 @@ impl View {
                 .find_map(|view| tree.arena[view.0].render.as_ref().map(|x| x.1))
         ));
         let arena = &mut tree.arena;
-        let window_tree = tree.window_tree.as_mut().unwrap_or_else(|| unsafe { unreachable_unchecked() });
+        let window_tree = tree.window_tree.as_mut().expect("ViewTree is in invalid state");
         let (view, result) = arena.insert(|view| {
             let (obj, result) = obj(View(view));
             let render = render_and_parent_window.map(|(render, parent_window)| (render, Window::new(
@@ -146,7 +149,8 @@ impl View {
                 parent: Some(parent),
                 next: View(view),
                 last_child: None,
-                measure_invalidated: false,
+                measure_size: None,
+                desired_size: Vector::null(),
             }, (view, result))
         });
         View(view).invalidate_measure(tree);
@@ -195,13 +199,28 @@ impl View {
     pub fn invalidate_measure(self, tree: &mut ViewTree) {
         let mut view = self;
         loop {
-            tree.arena[view.0].measure_invalidated = true;
+            tree.arena[view.0].measure_size = None;
             if let Some(parent) = view.parent(tree) {
                 view = parent;
             } else {
                 break;
             }
         }
+    }
+
+    pub fn measure(self, tree: &mut ViewTree, w: Option<i16>, h: Option<i16>) {
+        let node = &mut tree.arena[self.0];
+        if node.measure_size == Some((w, h)) { return; }
+        node.measure_size = Some((w, h));
+        let layout = node.layout.take();
+        let desired_size = if let Some(layout) = &layout {
+            layout.measure(tree, self, w, h)
+        } else {
+            Vector::null()
+        };
+        let node = &mut tree.arena[self.0];
+        node.layout = layout;
+        node.desired_size = desired_size;
     }
 }
 
