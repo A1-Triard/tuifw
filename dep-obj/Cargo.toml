@@ -1,0 +1,15 @@
+[package]
+edition = "2018"
+name = "dep-obj"
+version = "0.0.1"
+authors = ["warlock <internalmike@gmail.com>"]
+description = "Dependency object: effective reactive heterogeneous container."
+readme = "README.md"
+documentation = "https://docs.rs/dep-obj/"
+keywords = ["property", "reactive", "dependency", "runtime", "type"]
+categories = ["rust-patterns", "no-std"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/A1-Triard/dep-obj"
+
+[dependencies]
+derivative = "2.1.1"
