@@ -12,6 +12,7 @@ extern crate derivative;
 #[macro_use]
 pub mod context;
 pub mod property;
+pub mod dep;
 
 #[cfg(docsrs)]
 pub mod example;
