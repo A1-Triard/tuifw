@@ -9,5 +9,9 @@ pub(crate) mod std {
 #[macro_use]
 extern crate derivative;
 
+#[macro_use]
 pub mod context;
 pub mod property;
+
+#[cfg(docsrs)]
+pub mod example;

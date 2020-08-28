@@ -8,9 +8,12 @@ macro_rules! context {
         $(,)?
     }) => {
         mod $name {
+            use super::*;
+
             pub struct Context {
                 $($field : context!(@impl * $ref_mut $type_)),*
             }
+
             impl Context {
                 pub fn call<ContextCallReturnType>(
                     $($field : context!(@impl & $ref_mut $type_)),*,
@@ -25,6 +28,9 @@ macro_rules! context {
                     context! { @impl fn $field $ref_mut $type_ }
                 )*
             }
+
+            unsafe impl Send for Context { }
+            unsafe impl Sync for Context { }
         }
     };
     (@impl * ref $type_:ty) => { *const $type_ };
