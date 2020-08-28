@@ -1,42 +1,27 @@
 #[macro_export]
 macro_rules! context {
-    (struct $name:ident {
+    ($name:ident {
         $($field:ident : $ref_mut:tt $type_:ty),*
         $(,)?
     }) => {
-        context! { @impl () $name { $($field : $ref_mut $type_),* } }
-    };
-    (pub ($($vis:tt)+) struct $name:ident {
-        $($field:ident : $ref_mut:tt $type_:ty),*
-        $(,)?
-    }) => {
-        context! { @impl (pub ($($vis)+)) $name { $($field : $ref_mut $type_),* } }
-    };
-    (pub struct $name:ident {
-        $($field:ident : $ref_mut:tt $type_:ty),*
-        $(,)?
-    }) => {
-        context! { @impl (pub) $name { $($field : $ref_mut $type_),* } }
-    };
-    (@impl ($($vis:tt)*) $name:ident {
-        $($field:ident : $ref_mut:tt $type_:ty),*
-    }) => {
-        $($vis)* struct $name {
-            $($field : context!(@impl * $ref_mut $type_)),*
-        }
-        impl $name {
-            pub fn call<ContextCallReturnType>(
-                $($field : context!(@impl & $ref_mut $type_)),*,
-                f: impl std::ops::FnOnce(&mut Self) -> ContextCallReturnType 
-            ) -> ContextCallReturnType {
-                let mut context = Self {
-                    $($field : context!(@impl as $field $ref_mut $type_)),*
-                };
-                f(&mut context)
+        mod $name {
+            pub struct Context {
+                $($field : context!(@impl * $ref_mut $type_)),*
             }
-            $(
-                context! { @impl fn $field $ref_mut $type_ }
-            )*
+            impl Context {
+                pub fn call<ContextCallReturnType>(
+                    $($field : context!(@impl & $ref_mut $type_)),*,
+                    f: impl std::ops::FnOnce(&mut Self) -> ContextCallReturnType 
+                ) -> ContextCallReturnType {
+                    let mut context = Self {
+                        $($field : context!(@impl as $field $ref_mut $type_)),*
+                    };
+                    f(&mut context)
+                }
+                $(
+                    context! { @impl fn $field $ref_mut $type_ }
+                )*
+            }
         }
     };
     (@impl * ref $type_:ty) => { *const $type_ };
@@ -63,18 +48,18 @@ macro_rules! context {
 mod test {
     use std::mem::replace;
 
-    context! {
-        struct TestContext1 {
-            a: const u8,
-            b: ref u16,
-            c: mut u32,
-        }
-    }
+    context!(context_1 {
+        a: const u8,
+        b: ref u16,
+        c: mut u32,
+    });
+
+    type Context1 = context_1::Context;
 
     #[test]
     fn test_context_1() {
         let mut x = 3;
-        let res = TestContext1::call(1, &2, &mut x, |context| {
+        let res = Context1::call(1, &2, &mut x, |context| {
             assert_eq!(context.a(), 1u8);
             assert_eq!(context.b(), &2u16);
             assert_eq!(replace(context.c(), 12), 3u32);
@@ -83,4 +68,26 @@ mod test {
         assert_eq!(res, "res");
         assert_eq!(x, 12);
     }
+
+    context!(context_2 {
+        a: const u8,
+        b: ref u16,
+        c: mut u32,
+    });
+
+    pub type Context2 = context_2::Context;
+
+    #[test]
+    fn test_context_2() {
+        let mut x = 3;
+        let res = Context2::call(1, &2, &mut x, |context| {
+            assert_eq!(context.a(), 1u8);
+            assert_eq!(context.b(), &2u16);
+            assert_eq!(replace(context.c(), 12), 3u32);
+            "res"
+        });
+        assert_eq!(res, "res");
+        assert_eq!(x, 12);
+    }
+
 }
