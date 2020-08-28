@@ -17,11 +17,18 @@ impl Default for DepObjLock {
     fn default() -> Self { DepObjLock::new() }
 }
 
-pub trait DepObj {
-    fn lock() -> &'static DepObjLock;
+pub trait DepObjRaw {
+    fn lock() -> &'static DepObjLock where Self: Sized;
 }
 
-pub struct DepTypeBuilder<Owner: DepObj> {
+pub trait DepObj: DepObjRaw {
+    fn dep_props(&self) -> &DepObjProps<Self> where Self: Sized;
+    fn dep_props_mut(&mut self) -> &mut DepObjProps<Self> where Self: Sized;
+}
+
+#[derive(Derivative)]
+#[derivative(Debug(bound=""))]
+pub struct DepTypeBuilder<Owner: DepObj + ?Sized> {
     align: usize,
     size: usize,
     default: Vec<(isize, unsafe fn(usize, *mut u8), usize)>,
@@ -42,7 +49,9 @@ impl<Owner: DepObj> DepTypeBuilder<Owner> {
             Some(DepTypeBuilder { size: 0, align: 1, default: Vec::new(), phantom: PhantomData })
         }
     }
+}
 
+impl<Owner: DepObj + ?Sized> DepTypeBuilder<Owner> {
     pub fn prop<T>(&mut self, default: fn() -> T) -> DepProp<Owner, T> {
         let align = align_of::<T>();
         self.align = max(self.align, align);
@@ -54,8 +63,8 @@ impl<Owner: DepObj> DepTypeBuilder<Owner> {
         DepProp { offset, phantom: PhantomData }
     }
 
-    pub fn build(self) -> DepType<Owner> {
-        DepType {
+    pub fn build(self) -> DepTypeToken<Owner> {
+        DepTypeToken {
             layout: Layout::from_size_align(self.size, self.align).expect("out of memory"),
             default: self.default,
             phantom: PhantomData
@@ -66,12 +75,15 @@ impl<Owner: DepObj> DepTypeBuilder<Owner> {
 #[derive(Derivative)]
 #[derivative(Debug(bound=""), Copy(bound=""), Clone(bound=""), Eq(bound=""), PartialEq(bound=""))]
 #[derivative(Hash(bound=""), Ord(bound=""), PartialOrd(bound=""))]
-pub struct DepProp<Owner: DepObj, T> {
+pub struct DepProp<Owner: DepObj + ?Sized, T> {
     offset: isize,
-    phantom: PhantomData<(Owner, T)>,
+    phantom: PhantomData<(*const Owner, T)>,
 }
 
-impl<Owner: DepObj, T> DepProp<Owner, T> {
+unsafe impl<Owner: DepObj + ?Sized, T> Send for DepProp<Owner, T> { }
+unsafe impl<Owner: DepObj + ?Sized, T> Sync for DepProp<Owner, T> { }
+
+impl<Owner: DepObj + ?Sized, T> DepProp<Owner, T> {
     pub fn get(self, obj_props: &DepObjProps<Owner>) -> &T {
         unsafe { &*(obj_props.storage.offset(self.offset) as *const T) }
     }
@@ -85,44 +97,74 @@ impl<Owner: DepObj, T> DepProp<Owner, T> {
     }
 }
 
-pub struct DepType<Owner: DepObj> {
+#[derive(Derivative)]
+#[derivative(Debug(bound=""))]
+pub struct DepTypeToken<Owner: DepObj + ?Sized> {
     layout: Layout,
     default: Vec<(isize, unsafe fn(usize, *mut u8), usize)>,
     phantom: PhantomData<Owner>,
 }
 
-impl<Owner: DepObj> DepType<Owner> {
-}
-
-pub struct DepObjProps<Owner: DepObj> {
+#[derive(Derivative)]
+#[derivative(Debug(bound=""))]
+pub struct DepObjProps<Owner: DepObj + ?Sized> {
     layout: Layout,
     storage: *mut u8,
     phantom: PhantomData<Owner>,
 }
 
-impl<Owner: DepObj> DepObjProps<Owner> {
-    pub fn new(type_: &DepType<Owner>) -> DepObjProps<Owner> {
-        let storage = if type_.layout.size() == 0 {
+unsafe impl<Owner: DepObj + ?Sized> Send for DepObjProps<Owner> { }
+unsafe impl<Owner: DepObj + ?Sized> Sync for DepObjProps<Owner> { }
+
+impl<Owner: DepObj + ?Sized> DepObjProps<Owner> {
+    pub fn new(type_token: &DepTypeToken<Owner>) -> DepObjProps<Owner> {
+        let storage = if type_token.layout.size() == 0 {
             null_mut()
         } else {
-            NonNull::new(unsafe { alloc(type_.layout) }).expect("out of memory").as_ptr()
+            NonNull::new(unsafe { alloc(type_token.layout) }).expect("out of memory").as_ptr()
         };
-        for &(offset, store, fn_ptr) in &type_.default {
+        for &(offset, store, fn_ptr) in &type_token.default {
             unsafe { store(fn_ptr, storage.offset(offset)) };
         }
         DepObjProps {
-            layout: type_.layout,
+            layout: type_token.layout,
             storage,
             phantom: PhantomData
         }
     }
 }
 
-impl<Owner: DepObj> Drop for DepObjProps<Owner> {
+impl<Owner: DepObj + ?Sized> Drop for DepObjProps<Owner> {
     fn drop(&mut self) {
         if !self.storage.is_null() {
             unsafe { dealloc(self.storage, self.layout) };
             self.storage = null_mut();
         }
     }
+}
+
+#[macro_export]
+macro_rules! DepObjRaw {
+    (()
+        $(pub $(($($vis:tt)+))?)? enum $name:ident
+        $($tail:tt)+ ) => {
+        DepObjRaw! {
+            @impl $name
+        }
+    };
+    (()
+        $(pub $(($($vis:tt)+))?)? struct $name:ident
+        $($tail:tt)+ ) => {
+        DepObjRaw! {
+            @impl $name
+        }
+    };
+    (@impl $name:ident) => {
+        impl $crate::dep::DepObjRaw for $name {
+            fn lock() -> &'static $crate::dep::DepObjLock {
+                static LOCK: $crate::dep::DepObjLock = $crate::dep::DepObjLock::new();
+                &LOCK
+            }
+        }
+    };
 }

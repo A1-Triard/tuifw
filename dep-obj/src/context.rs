@@ -11,46 +11,69 @@ macro_rules! context {
             #[allow(unused_imports)]
             use super::*;
 
-            pub struct Context {
-                $($field : context!(@impl * $ref_mut $type_)),*
-            }
-
-            impl Context {
-                pub fn call<ContextCallReturnType>(
-                    $($field : context!(@impl & $ref_mut $type_)),*,
-                    f: impl $crate::context::std_ops_FnOnce(&mut Self) -> ContextCallReturnType 
-                ) -> ContextCallReturnType {
-                    let mut context = Self {
-                        $($field : context!(@impl as $field $ref_mut $type_)),*
-                    };
-                    f(&mut context)
-                }
-                $(
-                    context! { @impl fn $field $ref_mut $type_ }
-                )*
-            }
-
-            unsafe impl Send for Context { }
-            unsafe impl Sync for Context { }
+            context! { @impl Context {} {} {} {} { $($field : $ref_mut $type_),* } }
         }
     };
-    (@impl * ref $type_:ty) => { *const $type_ };
-    (@impl * mut $type_:ty) => { *mut $type_ };
-    (@impl * const $type_:ty) => { $type_ };
-    (@impl & ref $type_:ty) => { &$type_ };
-    (@impl & mut $type_:ty) => { &mut $type_ };
-    (@impl & const $type_:ty) => { $type_ };
-    (@impl as $field:ident ref $type_:ty) => { $field as *const $type_ };
-    (@impl as $field:ident mut $type_:ty) => { $field as *mut $type_ };
-    (@impl as $field:ident const $type_:ty) => { $field };
-    (@impl fn $field:ident ref $type_:ty) => {
-        pub fn $field (&self) -> &$type_ { unsafe { &*self.$field } }
+    (@impl $c:ident {$({$($f:tt)*})*} {$({$($p:tt)*})*} {$({$($a:tt)*})*} {$({$($b:tt)*})*} {}) => {
+        pub struct $c {
+            $($($f)*),*
+        }
+
+        impl $c {
+            pub fn call<ContextCallReturnType>(
+                $($($p)*),*,
+                f: impl $crate::context::std_ops_FnOnce(&mut Self) -> ContextCallReturnType 
+            ) -> ContextCallReturnType {
+                let mut context = Self {
+                    $($($a)*),*
+                };
+                f(&mut context)
+            }
+
+            $($($b)*)*
+        }
+
+        unsafe impl Send for $c { }
+        unsafe impl Sync for $c { }
     };
-    (@impl fn $field:ident mut $type_:ty) => {
-        pub fn $field (&mut self) -> &mut $type_ { unsafe { &mut *self.$field } }
+    (@impl $c:ident {$({$($f:tt)*})*} {$({$($p:tt)*})*} {$({$($a:tt)*})*} {$({$($b:tt)*})*}
+        {$field:ident : ref $type_:ty $(, $ft:ident : $rt:tt $t:ty)*}) => {
+
+        context! { @impl $c
+            {$({$($f)*})* {$field : *const $type_}}
+            {$({$($p)*})* {$field : &$type_}}
+            {$({$($a)*})* {$field : $field as *const $type_}}
+            {$({$($b)*})* {
+                pub fn $field (&self) -> &$type_ { unsafe { &*self.$field } }
+            }}
+            {$($ft : $rt $t),*}
+        }
     };
-    (@impl fn $field:ident const $type_:ty) => {
-        pub fn $field (&self) -> $type_ { self.$field }
+    (@impl $c:ident {$({$($f:tt)*})*} {$({$($p:tt)*})*} {$({$($a:tt)*})*} {$({$($b:tt)*})*}
+        {$field:ident : mut $type_:ty $(, $ft:ident : $rt:tt $t:ty)*}) => {
+
+        context! { @impl $c
+            {$({$($f)*})* {$field : *mut $type_}}
+            {$({$($p)*})* {$field : &mut $type_}}
+            {$({$($a)*})* {$field : $field as *mut $type_}}
+            {$({$($b)*})* {
+                pub fn $field (&mut self) -> &mut $type_ { unsafe { &mut *self.$field } }
+            }}
+            {$($ft : $rt $t),*}
+        }
+    };
+    (@impl $c:ident {$({$($f:tt)*})*} {$({$($p:tt)*})*} {$({$($a:tt)*})*} {$({$($b:tt)*})*}
+        {$field:ident : const $type_:ty $(, $ft:ident : $rt:tt $t:ty)*}) => {
+
+        context! { @impl $c
+            {$({$($f)*})* {$field : $type_}}
+            {$({$($p)*})* {$field : $type_}}
+            {$({$($a)*})* {$field}}
+            {$({$($b)*})* {
+                pub fn $field (&self) -> $type_ { self.$field }
+            }}
+            {$($ft : $rt $t),*}
+        }
     };
 }
 
