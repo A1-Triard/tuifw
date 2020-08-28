@@ -1,4 +1,5 @@
-use std::mem::replace;
+use core::mem::replace;
+use alloc::vec::Vec;
 
 #[derive(Derivative)]
 #[derivative(Debug)]
