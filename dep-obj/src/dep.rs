@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use core::cmp::max;
 use core::convert::TryInto;
 use core::marker::PhantomData;
-use core::mem::{align_of, size_of, transmute};
+use core::mem::{replace, align_of, size_of, transmute};
 use core::ptr::{self, NonNull, null_mut};
 use core::sync::atomic::{AtomicBool, Ordering};
 
@@ -73,7 +73,15 @@ pub struct DepProp<Owner: DepObj, T> {
 
 impl<Owner: DepObj, T> DepProp<Owner, T> {
     pub fn get(self, obj_props: &DepObjProps<Owner>) -> &T {
-        unsafe { &*(obj_props.storage.offset(self.offset) as  *const T) }
+        unsafe { &*(obj_props.storage.offset(self.offset) as *const T) }
+    }
+
+    pub fn get_mut(self, obj_props: &mut DepObjProps<Owner>) -> &mut T {
+        unsafe { &mut *(obj_props.storage.offset(self.offset) as *mut T) }
+    }
+
+    pub fn set(self, obj_props: &mut DepObjProps<Owner>, value: T) -> T {
+        replace(self.get_mut(obj_props), value)
     }
 }
 
