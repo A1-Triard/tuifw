@@ -1,4 +1,4 @@
-use alloc::alloc::{alloc, Layout};
+use alloc::alloc::{alloc, dealloc, Layout};
 use alloc::vec::Vec;
 use core::cmp::max;
 use core::convert::TryInto;
@@ -63,12 +63,18 @@ impl<Owner: DepObj> DepTypeBuilder<Owner> {
     }
 }
 
+#[derive(Derivative)]
+#[derivative(Debug(bound=""), Copy(bound=""), Clone(bound=""), Eq(bound=""), PartialEq(bound=""))]
+#[derivative(Hash(bound=""), Ord(bound=""), PartialOrd(bound=""))]
 pub struct DepProp<Owner: DepObj, T> {
     offset: isize,
     phantom: PhantomData<(Owner, T)>,
 }
 
 impl<Owner: DepObj, T> DepProp<Owner, T> {
+    pub fn get(self, obj_props: &DepObjProps<Owner>) -> &T {
+        unsafe { &*(obj_props.storage.offset(self.offset) as  *const T) }
+    }
 }
 
 pub struct DepType<Owner: DepObj> {
@@ -81,6 +87,7 @@ impl<Owner: DepObj> DepType<Owner> {
 }
 
 pub struct DepObjProps<Owner: DepObj> {
+    layout: Layout,
     storage: *mut u8,
     phantom: PhantomData<Owner>,
 }
@@ -96,11 +103,18 @@ impl<Owner: DepObj> DepObjProps<Owner> {
             unsafe { store(fn_ptr, storage.offset(offset)) };
         }
         DepObjProps {
+            layout: type_.layout,
             storage,
             phantom: PhantomData
         }
     }
 }
 
-
-
+impl<Owner: DepObj> Drop for DepObjProps<Owner> {
+    fn drop(&mut self) {
+        if !self.storage.is_null() {
+            unsafe { dealloc(self.storage, self.layout) };
+            self.storage = null_mut();
+        }
+    }
+}
