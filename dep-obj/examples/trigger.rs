@@ -88,6 +88,14 @@ mod and_chip {
         }
     }
 
+    impl AndLegs {
+        pub fn new() -> AndLegs {
+            AndLegs {
+                dep_props: DepObjProps::new(AND_LEGS_TYPE.token())
+            }
+        }
+    }
+
     impl DepObj for AndLegs {
         fn dep_props(&self) -> &DepObjProps<Self> { &self.dep_props }
         fn dep_props_mut(&mut self) -> &mut DepObjProps<Self> { &mut self.dep_props }
