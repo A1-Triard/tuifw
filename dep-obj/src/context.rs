@@ -1,6 +1,6 @@
 #[macro_export]
 macro_rules! context {
-    ($name:ident {
+    (mod $name:ident {
         $($field:ident : $ref_mut:tt $type_:ty),*
         $(,)?
     }) => {
@@ -48,11 +48,13 @@ macro_rules! context {
 mod test {
     use std::mem::replace;
 
-    context!(context_1 {
-        a: const u8,
-        b: ref u16,
-        c: mut u32,
-    });
+    context! {
+        mod context_1 {
+            a: const u8,
+            b: ref u16,
+            c: mut u32,
+        }
+    }
 
     type Context1 = context_1::Context;
 
@@ -69,11 +71,13 @@ mod test {
         assert_eq!(x, 12);
     }
 
-    context!(context_2 {
-        a: const u8,
-        b: ref u16,
-        c: mut u32,
-    });
+    context! {
+        mod context_2 {
+            a: const u8,
+            b: ref u16,
+            c: mut u32,
+        }
+    }
 
     pub type Context2 = context_2::Context;
 
