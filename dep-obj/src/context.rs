@@ -8,6 +8,7 @@ macro_rules! context {
         $(,)?
     }) => {
         mod $name {
+            #[allow(unused_imports)]
             use super::*;
 
             pub struct Context {
