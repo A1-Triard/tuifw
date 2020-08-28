@@ -1,3 +1,6 @@
+#[doc(hidden)]
+pub use core::ops::FnOnce as std_ops_FnOnce;
+
 #[macro_export]
 macro_rules! context {
     (mod $name:ident {
@@ -11,7 +14,7 @@ macro_rules! context {
             impl Context {
                 pub fn call<ContextCallReturnType>(
                     $($field : context!(@impl & $ref_mut $type_)),*,
-                    f: impl std::ops::FnOnce(&mut Self) -> ContextCallReturnType 
+                    f: impl $crate::context::std_ops_FnOnce(&mut Self) -> ContextCallReturnType 
                 ) -> ContextCallReturnType {
                     let mut context = Self {
                         $($field : context!(@impl as $field $ref_mut $type_)),*
@@ -46,7 +49,7 @@ macro_rules! context {
 
 #[cfg(test)]
 mod test {
-    use std::mem::replace;
+    use core::mem::replace;
 
     context! {
         mod context_1 {
@@ -93,5 +96,4 @@ mod test {
         assert_eq!(res, "res");
         assert_eq!(x, 12);
     }
-
 }
