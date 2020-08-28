@@ -1,6 +1,7 @@
 #![deny(warnings)]
 
 #![no_std]
+#[macro_use]
 extern crate alloc;
 pub(crate) mod std {
     pub use core::*;

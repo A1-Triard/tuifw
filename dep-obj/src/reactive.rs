@@ -6,24 +6,34 @@ use alloc::vec::Vec;
 pub struct Reactive<Type, Context> {
     value: Type,
     #[derivative(Debug="ignore")]
-    on_changed: Vec<fn(context: &mut Context, old: &Type)>,
+    on_changed: Option<Vec<fn(context: &mut Context, old: &Type)>>,
 }
 
 pub struct OnChanged<Type, Context>(
-    Vec<fn(context: &mut Context, old: &Type)>
+    Option<Vec<fn(context: &mut Context, old: &Type)>>
 );
 
 impl<Type, Context> OnChanged<Type, Context> {
     pub fn raise(self, context: &mut Context, old: &Type) {
-        for on_changed in self.0 {
-            on_changed(context, old);
+        if let Some(on_changed) = self.0 {
+            for on_changed in on_changed {
+                on_changed(context, old);
+            }
         }
+    }
+}
+
+impl<Type: Eq, Context> Reactive<Type, Context> {
+    pub fn set_dist(&mut self, value: Type) -> (Type, OnChanged<Type, Context>) {
+        let old = replace(&mut self.value, value);
+        let on_changed = if old == self.value { None } else { self.on_changed.clone() };
+        (old, OnChanged(on_changed))
     }
 }
 
 impl<Type, Context> Reactive<Type, Context> {
     pub fn new(value: Type) -> Self {
-        Reactive { value, on_changed: Vec::new() }
+        Reactive { value, on_changed: None }
     }
 
     pub fn set(&mut self, value: Type) -> (Type, OnChanged<Type, Context>) {
@@ -37,6 +47,10 @@ impl<Type, Context> Reactive<Type, Context> {
         &mut self,
         callback: fn(context: &mut Context, old: &Type)
     ) {
-        self.on_changed.push(callback);
+        if let Some(on_changed) = self.on_changed.as_mut() {
+            on_changed.push(callback);
+        } else {
+            self.on_changed = Some(vec![callback]);
+        }
     }
 }

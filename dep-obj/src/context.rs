@@ -3,23 +3,26 @@ pub use core::ops::FnOnce as std_ops_FnOnce;
 
 #[macro_export]
 macro_rules! context {
-    (mod $name:ident {
-        $($field:ident : $ref_mut:tt $type_:ty),*
+    (mod $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ $(,)?>)? $name:ident  {
+        $($field:ident $(($field_mut:ident))? : $ref_mut:tt $type_:ty ),*
         $(,)?
     }) => {
         mod $name {
             #[allow(unused_imports)]
             use super::*;
 
-            context! { @impl Context {} {} {} {} { $($field : $ref_mut $type_),* } }
+            context! { @impl Context [ $(< $( $lt $( : $clt $(+ $dlt )* )? ),+ >)?] [ $(< $( $lt ),+ >)?]
+                {} {} {} {} { $($field $(($field_mut))? : $ref_mut $type_),* } }
         }
     };
-    (@impl $c:ident {$({$($f:tt)*})*} {$({$($p:tt)*})*} {$({$($a:tt)*})*} {$({$($b:tt)*})*} {}) => {
-        pub struct $c {
+    (@impl $c:ident [$($i:tt)*] [$($r:tt)*]
+        {$({$($f:tt)*})*} {$({$($p:tt)*})*} {$({$($a:tt)*})*} {$({$($b:tt)*})*} {}) => {
+        
+        pub struct $c $($i)* {
             $($($f)*),*
         }
 
-        impl $c {
+        impl $($i)* $c $($r)* {
             pub fn call<ContextCallReturnType>(
                 $($($p)*),*,
                 f: impl $crate::context::std_ops_FnOnce(&mut Self) -> ContextCallReturnType 
@@ -33,46 +36,50 @@ macro_rules! context {
             $($($b)*)*
         }
 
-        unsafe impl Send for $c { }
-        unsafe impl Sync for $c { }
+        unsafe impl $($i)* Send for $c $($r)* { }
+        unsafe impl $($i)* Sync for $c $($r)* { }
     };
-    (@impl $c:ident {$({$($f:tt)*})*} {$({$($p:tt)*})*} {$({$($a:tt)*})*} {$({$($b:tt)*})*}
-        {$field:ident : ref $type_:ty $(, $ft:ident : $rt:tt $t:ty)*}) => {
+    (@impl $c:ident [$($i:tt)*] [$($r:tt)*]
+        {$({$($f:tt)*})*} {$({$($p:tt)*})*} {$({$($a:tt)*})*} {$({$($b:tt)*})*}
+        {$field:ident : ref $type_:ty $(, $ft:ident $(($fm:ident))? : $rt:tt $t:ty)*}) => {
 
-        context! { @impl $c
+        context! { @impl $c [$($i)*] [$($r)*]
             {$({$($f)*})* {$field : *const $type_}}
             {$({$($p)*})* {$field : &$type_}}
             {$({$($a)*})* {$field : $field as *const $type_}}
             {$({$($b)*})* {
                 pub fn $field (&self) -> &$type_ { unsafe { &*self.$field } }
             }}
-            {$($ft : $rt $t),*}
+            {$($ft $(($fm))? : $rt $t),*}
         }
     };
-    (@impl $c:ident {$({$($f:tt)*})*} {$({$($p:tt)*})*} {$({$($a:tt)*})*} {$({$($b:tt)*})*}
-        {$field:ident : mut $type_:ty $(, $ft:ident : $rt:tt $t:ty)*}) => {
+    (@impl $c:ident [$($i:tt)*] [$($r:tt)*]
+        {$({$($f:tt)*})*} {$({$($p:tt)*})*} {$({$($a:tt)*})*} {$({$($b:tt)*})*}
+        {$field:ident ($field_mut:ident) : mut $type_:ty $(, $ft:ident $(($fm:ident))? : $rt:tt $t:ty)*}) => {
 
-        context! { @impl $c
+        context! { @impl $c [$($i)*] [$($r)*]
             {$({$($f)*})* {$field : *mut $type_}}
             {$({$($p)*})* {$field : &mut $type_}}
             {$({$($a)*})* {$field : $field as *mut $type_}}
             {$({$($b)*})* {
-                pub fn $field (&mut self) -> &mut $type_ { unsafe { &mut *self.$field } }
+                pub fn $field (&self) -> &$type_ { unsafe { &*self.$field } }
+                pub fn $field_mut (&mut self) -> &mut $type_ { unsafe { &mut *self.$field } }
             }}
-            {$($ft : $rt $t),*}
+            {$($ft $(($fm))? : $rt $t),*}
         }
     };
-    (@impl $c:ident {$({$($f:tt)*})*} {$({$($p:tt)*})*} {$({$($a:tt)*})*} {$({$($b:tt)*})*}
-        {$field:ident : const $type_:ty $(, $ft:ident : $rt:tt $t:ty)*}) => {
+    (@impl $c:ident [$($i:tt)*] [$($r:tt)*]
+        {$({$($f:tt)*})*} {$({$($p:tt)*})*} {$({$($a:tt)*})*} {$({$($b:tt)*})*}
+        {$field:ident : const $type_:ty $(, $ft:ident $(($fm:ident))? : $rt:tt $t:ty)*}) => {
 
-        context! { @impl $c
+        context! { @impl $c [$($i)*] [$($r)*]
             {$({$($f)*})* {$field : $type_}}
             {$({$($p)*})* {$field : $type_}}
             {$({$($a)*})* {$field}}
             {$({$($b)*})* {
                 pub fn $field (&self) -> $type_ { self.$field }
             }}
-            {$($ft : $rt $t),*}
+            {$($ft $(($fm))? : $rt $t),*}
         }
     };
 }
