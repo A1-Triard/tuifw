@@ -14,14 +14,10 @@ extern crate derivative;
 pub use core::ops::FnOnce as std_ops_FnOnce;
 
 #[cfg(docsrs)]
-#[macro_use]
-mod context;
+pub mod context;
 
 #[cfg(not(docsrs))]
 mod context;
 
 pub mod reactive;
 pub mod dep;
-
-#[cfg(docsrs)]
-pub mod example;
