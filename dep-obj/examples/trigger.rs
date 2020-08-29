@@ -1,3 +1,6 @@
+#![deny(warnings)]
+#![allow(dead_code)]
+
 #[macro_use]
 extern crate macro_attr;
 #[macro_use]
@@ -321,11 +324,37 @@ fn main() {
         let in_2 = or_legs_type.in_2();
         or_2.set_dist(context, in_2, out);
     });
-    /*
-    not_2.on_changed(circuit, type_.out(), |context, _old| {
-        let chip = context.chip();
-        let out = *chip.get(context.circuit(), type_.out());
-        chip.set_dist(context.circuit_mut(), type_.in_1(), out);
+    not_2.on_changed(circuit, not_legs_type.out(), |not_2, context, _old| {
+        let not_legs_type = context.get::<NotLegsType<(usize, NonZeroUsize)>>().expect("NotLegsType required");
+        let or_legs_type = context.get::<OrLegsType<(usize, NonZeroUsize)>>().expect("OrLegsType required");
+        let circuit = context.get::<Circuit<(usize, NonZeroUsize)>>().expect("Cicuit required");
+        let or_1 = unsafe { Chip::from_raw_parts(*not_2.tag(circuit)) };
+        let &out = not_2.get(circuit, not_legs_type.out());
+        let in_2 = or_legs_type.in_2();
+        or_1.set_dist(context, in_2, out);
     });
-    */
+    or_1.on_changed(circuit, or_legs_type.out(), |or_1, context, _old| {
+        let not_legs_type = context.get::<NotLegsType<(usize, NonZeroUsize)>>().expect("NotLegsType required");
+        let or_legs_type = context.get::<OrLegsType<(usize, NonZeroUsize)>>().expect("OrLegsType required");
+        let circuit = context.get::<Circuit<(usize, NonZeroUsize)>>().expect("Cicuit required");
+        let not_1 = unsafe { Chip::from_raw_parts(*or_1.tag(circuit)) };
+        let &out = or_1.get(circuit, or_legs_type.out());
+        let in_ = not_legs_type.in_();
+        not_1.set_dist(context, in_, out);
+    });
+    or_2.on_changed(circuit, or_legs_type.out(), |or_2, context, _old| {
+        let not_legs_type = context.get::<NotLegsType<(usize, NonZeroUsize)>>().expect("NotLegsType required");
+        let or_legs_type = context.get::<OrLegsType<(usize, NonZeroUsize)>>().expect("OrLegsType required");
+        let circuit = context.get::<Circuit<(usize, NonZeroUsize)>>().expect("Cicuit required");
+        let not_2 = unsafe { Chip::from_raw_parts(*or_2.tag(circuit)) };
+        let &out = or_2.get(circuit, or_legs_type.out());
+        let in_ = not_legs_type.in_();
+        not_2.set_dist(context, in_, out);
+    });
+    not_1.on_changed(circuit, not_legs_type.out(), |not_1, context, _old| {
+        let not_legs_type = context.get::<NotLegsType<(usize, NonZeroUsize)>>().expect("NotLegsType required");
+        let circuit = context.get::<Circuit<(usize, NonZeroUsize)>>().expect("Cicuit required");
+        let &out = not_1.get(circuit, not_legs_type.out());
+        println!("{}", if out { 1 } else { 0 });
+    });
 }
