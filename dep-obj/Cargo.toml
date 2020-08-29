@@ -13,6 +13,7 @@ repository = "https://github.com/A1-Triard/dep-obj"
 
 [package.metadata.docs.rs]
 rustc-args = ["--cfg", "docsrs"]
+rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 derivative = "2.1.1"
