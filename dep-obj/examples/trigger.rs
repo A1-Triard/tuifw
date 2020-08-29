@@ -15,6 +15,7 @@ mod circuit {
     use components_arena::{Id, Arena, ComponentClassMutex};
     use downcast::Any;
     use std::fmt::Debug;
+    use std::num::NonZeroUsize;
 
     pub trait ChipLegs: DepObj + Any + Debug + Send + Sync {
     }
@@ -41,16 +42,32 @@ mod circuit {
     impl<Tag: 'static> Chip<Tag> {
         pub fn new<T>(
             circuit: &mut Circuit<Tag>,
-            legs_tag: impl FnOnce(Chip<Tag>) -> (Box<dyn ChipLegs>, Tag, T)
+            legs_tag: impl FnOnce(Chip<Tag>) -> (Box<dyn ChipLegs>, (Tag, T))
         ) -> T {
             circuit.arena.insert(|chip| {
-                let (legs, tag, result) = legs_tag(Chip(chip));
+                let (legs, (tag, result)) = legs_tag(Chip(chip));
                 (ChipNode { chip: Chip(chip), legs, tag }, result)
             })
         }
 
+        pub fn tag(self, circuit: &Circuit<Tag>) -> &Tag {
+            &circuit.arena[self.0].tag
+        }
+
+        pub fn tag_mut(self, circuit: &mut Circuit<Tag>) -> &mut Tag {
+            &mut circuit.arena[self.0].tag
+        }
+
         pub fn drop(self, circuit: &mut Circuit<Tag>) {
             circuit.arena.remove(self.0);
+        }
+
+        pub unsafe fn from_raw_parts(raw_parts: (usize, NonZeroUsize)) -> Self {
+            Chip(Id::from_raw_parts(raw_parts))
+        }
+
+        pub fn into_raw_parts(self) -> (usize, NonZeroUsize) {
+            self.0.into_raw_parts()
         }
 
         pub fn get<Legs: ChipLegs, T>(
@@ -127,13 +144,17 @@ mod or_chip {
     }
 
     impl OrLegs {
-        pub fn new<Tag: 'static>(circuit: &mut Circuit<Tag>, tag: Tag, type_: &OrLegsType<Tag>) -> Chip<Tag> {
+        pub fn new<Tag: 'static, T>(
+            circuit: &mut Circuit<Tag>,
+            type_: &OrLegsType<Tag>,
+            tag: impl FnOnce(Chip<Tag>) -> (Tag, T)
+        ) -> T {
             let mut legs = OrLegs {
                 dep_props: DepObjProps::new(type_.token())
             };
             type_.in_1().get_mut(&mut legs.dep_props).on_changed(Self::update::<Tag>);
             type_.in_2().get_mut(&mut legs.dep_props).on_changed(Self::update::<Tag>);
-            Chip::new(circuit, |chip| (Box::new(legs) as _, tag, chip))
+            Chip::new(circuit, |chip| (Box::new(legs) as _, tag(chip)))
         }
 
         fn update<Tag: 'static>(chip: Chip<Tag>, context: &mut dyn Context, _old: &bool) {
@@ -142,7 +163,7 @@ mod or_chip {
             let in_1 = *chip.get(circuit, type_.in_1());
             let in_2 = *chip.get(circuit, type_.in_2());
             let out = type_.out();
-            chip.set_dist(context, out, in_1 & in_2);
+            chip.set_dist(context, out, in_1 | in_2);
         }
     }
 
@@ -192,12 +213,16 @@ mod not_chip {
     }
 
     impl NotLegs {
-        pub fn new<Tag: 'static>(circuit: &mut Circuit<Tag>, tag: Tag, type_: &NotLegsType<Tag>) -> Chip<Tag> {
+        pub fn new<Tag: 'static, T>(
+            circuit: &mut Circuit<Tag>,
+            type_: &NotLegsType<Tag>,
+            tag: impl FnOnce(Chip<Tag>) -> (Tag, T)
+        ) -> T {
             let mut legs = NotLegs {
                 dep_props: DepObjProps::new(type_.token())
             };
             type_.in_().get_mut(&mut legs.dep_props).on_changed(Self::update::<Tag>);
-            Chip::new(circuit, |chip| (Box::new(legs) as _, tag, chip))
+            Chip::new(circuit, |chip| (Box::new(legs) as _, tag(chip)))
         }
 
         fn update<Tag: 'static>(chip: Chip<Tag>, context: &mut dyn Context, _old: &bool) {
@@ -239,29 +264,29 @@ mod not_chip {
 }
 
 use std::any::{Any, TypeId};
-use dep_obj::reactive::Context;
+use std::num::NonZeroUsize;
+use dep_obj::reactive::{Context, ContextExt};
 use circuit::*;
 use or_chip::*;
 use not_chip::*;
 
 context! {
     mod trigger_context {
-        circuit (circuit_mut): mut Circuit<u8>,
-        or_legs_type: ref OrLegsType<u8>,
-        not_legs_type: ref NotLegsType<u8>,
+        circuit (circuit_mut): mut Circuit<(usize, NonZeroUsize)>,
+        or_legs_type: ref OrLegsType<(usize, NonZeroUsize)>,
+        not_legs_type: ref NotLegsType<(usize, NonZeroUsize)>,
     }
 }
-
 
 use trigger_context::Context as TriggerContext;
 
 impl Context for TriggerContext {
     fn get_raw(&self, type_: TypeId) -> Option<&dyn Any> {
-        if type_ == TypeId::of::<Circuit<u8>>() {
+        if type_ == TypeId::of::<Circuit<(usize, NonZeroUsize)>>() {
             Some(self.circuit())
-        } else if type_ == TypeId::of::<OrLegsType<u8>>() {
+        } else if type_ == TypeId::of::<OrLegsType<(usize, NonZeroUsize)>>() {
             Some(self.or_legs_type())
-        } else if type_ == TypeId::of::<NotLegsType<u8>>() {
+        } else if type_ == TypeId::of::<NotLegsType<(usize, NonZeroUsize)>>() {
             Some(self.not_legs_type())
         } else {
             None
@@ -269,7 +294,7 @@ impl Context for TriggerContext {
     }
 
     fn get_mut_raw(&mut self, type_: TypeId) -> Option<&mut dyn Any> {
-        if type_ == TypeId::of::<Circuit<u8>>() {
+        if type_ == TypeId::of::<Circuit<(usize, NonZeroUsize)>>() {
             Some(self.circuit_mut())
         } else {
             None
@@ -279,20 +304,23 @@ impl Context for TriggerContext {
 
 fn main() {
     let circuit = &mut Circuit::new();
-    let or_legs_type: OrLegsType<u8> =  OrLegsType::new().unwrap();
-    let not_legs_type: NotLegsType<u8> = NotLegsType::new().unwrap();
-    let or_1 = OrLegs::new(circuit, 1, &or_legs_type);
-    let or_2 = OrLegs::new(circuit, 2, &or_legs_type);
-    let not_1 = NotLegs::new(circuit, 3, &not_legs_type);
-    let not_2 = NotLegs::new(circuit, 4, &not_legs_type);
-    /*
-    not_1.on_changed(circuit, not_legs_type.out(), |context, _old| {
-        let chip = context.chip();
-        let out = context.outer().not_legs_type
-        let out = *chip.get(context.circuit(), type_.out());
-        chip.set_dist(context.circuit_mut(), type_.in_2(), out);
+    let or_legs_type: OrLegsType<(usize, NonZeroUsize)> =  OrLegsType::new().unwrap();
+    let not_legs_type: NotLegsType<(usize, NonZeroUsize)> = NotLegsType::new().unwrap();
+    let not_1 = NotLegs::new(circuit, &not_legs_type, |chip| ((0, unsafe { NonZeroUsize::new_unchecked(1) }), chip));
+    let not_2 = NotLegs::new(circuit, &not_legs_type, |chip| ((0, unsafe { NonZeroUsize::new_unchecked(1) }), chip));
+    let or_1 = OrLegs::new(circuit, &or_legs_type, |chip| (not_1.into_raw_parts(), chip));
+    let or_2 = OrLegs::new(circuit, &or_legs_type, |chip| (not_2.into_raw_parts(), chip));
+    *not_1.tag_mut(circuit) = or_2.into_raw_parts();
+    *not_2.tag_mut(circuit) = or_1.into_raw_parts();
+    not_1.on_changed(circuit, not_legs_type.out(), |not_1, context, _old| {
+        let not_legs_type = context.get::<NotLegsType<(usize, NonZeroUsize)>>().expect("NotLegsType required");
+        let or_legs_type = context.get::<OrLegsType<(usize, NonZeroUsize)>>().expect("OrLegsType required");
+        let circuit = context.get::<Circuit<(usize, NonZeroUsize)>>().expect("Cicuit required");
+        let or_2 = unsafe { Chip::from_raw_parts(*not_1.tag(circuit)) };
+        let &out = not_1.get(circuit, not_legs_type.out());
+        let in_2 = or_legs_type.in_2();
+        or_2.set_dist(context, in_2, out);
     });
-    */
     /*
     not_2.on_changed(circuit, type_.out(), |context, _old| {
         let chip = context.chip();
