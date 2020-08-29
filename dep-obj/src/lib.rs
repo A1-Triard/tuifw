@@ -11,7 +11,7 @@ pub(crate) mod std {
 extern crate derivative;
 
 #[macro_use]
-pub mod context;
+mod context;
 pub mod reactive;
 pub mod dep;
 
