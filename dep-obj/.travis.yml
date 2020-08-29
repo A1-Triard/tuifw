@@ -3,3 +3,19 @@ rust:
 - stable
 - beta
 - nightly
+env:
+- NIGHTLY=true
+- NIGHTLY=false
+matrix:
+  exclude:
+  - rust: stable
+    env: NIGHTLY=true
+  - rust: beta
+    env: NIGHTLY=true
+  - rust: nightly
+    env: NIGHTLY=false
+script:
+- cargo build --verbose
+- cargo test --verbose --tests
+- if $NIGHTLY; then cargo test --verbose --doc; fi
+- if $NIGHTLY; then cargo test --verbose --examples; fi
