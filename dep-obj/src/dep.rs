@@ -35,6 +35,10 @@ pub struct DepTypeBuilder<Owner: DepObj + ?Sized> {
     phantom: PhantomData<Owner>,
 }
 
+unsafe impl<Owner: DepObj + ?Sized> Send for DepTypeBuilder<Owner> { }
+unsafe impl<Owner: DepObj + ?Sized> Sync for DepTypeBuilder<Owner> { }
+impl<Owner: DepObj + ?Sized> Unpin for DepTypeBuilder<Owner> { }
+
 unsafe fn store_default<T>(fn_ptr: usize, storage: *mut u8) {
     let fn_ptr: fn() -> T = transmute(fn_ptr);
     ptr::write(storage as *mut T, fn_ptr());
@@ -82,6 +86,7 @@ pub struct DepProp<Owner: DepObj + ?Sized, T> {
 
 unsafe impl<Owner: DepObj + ?Sized, T> Send for DepProp<Owner, T> { }
 unsafe impl<Owner: DepObj + ?Sized, T> Sync for DepProp<Owner, T> { }
+impl<Owner: DepObj + ?Sized, T> Unpin for DepProp<Owner, T> { }
 
 impl<Owner: DepObj + ?Sized, T> DepProp<Owner, T> {
     pub fn get(self, obj_props: &DepObjProps<Owner>) -> &T {
@@ -105,6 +110,10 @@ pub struct DepTypeToken<Owner: DepObj + ?Sized> {
     phantom: PhantomData<Owner>,
 }
 
+unsafe impl<Owner: DepObj + ?Sized> Send for DepTypeToken<Owner> { }
+unsafe impl<Owner: DepObj + ?Sized> Sync for DepTypeToken<Owner> { }
+impl<Owner: DepObj + ?Sized> Unpin for DepTypeToken<Owner> { }
+
 #[derive(Derivative)]
 #[derivative(Debug(bound=""))]
 pub struct DepObjProps<Owner: DepObj + ?Sized> {
@@ -115,6 +124,7 @@ pub struct DepObjProps<Owner: DepObj + ?Sized> {
 
 unsafe impl<Owner: DepObj + ?Sized> Send for DepObjProps<Owner> { }
 unsafe impl<Owner: DepObj + ?Sized> Sync for DepObjProps<Owner> { }
+impl<Owner: DepObj + ?Sized> Unpin for DepObjProps<Owner> { }
 
 impl<Owner: DepObj + ?Sized> DepObjProps<Owner> {
     pub fn new(type_token: &DepTypeToken<Owner>) -> DepObjProps<Owner> {
