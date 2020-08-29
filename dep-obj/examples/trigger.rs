@@ -369,5 +369,9 @@ fn main() {
         or_1.set_dist(context, or_legs_type.in_1(), false);
         or_2.set_dist(context, or_legs_type.in_1(), true);
         or_2.set_dist(context, or_legs_type.in_1(), false);
+        or_1.set_dist(context, or_legs_type.in_1(), true);
+        or_1.set_dist(context, or_legs_type.in_1(), false);
+        or_2.set_dist(context, or_legs_type.in_1(), true);
+        or_2.set_dist(context, or_legs_type.in_1(), false);
     });
 }
