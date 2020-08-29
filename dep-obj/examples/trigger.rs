@@ -256,7 +256,7 @@ mod not_chip {
         pub fn new() -> Option<Self> {
             DepTypeBuilder::new().map(|mut builder| {
                 let in_ = builder.prop::<Reactive<Chip<Tag>, bool>>(|| Reactive::new(false));
-                let out = builder.prop::<Reactive<Chip<Tag>, bool>>(|| Reactive::new(false));
+                let out = builder.prop::<Reactive<Chip<Tag>, bool>>(|| Reactive::new(true));
                 let token = builder.build();
                 NotLegsType { token, in_, out }
             })
@@ -356,5 +356,18 @@ fn main() {
         let circuit = context.get::<Circuit<(usize, NonZeroUsize)>>().expect("Cicuit required");
         let &out = not_1.get(circuit, not_legs_type.out());
         println!("{}", if out { 1 } else { 0 });
+    });
+    TriggerContext::call(circuit, &or_legs_type, &not_legs_type, |context| {
+        or_1.set(context, or_legs_type.in_2(), true);
+        or_2.set(context, or_legs_type.in_2(), true);
+        not_1.set(context, not_legs_type.in_(), true);
+        not_2.set(context, not_legs_type.in_(), true);
+        or_1.set_dist(context, or_legs_type.in_1(), false);
+        or_2.set_dist(context, or_legs_type.in_1(), false);
+        println!("---");
+        or_1.set_dist(context, or_legs_type.in_1(), true);
+        or_1.set_dist(context, or_legs_type.in_1(), false);
+        or_2.set_dist(context, or_legs_type.in_1(), true);
+        or_2.set_dist(context, or_legs_type.in_1(), false);
     });
 }
