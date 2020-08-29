@@ -3,46 +3,58 @@ use core::mem::replace;
 use alloc::vec::Vec;
 
 pub trait Context {
-    fn get(&self, type_: TypeId) -> Option<&dyn Any>;
-    fn get_mut(&mut self, type_: TypeId) -> Option<&mut dyn Any>;
+    fn get_raw(&self, type_: TypeId) -> Option<&dyn Any>;
+    fn get_mut_raw(&mut self, type_: TypeId) -> Option<&mut dyn Any>;
 }
+
+pub trait ContextExt: Context {
+    fn get<T: 'static>(&self) -> Option<&T> {
+        self.get_raw(TypeId::of::<T>()).map(|x| x.downcast_ref::<T>().expect("invalid cast"))
+    }
+
+    fn get_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        self.get_mut_raw(TypeId::of::<T>()).map(|x| x.downcast_mut::<T>().expect("invalid cast"))
+    }
+}
+
+impl<T: Context + ?Sized> ContextExt for T { }
 
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct Reactive<Type> {
+pub struct Reactive<Owner: Copy, Type> {
     value: Type,
     #[derivative(Debug="ignore")]
-    on_changed: Option<Vec<fn(context: &mut dyn Context, old: &Type)>>,
+    on_changed: Option<Vec<fn(owner: Owner, context: &mut dyn Context, old: &Type)>>,
 }
 
-pub struct OnChanged<Type>(
-    Option<Vec<fn(context: &mut dyn Context, old: &Type)>>
+pub struct OnChanged<Owner: Copy, Type>(
+    Option<Vec<fn(owner: Owner, context: &mut dyn Context, old: &Type)>>
 );
 
-impl<Type> OnChanged<Type> {
-    pub fn raise(self, context: &mut dyn Context, old: &Type) {
+impl<Owner: Copy, Type> OnChanged<Owner, Type> {
+    pub fn raise(self, owner: Owner, context: &mut dyn Context, old: &Type) {
         if let Some(on_changed) = self.0 {
             for on_changed in on_changed {
-                on_changed(context, old);
+                on_changed(owner, context, old);
             }
         }
     }
 }
 
-impl<Type: Eq> Reactive<Type> {
-    pub fn set_dist(&mut self, value: Type) -> (Type, OnChanged<Type>) {
+impl<Owner: Copy, Type: Eq> Reactive<Owner, Type> {
+    pub fn set_dist(&mut self, value: Type) -> (Type, OnChanged<Owner, Type>) {
         let old = replace(&mut self.value, value);
         let on_changed = if old == self.value { None } else { self.on_changed.clone() };
         (old, OnChanged(on_changed))
     }
 }
 
-impl<Type> Reactive<Type> {
+impl<Owner: Copy, Type> Reactive<Owner, Type> {
     pub fn new(value: Type) -> Self {
         Reactive { value, on_changed: None }
     }
 
-    pub fn set(&mut self, value: Type) -> (Type, OnChanged<Type>) {
+    pub fn set(&mut self, value: Type) -> (Type, OnChanged<Owner, Type>) {
         let old = replace(&mut self.value, value);
         (old, OnChanged(self.on_changed.clone()))
     }
@@ -51,7 +63,7 @@ impl<Type> Reactive<Type> {
 
     pub fn on_changed(
         &mut self,
-        callback: fn(context: &mut dyn Context, old: &Type)
+        callback: fn(owner: Owner, context: &mut dyn Context, old: &Type)
     ) {
         if let Some(on_changed) = self.on_changed.as_mut() {
             on_changed.push(callback);
