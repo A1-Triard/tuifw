@@ -113,7 +113,7 @@ mod circuit {
     }
 }
 
-mod and_chip {
+mod or_chip {
     use crate::circuit::*;
     use dep_obj::dep::{DepObj, DepObjProps, DepProp, DepTypeBuilder, DepTypeToken};
     use dep_obj::reactive::{Reactive, Context, ContextExt};
@@ -121,14 +121,14 @@ mod and_chip {
     macro_attr! {
         #[derive(DepObjRaw!)]
         #[derive(Debug)]
-        pub struct AndLegs {
+        pub struct OrLegs {
             dep_props: DepObjProps<Self>,
         }
     }
 
-    impl AndLegs {
-        pub fn new<Tag: 'static>(circuit: &mut Circuit<Tag>, tag: Tag, type_: &AndLegsType<Tag>) -> Chip<Tag> {
-            let mut legs = AndLegs {
+    impl OrLegs {
+        pub fn new<Tag: 'static>(circuit: &mut Circuit<Tag>, tag: Tag, type_: &OrLegsType<Tag>) -> Chip<Tag> {
+            let mut legs = OrLegs {
                 dep_props: DepObjProps::new(type_.token())
             };
             type_.in_1().get_mut(&mut legs.dep_props).on_changed(Self::update::<Tag>);
@@ -137,7 +137,7 @@ mod and_chip {
         }
 
         fn update<Tag: 'static>(chip: Chip<Tag>, context: &mut dyn Context, _old: &bool) {
-            let type_ = context.get::<AndLegsType<Tag>>().expect("AndLegsType required");
+            let type_ = context.get::<OrLegsType<Tag>>().expect("OrLegsType required");
             let circuit = context.get::<Circuit<Tag>>().expect("Cicuit required");
             let in_1 = *chip.get(circuit, type_.in_1());
             let in_2 = *chip.get(circuit, type_.in_2());
@@ -146,23 +146,23 @@ mod and_chip {
         }
     }
 
-    impl DepObj for AndLegs {
+    impl DepObj for OrLegs {
         fn dep_props(&self) -> &DepObjProps<Self> { &self.dep_props }
         fn dep_props_mut(&mut self) -> &mut DepObjProps<Self> { &mut self.dep_props }
     }
 
-    pub struct AndLegsType<Tag> {
-        token: DepTypeToken<AndLegs>,
-        in_1: DepProp<AndLegs, Reactive<Chip<Tag>, bool>>,
-        in_2: DepProp<AndLegs, Reactive<Chip<Tag>, bool>>,
-        out: DepProp<AndLegs, Reactive<Chip<Tag>, bool>>,
+    pub struct OrLegsType<Tag> {
+        token: DepTypeToken<OrLegs>,
+        in_1: DepProp<OrLegs, Reactive<Chip<Tag>, bool>>,
+        in_2: DepProp<OrLegs, Reactive<Chip<Tag>, bool>>,
+        out: DepProp<OrLegs, Reactive<Chip<Tag>, bool>>,
     }
 
-    impl<Tag> AndLegsType<Tag> {
-        pub fn token(&self) -> &DepTypeToken<AndLegs> { &self.token }
-        pub fn in_1(&self) -> DepProp<AndLegs, Reactive<Chip<Tag>, bool>> { self.in_1 }
-        pub fn in_2(&self) -> DepProp<AndLegs, Reactive<Chip<Tag>, bool>> { self.in_2 }
-        pub fn out(&self) -> DepProp<AndLegs, Reactive<Chip<Tag>, bool>> { self.out }
+    impl<Tag> OrLegsType<Tag> {
+        pub fn token(&self) -> &DepTypeToken<OrLegs> { &self.token }
+        pub fn in_1(&self) -> DepProp<OrLegs, Reactive<Chip<Tag>, bool>> { self.in_1 }
+        pub fn in_2(&self) -> DepProp<OrLegs, Reactive<Chip<Tag>, bool>> { self.in_2 }
+        pub fn out(&self) -> DepProp<OrLegs, Reactive<Chip<Tag>, bool>> { self.out }
 
         pub fn new() -> Option<Self> {
             DepTypeBuilder::new().map(|mut builder| {
@@ -170,12 +170,12 @@ mod and_chip {
                 let in_2 = builder.prop::<Reactive<Chip<Tag>, bool>>(|| Reactive::new(false));
                 let out = builder.prop::<Reactive<Chip<Tag>, bool>>(|| Reactive::new(false));
                 let token = builder.build();
-                AndLegsType { token, in_1, in_2, out }
+                OrLegsType { token, in_1, in_2, out }
             })
         }
     }
 
-    impl ChipLegs for AndLegs { }
+    impl ChipLegs for OrLegs { }
 }
 
 mod not_chip {
@@ -241,13 +241,13 @@ mod not_chip {
 use std::any::{Any, TypeId};
 use dep_obj::reactive::Context;
 use circuit::*;
-use and_chip::*;
+use or_chip::*;
 use not_chip::*;
 
 context! {
     mod trigger_context {
         circuit (circuit_mut): mut Circuit<u8>,
-        and_legs_type: ref AndLegsType<u8>,
+        or_legs_type: ref OrLegsType<u8>,
         not_legs_type: ref NotLegsType<u8>,
     }
 }
@@ -259,8 +259,8 @@ impl Context for TriggerContext {
     fn get_raw(&self, type_: TypeId) -> Option<&dyn Any> {
         if type_ == TypeId::of::<Circuit<u8>>() {
             Some(self.circuit())
-        } else if type_ == TypeId::of::<AndLegsType<u8>>() {
-            Some(self.and_legs_type())
+        } else if type_ == TypeId::of::<OrLegsType<u8>>() {
+            Some(self.or_legs_type())
         } else if type_ == TypeId::of::<NotLegsType<u8>>() {
             Some(self.not_legs_type())
         } else {
@@ -279,10 +279,10 @@ impl Context for TriggerContext {
 
 fn main() {
     let circuit = &mut Circuit::new();
-    let and_legs_type: AndLegsType<u8> =  AndLegsType::new().unwrap();
+    let or_legs_type: OrLegsType<u8> =  OrLegsType::new().unwrap();
     let not_legs_type: NotLegsType<u8> = NotLegsType::new().unwrap();
-    let and_1 = AndLegs::new(circuit, 1, &and_legs_type);
-    let and_2 = AndLegs::new(circuit, 2, &and_legs_type);
+    let or_1 = OrLegs::new(circuit, 1, &or_legs_type);
+    let or_2 = OrLegs::new(circuit, 2, &or_legs_type);
     let not_1 = NotLegs::new(circuit, 3, &not_legs_type);
     let not_2 = NotLegs::new(circuit, 4, &not_legs_type);
     /*
