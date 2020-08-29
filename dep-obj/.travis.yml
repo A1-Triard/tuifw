@@ -16,6 +16,4 @@ matrix:
     env: NIGHTLY=false
 script:
 - cargo build --verbose
-- cargo test --verbose --tests
-- if $NIGHTLY; then cargo test --verbose --doc; fi
-- if $NIGHTLY; then cargo test --verbose --examples; fi
+- if $NIGHTLY; then cargo test --verbose; fi
