@@ -62,7 +62,9 @@ macro_rules! context {
             {$({$($p)*})* {$field : &mut $type_}}
             {$({$($a)*})* {$field : $field as *mut $type_}}
             {$({$($b)*})* {
+                #[allow(dead_code)]
                 pub fn $field (&self) -> &$type_ { unsafe { &*self.$field } }
+                #[allow(dead_code)]
                 pub fn $field_mut (&mut self) -> &mut $type_ { unsafe { &mut *self.$field } }
             }}
             {$($ft $(($fm))? : $rt $t),*}
@@ -92,7 +94,7 @@ mod test {
         mod context_1 {
             a: const u8,
             b: ref u16,
-            c: mut u32,
+            c (c_mut): mut u32,
         }
     }
 
@@ -104,7 +106,7 @@ mod test {
         let res = Context1::call(1, &2, &mut x, |context| {
             assert_eq!(context.a(), 1u8);
             assert_eq!(context.b(), &2u16);
-            assert_eq!(replace(context.c(), 12), 3u32);
+            assert_eq!(replace(context.c_mut(), 12), 3u32);
             "res"
         });
         assert_eq!(res, "res");
@@ -115,7 +117,7 @@ mod test {
         mod context_2 {
             a: const u8,
             b: ref u16,
-            c: mut u32,
+            c (c_mut): mut u32,
         }
     }
 
@@ -127,7 +129,7 @@ mod test {
         let res = Context2::call(1, &2, &mut x, |context| {
             assert_eq!(context.a(), 1u8);
             assert_eq!(context.b(), &2u16);
-            assert_eq!(replace(context.c(), 12), 3u32);
+            assert_eq!(replace(context.c_mut(), 12), 3u32);
             "res"
         });
         assert_eq!(res, "res");

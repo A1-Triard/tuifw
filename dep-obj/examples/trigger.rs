@@ -53,7 +53,7 @@ mod circuit {
             circuit.arena.remove(self.0);
         }
 
-        pub fn get<Legs: ChipLegs, T, Outer>(
+        pub fn get<Legs: ChipLegs, T, Outer: 'static>(
             self,
             circuit: &Circuit<Tag>,
             prop: DepProp<Legs, Reactive<T, CircuitContext<Tag, Outer>>>
@@ -62,29 +62,27 @@ mod circuit {
             prop.get(legs.dep_props()).get()
         }
 
-        pub fn set<Legs: ChipLegs, T, Outer>(
+        pub fn set<Legs: ChipLegs, T, Context: CircuitContext<Tag>>(
             self,
-            circuit: &mut Circuit<Tag>,
             prop: DepProp<Legs, Reactive<T, CircuitContext<Tag, Outer>>>,
             value: T,
-            context: &mut Outer
+            context: &mut Context
         ) -> T {
-            let legs = circuit.arena[self.0].legs.downcast_mut::<Legs>().expect("invalid cast");
+            let legs = context.circuit_mut().arena[self.0].legs.downcast_mut::<Legs>().expect("invalid cast");
             let (old, on_changed) = prop.get_mut(legs.dep_props_mut()).set(value);
-            CircuitContext::call(circuit, self, context, |context| on_changed.raise(context, &old));
+            on_changed.raise(context, &old);
             old
         }
 
-        pub fn set_dist<Legs: ChipLegs, T: Eq, Outer>(
+        pub fn set_dist<Legs: ChipLegs, T: Eq, Context: CircuitContext<Tag>>(
             self,
-            circuit: &mut Circuit<Tag>,
             prop: DepProp<Legs, Reactive<T, CircuitContext<Tag, Outer>>>,
             value: T,
-            context: &mut Outer
+            context: &mut Context
         ) -> T {
-            let legs = circuit.arena[self.0].legs.downcast_mut::<Legs>().expect("invalid cast");
+            let legs = context.circuit_mut().arena[self.0].legs.downcast_mut::<Legs>().expect("invalid cast");
             let (old, on_changed) = prop.get_mut(legs.dep_props_mut()).set_dist(value);
-            CircuitContext::call(circuit, self, context, |context| on_changed.raise(context, &old));
+            on_changed.raise(context, &old);
             old
         }
 
@@ -112,15 +110,10 @@ mod circuit {
         }
     }
 
-    context! {
-        mod<Tag, Outer> circuit_context {
-            circuit (circuit_mut): mut Circuit<Tag>,
-            chip: const Chip<Tag>,
-            outer (outer_mut): mut Outer,
-        }
+    pub trait CircuitContext<Tag> {
+        fn circuit(&self) -> &Circuit<Tag>;
+        fn circuit_mut(&mut self) -> &mut Circuit<Tag>;
     }
-
-    pub use circuit_context::Context as CircuitContext;
 }
 
 mod and_chip {
@@ -136,21 +129,27 @@ mod and_chip {
         }
     }
 
+    pub trait AndChipContext<Tag>: Sized {
+        fn and_legs_type(&self) -> &AndLegsType<Tag, Self>;
+    }
+
     impl AndLegs {
-        pub fn new<Tag, Outer>(circuit: &mut Circuit<Tag>, type_: &AndLegsType<Tag>) -> Chip<Tag> {
+        pub fn new<Tag, Outer: AndChipContext<Tag> + 'static>(circuit: &mut Circuit<Tag>, tag: Tag, type_: &AndLegsType<Tag, Outer>) -> Chip<Tag> {
             let mut legs = AndLegs {
                 dep_props: DepObjProps::new(type_.token())
             };
             type_.in_1().get_mut(&mut legs.dep_props).on_changed(Self::update::<Tag, Outer>);
             type_.in_2().get_mut(&mut legs.dep_props).on_changed(Self::update::<Tag, Outer>);
-            Chip::new(circuit, |chip| (Box::new(legs) as _, chip))
+            Chip::new(circuit, |chip| (Box::new(legs) as _, tag, chip))
         }
 
-        fn update<Tag, Outer>(context: CircuitContext<Tag, Outer>, _old: bool) {
+        fn update<Tag, Outer: AndChipContext<Tag> + 'static>(context: &mut CircuitContext<Tag, Outer>, _old: &bool) {
             let chip = context.chip();
+            let type_ = context.outer().and_legs_type();
             let in_1 = *chip.get(context.circuit(), type_.in_1());
             let in_2 = *chip.get(context.circuit(), type_.in_2());
-            chip.set_dist(context.circuit_mut(), type_.out(), in_1 & in_2);
+            let out = type_.out();
+            chip.set_dist(context.circuit_mut(), out, in_1 & in_2, context.outer_mut());
         }
     }
 
@@ -159,14 +158,14 @@ mod and_chip {
         fn dep_props_mut(&mut self) -> &mut DepObjProps<Self> { &mut self.dep_props }
     }
 
-    pub struct AndLegsType<Tag> {
+    pub struct AndLegsType<Tag, Outer> {
         token: DepTypeToken<AndLegs>,
         in_1: DepProp<AndLegs, Reactive<bool, CircuitContext<Tag, Outer>>>,
         in_2: DepProp<AndLegs, Reactive<bool, CircuitContext<Tag, Outer>>>,
         out: DepProp<AndLegs, Reactive<bool, CircuitContext<Tag, Outer>>>,
     }
 
-    impl<Tag> AndLegsType<Tag> {
+    impl<Tag, Outer> AndLegsType<Tag, Outer> {
         pub fn token(&self) -> &DepTypeToken<AndLegs> { &self.token }
         pub fn in_1(&self) -> DepProp<AndLegs, Reactive<bool, CircuitContext<Tag, Outer>>> { self.in_1 }
         pub fn in_2(&self) -> DepProp<AndLegs, Reactive<bool, CircuitContext<Tag, Outer>>> { self.in_2 }
@@ -199,17 +198,25 @@ mod not_chip {
         }
     }
 
+    pub trait NotChipContext<Tag>: Sized {
+        fn not_legs_type(&self) -> &NotLegsType<Tag, Self>;
+    }
+
     impl NotLegs {
-        pub fn new<Tag>(circuit: &mut Circuit<Tag>, type_: &NotLegsType<Tag>) -> Chip<Tag> {
+        pub fn new<Tag, Outer: NotChipContext<Tag> + 'static>(circuit: &mut Circuit<Tag>, tag: Tag, type_: &NotLegsType<Tag, Outer>) -> Chip<Tag> {
             let mut legs = NotLegs {
                 dep_props: DepObjProps::new(type_.token())
             };
-            type_.in_().get_mut(&mut legs.dep_props).on_changed(|context, _old| {
-                let chip = context.chip();
-                let in_ = *chip.get(context.circuit(), type_.in_());
-                chip.set_dist(context.circuit_mut(), type_.out(), !in_);
-            });
-            Chip::new(circuit, |chip| (Box::new(legs) as _, chip))
+            type_.in_().get_mut(&mut legs.dep_props).on_changed(Self::update::<Tag, Outer>);
+            Chip::new(circuit, |chip| (Box::new(legs) as _, tag, chip))
+        }
+
+        fn update<Tag, Outer: NotChipContext<Tag> + 'static>(context: &mut CircuitContext<Tag, Outer>, _old: &bool) {
+            let chip = context.chip();
+            let type_ = context.outer().not_legs_type();
+            let in_ = *chip.get(context.circuit(), type_.in_());
+            let out = type_.out();
+            chip.set_dist(context.circuit_mut(), out, !in_, context.outer_mut());
         }
     }
 
@@ -218,13 +225,13 @@ mod not_chip {
         fn dep_props_mut(&mut self) -> &mut DepObjProps<Self> { &mut self.dep_props }
     }
 
-    pub struct NotLegsType<Tag> {
+    pub struct NotLegsType<Tag, Outer> {
         token: DepTypeToken<NotLegs>,
         in_: DepProp<NotLegs, Reactive<bool, CircuitContext<Tag, Outer>>>,
         out: DepProp<NotLegs, Reactive<bool, CircuitContext<Tag, Outer>>>,
     }
 
-    impl<Tag> NotLegsType<Tag> {
+    impl<Tag, Outer> NotLegsType<Tag, Outer> {
         pub fn token(&self) -> &DepTypeToken<NotLegs> { &self.token }
         pub fn in_(&self) -> DepProp<NotLegs, Reactive<bool, CircuitContext<Tag, Outer>>> { self.in_ }
         pub fn out(&self) -> DepProp<NotLegs, Reactive<bool, CircuitContext<Tag, Outer>>> { self.out }
@@ -247,20 +254,41 @@ use circuit::*;
 use and_chip::*;
 use not_chip::*;
 
+context! {
+    mod trigger_context {
+        and_legs_type: ref AndLegsType<u8, Self>,
+        not_legs_type: ref NotLegsType<u8, Self>,
+    }
+}
+
+
+use trigger_context::Context as TriggerContext;
+
+impl AndChipContext<u8> for TriggerContext {
+    fn and_legs_type(&self) -> &AndLegsType<u8, Self> { self.and_legs_type() }
+}
+
+impl NotChipContext<u8> for TriggerContext {
+    fn not_legs_type(&self) -> &NotLegsType<u8, Self> { self.not_legs_type() }
+}
+
 fn main() {
     let circuit = &mut Circuit::new();
-    let and_legs_type = AndLegsType::new().unwrap();
-    let not_legs_type = NotLegsType::new().unwrap();
-    let and_1 = AndLegs::new(circuit, &and_legs_type);
-    let and_2 = AndLegs::new(circuit, &and_legs_type);
-    let not_1 = NotLegs::new(circuit, &not_legs_type);
-    let not_2 = NotLegs::new(circuit, &not_legs_type);
+    let and_legs_type: AndLegsType<u8, TriggerContext> = AndLegsType::new().unwrap();
+    let not_legs_type: NotLegsType<u8, TriggerContext> = NotLegsType::new().unwrap();
+    let and_1 = AndLegs::new(circuit, 1, &and_legs_type);
+    let and_2 = AndLegs::new(circuit, 2, &and_legs_type);
+    let not_1 = NotLegs::new(circuit, 3, &not_legs_type);
+    let not_2 = NotLegs::new(circuit, 4, &not_legs_type);
     /*
-    not_1.on_changed(circuit, type_.out(), |context, _old| {
+    not_1.on_changed(circuit, not_legs_type.out(), |context, _old| {
         let chip = context.chip();
+        let out = context.outer().not_legs_type
         let out = *chip.get(context.circuit(), type_.out());
         chip.set_dist(context.circuit_mut(), type_.in_2(), out);
     });
+    */
+    /*
     not_2.on_changed(circuit, type_.out(), |context, _old| {
         let chip = context.chip();
         let out = *chip.get(context.circuit(), type_.out());
