@@ -7,7 +7,7 @@ pub struct Data {
 
 context! {
     mod example_context {
-        data: mut Data,
+        data (data_mut): mut Data,
         display: ref dyn Display,
         id: const usize,
     }

@@ -1,6 +1,3 @@
-#[doc(hidden)]
-pub use core::ops::FnOnce as std_ops_FnOnce;
-
 #[macro_export]
 macro_rules! context {
     (mod $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ $(,)?>)? $name:ident  {
@@ -25,7 +22,7 @@ macro_rules! context {
         impl $($i)* $c $($r)* {
             pub fn call<ContextCallReturnType>(
                 $($($p)*),*,
-                f: impl $crate::context::std_ops_FnOnce(&mut Self) -> ContextCallReturnType 
+                f: impl $crate::std_ops_FnOnce(&mut Self) -> ContextCallReturnType 
             ) -> ContextCallReturnType {
                 let mut context = Self {
                     $($($a)*),*

@@ -82,7 +82,7 @@ mod circuit {
             prop.get(legs.dep_props()).get()
         }
 
-        pub fn set<Legs: ChipLegs, T>(
+        pub fn set_uncond<Legs: ChipLegs, T>(
             self,
             context: &mut dyn Context,
             prop: DepProp<Legs, Reactive<Chip<Tag>, T>>,
@@ -90,12 +90,12 @@ mod circuit {
         ) -> T {
             let circuit = context.get_mut::<Circuit<Tag>>().expect("Circuit required");
             let legs = circuit.arena[self.0].legs.downcast_mut::<Legs>().expect("invalid cast");
-            let (old, on_changed) = prop.get_mut(legs.dep_props_mut()).set(value);
+            let (old, on_changed) = prop.get_mut(legs.dep_props_mut()).set_uncond(value);
             on_changed.raise(self, context, &old);
             old
         }
 
-        pub fn set_dist<Legs: ChipLegs, T: Eq>(
+        pub fn set_distinct<Legs: ChipLegs, T: Eq>(
             self,
             context: &mut dyn Context,
             prop: DepProp<Legs, Reactive<Chip<Tag>, T>>,
@@ -103,7 +103,7 @@ mod circuit {
         ) -> T {
             let circuit = context.get_mut::<Circuit<Tag>>().expect("Circuit required");
             let legs = circuit.arena[self.0].legs.downcast_mut::<Legs>().expect("invalid cast");
-            let (old, on_changed) = prop.get_mut(legs.dep_props_mut()).set_dist(value);
+            let (old, on_changed) = prop.get_mut(legs.dep_props_mut()).set_distinct(value);
             on_changed.raise(self, context, &old);
             old
         }
@@ -166,7 +166,7 @@ mod or_chip {
             let in_1 = *chip.get(circuit, type_.in_1());
             let in_2 = *chip.get(circuit, type_.in_2());
             let out = type_.out();
-            chip.set_dist(context, out, in_1 | in_2);
+            chip.set_distinct(context, out, in_1 | in_2);
         }
     }
 
@@ -233,7 +233,7 @@ mod not_chip {
             let circuit = context.get::<Circuit<Tag>>().expect("Cicuit required");
             let in_ = *chip.get(circuit, type_.in_());
             let out = type_.out();
-            chip.set_dist(context, out, !in_);
+            chip.set_distinct(context, out, !in_);
         }
     }
 
@@ -322,7 +322,7 @@ fn main() {
         let or_2 = unsafe { Chip::from_raw_parts(*not_1.tag(circuit)) };
         let &out = not_1.get(circuit, not_legs_type.out());
         let in_2 = or_legs_type.in_2();
-        or_2.set_dist(context, in_2, out);
+        or_2.set_distinct(context, in_2, out);
     });
     not_2.on_changed(circuit, not_legs_type.out(), |not_2, context, _old| {
         let not_legs_type = context.get::<NotLegsType<(usize, NonZeroUsize)>>().expect("NotLegsType required");
@@ -331,7 +331,7 @@ fn main() {
         let or_1 = unsafe { Chip::from_raw_parts(*not_2.tag(circuit)) };
         let &out = not_2.get(circuit, not_legs_type.out());
         let in_2 = or_legs_type.in_2();
-        or_1.set_dist(context, in_2, out);
+        or_1.set_distinct(context, in_2, out);
     });
     or_1.on_changed(circuit, or_legs_type.out(), |or_1, context, _old| {
         let not_legs_type = context.get::<NotLegsType<(usize, NonZeroUsize)>>().expect("NotLegsType required");
@@ -340,7 +340,7 @@ fn main() {
         let not_1 = unsafe { Chip::from_raw_parts(*or_1.tag(circuit)) };
         let &out = or_1.get(circuit, or_legs_type.out());
         let in_ = not_legs_type.in_();
-        not_1.set_dist(context, in_, out);
+        not_1.set_distinct(context, in_, out);
     });
     or_2.on_changed(circuit, or_legs_type.out(), |or_2, context, _old| {
         let not_legs_type = context.get::<NotLegsType<(usize, NonZeroUsize)>>().expect("NotLegsType required");
@@ -349,7 +349,7 @@ fn main() {
         let not_2 = unsafe { Chip::from_raw_parts(*or_2.tag(circuit)) };
         let &out = or_2.get(circuit, or_legs_type.out());
         let in_ = not_legs_type.in_();
-        not_2.set_dist(context, in_, out);
+        not_2.set_distinct(context, in_, out);
     });
     not_1.on_changed(circuit, not_legs_type.out(), |not_1, context, _old| {
         let not_legs_type = context.get::<NotLegsType<(usize, NonZeroUsize)>>().expect("NotLegsType required");
@@ -358,20 +358,13 @@ fn main() {
         println!("{}", if out { 1 } else { 0 });
     });
     TriggerContext::call(circuit, &or_legs_type, &not_legs_type, |context| {
-        //or_1.set(context, or_legs_type.in_2(), true);
-        //or_2.set(context, or_legs_type.in_2(), true);
-        //not_1.set(context, not_legs_type.in_(), true);
-        //not_2.set(context, not_legs_type.in_(), true);
-        //or_1.set_dist(context, or_legs_type.in_1(), false);
-        //or_2.set_dist(context, or_legs_type.in_1(), false);
-        //println!("---");
-        or_1.set_dist(context, or_legs_type.in_1(), true);
-        or_1.set_dist(context, or_legs_type.in_1(), false);
-        or_2.set_dist(context, or_legs_type.in_1(), true);
-        or_2.set_dist(context, or_legs_type.in_1(), false);
-        or_1.set_dist(context, or_legs_type.in_1(), true);
-        or_1.set_dist(context, or_legs_type.in_1(), false);
-        or_2.set_dist(context, or_legs_type.in_1(), true);
-        or_2.set_dist(context, or_legs_type.in_1(), false);
+        or_1.set_distinct(context, or_legs_type.in_1(), true);
+        or_1.set_distinct(context, or_legs_type.in_1(), false);
+        or_2.set_distinct(context, or_legs_type.in_1(), true);
+        or_2.set_distinct(context, or_legs_type.in_1(), false);
+        or_1.set_distinct(context, or_legs_type.in_1(), true);
+        or_1.set_distinct(context, or_legs_type.in_1(), false);
+        or_2.set_distinct(context, or_legs_type.in_1(), true);
+        or_2.set_distinct(context, or_legs_type.in_1(), false);
     });
 }

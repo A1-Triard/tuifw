@@ -42,7 +42,7 @@ impl<Owner: Copy, Type> OnChanged<Owner, Type> {
 }
 
 impl<Owner: Copy, Type: Eq> Reactive<Owner, Type> {
-    pub fn set_dist(&mut self, value: Type) -> (Type, OnChanged<Owner, Type>) {
+    pub fn set_distinct(&mut self, value: Type) -> (Type, OnChanged<Owner, Type>) {
         let old = replace(&mut self.value, value);
         let on_changed = if old == self.value { None } else { self.on_changed.clone() };
         (old, OnChanged(on_changed))
@@ -54,7 +54,7 @@ impl<Owner: Copy, Type> Reactive<Owner, Type> {
         Reactive { value, on_changed: None }
     }
 
-    pub fn set(&mut self, value: Type) -> (Type, OnChanged<Owner, Type>) {
+    pub fn set_uncond(&mut self, value: Type) -> (Type, OnChanged<Owner, Type>) {
         let old = replace(&mut self.value, value);
         (old, OnChanged(self.on_changed.clone()))
     }
