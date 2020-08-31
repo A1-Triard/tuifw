@@ -211,10 +211,19 @@ impl View {
         result
     }
 
+    /// Forms an `View` from the [`into_raw_parts`](View::into_raw_parts) function result.
+    ///
+    /// # Safety
+    ///
+    /// Safe iff the provided arguments were obtained by calling the `View::into_raw_parts` function.
     pub unsafe fn from_raw_parts(raw_parts: (usize, NonZeroUsize)) -> Self {
         View(Id::from_raw_parts(raw_parts))
     }
 
+    /// Transforms `View` to primitive-typed parts, which can be
+    /// easily passed through FFI.
+    ///
+    /// Use [`from_raw_parts`](View::from_raw_parts) to put the `View` back together.
     pub fn into_raw_parts(self) -> (usize, NonZeroUsize) {
         self.0.into_raw_parts()
     }

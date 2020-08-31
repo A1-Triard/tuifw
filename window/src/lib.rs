@@ -186,10 +186,20 @@ impl<Tag, RenderContext> Window<Tag, RenderContext> {
         result
     }
 
+    /// Forms an `Window` from the [`into_raw_parts`](Window::into_raw_parts) function result.
+    ///
+    /// # Safety
+    ///
+    /// Safe iff the provided arguments were obtained by calling the `into_raw_parts` function
+    /// on an `Window` of the same type.
     pub unsafe fn from_raw_parts(raw_parts: (usize, NonZeroUsize)) -> Self {
         Window(Id::from_raw_parts(raw_parts), PhantomData)
     }
 
+    /// Transforms `Window` to primitive-typed parts, which can be
+    /// easily passed through FFI.
+    ///
+    /// Use [`from_raw_parts`](Window::from_raw_parts) to put the `Window` back together.
     pub fn into_raw_parts(self) -> (usize, NonZeroUsize) {
         self.0.into_raw_parts()
     }
