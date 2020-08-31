@@ -12,36 +12,47 @@ use once_cell::sync::{self};
 use tuifw_screen_base::{Event, Screen, Vector, Point, Rect, Attr, Color};
 use tuifw_window::{RenderPort, WindowTree, Window};
 
-pub trait Panel: Any + DepObj + Debug + Send + Sync {
+pub trait PanelBehavior {
     fn children_desired_size(
         &self,
+        view: View,
         tree: &mut ViewTree,
         children_measure_size: (Option<i16>, Option<i16>)
     ) -> Vector;
 
     fn children_render_bounds(
         &self,
+        view: View,
         tree: &mut ViewTree,
         children_arrange_bounds: Rect
     ) -> Rect;
 }
 
+pub trait Panel: Any + DepObj + Debug + Send + Sync {
+    fn behavior(&self) -> &'static dyn PanelBehavior;
+}
+
 downcast!(dyn Panel);
 
-pub trait Decorator: Any + DepObj + Debug + Sync + Send {
+pub trait DecoratorBehavior {
     fn children_measure_size(
         &self,
+        view: View,
         tree: &mut ViewTree,
         measure_size: (Option<i16>, Option<i16>)
     ) -> (Option<i16>, Option<i16>);
 
-    fn desired_size(&self, tree: &mut ViewTree, children_desired_size: Vector) -> Vector;
+    fn desired_size(&self, view: View, tree: &mut ViewTree, children_desired_size: Vector) -> Vector;
 
-    fn children_arrange_bounds(&self, tree: &mut ViewTree, arrange_size: Vector) -> Rect;
+    fn children_arrange_bounds(&self, view: View, tree: &mut ViewTree, arrange_size: Vector) -> Rect;
 
-    fn render_bounds(&self, tree: &mut ViewTree, children_render_bounds: Rect) -> Rect;
+    fn render_bounds(&self, view: View, tree: &mut ViewTree, children_render_bounds: Rect) -> Rect;
 
-    fn render(&self, tree: &ViewTree, port: &mut RenderPort);
+    fn render(&self, view: View, tree: &ViewTree, port: &mut RenderPort);
+}
+
+pub trait Decorator: Any + DepObj + Debug + Sync + Send {
+    fn behavior(&self) -> &'static dyn DecoratorBehavior;
 }
 
 downcast!(dyn Decorator);
@@ -149,7 +160,7 @@ fn render_view(
     tag: &View,
     context: &mut ViewTree
 ) {
-    context.arena[tag.0].decorator.as_ref().unwrap().render(context, port);
+    context.arena[tag.0].decorator.as_ref().unwrap().behavior().render(*tag, context, port);
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
@@ -404,23 +415,21 @@ impl View {
         let node = &mut tree.arena[self.0];
         if node.measure_size == Some(size) { return; }
         node.measure_size = Some(size);
-        let panel = node.panel.take();
-        let decorator = node.decorator.take();
+        let panel = node.panel.as_ref().map(|x| x.behavior());
+        let decorator = node.decorator.as_ref().map(|x| x.behavior());
         let children_measure_size = decorator.as_ref().map_or(
             size,
-            |d| d.children_measure_size(tree, size)
+            |d| d.children_measure_size(self, tree, size)
         );
         let children_desired_size = panel.as_ref().map_or(
             Vector::null(),
-            |p| p.children_desired_size(tree, children_measure_size)
+            |p| p.children_desired_size(self, tree, children_measure_size)
         );
         let desired_size = decorator.as_ref().map_or(
             children_desired_size,
-            |d| d.desired_size(tree, children_desired_size)
+            |d| d.desired_size(self, tree, children_desired_size)
         );
         let node = &mut tree.arena[self.0];
-        node.panel = panel;
-        node.decorator = decorator;
         node.desired_size = desired_size;
     }
 
@@ -440,23 +449,21 @@ impl View {
             }
         }
         node.arrange_bounds = Some(rect);
-        let panel = node.panel.take();
-        let decorator = node.decorator.take();
+        let panel = node.panel.as_ref().map(|x| x.behavior());
+        let decorator = node.decorator.as_ref().map(|x| x.behavior());
         let children_arrange_bounds = decorator.as_ref().map_or_else(
             || Rect { tl: Point { x: 0, y: 0 }, size: rect.size },
-            |d| d.children_arrange_bounds(tree, rect.size)
+            |d| d.children_arrange_bounds(self, tree, rect.size)
         );
         let children_render_bounds = panel.as_ref().map_or(
             children_arrange_bounds,
-            |p| p.children_render_bounds(tree, children_arrange_bounds)
+            |p| p.children_render_bounds(self, tree, children_arrange_bounds)
         );
         let render_bounds = decorator.as_ref().map_or(
             children_render_bounds,
-            |d| d.render_bounds(tree, children_render_bounds)
+            |d| d.render_bounds(self, tree, children_render_bounds)
         );
         let node = &mut tree.arena[self.0];
-        node.panel = panel;
-        node.decorator = decorator;
         node.render_bounds = Rect {
             tl: rect.tl.offset(render_bounds.tl.offset_from(Point { x: 0, y: 0 })),
             size: render_bounds.size
@@ -502,28 +509,38 @@ impl DepObj for RootDecorator {
 }
 
 impl Decorator for RootDecorator {
+    fn behavior(&self) -> &'static dyn DecoratorBehavior {
+        static BEHAVIOR: RootDecoratorBehavior = RootDecoratorBehavior;
+        &BEHAVIOR
+    }
+}
+
+struct RootDecoratorBehavior;
+
+impl DecoratorBehavior for RootDecoratorBehavior {
     fn children_measure_size(
         &self,
+        _view: View,
         _tree: &mut ViewTree,
         measure_size: (Option<i16>, Option<i16>)
     ) -> (Option<i16>, Option<i16>) {
         measure_size
     }
 
-    fn desired_size(&self, _tree: &mut ViewTree, children_desired_size: Vector) -> Vector {
+    fn desired_size(&self, _view: View, _tree: &mut ViewTree, children_desired_size: Vector) -> Vector {
         children_desired_size
     }
 
-    fn children_arrange_bounds(&self, _tree: &mut ViewTree, arrange_size: Vector) -> Rect {
+    fn children_arrange_bounds(&self, _view: View, _tree: &mut ViewTree, arrange_size: Vector) -> Rect {
         Rect { tl: Point { x: 0, y: 0 }, size: arrange_size }
     }
 
-    fn render_bounds(&self, tree: &mut ViewTree, _children_render_bounds: Rect) -> Rect {
+    fn render_bounds(&self, _view: View, tree: &mut ViewTree, _children_render_bounds: Rect) -> Rect {
         Rect { tl: Point { x: 0, y: 0 }, size: tree.screen_size }
     }
 
-    fn render(&self, _tree: &ViewTree, port: &mut RenderPort) {
-        let bg = ROOT_DECORATOR_TYPE.bg().get(self.dep_props()).get();
+    fn render(&self, view: View, tree: &ViewTree, port: &mut RenderPort) {
+        let bg = view.decorator_get(tree, ROOT_DECORATOR_TYPE.bg());
         port.fill(|port, p| port.out(p, bg.fg, bg.bg, bg.attr, &bg.value));
     }
 }
