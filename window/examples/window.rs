@@ -2,12 +2,12 @@
 #![deny(warnings)]
 
 use tuifw_screen_base::{Point, Color, Attr, Vector, Event, Key, Rect};
-use tuifw_window::{WindowTree, Window, DrawingPort};
+use tuifw_window::{WindowTree, Window, RenderPort};
 
 fn draw(
     _tree: &WindowTree<(), ()>,
     window: Option<Window<(), ()>>,
-    port: &mut DrawingPort,
+    port: &mut RenderPort,
     _tag: &(),
     _context: &mut ()
 ) {
