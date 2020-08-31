@@ -1,5 +1,8 @@
 #![deny(warnings)]
 #![feature(never_type)]
+#![allow(clippy::collapsible_if)]
+#![allow(clippy::type_complexity)]
+#![allow(clippy::blocks_in_if_conditions)]
 
 #[macro_use]
 extern crate components_arena;
@@ -156,6 +159,7 @@ impl<Tag, RenderContext> Unpin for Window<Tag, RenderContext> { }
 impl<Tag, RenderContext> UnwindSafe for Window<Tag, RenderContext> { }
 
 impl<Tag, RenderContext> Window<Tag, RenderContext> {
+    #[allow(clippy::new_ret_no_self)]
     pub fn new<T>(
         tree: &mut WindowTree<Tag, RenderContext>,
         parent: Option<Self>,
