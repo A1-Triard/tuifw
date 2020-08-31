@@ -33,7 +33,8 @@ macro_attr! {
     #[derive(Debug)]
     #[derive(Component!)]
     struct ViewNode {
-        decorator: Option<(Box<dyn Decorator>, Window<View, ViewTree>)>,
+        decorator: Option<Box<dyn Decorator>>,
+        window: Option<Window<View, ViewTree>>,
         panel: Option<Box<dyn Panel>>,
         parent: Option<View>,
         next: View,
@@ -53,7 +54,6 @@ pub struct ViewTree {
     window_tree: Option<WindowTree<View, ViewTree>>,
     screen_size: Vector,
     root: View,
-    root_decorator: Box<dyn Decorator>,
 }
 
 impl Context for ViewTree {
@@ -80,8 +80,10 @@ impl ViewTree {
         let (window_tree, root) = arena.insert(|view| {
             let window_tree = WindowTree::new(screen, render_view, View(view));
             let screen_size = window_tree.screen_size();
+            let decorator = RootDecorator { dep_props: DepObjProps::new(ROOT_DECORATOR_TYPE.token()) };
             (ViewNode {
-                decorator: None,
+                decorator: Some(Box::new(decorator) as _),
+                window: None,
                 panel: None,
                 parent: None,
                 next: View(view),
@@ -93,13 +95,11 @@ impl ViewTree {
             }, (window_tree, View(view)))
         });
         let screen_size = window_tree.screen_size();
-        let mut root_decorator = RootDecorator { dep_props: DepObjProps::new(ROOT_DECORATOR_TYPE.token()) };
         let mut tree = ViewTree {
             arena,
             window_tree: Some(window_tree),
             screen_size,
             root,
-            root_decorator: Box::new(root_decorator) as _
         };
         root.decorator_on_changed(&mut tree, ROOT_DECORATOR_TYPE.bg(), RootDecorator::invalidate_bg);
         tree
@@ -132,7 +132,7 @@ fn render_view(
     tag: &View,
     context: &mut ViewTree
 ) {
-    context.arena[tag.0].decorator.as_ref().unwrap().0.render(context, port);
+    context.arena[tag.0].decorator.as_ref().unwrap().render(context, port);
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
@@ -146,20 +146,25 @@ impl View {
     ) -> T {
         let parent_window = parent
             .self_and_parents(tree)
-            .find_map(|view| tree.arena[view.0].decorator.as_ref().map(|x| x.1))
+            .find_map(|view| tree.arena[view.0].window.as_ref().map(|x| *x))
         ;
         let arena = &mut tree.arena;
         let window_tree = tree.window_tree.as_mut().expect("ViewTree is in invalid state");
         let (view, result) = arena.insert(|view| {
             let (decorator, panel, result) = decorator_and_panel(View(view));
-            let decorator = decorator.map(|decorator| (decorator, Window::new(
-                window_tree,
-                parent_window,
-                Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() },
-                |window| (View(view), window)
-            )));
+            let window = if decorator.is_none() {
+                None
+            } else {
+                Some(Window::new(
+                    window_tree,
+                    parent_window,
+                    Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() },
+                    |window| (View(view), window)
+                ))
+            };
             (ViewNode {
                 decorator,
+                window,
                 panel,
                 parent: Some(parent),
                 next: View(view),
@@ -201,7 +206,6 @@ impl View {
             .decorator
             .as_ref()
             .expect("Decorator missed")
-            .0
             .downcast_ref::<D>()
             .expect("invalid cast")
         ;
@@ -217,9 +221,8 @@ impl View {
         let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
         let decorator = tree.arena[self.0]
             .decorator
-            .as_ref()
+            .as_mut()
             .expect("Decorator missed")
-            .0
             .downcast_mut::<D>()
             .expect("invalid cast")
         ;
@@ -237,9 +240,8 @@ impl View {
         let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
         let decorator = tree.arena[self.0]
             .decorator
-            .as_ref()
+            .as_mut()
             .expect("Decorator missed")
-            .0
             .downcast_mut::<D>()
             .expect("invalid cast")
         ;
@@ -258,7 +260,6 @@ impl View {
             .decorator
             .as_mut()
             .expect("Decorator missed")
-            .0
             .downcast_mut::<D>()
             .expect("invalid cast")
         ;
@@ -289,7 +290,7 @@ impl View {
         let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
         let panel = tree.arena[self.0]
             .panel
-            .as_ref()
+            .as_mut()
             .expect("Panel missed")
             .downcast_mut::<P>()
             .expect("invalid cast")
@@ -308,7 +309,7 @@ impl View {
         let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
         let panel = tree.arena[self.0]
             .panel
-            .as_ref()
+            .as_mut()
             .expect("Panel missed")
             .downcast_mut::<P>()
             .expect("invalid cast")
@@ -337,14 +338,14 @@ impl View {
     #[must_use]
     pub fn invalidate_rect(self, tree: &mut ViewTree, rect: Rect) -> Option<()> {
         if self == tree.root { return Some(tree.window_tree().invalidate_rect(rect)); }
-        let window = tree.arena[self.0].decorator.as_ref().map(|x| x.1);
+        let window = tree.arena[self.0].window;
         window.map(|window| window.invalidate_rect(&mut tree.window_tree(), rect))
     }
 
     #[must_use]
     pub fn invalidate_render(self, tree: &mut ViewTree) -> Option<()> {
         if self == tree.root { return Some(tree.window_tree().invalidate_screen()); }
-        let window = tree.arena[self.0].decorator.as_ref().map(|x| x.1);
+        let window = tree.arena[self.0].window;
         window.map(|window| window.invalidate(&mut tree.window_tree()))
     }
     
@@ -383,13 +384,13 @@ impl View {
         if node.measure_size == Some((w, h)) { return; }
         node.measure_size = Some((w, h));
         let panel = node.panel.take();
-        let desired_size = if let Some(panel) = &panel {
-            panel.measure(tree, self, w, h)
-        } else {
-            Vector::null()
-        };
+        let decorator = node.decorator.take();
+        let children_measure_size = decorator.as_ref().map_or((w, h), |d| d.children_measure_size(tree, (w, h)));
+        let children_desired_size = panel.as_ref().map_or(Vector::null(), |p| p.children_desired_size(tree, children_measure_size));
+        let desired_size = decorator.as_ref().map_or(children_desired_size, |d| d.desired_size(tree, children_desired_size));
         let node = &mut tree.arena[self.0];
         node.panel = panel;
+        node.decorator = decorator;
         node.desired_size = desired_size;
     }
 }
@@ -420,8 +421,8 @@ macro_attr! {
 }
 
 impl RootDecorator {
-    fn invalidate_bg(view: View, context: &mut dyn Context, _old: &Text) {
-        let tree = context.get::<ViewTree>().expect("ViewTree required");
+    fn invalidate_bg(_view: View, context: &mut dyn Context, _old: &Text) {
+        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
         tree.window_tree().invalidate_screen();
     }
 }
@@ -432,23 +433,23 @@ impl DepObj for RootDecorator {
 }
 
 impl Decorator for RootDecorator {
-    fn children_measure_size(&self, tree: &mut ViewTree, measure_size: (Option<i16>, Option<i16>)) -> (Option<i16>, Option<i16>) {
+    fn children_measure_size(&self, _tree: &mut ViewTree, measure_size: (Option<i16>, Option<i16>)) -> (Option<i16>, Option<i16>) {
         measure_size
     }
 
-    fn desired_size(&self, tree: &mut ViewTree, children_desired_size: Vector) -> Vector {
+    fn desired_size(&self, _tree: &mut ViewTree, children_desired_size: Vector) -> Vector {
         children_desired_size
     }
 
-    fn children_arrange_bounds(&self, tree: &mut ViewTree, arrange_size: Vector) -> Rect {
+    fn children_arrange_bounds(&self, _tree: &mut ViewTree, arrange_size: Vector) -> Rect {
         Rect { tl: Point { x: 0, y: 0 }, size: arrange_size }
     }
 
-    fn render_size(&self, tree: &mut ViewTree, children_render_bounds: Rect) -> Vector {
+    fn render_size(&self, tree: &mut ViewTree, _children_render_bounds: Rect) -> Vector {
         tree.screen_size
     }
 
-    fn render(&self, tree: &ViewTree, port: &mut RenderPort) {
+    fn render(&self, _tree: &ViewTree, port: &mut RenderPort) {
         let bg = ROOT_DECORATOR_TYPE.bg().get(self.dep_props()).get();
         port.fill(|port, p| port.out(p, bg.fg, bg.bg, bg.attr, &bg.value));
     }
