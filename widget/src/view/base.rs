@@ -179,7 +179,7 @@ impl View {
     ) -> T {
         let parent_window = parent
             .self_and_parents(tree)
-            .find_map(|view| tree.arena[view.0].window.as_ref().copied())
+            .find_map(|view| tree.arena[view.0].window)
         ;
         let arena = &mut tree.arena;
         let window_tree = tree.window_tree.as_mut().expect("ViewTree is in invalid state");
