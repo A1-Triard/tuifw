@@ -229,6 +229,10 @@ impl View {
         })
     }
 
+    pub fn desired_size(self, tree: &ViewTree) -> Vector { tree.arena[self.0].desired_size }
+
+    pub fn render_bounds(self, tree: &ViewTree) -> Rect { tree.arena[self.0].render_bounds }
+
     pub fn decorator_get<D: Decorator, T>(
         self,
         tree: &ViewTree,
