@@ -44,7 +44,7 @@ int main() {
     printf("pub const CCHARW_MAX: usize = %d;\n", CCHARW_MAX);
     return 0;
 }
-"##).expect(&format!("cannot write {}", c_file_display));
+"##).unwrap_or_else(|_| panic!(format!("cannot write {}", c_file_display)));
     }
 
     let mut build = cc::Build::new();
@@ -60,5 +60,6 @@ int main() {
     }
     let rs_file = File::create(&rs_file)
         .unwrap_or_else(|_| panic!(format!("cannot create {}", rs_file.display())));
-    Command::new(&bin_file).stdin(Stdio::null()).stdout(rs_file).status().expect(&format!("{} failed", bin_file.display()));
+    Command::new(&bin_file).stdin(Stdio::null()).stdout(rs_file).status()
+        .unwrap_or_else(|_| panic!(format!("{} failed", bin_file.display())));
 }

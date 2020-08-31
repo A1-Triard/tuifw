@@ -147,6 +147,7 @@ impl Screen {
 }
 
 impl Drop for Screen {
+    #![allow(clippy::panicking_unwrap)]
     fn drop(&mut self) {
         let e = unsafe { no_err(endwin()) };
         if e.is_err() && !thread::panicking() { e.unwrap(); }

@@ -1,6 +1,7 @@
 #![deny(warnings)]
 #![allow(clippy::collapsible_if)]
 #![allow(clippy::many_single_char_names)]
+#![allow(clippy::too_many_arguments)]
 #![feature(stmt_expr_attributes)]
 
 #![no_std]
@@ -384,11 +385,11 @@ impl Rect {
             Some(Right(rect)) => rect.intersect(intersect_with),
             Some(Left(Right(v_band))) => Rect {
                 tl: Point { x: v_band.l, y: intersect_with.t() },
-                size: Vector { x: v_band.w, y: intersect_with.h() }
+                size: Vector { x: v_band.w.get(), y: intersect_with.h() }
             },
             Some(Left(Left(h_band))) => Rect {
                 tl: Point { y: h_band.t, x: intersect_with.l() },
-                size: Vector { y: h_band.h, x: intersect_with.w() }
+                size: Vector { y: h_band.h.get(), x: intersect_with.w() }
             },
         }
     }
