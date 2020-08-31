@@ -23,7 +23,7 @@ pub trait Decorator: Any + DepObj + Debug + Sync + Send {
     fn children_measure_size(&self, tree: &mut ViewTree, measure_size: (Option<i16>, Option<i16>)) -> (Option<i16>, Option<i16>);
     fn desired_size(&self, tree: &mut ViewTree, children_desired_size: Vector) -> Vector;
     fn children_arrange_bounds(&self, tree: &mut ViewTree, arrange_size: Vector) -> Rect;
-    fn render_size(&self, tree: &mut ViewTree, children_render_bounds: Rect) -> Vector;
+    fn render_bounds(&self, tree: &mut ViewTree, children_render_bounds: Rect) -> Rect;
     fn render(&self, tree: &ViewTree, port: &mut RenderPort);
 }
 
@@ -41,8 +41,8 @@ macro_attr! {
         last_child: Option<View>,
         measure_size: Option<(Option<i16>, Option<i16>)>,
         desired_size: Vector,
-        arrange_size: Option<Vector>,
-        render_size: Vector,
+        arrange_bounds: Option<Rect>,
+        render_bounds: Rect,
     }
 }
 
@@ -90,8 +90,8 @@ impl ViewTree {
                 last_child: None,
                 measure_size: Some((Some(screen_size.x), Some(screen_size.y))),
                 desired_size: screen_size,
-                arrange_size: Some(screen_size),
-                render_size: screen_size,
+                arrange_bounds: Some(Rect { tl: Point { x: 0, y: 0 }, size: screen_size }),
+                render_bounds: Rect { tl: Point { x: 0, y: 0 }, size: screen_size },
             }, (window_tree, View(view)))
         });
         let screen_size = window_tree.screen_size();
@@ -112,7 +112,7 @@ impl ViewTree {
     pub fn root(&self) -> View { self.root }
 
     pub fn update(&mut self, wait: bool) -> Result<Option<Event>, Box<dyn std::any::Any>> {
-        self.root.measure(self, Some(self.screen_size.x), Some(self.screen_size.y));
+        self.root.measure(self, (Some(self.screen_size.x), Some(self.screen_size.y)));
         let mut window_tree = self.window_tree.take().expect("ViewTree is in invalid state");
         let result = window_tree.update(wait, self);
         if let Ok(result) = &result {
@@ -171,8 +171,8 @@ impl View {
                 last_child: None,
                 measure_size: Some((None, None)),
                 desired_size: Vector::null(),
-                arrange_size: Some(Vector::null()),
-                render_size: Vector::null(),
+                arrange_bounds: Some(Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() }),
+                render_bounds: Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() },
             }, (view, result))
         });
         View(view).invalidate_measure(tree);
@@ -353,10 +353,10 @@ impl View {
         let mut view = self;
         loop {
             if replace(&mut tree.arena[view.0].measure_size, None).is_none() {
-                debug_assert!(tree.arena[view.0].arrange_size.is_none());
+                debug_assert!(tree.arena[view.0].arrange_bounds.is_none());
                 break;
             }
-            tree.arena[view.0].arrange_size = None;
+            tree.arena[view.0].arrange_bounds = None;
             if let Some(parent) = view.parent(tree) {
                 view = parent;
             } else {
@@ -368,7 +368,7 @@ impl View {
     pub fn invalidate_arrange(self, tree: &mut ViewTree) {
         let mut view = self;
         loop {
-            if replace(&mut tree.arena[view.0].arrange_size, None).is_none() {
+            if replace(&mut tree.arena[view.0].arrange_bounds, None).is_none() {
                 break;
             }
             if let Some(parent) = view.parent(tree) {
@@ -379,19 +379,65 @@ impl View {
         }
     }
 
-    pub fn measure(self, tree: &mut ViewTree, w: Option<i16>, h: Option<i16>) {
+    pub fn measure(self, tree: &mut ViewTree, size: (Option<i16>, Option<i16>)) {
         let node = &mut tree.arena[self.0];
-        if node.measure_size == Some((w, h)) { return; }
-        node.measure_size = Some((w, h));
+        if node.measure_size == Some(size) { return; }
+        node.measure_size = Some(size);
         let panel = node.panel.take();
         let decorator = node.decorator.take();
-        let children_measure_size = decorator.as_ref().map_or((w, h), |d| d.children_measure_size(tree, (w, h)));
-        let children_desired_size = panel.as_ref().map_or(Vector::null(), |p| p.children_desired_size(tree, children_measure_size));
-        let desired_size = decorator.as_ref().map_or(children_desired_size, |d| d.desired_size(tree, children_desired_size));
+        let children_measure_size = decorator.as_ref().map_or(
+            size,
+            |d| d.children_measure_size(tree, size)
+        );
+        let children_desired_size = panel.as_ref().map_or(
+            Vector::null(),
+            |p| p.children_desired_size(tree, children_measure_size)
+        );
+        let desired_size = decorator.as_ref().map_or(
+            children_desired_size,
+            |d| d.desired_size(tree, children_desired_size)
+        );
         let node = &mut tree.arena[self.0];
         node.panel = panel;
         node.decorator = decorator;
         node.desired_size = desired_size;
+    }
+
+    pub fn arrange(self, tree: &mut ViewTree, rect: Rect) {
+        let node = &mut tree.arena[self.0];
+        if let Some(arrange_bounds) = node.arrange_bounds.as_mut() {
+            if arrange_bounds.size == rect.size {
+                if rect.tl != arrange_bounds.tl {
+                    node.render_bounds.tl = node.render_bounds.tl.offset(rect.tl.offset_from(arrange_bounds.tl));
+                    arrange_bounds.tl = rect.tl;
+                    let render_bounds = node.render_bounds;
+                    node.window.map(|w| w.move_(tree.window_tree(), render_bounds));
+                }
+                return;
+            }
+        }
+        node.arrange_bounds = Some(rect);
+        let panel = node.panel.take();
+        let decorator = node.decorator.take();
+        let children_arrange_bounds = decorator.as_ref().map_or_else(
+            || Rect { tl: Point { x: 0, y: 0 }, size: rect.size },
+            |d| d.children_arrange_bounds(tree, rect.size)
+        );
+        let children_render_bounds = panel.as_ref().map_or(
+            children_arrange_bounds,
+            |p| p.children_render_bounds(tree, children_arrange_bounds)
+        );
+        let render_bounds = decorator.as_ref().map_or(
+            children_render_bounds,
+            |d| d.render_bounds(tree, children_render_bounds)
+        );
+        let node = &mut tree.arena[self.0];
+        node.panel = panel;
+        node.decorator = decorator;
+        node.render_bounds = Rect {
+            tl: rect.tl.offset(render_bounds.tl.offset_from(Point { x: 0, y: 0 })),
+            size: render_bounds.size
+        };
     }
 }
 
@@ -445,8 +491,8 @@ impl Decorator for RootDecorator {
         Rect { tl: Point { x: 0, y: 0 }, size: arrange_size }
     }
 
-    fn render_size(&self, tree: &mut ViewTree, _children_render_bounds: Rect) -> Vector {
-        tree.screen_size
+    fn render_bounds(&self, tree: &mut ViewTree, _children_render_bounds: Rect) -> Rect {
+        Rect { tl: Point { x: 0, y: 0 }, size: tree.screen_size }
     }
 
     fn render(&self, _tree: &ViewTree, port: &mut RenderPort) {
