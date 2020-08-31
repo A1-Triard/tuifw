@@ -141,6 +141,7 @@ impl ViewTree {
 
     pub fn update(&mut self, wait: bool) -> Result<Option<Event>, Box<dyn std::any::Any>> {
         self.root.measure(self, (Some(self.screen_size.x), Some(self.screen_size.y)));
+        self.root.arrange(self, Rect { tl: Point { x: 0, y: 0 }, size: self.screen_size });
         let mut window_tree = self.window_tree.take().expect("ViewTree is in invalid state");
         let result = window_tree.update(wait, self);
         if let Ok(result) = &result {
@@ -518,11 +519,13 @@ impl View {
             children_render_bounds,
             |d| d.render_bounds(self, tree, children_render_bounds)
         );
-        let node = &mut tree.arena[self.0];
-        node.render_bounds = Rect {
+        let render_bounds = Rect {
             tl: rect.tl.offset(render_bounds.tl.offset_from(Point { x: 0, y: 0 })),
             size: render_bounds.size
         }.intersect(rect);
+        let window = tree.arena[self.0].window;
+        window.map(|w| w.move_(tree.window_tree(), render_bounds));
+        tree.arena[self.0].render_bounds = render_bounds;
     }
 }
 
