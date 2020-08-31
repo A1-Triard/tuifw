@@ -1,7 +1,6 @@
 use std::fmt::Debug;
 use tuifw_screen_base::{Vector, Point, Rect};
 use tuifw_window::{RenderPort};
-use crate::property::Property;
 use crate::view::base::*;
 
 #[derive(Debug)]
@@ -10,14 +9,14 @@ struct BorderRender;
 #[derive(Debug)]
 pub struct BorderView {
     view: View,
-    tl: Property<Self, Option<Text>, ViewContext>,
-    tr: Property<Self, Option<Text>, ViewContext>,
-    bl: Property<Self, Option<Text>, ViewContext>,
-    br: Property<Self, Option<Text>, ViewContext>,
-    l: Property<Self, Option<Text>, ViewContext>,
-    t: Property<Self, Option<Text>, ViewContext>,
-    r: Property<Self, Option<Text>, ViewContext>,
-    b: Property<Self, Option<Text>, ViewContext>
+    tl: Property<Self, Option<Text>>,
+    tr: Property<Self, Option<Text>>,
+    bl: Property<Self, Option<Text>>,
+    br: Property<Self, Option<Text>>,
+    l: Property<Self, Option<Text>>,
+    t: Property<Self, Option<Text>>,
+    r: Property<Self, Option<Text>>,
+    b: Property<Self, Option<Text>>
 }
 
 impl BorderView {
@@ -49,14 +48,14 @@ impl BorderView {
         })
     }
 
-    property!(Option<Text>, tl, set_tl, on_tl_changed, ViewContext);
-    property!(Option<Text>, tr, set_tr, on_tr_changed, ViewContext);
-    property!(Option<Text>, bl, set_bl, on_bl_changed, ViewContext);
-    property!(Option<Text>, br, set_br, on_br_changed, ViewContext);
-    property!(Option<Text>, l, set_l, on_l_changed, ViewContext);
-    property!(Option<Text>, t, set_t, on_t_changed, ViewContext);
-    property!(Option<Text>, r, set_r, on_r_changed, ViewContext);
-    property!(Option<Text>, b, set_b, on_b_changed, ViewContext);
+    property!(Option<Text>, tl, set_tl, on_tl_changed);
+    property!(Option<Text>, tr, set_tr, on_tr_changed);
+    property!(Option<Text>, bl, set_bl, on_bl_changed);
+    property!(Option<Text>, br, set_br, on_br_changed);
+    property!(Option<Text>, l, set_l, on_l_changed);
+    property!(Option<Text>, t, set_t, on_t_changed);
+    property!(Option<Text>, r, set_r, on_r_changed);
+    property!(Option<Text>, b, set_b, on_b_changed);
 
     fn invalidate_tl(&mut self, context: &mut ViewContext, _old: &Option<Text>) {
         let tree = context.get_1();

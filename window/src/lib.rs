@@ -11,6 +11,7 @@ use std::cmp::{min, max};
 use std::hint::{unreachable_unchecked};
 use std::marker::PhantomData;
 use std::mem::replace;
+use std::num::NonZeroUsize;
 use std::ops::Range;
 use std::panic::{UnwindSafe, RefUnwindSafe};
 use components_arena::{Arena, Id, ComponentClassMutex};
@@ -179,6 +180,14 @@ impl<Tag, RenderContext> Window<Tag, RenderContext> {
         let screen_bounds = bounds.offset(offset_from_root(parent, tree));
         invalidate_rect(tree.invalidated(), screen_bounds);
         result
+    }
+
+    pub unsafe fn from_raw_parts(raw_parts: (usize, NonZeroUsize)) -> Self {
+        Window(Id::from_raw_parts(raw_parts), PhantomData)
+    }
+
+    pub fn into_raw_parts(self) -> (usize, NonZeroUsize) {
+        self.0.into_raw_parts()
     }
 
     pub fn move_(self, tree: &mut WindowTree<Tag, RenderContext>, bounds: Rect) {
