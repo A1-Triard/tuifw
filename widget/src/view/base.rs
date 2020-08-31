@@ -167,6 +167,7 @@ fn render_view(
 pub struct View(Id<ViewNode>);
 
 impl View {
+    #[allow(clippy::new_ret_no_self)]
     pub fn new<T>(
         tree: &mut ViewTree,
         parent: View,
@@ -178,7 +179,7 @@ impl View {
     ) -> T {
         let parent_window = parent
             .self_and_parents(tree)
-            .find_map(|view| tree.arena[view.0].window.as_ref().map(|x| *x))
+            .find_map(|view| tree.arena[view.0].window.as_ref().copied())
         ;
         let arena = &mut tree.arena;
         let window_tree = tree.window_tree.as_mut().expect("ViewTree is in invalid state");

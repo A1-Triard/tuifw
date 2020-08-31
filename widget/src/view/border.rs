@@ -59,6 +59,7 @@ macro_attr! {
 }
 
 impl BorderDecorator {
+    #[allow(clippy::new_ret_no_self)]
     pub fn new(
         tree: &mut ViewTree,
         parent: View,
