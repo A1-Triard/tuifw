@@ -13,17 +13,34 @@ use tuifw_screen_base::{Event, Screen, Vector, Point, Rect, Attr, Color};
 use tuifw_window::{RenderPort, WindowTree, Window};
 
 pub trait Panel: Any + DepObj + Debug + Send + Sync {
-    fn children_desired_size(&self, tree: &mut ViewTree, children_measure_size: (Option<i16>, Option<i16>)) -> Vector;
-    fn children_render_bounds(&self, tree: &mut ViewTree, children_arrange_bounds: Rect) -> Rect;
+    fn children_desired_size(
+        &self,
+        tree: &mut ViewTree,
+        children_measure_size: (Option<i16>, Option<i16>)
+    ) -> Vector;
+
+    fn children_render_bounds(
+        &self,
+        tree: &mut ViewTree,
+        children_arrange_bounds: Rect
+    ) -> Rect;
 }
 
 downcast!(dyn Panel);
 
 pub trait Decorator: Any + DepObj + Debug + Sync + Send {
-    fn children_measure_size(&self, tree: &mut ViewTree, measure_size: (Option<i16>, Option<i16>)) -> (Option<i16>, Option<i16>);
+    fn children_measure_size(
+        &self,
+        tree: &mut ViewTree,
+        measure_size: (Option<i16>, Option<i16>)
+    ) -> (Option<i16>, Option<i16>);
+
     fn desired_size(&self, tree: &mut ViewTree, children_desired_size: Vector) -> Vector;
+
     fn children_arrange_bounds(&self, tree: &mut ViewTree, arrange_size: Vector) -> Rect;
+
     fn render_bounds(&self, tree: &mut ViewTree, children_render_bounds: Rect) -> Rect;
+
     fn render(&self, tree: &ViewTree, port: &mut RenderPort);
 }
 
@@ -142,7 +159,11 @@ impl View {
     pub fn new<T>(
         tree: &mut ViewTree,
         parent: View,
-        decorator_and_panel: impl FnOnce(View) -> (Option<Box<dyn Decorator>>, Option<Box<dyn Panel>>, T)
+        decorator_and_panel: impl FnOnce(View) -> (
+            Option<Box<dyn Decorator>>,
+            Option<Box<dyn Panel>>,
+            T
+        )
     ) -> T {
         let parent_window = parent
             .self_and_parents(tree)
@@ -408,7 +429,9 @@ impl View {
         if let Some(arrange_bounds) = node.arrange_bounds.as_mut() {
             if arrange_bounds.size == rect.size {
                 if rect.tl != arrange_bounds.tl {
-                    node.render_bounds.tl = node.render_bounds.tl.offset(rect.tl.offset_from(arrange_bounds.tl));
+                    node.render_bounds.tl = node.render_bounds.tl.offset(
+                        rect.tl.offset_from(arrange_bounds.tl)
+                    );
                     arrange_bounds.tl = rect.tl;
                     let render_bounds = node.render_bounds;
                     node.window.map(|w| w.move_(tree.window_tree(), render_bounds));
@@ -479,7 +502,11 @@ impl DepObj for RootDecorator {
 }
 
 impl Decorator for RootDecorator {
-    fn children_measure_size(&self, _tree: &mut ViewTree, measure_size: (Option<i16>, Option<i16>)) -> (Option<i16>, Option<i16>) {
+    fn children_measure_size(
+        &self,
+        _tree: &mut ViewTree,
+        measure_size: (Option<i16>, Option<i16>)
+    ) -> (Option<i16>, Option<i16>) {
         measure_size
     }
 

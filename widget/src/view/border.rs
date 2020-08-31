@@ -3,126 +3,146 @@ use tuifw_screen_base::{Vector, Point, Rect};
 use tuifw_window::{RenderPort};
 use crate::view::base::*;
 
-#[derive(Debug)]
-struct BorderRender;
-
-#[derive(Debug)]
-pub struct BorderView {
-    view: View,
-    tl: Property<Self, Option<Text>>,
-    tr: Property<Self, Option<Text>>,
-    bl: Property<Self, Option<Text>>,
-    br: Property<Self, Option<Text>>,
-    l: Property<Self, Option<Text>>,
-    t: Property<Self, Option<Text>>,
-    r: Property<Self, Option<Text>>,
-    b: Property<Self, Option<Text>>
+pub struct BorderDecoratorType {
+    token: DepTypeToken<BorderDecorator>,
+    tl: DepProp<BorderDecorator, Reactive<View, Option<Text>>>,
+    tr: DepProp<BorderDecorator, Reactive<View, Option<Text>>>,
+    bl: DepProp<BorderDecorator, Reactive<View, Option<Text>>>,
+    br: DepProp<BorderDecorator, Reactive<View, Option<Text>>>,
+    l: DepProp<BorderDecorator, Reactive<View, Option<Text>>>,
+    t: DepProp<BorderDecorator, Reactive<View, Option<Text>>>,
+    r: DepProp<BorderDecorator, Reactive<View, Option<Text>>>,
+    b: DepProp<BorderDecorator, Reactive<View, Option<Text>>>,
 }
 
-impl BorderView {
+impl BorderDecoratorType {
+    pub fn token(&self) -> &DepTypeToken<BorderDecorator> { &self.token }
+    pub fn tl(&self) -> DepProp<BorderDecorator, Reactive<View, Option<Text>>> { self.tl }
+    pub fn tr(&self) -> DepProp<BorderDecorator, Reactive<View, Option<Text>>> { self.tr }
+    pub fn bl(&self) -> DepProp<BorderDecorator, Reactive<View, Option<Text>>> { self.bl }
+    pub fn br(&self) -> DepProp<BorderDecorator, Reactive<View, Option<Text>>> { self.br }
+    pub fn l(&self) -> DepProp<BorderDecorator, Reactive<View, Option<Text>>> { self.l }
+    pub fn t(&self) -> DepProp<BorderDecorator, Reactive<View, Option<Text>>> { self.t }
+    pub fn r(&self) -> DepProp<BorderDecorator, Reactive<View, Option<Text>>> { self.r }
+    pub fn b(&self) -> DepProp<BorderDecorator, Reactive<View, Option<Text>>> { self.b }
+}
+
+pub static BORDER_DECORATOR_TYPE: sync::Lazy<BorderDecoratorType> = sync::Lazy::new(|| {
+    let mut builder = DepTypeBuilder::new().expect("BorderDecoratorType builder locked");
+    let tl = builder.prop(|| Reactive::new(None));
+    let tr = builder.prop(|| Reactive::new(None));
+    let bl = builder.prop(|| Reactive::new(None));
+    let br = builder.prop(|| Reactive::new(None));
+    let l = builder.prop(|| Reactive::new(None));
+    let t = builder.prop(|| Reactive::new(None));
+    let r = builder.prop(|| Reactive::new(None));
+    let b = builder.prop(|| Reactive::new(None));
+    let token = builder.build();
+    BorderDecoratorType {
+        token,
+        tl, tr, bl, br,
+        l, t, r, b,
+    }
+});
+
+macro_attr! {
+    #[derive(DepObjRaw!)]
+    #[derive(Debug)]
+    pub struct BorderDecorator {
+        view: View,
+        dep_props: DepObjProps<Self>,
+    }
+}
+
+impl BorderDecorator {
     pub fn new(
         tree: &mut ViewTree,
         parent: View,
     ) -> View {
-        View::new(tree, parent, Some(Box::new(BorderRender) as _), |view| {
-            let mut obj = BorderView {
+        let view = View::new(tree, parent, |view| {
+            let decorator = BorderDecorator {
                 view,
-                tl: Property::new(None),
-                tr: Property::new(None),
-                bl: Property::new(None),
-                br: Property::new(None),
-                l: Property::new(None),
-                t: Property::new(None),
-                r: Property::new(None),
-                b: Property::new(None),
+                dep_props: DepObjProps::new()
             };
-            obj.on_tl_changed(Self::invalidate_tl);
-            obj.on_tr_changed(Self::invalidate_tr);
-            obj.on_bl_changed(Self::invalidate_bl);
-            obj.on_br_changed(Self::invalidate_br);
-            obj.on_l_changed(Self::invalidate_l);
-            obj.on_t_changed(Self::invalidate_t);
-            obj.on_r_changed(Self::invalidate_r);
-            obj.on_b_changed(Self::invalidate_b);
-            (Box::new(obj) as _, view)
-        })
+            (Some(Box::new(decorator) as _), None, view)
+        });
+        view.decorator_on_changed(&mut tree, BORDER_DECORATOR_TYPE.tl(), Self::invalidate_tl);
+        view.decorator_on_changed(&mut tree, BORDER_DECORATOR_TYPE.tr(), Self::invalidate_tr);
+        view.decorator_on_changed(&mut tree, BORDER_DECORATOR_TYPE.bl(), Self::invalidate_bl);
+        view.decorator_on_changed(&mut tree, BORDER_DECORATOR_TYPE.br(), Self::invalidate_br);
+        view.decorator_on_changed(&mut tree, BORDER_DECORATOR_TYPE.l(), Self::invalidate_l);
+        view.decorator_on_changed(&mut tree, BORDER_DECORATOR_TYPE.t(), Self::invalidate_t);
+        view.decorator_on_changed(&mut tree, BORDER_DECORATOR_TYPE.r(), Self::invalidate_r);
+        view.decorator_on_changed(&mut tree, BORDER_DECORATOR_TYPE.b(), Self::invalidate_b);
+        view
     }
 
-    property!(Option<Text>, tl, set_tl, on_tl_changed);
-    property!(Option<Text>, tr, set_tr, on_tr_changed);
-    property!(Option<Text>, bl, set_bl, on_bl_changed);
-    property!(Option<Text>, br, set_br, on_br_changed);
-    property!(Option<Text>, l, set_l, on_l_changed);
-    property!(Option<Text>, t, set_t, on_t_changed);
-    property!(Option<Text>, r, set_r, on_r_changed);
-    property!(Option<Text>, b, set_b, on_b_changed);
-
-    fn invalidate_tl(&mut self, context: &mut ViewContext, _old: &Option<Text>) {
-        let tree = context.get_1();
-        self.view.invalidate_rect(tree, Rect {
+    fn invalidate_tl(view: View, context: &mut dyn Context, _old: &Option<Text>) {
+        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        view.invalidate_rect(tree, Rect {
             tl: Point { x: 0, y: 0 },
             size: Vector { x: 1, y: 1 }
         }).unwrap();
     }
 
-    fn invalidate_tr(&mut self, context: &mut ViewContext, _old: &Option<Text>) {
-        let tree = context.get_1();
-        let size = self.view.size(tree).unwrap();
-        self.view.invalidate_rect(tree, Rect {
+    fn invalidate_tr(view: View, context: &mut dyn Context, _old: &Option<Text>) {
+        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let size = view.size(tree).unwrap();
+        view.invalidate_rect(tree, Rect {
             tl: Point { x: size.x.overflowing_sub(1).0, y: 0 },
             size: Vector { x: 1, y: 1 }
         }).unwrap();
     }
 
-    fn invalidate_bl(&mut self, context: &mut ViewContext, _old: &Option<Text>) {
-        let tree = context.get_1();
-        let size = self.view.size(tree).unwrap();
-        self.view.invalidate_rect(tree, Rect {
+    fn invalidate_bl(view: View, context: &mut dyn Context, _old: &Option<Text>) {
+        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let size = view.size(tree).unwrap();
+        view.invalidate_rect(tree, Rect {
             tl: Point { x: 0, y: size.y.overflowing_sub(1).0 },
             size: Vector { x: 1, y: 1 }
         }).unwrap();
     }
 
-    fn invalidate_br(&mut self, context: &mut ViewContext, _old: &Option<Text>) {
-        let tree = context.get_1();
-        let size = self.view.size(tree).unwrap();
-        self.view.invalidate_rect(tree, Rect {
+    fn invalidate_br(view: View, context: &mut dyn Context, _old: &Option<Text>) {
+        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let size = view.size(tree).unwrap();
+        view.invalidate_rect(tree, Rect {
             tl: Point { x: size.x.overflowing_sub(1).0, y: size.y.overflowing_sub(1).0 },
             size: Vector { x: 1, y: 1 }
         }).unwrap();
     }
 
-    fn invalidate_l(&mut self, context: &mut ViewContext, _old: &Option<Text>) {
-        let tree = context.get_1();
-        let size = self.view.size(tree).unwrap();
-        self.view.invalidate_rect(tree, Rect {
+    fn invalidate_l(view: View, context: &mut dyn Context, _old: &Option<Text>) {
+        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let size = view.size(tree).unwrap();
+        view.invalidate_rect(tree, Rect {
             tl: Point { x: 0, y: 0 },
             size: Vector { x: 1, y: size.y }
         }).unwrap();
     }
 
-    fn invalidate_t(&mut self, context: &mut ViewContext, _old: &Option<Text>) {
-        let tree = context.get_1();
-        let size = self.view.size(tree).unwrap();
-        self.view.invalidate_rect(tree, Rect {
+    fn invalidate_t(view: View, context: &mut dyn Context, _old: &Option<Text>) {
+        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let size = view.size(tree).unwrap();
+        view.invalidate_rect(tree, Rect {
             tl: Point { x: 0, y: 0 },
             size: Vector { x: size.x, y: 1 }
         }).unwrap();
     }
 
-    fn invalidate_r(&mut self, context: &mut ViewContext, _old: &Option<Text>) {
-        let tree = context.get_1();
-        let size = self.view.size(tree).unwrap();
-        self.view.invalidate_rect(tree, Rect {
+    fn invalidate_r(view: View, context: &mut dyn Context, _old: &Option<Text>) {
+        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let size = view.size(tree).unwrap();
+        view.invalidate_rect(tree, Rect {
             tl: Point { x: size.x.overflowing_sub(1).0, y: 0 },
             size: Vector { x: 1, y: size.y }
         }).unwrap();
     }
 
-    fn invalidate_b(&mut self, context: &mut ViewContext, _old: &Option<Text>) {
-        let tree = context.get_1();
-        let size = self.view.size(tree).unwrap();
-        self.view.invalidate_rect(tree, Rect {
+    fn invalidate_b(view: View, context: &mut dyn Context, _old: &Option<Text>) {
+        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let size = view.size(tree).unwrap();
+        view.invalidate_rect(tree, Rect {
             tl: Point { x: 0, y: size.y.overflowing_sub(1).0 },
             size: Vector { x: size.x, y: 1 }
         }).unwrap();
