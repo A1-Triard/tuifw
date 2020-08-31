@@ -377,6 +377,21 @@ impl Rect {
             }
         }
     }
+
+    pub fn union_intersect(self, union_with: Rect, intersect_with: Rect) -> Rect {
+        match self.union(union_with) {
+            None => intersect_with,
+            Some(Right(rect)) => rect.intersect(intersect_with),
+            Some(Left(Right(v_band))) => Rect {
+                tl: Point { x: v_band.l, y: intersect_with.t() },
+                size: Vector { x: v_band.w, y: intersect_with.h() }
+            },
+            Some(Left(Left(h_band))) => Rect {
+                tl: Point { y: h_band.t, x: intersect_with.l() },
+                size: Vector { y: h_band.h, x: intersect_with.w() }
+            },
+        }
+    }
  
     pub fn offset(self, d: Vector) -> Rect {
         Rect { tl: self.tl.offset(d), size: self.size }

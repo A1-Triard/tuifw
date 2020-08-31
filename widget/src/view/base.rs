@@ -485,10 +485,25 @@ impl View {
             || Rect { tl: Point { x: 0, y: 0 }, size: rect.size },
             |d| d.children_arrange_bounds(self, tree, rect.size)
         );
-        let children_render_bounds = panel.as_ref().map_or(
-            children_arrange_bounds,
-            |p| p.children_render_bounds(self, tree, children_arrange_bounds)
-        );
+        let children_render_bounds = if let Some(panel) = panel.as_ref() {
+            panel.children_render_bounds(self, tree, children_arrange_bounds)
+        } else {
+            if let Some(last_child) = self.last_child(tree) {
+                let mut children_render_bounds = Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() };
+                let mut child = last_child;
+                loop {
+                    child = child.next(tree);
+                    if child == last_child { break children_render_bounds; }
+                    child.arrange(tree, children_arrange_bounds);
+                    children_render_bounds = children_render_bounds.union_intersect(
+                        child.render_bounds(tree),
+                        children_arrange_bounds
+                    );
+                }
+            } else {
+                children_arrange_bounds
+            }
+        };
         let render_bounds = decorator.as_ref().map_or(
             children_render_bounds,
             |d| d.render_bounds(self, tree, children_render_bounds)
@@ -497,7 +512,7 @@ impl View {
         node.render_bounds = Rect {
             tl: rect.tl.offset(render_bounds.tl.offset_from(Point { x: 0, y: 0 })),
             size: render_bounds.size
-        };
+        }.intersect(rect);
     }
 }
 
