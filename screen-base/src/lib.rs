@@ -21,6 +21,7 @@ mod bitflags_ext;
 
 use alloc::boxed::Box;
 use core::any::Any;
+use core::cmp::{min, max};
 use core::num::{NonZeroU16, NonZeroI16};
 use core::ops::{Add, AddAssign, Sub, SubAssign, Neg, Range};
 use core::option::{Option};
@@ -137,6 +138,20 @@ impl Vector {
     pub fn is_null(self) -> bool { self.x == 0 && self.y == 0 }
 
     pub fn rect_area(self) -> u32 { (self.x as u16 as u32) * (self.y as u16 as u32) }
+
+    pub fn max(self, other: Vector) -> Vector {
+        Vector {
+            x: max(self.x as u16, other.x as u16) as i16,
+            y: max(self.y as u16, other.y as u16) as i16,
+        }
+    }
+
+    pub fn min(self, other: Vector) -> Vector {
+        Vector {
+            x: min(self.x as u16, other.x as u16) as i16,
+            y: min(self.y as u16, other.y as u16) as i16,
+        }
+    }
 }
 
 impl Default for Vector {

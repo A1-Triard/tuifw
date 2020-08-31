@@ -229,6 +229,20 @@ impl View {
         })
     }
 
+    pub fn last_child(self, tree: &ViewTree) -> Option<View> { tree.arena[self.0].last_child }
+
+    pub fn next(self, tree: &ViewTree) -> View { tree.arena[self.0].next }
+
+    pub fn children<'a>(self, tree: &'a ViewTree) -> impl Iterator<Item=View> + 'a {
+        let last_child = self.last_child(tree);
+        let mut view = last_child;
+        iter::from_fn(move || {
+            view = view.map(|view| view.next(tree));
+            if view == last_child { view = None; }
+            view
+        })
+    }
+
     pub fn desired_size(self, tree: &ViewTree) -> Vector { tree.arena[self.0].desired_size }
 
     pub fn render_bounds(self, tree: &ViewTree) -> Rect { tree.arena[self.0].render_bounds }
@@ -425,10 +439,22 @@ impl View {
             size,
             |d| d.children_measure_size(self, tree, size)
         );
-        let children_desired_size = panel.as_ref().map_or(
-            Vector::null(),
-            |p| p.children_desired_size(self, tree, children_measure_size)
-        );
+        let children_desired_size = if let Some(panel) = panel.as_ref() {
+            panel.children_desired_size(self, tree, children_measure_size)
+        } else {
+            if let Some(last_child) = self.last_child(tree) {
+                let mut children_desired_size = Vector::null();
+                let mut child = last_child;
+                loop {
+                    child = child.next(tree);
+                    if child == last_child { break children_desired_size; }
+                    child.measure(tree, children_measure_size);
+                    children_desired_size = children_desired_size.max(child.desired_size(tree));
+                }
+            } else {
+                Vector::null()
+            }
+        };
         let desired_size = decorator.as_ref().map_or(
             children_desired_size,
             |d| d.desired_size(self, tree, children_desired_size)

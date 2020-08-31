@@ -225,10 +225,6 @@ impl<Tag, RenderContext> Window<Tag, RenderContext> {
         invalidate_rect(tree.invalidated(), screen_bounds);
     }
 
-    pub fn size(self, tree: &WindowTree<Tag, RenderContext>) -> Vector {
-        tree.arena[self.0].bounds.size
-    }
-
     pub fn invalidate_rect(self, tree: &mut WindowTree<Tag, RenderContext>, rect: Rect) {
         let bounds = tree.arena[self.0].bounds;
         let rect = rect.offset(bounds.tl.offset_from(Point { x: 0, y: 0 })).intersect(bounds);
