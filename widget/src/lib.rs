@@ -12,5 +12,7 @@ extern crate components_arena;
 extern crate downcast;
 #[macro_use]
 extern crate dep_obj;
+#[macro_use]
+extern crate enum_derive;
 
 pub mod view;

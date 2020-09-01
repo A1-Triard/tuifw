@@ -53,7 +53,6 @@ macro_attr! {
     #[derive(DepObjRaw!)]
     #[derive(Debug)]
     pub struct BorderDecorator {
-        view: View,
         dep_props: DepObjProps<Self>,
     }
 }
@@ -66,7 +65,6 @@ impl BorderDecorator {
     ) -> View {
         let view = View::new(tree, parent, |view| {
             let decorator = BorderDecorator {
-                view,
                 dep_props: DepObjProps::new(BORDER_DECORATOR_TYPE.token())
             };
             (Some(Box::new(decorator) as _), None, view)

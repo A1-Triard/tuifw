@@ -12,6 +12,15 @@ use once_cell::sync::{self};
 use tuifw_screen_base::{Event, Screen, Vector, Point, Rect, Attr, Color};
 use tuifw_window::{RenderPort, WindowTree, Window};
 
+macro_attr! {
+    #[derive(Eq, PartialEq, Debug, Hash, Clone, Copy, Ord, PartialOrd)]
+    #[derive(EnumDisplay!, EnumFromStr!)]
+    pub enum Orient {
+        Hor,
+        Vert
+    }
+}
+
 pub trait PanelBehavior {
     fn children_desired_size(
         &self,
