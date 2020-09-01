@@ -17,9 +17,9 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 derivative = "2.1.1"
+components-arena = { version = "0.6.0", features = [] }
 
 [dev-dependencies]
-components-arena = "0.4.0"
 macro-attr = "0.2.0"
 downcast = "0.10.0"
 once_cell = "1.4.0"

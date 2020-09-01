@@ -19,5 +19,5 @@ pub mod context;
 #[cfg(not(docsrs))]
 mod context;
 
-pub mod reactive;
-pub mod dep;
+mod dep;
+pub use dep::*;
