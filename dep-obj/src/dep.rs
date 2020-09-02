@@ -93,7 +93,7 @@ impl<Type: DepType> DepTypeBuilder<Type> {
 }
 
 impl<Type: DepType> DepTypeBuilder<Type> {
-    pub fn prop<PropType>(&mut self, default: fn() -> PropType) -> DepProp<Type, PropType> {
+    pub fn prop<PropType>(&mut self, default: fn() -> PropType) -> DepPropRaw<Type, PropType> {
         let align = align_of::<Entry<PropType>>();
         self.align = max(self.align, align);
         let padding = (align - self.size % align) % align;
@@ -101,7 +101,7 @@ impl<Type: DepType> DepTypeBuilder<Type> {
         let offset = self.size.try_into().expect("out of memory");
         self.size = self.size.checked_add(size_of::<Entry<PropType>>()).expect("out of memory");
         self.default.push((offset, store_default::<PropType>, default as usize));
-        DepProp { offset, phantom: (PhantomData, PhantomData) }
+        DepPropRaw { offset, phantom: (PhantomData, PhantomData) }
     }
 
     pub fn build(self, type_: Type) -> DepTypeToken<Type> {
@@ -133,89 +133,107 @@ impl<OwnerId: ComponentId, Type> OnChanged<OwnerId, Type> {
 #[derive(Derivative)]
 #[derivative(Debug(bound=""), Copy(bound=""), Clone(bound=""), Eq(bound=""), PartialEq(bound=""))]
 #[derivative(Hash(bound=""), Ord(bound=""), PartialOrd(bound=""))]
-pub struct DepProp<Owner: DepType, Type> {
+pub struct DepPropRaw<OwnerType: DepType, Type> {
     offset: isize,
-    phantom: (PhantomData<Owner>, PhantomData<Type>),
+    phantom: (PhantomData<OwnerType>, PhantomData<Type>),
 }
 
-unsafe impl<Owner: DepType, Type> Send for DepProp<Owner, Type> { }
-unsafe impl<Owner: DepType, Type> Sync for DepProp<Owner, Type> { }
-impl<Owner: DepType, Type> Unpin for DepProp<Owner, Type> { }
+unsafe impl<OwnerType: DepType, Type> Send for DepPropRaw<OwnerType, Type> { }
+unsafe impl<OwnerType: DepType, Type> Sync for DepPropRaw<OwnerType, Type> { }
+impl<OwnerType: DepType, Type> Unpin for DepPropRaw<OwnerType, Type> { }
 
-impl<Owner: DepType, Type: Eq> DepProp<Owner, Type> {
-    pub fn set_distinct<OwnerId: ComponentId>(
-        self,
-        obj_props: &mut DepObjProps<Owner, OwnerId>,
-        value: Type
-    ) -> (Type, OnChanged<OwnerId, Type>) {
-        let entry = self.get_entry_mut(obj_props);
-        let old = replace(&mut entry.value, value);
-        let on_changed = if old == entry.value { None } else { entry.on_changed.clone() };
-        (old, OnChanged(on_changed, (PhantomData, PhantomData)))
-    }
-}
-
-impl<Owner: DepType, Type> DepProp<Owner, Type> {
-    pub fn set_uncond<OwnerId: ComponentId>(
-        self,
-        obj_props: &mut DepObjProps<Owner, OwnerId>,
-        value: Type
-    ) -> (Type, OnChanged<OwnerId, Type>) {
-        let entry = self.get_entry_mut(obj_props);
-        let old = replace(&mut entry.value, value);
-        (old, OnChanged(entry.on_changed.clone(), (PhantomData, PhantomData)))
-    }
-
-    pub fn get<OwnerId: ComponentId>(
-        self,
-        obj_props: &DepObjProps<Owner, OwnerId>
-    ) -> &Type {
-        &self.get_entry(obj_props).value
-    }
-
-    pub fn on_changed<OwnerId: ComponentId>(
-        self,
-        obj_props: &mut DepObjProps<Owner, OwnerId>,
-        callback: fn(owner_id: OwnerId, context: &mut dyn Context, old: &Type)
-    ) {
-        let callback = unsafe { transmute(callback) };
-        let entry = self.get_entry_mut(obj_props);
-        if let Some(on_changed) = entry.on_changed.as_mut() {
-            on_changed.push(callback);
-        } else {
-            entry.on_changed = Some(vec![callback]);
-        }
+impl<OwnerType: DepType, Type> DepPropRaw<OwnerType, Type> {
+    pub fn owned_by<Owner: DepObj<Type=OwnerType>>(self) -> DepProp<Owner, Type> {
+        DepProp(self, PhantomData)
     }
 
     fn get_entry<OwnerId: ComponentId>(
         self,
-        obj_props: &DepObjProps<Owner, OwnerId>
+        obj_props: &DepObjProps<OwnerType, OwnerId>
     ) -> &Entry<Type> {
         unsafe { &*(obj_props.storage.offset(self.offset) as *const Entry<Type>) }
     }
 
     fn get_entry_mut<OwnerId: ComponentId>(
         self,
-        obj_props: &mut DepObjProps<Owner, OwnerId>
+        obj_props: &mut DepObjProps<OwnerType, OwnerId>
     ) -> &mut Entry<Type> {
         unsafe { &mut *(obj_props.storage.offset(self.offset) as *mut Entry<Type>) }
     }
 }
 
 #[derive(Derivative)]
-#[derivative(Debug(bound=""))]
-pub struct DepObjProps<Owner: DepType, OwnerId: ComponentId> {
-    layout: Layout,
-    storage: *mut u8,
-    phantom: (PhantomData<Owner>, PhantomData<OwnerId>)
+#[derivative(Debug(bound=""), Copy(bound=""), Clone(bound=""), Eq(bound=""), PartialEq(bound=""))]
+#[derivative(Hash(bound=""), Ord(bound=""), PartialOrd(bound=""))]
+pub struct DepProp<Owner: DepObj, Type>(
+    DepPropRaw<Owner::Type, Type>,
+    PhantomData<Owner>,
+);
+
+//unsafe impl<OwnerType: DepType, Type> Send for DepProp<Owner, Type> { }
+//unsafe impl<OwnerType: DepType, Type> Sync for DepProp<Owner, Type> { }
+//impl<OwnerType: DepType, Type> Unpin for DepProp<Owner, Type> { }
+
+impl<Owner: DepObj, Type: Eq> DepProp<Owner, Type> {
+    pub fn set_distinct<OwnerId: ComponentId>(
+        self,
+        obj_props: &mut DepObjProps<Owner::Type, OwnerId>,
+        value: Type
+    ) -> (Type, OnChanged<OwnerId, Type>) {
+        let entry = self.0.get_entry_mut(obj_props);
+        let old = replace(&mut entry.value, value);
+        let on_changed = if old == entry.value { None } else { entry.on_changed.clone() };
+        (old, OnChanged(on_changed, (PhantomData, PhantomData)))
+    }
 }
 
-unsafe impl<Owner: DepType, OwnerId: ComponentId> Send for DepObjProps<Owner, OwnerId> { }
-unsafe impl<Owner: DepType, OwnerId: ComponentId> Sync for DepObjProps<Owner, OwnerId> { }
-impl<Owner: DepType, OwnerId: ComponentId> Unpin for DepObjProps<Owner, OwnerId> { }
+impl<Owner: DepObj, Type> DepProp<Owner, Type> {
+    pub fn set_uncond<OwnerId: ComponentId>(
+        self,
+        obj_props: &mut DepObjProps<Owner::Type, OwnerId>,
+        value: Type
+    ) -> (Type, OnChanged<OwnerId, Type>) {
+        let entry = self.0.get_entry_mut(obj_props);
+        let old = replace(&mut entry.value, value);
+        (old, OnChanged(entry.on_changed.clone(), (PhantomData, PhantomData)))
+    }
 
-impl<Owner: DepType, OwnerId: ComponentId> DepObjProps<Owner, OwnerId> {
-    pub fn new(type_token: &DepTypeToken<Owner>) -> DepObjProps<Owner, OwnerId> {
+    pub fn get<OwnerId: ComponentId>(
+        self,
+        obj_props: &DepObjProps<Owner::Type, OwnerId>
+    ) -> &Type {
+        &self.0.get_entry(obj_props).value
+    }
+
+    pub fn on_changed<OwnerId: ComponentId>(
+        self,
+        obj_props: &mut DepObjProps<Owner::Type, OwnerId>,
+        callback: fn(owner_id: OwnerId, context: &mut dyn Context, old: &Type)
+    ) {
+        let callback = unsafe { transmute(callback) };
+        let entry = self.0.get_entry_mut(obj_props);
+        if let Some(on_changed) = entry.on_changed.as_mut() {
+            on_changed.push(callback);
+        } else {
+            entry.on_changed = Some(vec![callback]);
+        }
+    }
+}
+
+#[derive(Derivative)]
+#[derivative(Debug(bound=""))]
+pub struct DepObjProps<OwnerType: DepType, OwnerId: ComponentId> {
+    layout: Layout,
+    storage: *mut u8,
+    phantom: (PhantomData<OwnerType>, PhantomData<OwnerId>)
+}
+
+unsafe impl<OwnerType: DepType, OwnerId: ComponentId> Send for DepObjProps<OwnerType, OwnerId> { }
+unsafe impl<OwnerType: DepType, OwnerId: ComponentId> Sync for DepObjProps<OwnerType, OwnerId> { }
+impl<OwnerType: DepType, OwnerId: ComponentId> Unpin for DepObjProps<OwnerType, OwnerId> { }
+
+impl<OwnerType: DepType, OwnerId: ComponentId> DepObjProps<OwnerType, OwnerId> {
+    pub fn new(type_token: &DepTypeToken<OwnerType>) -> DepObjProps<OwnerType, OwnerId> {
         let storage = if type_token.layout.size() == 0 {
             null_mut()
         } else {
@@ -232,7 +250,7 @@ impl<Owner: DepType, OwnerId: ComponentId> DepObjProps<Owner, OwnerId> {
     }
 }
 
-impl<Owner: DepType, OwnerId: ComponentId> Drop for DepObjProps<Owner, OwnerId> {
+impl<OwnerType: DepType, OwnerId: ComponentId> Drop for DepObjProps<OwnerType, OwnerId> {
     fn drop(&mut self) {
         if !self.storage.is_null() {
             unsafe { dealloc(self.storage, self.layout) };
