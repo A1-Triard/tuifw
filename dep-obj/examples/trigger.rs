@@ -15,7 +15,7 @@ extern crate derivative;
 mod circuit {
     use dep_obj::{DepObj, DepProp};
     use dep_obj::{Context, ContextExt};
-    use components_arena::{ComponentId, Id, Arena, ComponentClassMutex};
+    use components_arena::{ComponentId, Id, Arena, ComponentClassToken};
     use downcast::Any;
     use std::fmt::Debug;
     use std::num::NonZeroUsize;
@@ -33,8 +33,6 @@ mod circuit {
             tag: Tag,
         }
     }
-
-    static CHIP_NODE: ComponentClassMutex<ChipNodeComponent> = ComponentClassMutex::new();
 
     #[derive(Derivative)]
     #[derivative(Debug(bound=""), Copy(bound=""), Clone(bound=""), Eq(bound=""), PartialEq(bound=""))]
@@ -126,10 +124,18 @@ mod circuit {
     }
 
     impl<Tag> Circuit<Tag> {
-        pub fn new() -> Self {
+        pub fn new(token: &mut CircuitToken) -> Self {
             Circuit {
-                arena: Arena::new(&mut CHIP_NODE.lock().unwrap())
+                arena: Arena::new(&mut token.0)
             }
+        }
+    }
+
+    pub struct CircuitToken(ComponentClassToken<ChipNodeComponent>);
+
+    impl CircuitToken {
+        pub fn new() -> Option<Self> {
+            ComponentClassToken::new().map(CircuitToken)
         }
     }
 }
@@ -316,7 +322,8 @@ impl Context for TriggerContext {
 }
 
 fn main() {
-    let circuit = &mut Circuit::new();
+    let mut circuit_token = CircuitToken::new().unwrap();
+    let circuit = &mut Circuit::new(&mut circuit_token);
     let or_legs_token: DepTypeToken<OrLegsType> =  OrLegsType::new().unwrap();
     let not_legs_token: DepTypeToken<NotLegsType> = NotLegsType::new().unwrap();
     let not_1 = NotLegs::new(circuit, &not_legs_token, |chip| ((0, unsafe { NonZeroUsize::new_unchecked(1) }), chip));
