@@ -170,9 +170,9 @@ pub struct DepProp<Owner: DepObj, Type>(
     PhantomData<Owner>,
 );
 
-//unsafe impl<OwnerType: DepType, Type> Send for DepProp<Owner, Type> { }
-//unsafe impl<OwnerType: DepType, Type> Sync for DepProp<Owner, Type> { }
-//impl<OwnerType: DepType, Type> Unpin for DepProp<Owner, Type> { }
+unsafe impl<Owner: DepObj, Type> Send for DepProp<Owner, Type> { }
+unsafe impl<Owner: DepObj, Type> Sync for DepProp<Owner, Type> { }
+impl<Owner: DepObj, Type> Unpin for DepProp<Owner, Type> { }
 
 impl<Owner: DepObj, Type: Eq> DepProp<Owner, Type> {
     pub fn set_distinct<OwnerId: ComponentId>(
