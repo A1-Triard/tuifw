@@ -39,6 +39,7 @@ impl Default for DepTypeLock {
 pub struct DepTypeToken<Type: DepType> {
     layout: Layout,
     default: Vec<(isize, unsafe fn(usize, *mut u8), usize)>,
+    drop: Vec<(isize, unsafe fn(*mut u8))>,
     type_: Type,
 }
 
@@ -63,6 +64,7 @@ pub struct DepTypeBuilder<Type: DepType> {
     align: usize,
     size: usize,
     default: Vec<(isize, unsafe fn(usize, *mut u8), usize)>,
+    drop: Vec<(isize, unsafe fn(*mut u8))>,
     phantom: PhantomData<Type>,
 }
 
@@ -81,13 +83,23 @@ unsafe fn store_default<Type>(fn_ptr: usize, storage: *mut u8) {
     ptr::write(storage as *mut Entry<Type>, Entry { value: fn_ptr(), on_changed: None });
 }
 
+unsafe fn drop_entry<Type>(storage: *mut u8) {
+    ptr::drop_in_place(storage as *mut Entry<Type>);
+}
+
 impl<Type: DepType> DepTypeBuilder<Type> {
     pub fn new() -> Option<DepTypeBuilder<Type>> {
         let lock = Type::lock();
         if lock.0.compare_and_swap(false, true, Ordering::Relaxed) {
             None
         } else {
-            Some(DepTypeBuilder { size: 0, align: 1, default: Vec::new(), phantom: PhantomData })
+            Some(DepTypeBuilder {
+                size: 0,
+                align: 1,
+                default: Vec::new(),
+                drop: Vec::new(),
+                phantom: PhantomData
+            })
         }
     }
 }
@@ -101,13 +113,17 @@ impl<Type: DepType> DepTypeBuilder<Type> {
         let offset = self.size.try_into().expect("out of memory");
         self.size = self.size.checked_add(size_of::<Entry<PropType>>()).expect("out of memory");
         self.default.push((offset, store_default::<PropType>, default as usize));
+        self.drop.push((offset, drop_entry::<PropType>));
         DepPropRaw { offset, phantom: (PhantomData, PhantomData) }
     }
 
-    pub fn build(self, type_: Type) -> DepTypeToken<Type> {
+    pub fn build(mut self, type_: Type) -> DepTypeToken<Type> {
+        self.default.shrink_to_fit();
+        self.drop.shrink_to_fit();
         DepTypeToken {
             layout: Layout::from_size_align(self.size, self.align).expect("out of memory"),
             default: self.default,
+            drop: self.drop,
             type_
         }
     }
@@ -225,6 +241,7 @@ impl<Owner: DepObj, Type> DepProp<Owner, Type> {
 pub struct DepObjProps<OwnerType: DepType, OwnerId: ComponentId> {
     layout: Layout,
     storage: *mut u8,
+    drop: Vec<(isize, unsafe fn(*mut u8))>,
     phantom: (PhantomData<OwnerType>, PhantomData<OwnerId>)
 }
 
@@ -245,6 +262,7 @@ impl<OwnerType: DepType, OwnerId: ComponentId> DepObjProps<OwnerType, OwnerId> {
         DepObjProps {
             layout: type_token.layout,
             storage,
+            drop: type_token.drop.clone(),
             phantom: (PhantomData, PhantomData)
         }
     }
@@ -253,6 +271,9 @@ impl<OwnerType: DepType, OwnerId: ComponentId> DepObjProps<OwnerType, OwnerId> {
 impl<OwnerType: DepType, OwnerId: ComponentId> Drop for DepObjProps<OwnerType, OwnerId> {
     fn drop(&mut self) {
         if !self.storage.is_null() {
+            for &(offset, drop_entry) in &self.drop {
+                unsafe { drop_entry(self.storage.offset(offset)) };
+            }
             unsafe { dealloc(self.storage, self.layout) };
             self.storage = null_mut();
         }
