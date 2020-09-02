@@ -4,9 +4,9 @@ use std::iter::{self};
 use std::mem::{replace};
 use std::num::{NonZeroUsize};
 use boow::Bow;
-use components_arena::{Id, Arena, ComponentClassMutex};
-use dep_obj::reactive::{Context, ContextExt, Reactive};
-use dep_obj::dep::{DepProp, DepObj, DepTypeBuilder, DepObjProps, DepTypeToken};
+use components_arena::{Id, Arena, ComponentClassMutex, ComponentId};
+use dep_obj::{Context, ContextExt};
+use dep_obj::{DepProp, DepPropRaw, DepObj, DepTypeBuilder, DepObjProps, DepTypeToken};
 use downcast::Any;
 use once_cell::sync::{self};
 use tuifw_screen_base::{Event, Screen, Vector, Point, Rect, Attr, Color};
@@ -37,7 +37,7 @@ pub trait PanelBehavior {
     ) -> Rect;
 }
 
-pub trait Panel: Any + DepObj + Debug + Send + Sync {
+pub trait Panel: Any + Debug + Send + Sync {
     fn behavior(&self) -> &'static dyn PanelBehavior;
 }
 
@@ -60,7 +60,7 @@ pub trait DecoratorBehavior {
     fn render(&self, view: View, tree: &ViewTree, port: &mut RenderPort);
 }
 
-pub trait Decorator: Any + DepObj + Debug + Sync + Send {
+pub trait Decorator: Any + Debug + Sync + Send {
     fn behavior(&self) -> &'static dyn DecoratorBehavior;
 }
 
@@ -117,7 +117,7 @@ impl ViewTree {
         let (window_tree, root) = arena.insert(|view| {
             let window_tree = WindowTree::new(screen, render_view, View(view));
             let screen_size = window_tree.screen_size();
-            let decorator = RootDecorator { dep_props: DepObjProps::new(ROOT_DECORATOR_TYPE.token()) };
+            let decorator = RootDecorator { dep_props: DepObjProps::new(&ROOT_DECORATOR_TOKEN) };
             (ViewNode {
                 decorator: Some(Box::new(decorator) as _),
                 window: None,
@@ -138,7 +138,7 @@ impl ViewTree {
             screen_size,
             root,
         };
-        root.decorator_on_changed(&mut tree, ROOT_DECORATOR_TYPE.bg(), RootDecorator::invalidate_bg);
+        root.decorator_on_changed(&mut tree, root_decorator_type().bg(), RootDecorator::invalidate_bg);
         tree
     }
 
@@ -175,6 +175,16 @@ fn render_view(
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct View(Id<ViewNode>);
+
+impl ComponentId for View {
+    fn from_raw_parts(raw_parts: (usize, NonZeroUsize)) -> Self {
+        View(Id::from_raw_parts(raw_parts))
+    }
+
+    fn into_raw_parts(self) -> (usize, NonZeroUsize) {
+        self.0.into_raw_parts()
+    }
+}
 
 impl View {
     #[allow(clippy::new_ret_no_self)]
@@ -222,23 +232,6 @@ impl View {
         result
     }
 
-    /// Forms an `View` from the [`into_raw_parts`](View::into_raw_parts) function result.
-    ///
-    /// # Safety
-    ///
-    /// Safe iff the provided arguments were obtained by calling the `View::into_raw_parts` function.
-    pub unsafe fn from_raw_parts(raw_parts: (usize, NonZeroUsize)) -> Self {
-        View(Id::from_raw_parts(raw_parts))
-    }
-
-    /// Transforms `View` to primitive-typed parts, which can be
-    /// easily passed through FFI.
-    ///
-    /// Use [`from_raw_parts`](View::from_raw_parts) to put the `View` back together.
-    pub fn into_raw_parts(self) -> (usize, NonZeroUsize) {
-        self.0.into_raw_parts()
-    }
-
     pub fn parent(self, tree: &ViewTree) -> Option<View> { tree.arena[self.0].parent }
 
     pub fn self_and_parents<'a>(self, tree: &'a ViewTree) -> impl Iterator<Item=View> + 'a {
@@ -267,10 +260,10 @@ impl View {
 
     pub fn render_bounds(self, tree: &ViewTree) -> Rect { tree.arena[self.0].render_bounds }
 
-    pub fn decorator_get<D: Decorator, T>(
+    pub fn decorator_get<D: Decorator + DepObj<Id=View>, T>(
         self,
         tree: &ViewTree,
-        prop: DepProp<D, Reactive<View, T>>,
+        prop: DepProp<D, T>,
     ) -> &T {
         let decorator = tree.arena[self.0]
             .decorator
@@ -279,13 +272,13 @@ impl View {
             .downcast_ref::<D>()
             .expect("invalid cast")
         ;
-        prop.get(decorator.dep_props()).get()
+        prop.get(decorator)
     }
 
-    pub fn decorator_set_uncond<D: Decorator, T>(
+    pub fn decorator_set_uncond<D: Decorator + DepObj<Id=View>, T>(
         self,
         context: &mut dyn Context,
-        prop: DepProp<D, Reactive<View, T>>,
+        prop: DepProp<D, T>,
         value: T,
     ) -> T {
         let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
@@ -296,15 +289,15 @@ impl View {
             .downcast_mut::<D>()
             .expect("invalid cast")
         ;
-        let (old, on_changed) = prop.get_mut(decorator.dep_props_mut()).set_uncond(value);
+        let (old, on_changed) = prop.set_uncond(decorator, value);
         on_changed.raise(self, context, &old);
         old
     }
 
-    pub fn decorator_set_distinct<D: Decorator, T: Eq>(
+    pub fn decorator_set_distinct<D: Decorator + DepObj<Id=View>, T: Eq>(
         self,
         context: &mut dyn Context,
-        prop: DepProp<D, Reactive<View, T>>,
+        prop: DepProp<D, T>,
         value: T,
     ) -> T {
         let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
@@ -315,15 +308,15 @@ impl View {
             .downcast_mut::<D>()
             .expect("invalid cast")
         ;
-        let (old, on_changed) = prop.get_mut(decorator.dep_props_mut()).set_distinct(value);
+        let (old, on_changed) = prop.set_distinct(decorator, value);
         on_changed.raise(self, context, &old);
         old
     }
 
-    pub fn decorator_on_changed<D: Decorator, T>(
+    pub fn decorator_on_changed<D: Decorator + DepObj<Id=View>, T>(
         self,
         tree: &mut ViewTree,
-        prop: DepProp<D, Reactive<View, T>>,
+        prop: DepProp<D,T>,
         on_changed: fn(owner: View, context: &mut dyn Context, old: &T),
     ) {
         let decorator = tree.arena[self.0]
@@ -333,13 +326,13 @@ impl View {
             .downcast_mut::<D>()
             .expect("invalid cast")
         ;
-        prop.get_mut(decorator.dep_props_mut()).on_changed(on_changed);
+        prop.on_changed(decorator, on_changed);
     }
 
-    pub fn panel_get<P: Panel, T>(
+    pub fn panel_get<P: Panel + DepObj<Id=View>, T>(
         self,
         tree: &ViewTree,
-        prop: DepProp<P, Reactive<View, T>>,
+        prop: DepProp<P, T>,
     ) -> &T {
         let panel = tree.arena[self.0]
             .panel
@@ -348,13 +341,13 @@ impl View {
             .downcast_ref::<P>()
             .expect("invalid cast")
         ;
-        prop.get(panel.dep_props()).get()
+        prop.get(panel)
     }
 
-    pub fn panel_set_uncond<P: Panel, T>(
+    pub fn panel_set_uncond<P: Panel + DepObj<Id=View>, T>(
         self,
         context: &mut dyn Context,
-        prop: DepProp<P, Reactive<View, T>>,
+        prop: DepProp<P, T>,
         value: T,
     ) -> T {
         let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
@@ -365,15 +358,15 @@ impl View {
             .downcast_mut::<P>()
             .expect("invalid cast")
         ;
-        let (old, on_changed) = prop.get_mut(panel.dep_props_mut()).set_uncond(value);
+        let (old, on_changed) = prop.set_uncond(panel, value);
         on_changed.raise(self, context, &old);
         old
     }
 
-    pub fn panel_set_distinct<P: Panel, T: Eq>(
+    pub fn panel_set_distinct<P: Panel + DepObj<Id=View>, T: Eq>(
         self,
         context: &mut dyn Context,
-        prop: DepProp<P, Reactive<View, T>>,
+        prop: DepProp<P, T>,
         value: T,
     ) -> T {
         let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
@@ -384,15 +377,15 @@ impl View {
             .downcast_mut::<P>()
             .expect("invalid cast")
         ;
-        let (old, on_changed) = prop.get_mut(panel.dep_props_mut()).set_distinct(value);
+        let (old, on_changed) = prop.set_distinct(panel, value);
         on_changed.raise(self, context, &old);
         old
     }
 
-    pub fn panel_on_changed<P: Panel, T>(
+    pub fn panel_on_changed<P: Panel + DepObj<Id=View>, T>(
         self,
         tree: &mut ViewTree,
-        prop: DepProp<P, Reactive<View, T>>,
+        prop: DepProp<P, T>,
         on_changed: fn(owner: View, context: &mut dyn Context, old: &T),
     ) {
         let panel = tree.arena[self.0]
@@ -402,7 +395,7 @@ impl View {
             .downcast_mut::<P>()
             .expect("invalid cast")
         ;
-        prop.get_mut(panel.dep_props_mut()).on_changed(on_changed);
+        prop.on_changed(panel, on_changed);
     }
 
     #[must_use]
@@ -538,29 +531,28 @@ impl View {
     }
 }
 
-pub struct RootDecoratorType {
-    token: DepTypeToken<RootDecorator>,
-    bg: DepProp<RootDecorator, Reactive<View, Text>>,
+macro_attr! {
+    #[derive(DepType!)]
+    pub struct RootDecoratorType {
+        bg: DepPropRaw<Self, Text>,
+    }
 }
 
 impl RootDecoratorType {
-    pub fn token(&self) -> &DepTypeToken<RootDecorator> { &self.token }
-    pub fn bg(&self) -> DepProp<RootDecorator, Reactive<View, Text>> { self.bg }
+    pub fn bg(&self) -> DepProp<RootDecorator, Text> { self.bg.owned_by() }
 }
 
-pub static ROOT_DECORATOR_TYPE: sync::Lazy<RootDecoratorType> = sync::Lazy::new(|| {
+pub static ROOT_DECORATOR_TOKEN: sync::Lazy<DepTypeToken<RootDecoratorType>> = sync::Lazy::new(|| {
     let mut builder = DepTypeBuilder::new().expect("RootDecoratorType builder locked");
-    let bg = builder.prop::<Reactive<View, Text>>(|| Reactive::new(Text::SPACE.clone()));
-    let token = builder.build();
-    RootDecoratorType { token, bg }
+    let bg = builder.prop(|| Text::SPACE.clone());
+    builder.build(RootDecoratorType { bg })
 });
 
-macro_attr! {
-    #[derive(DepObjRaw!)]
-    #[derive(Debug)]
-    pub struct RootDecorator {
-        dep_props: DepObjProps<Self>,
-    }
+pub fn root_decorator_type() -> &'static RootDecoratorType { ROOT_DECORATOR_TOKEN.type_() }
+
+#[derive(Debug)]
+pub struct RootDecorator {
+    dep_props: DepObjProps<RootDecoratorType, View>,
 }
 
 impl RootDecorator {
@@ -571,8 +563,10 @@ impl RootDecorator {
 }
 
 impl DepObj for RootDecorator {
-    fn dep_props(&self) -> &DepObjProps<Self> { &self.dep_props }
-    fn dep_props_mut(&mut self) -> &mut DepObjProps<Self> { &mut self.dep_props }
+    type Type = RootDecoratorType;
+    type Id = View;
+    fn dep_props(&self) -> &DepObjProps<Self::Type, Self::Id> { &self.dep_props }
+    fn dep_props_mut(&mut self) -> &mut DepObjProps<Self::Type, Self::Id> { &mut self.dep_props }
 }
 
 impl Decorator for RootDecorator {
@@ -607,7 +601,7 @@ impl DecoratorBehavior for RootDecoratorBehavior {
     }
 
     fn render(&self, view: View, tree: &ViewTree, port: &mut RenderPort) {
-        let bg = view.decorator_get(tree, ROOT_DECORATOR_TYPE.bg());
+        let bg = view.decorator_get(tree, root_decorator_type().bg());
         port.fill(|port, p| port.out(p, bg.fg, bg.bg, bg.attr, &bg.value));
     }
 }

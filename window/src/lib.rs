@@ -17,7 +17,7 @@ use std::mem::replace;
 use std::num::NonZeroUsize;
 use std::ops::Range;
 use std::panic::{UnwindSafe, RefUnwindSafe};
-use components_arena::{Arena, Id, ComponentClassMutex};
+use components_arena::{Arena, Id, ComponentClassMutex, ComponentId};
 use tuifw_screen_base::{Screen, Rect, Point, Vector, Attr, Color, Event};
 
 fn invalidate_rect(invalidated: (&mut Vec<Range<i16>>, Vector), rect: Rect) {
@@ -158,6 +158,16 @@ unsafe impl<Tag, RenderContext> Sync for Window<Tag, RenderContext> { }
 impl<Tag, RenderContext> Unpin for Window<Tag, RenderContext> { }
 impl<Tag, RenderContext> UnwindSafe for Window<Tag, RenderContext> { }
 
+impl<Tag, RenderContext> ComponentId for Window<Tag, RenderContext> {
+    fn from_raw_parts(raw_parts: (usize, NonZeroUsize)) -> Self {
+        Window(Id::from_raw_parts(raw_parts), PhantomData)
+    }
+
+    fn into_raw_parts(self) -> (usize, NonZeroUsize) {
+        self.0.into_raw_parts()
+    }
+}
+
 impl<Tag, RenderContext> Window<Tag, RenderContext> {
     #[allow(clippy::new_ret_no_self)]
     pub fn new<T>(
@@ -184,24 +194,6 @@ impl<Tag, RenderContext> Window<Tag, RenderContext> {
         let screen_bounds = bounds.offset(offset_from_root(parent, tree));
         invalidate_rect(tree.invalidated(), screen_bounds);
         result
-    }
-
-    /// Forms an `Window` from the [`into_raw_parts`](Window::into_raw_parts) function result.
-    ///
-    /// # Safety
-    ///
-    /// Safe iff the provided arguments were obtained by calling the `into_raw_parts` function
-    /// on an `Window` of the same type.
-    pub unsafe fn from_raw_parts(raw_parts: (usize, NonZeroUsize)) -> Self {
-        Window(Id::from_raw_parts(raw_parts), PhantomData)
-    }
-
-    /// Transforms `Window` to primitive-typed parts, which can be
-    /// easily passed through FFI.
-    ///
-    /// Use [`from_raw_parts`](Window::from_raw_parts) to put the `Window` back together.
-    pub fn into_raw_parts(self) -> (usize, NonZeroUsize) {
-        self.0.into_raw_parts()
     }
 
     pub fn move_(self, tree: &mut WindowTree<Tag, RenderContext>, bounds: Rect) {

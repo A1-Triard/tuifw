@@ -1,60 +1,58 @@
 use std::fmt::Debug;
 use tuifw_screen_base::{Vector, Point, Rect};
 use tuifw_window::{RenderPort};
-use dep_obj::dep::{DepObjProps, DepTypeBuilder, DepProp, DepTypeToken, DepObj};
-use dep_obj::reactive::{Context, ContextExt, Reactive};
+use dep_obj::{DepPropRaw, DepObjProps, DepTypeBuilder, DepProp, DepTypeToken, DepObj};
+use dep_obj::{Context, ContextExt};
 use once_cell::sync::{self};
 use either::{Left, Right};
 use crate::view::base::*;
 
-pub struct BorderDecoratorType {
-    token: DepTypeToken<BorderDecorator>,
-    tl: DepProp<BorderDecorator, Reactive<View, Option<Text>>>,
-    tr: DepProp<BorderDecorator, Reactive<View, Option<Text>>>,
-    bl: DepProp<BorderDecorator, Reactive<View, Option<Text>>>,
-    br: DepProp<BorderDecorator, Reactive<View, Option<Text>>>,
-    l: DepProp<BorderDecorator, Reactive<View, Option<Text>>>,
-    t: DepProp<BorderDecorator, Reactive<View, Option<Text>>>,
-    r: DepProp<BorderDecorator, Reactive<View, Option<Text>>>,
-    b: DepProp<BorderDecorator, Reactive<View, Option<Text>>>,
+macro_attr! {
+    #[derive(DepType!)]
+    pub struct BorderDecoratorType {
+        tl: DepPropRaw<Self, Option<Text>>,
+        tr: DepPropRaw<Self, Option<Text>>,
+        bl: DepPropRaw<Self, Option<Text>>,
+        br: DepPropRaw<Self, Option<Text>>,
+        l: DepPropRaw<Self, Option<Text>>,
+        t: DepPropRaw<Self, Option<Text>>,
+        r: DepPropRaw<Self, Option<Text>>,
+        b: DepPropRaw<Self, Option<Text>>,
+    }
 }
 
 impl BorderDecoratorType {
-    pub fn token(&self) -> &DepTypeToken<BorderDecorator> { &self.token }
-    pub fn tl(&self) -> DepProp<BorderDecorator, Reactive<View, Option<Text>>> { self.tl }
-    pub fn tr(&self) -> DepProp<BorderDecorator, Reactive<View, Option<Text>>> { self.tr }
-    pub fn bl(&self) -> DepProp<BorderDecorator, Reactive<View, Option<Text>>> { self.bl }
-    pub fn br(&self) -> DepProp<BorderDecorator, Reactive<View, Option<Text>>> { self.br }
-    pub fn l(&self) -> DepProp<BorderDecorator, Reactive<View, Option<Text>>> { self.l }
-    pub fn t(&self) -> DepProp<BorderDecorator, Reactive<View, Option<Text>>> { self.t }
-    pub fn r(&self) -> DepProp<BorderDecorator, Reactive<View, Option<Text>>> { self.r }
-    pub fn b(&self) -> DepProp<BorderDecorator, Reactive<View, Option<Text>>> { self.b }
+    pub fn tl(&self) -> DepProp<BorderDecorator, Option<Text>> { self.tl.owned_by() }
+    pub fn tr(&self) -> DepProp<BorderDecorator, Option<Text>> { self.tr.owned_by() }
+    pub fn bl(&self) -> DepProp<BorderDecorator, Option<Text>> { self.bl.owned_by() }
+    pub fn br(&self) -> DepProp<BorderDecorator, Option<Text>> { self.br.owned_by() }
+    pub fn l(&self) -> DepProp<BorderDecorator, Option<Text>> { self.l.owned_by() }
+    pub fn t(&self) -> DepProp<BorderDecorator, Option<Text>> { self.t.owned_by() }
+    pub fn r(&self) -> DepProp<BorderDecorator, Option<Text>> { self.r.owned_by() }
+    pub fn b(&self) -> DepProp<BorderDecorator, Option<Text>> { self.b.owned_by() }
 }
 
-pub static BORDER_DECORATOR_TYPE: sync::Lazy<BorderDecoratorType> = sync::Lazy::new(|| {
+pub static BORDER_DECORATOR_TOKEN: sync::Lazy<DepTypeToken<BorderDecoratorType>> = sync::Lazy::new(|| {
     let mut builder = DepTypeBuilder::new().expect("BorderDecoratorType builder locked");
-    let tl = builder.prop(|| Reactive::new(None));
-    let tr = builder.prop(|| Reactive::new(None));
-    let bl = builder.prop(|| Reactive::new(None));
-    let br = builder.prop(|| Reactive::new(None));
-    let l = builder.prop(|| Reactive::new(None));
-    let t = builder.prop(|| Reactive::new(None));
-    let r = builder.prop(|| Reactive::new(None));
-    let b = builder.prop(|| Reactive::new(None));
-    let token = builder.build();
-    BorderDecoratorType {
-        token,
+    let tl = builder.prop(|| None);
+    let tr = builder.prop(|| None);
+    let bl = builder.prop(|| None);
+    let br = builder.prop(|| None);
+    let l = builder.prop(|| None);
+    let t = builder.prop(|| None);
+    let r = builder.prop(|| None);
+    let b = builder.prop(|| None);
+    builder.build(BorderDecoratorType {
         tl, tr, bl, br,
         l, t, r, b,
-    }
+    })
 });
 
-macro_attr! {
-    #[derive(DepObjRaw!)]
-    #[derive(Debug)]
-    pub struct BorderDecorator {
-        dep_props: DepObjProps<Self>,
-    }
+pub fn border_decorator_type() -> &'static BorderDecoratorType { BORDER_DECORATOR_TOKEN.type_() }
+
+#[derive(Debug)]
+pub struct BorderDecorator {
+    dep_props: DepObjProps<BorderDecoratorType, View>,
 }
 
 impl BorderDecorator {
@@ -65,18 +63,18 @@ impl BorderDecorator {
     ) -> View {
         let view = View::new(tree, parent, |view| {
             let decorator = BorderDecorator {
-                dep_props: DepObjProps::new(BORDER_DECORATOR_TYPE.token())
+                dep_props: DepObjProps::new(&BORDER_DECORATOR_TOKEN)
             };
             (Some(Box::new(decorator) as _), None, view)
         });
-        view.decorator_on_changed(tree, BORDER_DECORATOR_TYPE.tl(), Self::invalidate_tl);
-        view.decorator_on_changed(tree, BORDER_DECORATOR_TYPE.tr(), Self::invalidate_tr);
-        view.decorator_on_changed(tree, BORDER_DECORATOR_TYPE.bl(), Self::invalidate_bl);
-        view.decorator_on_changed(tree, BORDER_DECORATOR_TYPE.br(), Self::invalidate_br);
-        view.decorator_on_changed(tree, BORDER_DECORATOR_TYPE.l(), Self::invalidate_l);
-        view.decorator_on_changed(tree, BORDER_DECORATOR_TYPE.t(), Self::invalidate_t);
-        view.decorator_on_changed(tree, BORDER_DECORATOR_TYPE.r(), Self::invalidate_r);
-        view.decorator_on_changed(tree, BORDER_DECORATOR_TYPE.b(), Self::invalidate_b);
+        view.decorator_on_changed(tree, border_decorator_type().tl(), Self::invalidate_tl);
+        view.decorator_on_changed(tree, border_decorator_type().tr(), Self::invalidate_tr);
+        view.decorator_on_changed(tree, border_decorator_type().bl(), Self::invalidate_bl);
+        view.decorator_on_changed(tree, border_decorator_type().br(), Self::invalidate_br);
+        view.decorator_on_changed(tree, border_decorator_type().l(), Self::invalidate_l);
+        view.decorator_on_changed(tree, border_decorator_type().t(), Self::invalidate_t);
+        view.decorator_on_changed(tree, border_decorator_type().r(), Self::invalidate_r);
+        view.decorator_on_changed(tree, border_decorator_type().b(), Self::invalidate_b);
         view
     }
 
@@ -153,8 +151,10 @@ impl BorderDecorator {
 }
 
 impl DepObj for BorderDecorator {
-    fn dep_props(&self) -> &DepObjProps<Self> { &self.dep_props }
-    fn dep_props_mut(&mut self) -> &mut DepObjProps<Self> { &mut self.dep_props }
+    type Type = BorderDecoratorType;
+    type Id = View;
+    fn dep_props(&self) -> &DepObjProps<Self::Type, Self::Id> { &self.dep_props }
+    fn dep_props_mut(&mut self) -> &mut DepObjProps<Self::Type, Self::Id> { &mut self.dep_props }
 }
 
 impl Decorator for BorderDecorator {
@@ -173,20 +173,20 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
         tree: &mut ViewTree,
         measure_size: (Option<i16>, Option<i16>)
     ) -> (Option<i16>, Option<i16>) {
-        let tl = view.decorator_get(tree, BORDER_DECORATOR_TYPE.tl()).is_some();
-        let tr = view.decorator_get(tree, BORDER_DECORATOR_TYPE.tr()).is_some();
-        let bl = view.decorator_get(tree, BORDER_DECORATOR_TYPE.bl()).is_some();
-        let br = view.decorator_get(tree, BORDER_DECORATOR_TYPE.br()).is_some();
+        let tl = view.decorator_get(tree, border_decorator_type().tl()).is_some();
+        let tr = view.decorator_get(tree, border_decorator_type().tr()).is_some();
+        let bl = view.decorator_get(tree, border_decorator_type().bl()).is_some();
+        let br = view.decorator_get(tree, border_decorator_type().br()).is_some();
         let children_measure_width = if let Some(measure_width) = measure_size.0 {
-            let l = tl || bl || view.decorator_get(tree, BORDER_DECORATOR_TYPE.l()).is_some();
-            let r = tr || br || view.decorator_get(tree, BORDER_DECORATOR_TYPE.r()).is_some();
+            let l = tl || bl || view.decorator_get(tree, border_decorator_type().l()).is_some();
+            let r = tr || br || view.decorator_get(tree, border_decorator_type().r()).is_some();
             Some((measure_width as u16).saturating_sub(if l { 1 } else { 0 }).saturating_sub(if r { 1 } else { 0 }) as i16)
         } else {
             None
         };
         let children_measure_height = if let Some(measure_height) = measure_size.1 {
-            let t = tl || tr || view.decorator_get(tree, BORDER_DECORATOR_TYPE.t()).is_some();
-            let b = bl || br || view.decorator_get(tree, BORDER_DECORATOR_TYPE.b()).is_some();
+            let t = tl || tr || view.decorator_get(tree, border_decorator_type().t()).is_some();
+            let b = bl || br || view.decorator_get(tree, border_decorator_type().b()).is_some();
             Some((measure_height as u16).saturating_sub(if t { 1 } else { 0 }).saturating_sub(if b { 1 } else { 0 }) as i16)
         } else {
             None
@@ -195,19 +195,19 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
     }
 
     fn desired_size(&self, view: View, tree: &mut ViewTree, children_desired_size: Vector) -> Vector {
-        let tl = view.decorator_get(tree, BORDER_DECORATOR_TYPE.tl()).is_some();
-        let tr = view.decorator_get(tree, BORDER_DECORATOR_TYPE.tr()).is_some();
-        let bl = view.decorator_get(tree, BORDER_DECORATOR_TYPE.bl()).is_some();
-        let br = view.decorator_get(tree, BORDER_DECORATOR_TYPE.br()).is_some();
-        let l = tl || bl || view.decorator_get(tree, BORDER_DECORATOR_TYPE.l()).is_some();
-        let r = tr || br || view.decorator_get(tree, BORDER_DECORATOR_TYPE.r()).is_some();
+        let tl = view.decorator_get(tree, border_decorator_type().tl()).is_some();
+        let tr = view.decorator_get(tree, border_decorator_type().tr()).is_some();
+        let bl = view.decorator_get(tree, border_decorator_type().bl()).is_some();
+        let br = view.decorator_get(tree, border_decorator_type().br()).is_some();
+        let l = tl || bl || view.decorator_get(tree, border_decorator_type().l()).is_some();
+        let r = tr || br || view.decorator_get(tree, border_decorator_type().r()).is_some();
         let desired_width = (children_desired_size.x as u16)
             .saturating_add(if l { 1 } else { 0 })
             .saturating_add(if r { 1 } else { 0 })
             as i16
         ;
-        let t = tl || tr || view.decorator_get(tree, BORDER_DECORATOR_TYPE.t()).is_some();
-        let b = bl || br || view.decorator_get(tree, BORDER_DECORATOR_TYPE.b()).is_some();
+        let t = tl || tr || view.decorator_get(tree, border_decorator_type().t()).is_some();
+        let b = bl || br || view.decorator_get(tree, border_decorator_type().b()).is_some();
         let desired_height = (children_desired_size.y as u16)
             .saturating_add(if t { 1 } else { 0 })
             .saturating_add(if b { 1 } else { 0 })
@@ -217,18 +217,18 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
     }
 
     fn children_arrange_bounds(&self, view: View, tree: &mut ViewTree, arrange_size: Vector) -> Rect {
-        let tl = view.decorator_get(tree, BORDER_DECORATOR_TYPE.tl()).is_some();
-        let tr = view.decorator_get(tree, BORDER_DECORATOR_TYPE.tr()).is_some();
-        let bl = view.decorator_get(tree, BORDER_DECORATOR_TYPE.bl()).is_some();
-        let br = view.decorator_get(tree, BORDER_DECORATOR_TYPE.br()).is_some();
-        let l = tl || bl || view.decorator_get(tree, BORDER_DECORATOR_TYPE.l()).is_some();
-        let t = tl || tr || view.decorator_get(tree, BORDER_DECORATOR_TYPE.t()).is_some();
+        let tl = view.decorator_get(tree, border_decorator_type().tl()).is_some();
+        let tr = view.decorator_get(tree, border_decorator_type().tr()).is_some();
+        let bl = view.decorator_get(tree, border_decorator_type().bl()).is_some();
+        let br = view.decorator_get(tree, border_decorator_type().br()).is_some();
+        let l = tl || bl || view.decorator_get(tree, border_decorator_type().l()).is_some();
+        let t = tl || tr || view.decorator_get(tree, border_decorator_type().t()).is_some();
         let tl_offset = Point {
             x: if l { 1 } else { 0 },
             y: if t { 1 } else { 0 },
         };
-        let r = tr || br || view.decorator_get(tree, BORDER_DECORATOR_TYPE.r()).is_some();
-        let b = bl || br || view.decorator_get(tree, BORDER_DECORATOR_TYPE.b()).is_some();
+        let r = tr || br || view.decorator_get(tree, border_decorator_type().r()).is_some();
+        let b = bl || br || view.decorator_get(tree, border_decorator_type().b()).is_some();
         let br_offset = Vector {
             x: if r { -1 } else { 0 },
             y: if b { -1 } else { 0 },
@@ -238,18 +238,18 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
     }
 
     fn render_bounds(&self, view: View, tree: &mut ViewTree, children_render_bounds: Rect) -> Rect {
-        let tl = view.decorator_get(tree, BORDER_DECORATOR_TYPE.tl()).is_some();
-        let tr = view.decorator_get(tree, BORDER_DECORATOR_TYPE.tr()).is_some();
-        let bl = view.decorator_get(tree, BORDER_DECORATOR_TYPE.bl()).is_some();
-        let br = view.decorator_get(tree, BORDER_DECORATOR_TYPE.br()).is_some();
-        let l = tl || bl || view.decorator_get(tree, BORDER_DECORATOR_TYPE.l()).is_some();
-        let t = tl || tr || view.decorator_get(tree, BORDER_DECORATOR_TYPE.t()).is_some();
+        let tl = view.decorator_get(tree, border_decorator_type().tl()).is_some();
+        let tr = view.decorator_get(tree, border_decorator_type().tr()).is_some();
+        let bl = view.decorator_get(tree, border_decorator_type().bl()).is_some();
+        let br = view.decorator_get(tree, border_decorator_type().br()).is_some();
+        let l = tl || bl || view.decorator_get(tree, border_decorator_type().l()).is_some();
+        let t = tl || tr || view.decorator_get(tree, border_decorator_type().t()).is_some();
         let tl_offset = Vector {
             x: if l { -1 } else { 0 },
             y: if t { -1 } else { 0 },
         };
-        let r = tr || br || view.decorator_get(tree, BORDER_DECORATOR_TYPE.r()).is_some();
-        let b = bl || br || view.decorator_get(tree, BORDER_DECORATOR_TYPE.b()).is_some();
+        let r = tr || br || view.decorator_get(tree, border_decorator_type().r()).is_some();
+        let b = bl || br || view.decorator_get(tree, border_decorator_type().b()).is_some();
         let br_offset = Vector {
             x: if r { 1 } else { 0 },
             y: if b { 1 } else { 0 },
@@ -274,14 +274,14 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
 
     fn render(&self, view: View, tree: &ViewTree, port: &mut RenderPort) {
         let size = view.render_bounds(tree).size;
-        let tl = view.decorator_get(tree, BORDER_DECORATOR_TYPE.tl());
-        let tr = view.decorator_get(tree, BORDER_DECORATOR_TYPE.tr());
-        let bl = view.decorator_get(tree, BORDER_DECORATOR_TYPE.bl());
-        let br = view.decorator_get(tree, BORDER_DECORATOR_TYPE.br());
-        let l = view.decorator_get(tree, BORDER_DECORATOR_TYPE.l());
-        let r = view.decorator_get(tree, BORDER_DECORATOR_TYPE.r());
-        let t = view.decorator_get(tree, BORDER_DECORATOR_TYPE.t());
-        let b = view.decorator_get(tree, BORDER_DECORATOR_TYPE.b());
+        let tl = view.decorator_get(tree, border_decorator_type().tl());
+        let tr = view.decorator_get(tree, border_decorator_type().tr());
+        let bl = view.decorator_get(tree, border_decorator_type().bl());
+        let br = view.decorator_get(tree, border_decorator_type().br());
+        let l = view.decorator_get(tree, border_decorator_type().l());
+        let r = view.decorator_get(tree, border_decorator_type().r());
+        let t = view.decorator_get(tree, border_decorator_type().t());
+        let b = view.decorator_get(tree, border_decorator_type().b());
         let l = l.as_ref().or_else(|| if tl.is_some() || bl.is_some() { Some(&Text::SPACE) } else { None });
         let t = t.as_ref().or_else(|| if tl.is_some() || tr.is_some() { Some(&Text::SPACE) } else { None });
         let r = r.as_ref().or_else(|| if tr.is_some() || br.is_some() { Some(&Text::SPACE) } else { None });
