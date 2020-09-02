@@ -68,7 +68,7 @@ mod circuit {
             prop: DepProp<Legs, T>,
         ) -> &T {
             let legs = circuit.arena[self.0].legs.downcast_ref::<Legs>().expect("invalid cast");
-            prop.get(legs.dep_props())
+            prop.get(legs)
         }
 
         pub fn set_uncond<Legs: ChipLegs + DepObj<Id=Chip<Tag>>, T>(
@@ -79,7 +79,7 @@ mod circuit {
         ) -> T {
             let circuit = context.get_mut::<Circuit<Tag>>().expect("Circuit required");
             let legs = circuit.arena[self.0].legs.downcast_mut::<Legs>().expect("invalid cast");
-            let (old, on_changed) = prop.set_uncond(legs.dep_props_mut(), value);
+            let (old, on_changed) = prop.set_uncond(legs, value);
             on_changed.raise(self, context, &old);
             old
         }
@@ -92,7 +92,7 @@ mod circuit {
         ) -> T {
             let circuit = context.get_mut::<Circuit<Tag>>().expect("Circuit required");
             let legs = circuit.arena[self.0].legs.downcast_mut::<Legs>().expect("invalid cast");
-            let (old, on_changed) = prop.set_distinct(legs.dep_props_mut(), value);
+            let (old, on_changed) = prop.set_distinct(legs, value);
             on_changed.raise(self, context, &old);
             old
         }
@@ -104,7 +104,7 @@ mod circuit {
             on_changed: fn(owner: Chip<Tag>, context: &mut dyn Context, old: &T),
         ) {
             let legs = circuit.arena[self.0].legs.downcast_mut::<Legs>().expect("invalid cast");
-            prop.on_changed(legs.dep_props_mut(), on_changed);
+            prop.on_changed(legs, on_changed);
         }
     }
 

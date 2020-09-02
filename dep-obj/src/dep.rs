@@ -175,12 +175,12 @@ unsafe impl<Owner: DepObj, Type> Sync for DepProp<Owner, Type> { }
 impl<Owner: DepObj, Type> Unpin for DepProp<Owner, Type> { }
 
 impl<Owner: DepObj, Type: Eq> DepProp<Owner, Type> {
-    pub fn set_distinct<OwnerId: ComponentId>(
+    pub fn set_distinct(
         self,
-        obj_props: &mut DepObjProps<Owner::Type, OwnerId>,
+        obj: &mut Owner,
         value: Type
-    ) -> (Type, OnChanged<OwnerId, Type>) {
-        let entry = self.0.get_entry_mut(obj_props);
+    ) -> (Type, OnChanged<Owner::Id, Type>) {
+        let entry = self.0.get_entry_mut(obj.dep_props_mut());
         let old = replace(&mut entry.value, value);
         let on_changed = if old == entry.value { None } else { entry.on_changed.clone() };
         (old, OnChanged(on_changed, (PhantomData, PhantomData)))
@@ -188,30 +188,30 @@ impl<Owner: DepObj, Type: Eq> DepProp<Owner, Type> {
 }
 
 impl<Owner: DepObj, Type> DepProp<Owner, Type> {
-    pub fn set_uncond<OwnerId: ComponentId>(
+    pub fn set_uncond(
         self,
-        obj_props: &mut DepObjProps<Owner::Type, OwnerId>,
+        obj: &mut Owner,
         value: Type
-    ) -> (Type, OnChanged<OwnerId, Type>) {
-        let entry = self.0.get_entry_mut(obj_props);
+    ) -> (Type, OnChanged<Owner::Id, Type>) {
+        let entry = self.0.get_entry_mut(obj.dep_props_mut());
         let old = replace(&mut entry.value, value);
         (old, OnChanged(entry.on_changed.clone(), (PhantomData, PhantomData)))
     }
 
-    pub fn get<OwnerId: ComponentId>(
+    pub fn get(
         self,
-        obj_props: &DepObjProps<Owner::Type, OwnerId>
+        obj: &Owner
     ) -> &Type {
-        &self.0.get_entry(obj_props).value
+        &self.0.get_entry(obj.dep_props()).value
     }
 
-    pub fn on_changed<OwnerId: ComponentId>(
+    pub fn on_changed(
         self,
-        obj_props: &mut DepObjProps<Owner::Type, OwnerId>,
-        callback: fn(owner_id: OwnerId, context: &mut dyn Context, old: &Type)
+        obj: &mut Owner,
+        callback: fn(owner_id: Owner::Id, context: &mut dyn Context, old: &Type)
     ) {
         let callback = unsafe { transmute(callback) };
-        let entry = self.0.get_entry_mut(obj_props);
+        let entry = self.0.get_entry_mut(obj.dep_props_mut());
         if let Some(on_changed) = entry.on_changed.as_mut() {
             on_changed.push(callback);
         } else {
