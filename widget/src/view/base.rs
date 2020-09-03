@@ -21,6 +21,10 @@ macro_attr! {
     }
 }
 
+pub trait Layout: Any + Debug + Send + Sync { }
+
+downcast!(dyn Layout);
+
 pub trait PanelBehavior {
     fn children_desired_size(
         &self,
@@ -73,6 +77,7 @@ macro_attr! {
         decorator: Option<Box<dyn Decorator>>,
         window: Option<Window<View, ViewTree>>,
         panel: Option<Box<dyn Panel>>,
+        layout: Option<Box<dyn Layout>>,
         parent: Option<View>,
         next: View,
         last_child: Option<View>,
@@ -121,6 +126,7 @@ impl ViewTree {
             (ViewNode {
                 decorator: Some(Box::new(decorator) as _),
                 window: None,
+                layout: None,
                 panel: None,
                 parent: None,
                 next: View(view),
@@ -196,6 +202,7 @@ impl View {
             (ViewNode {
                 decorator: None,
                 window: None,
+                layout: None,
                 panel: None,
                 parent: Some(parent),
                 next: View(view),
@@ -229,8 +236,8 @@ impl View {
             let mut child = last_child;
             loop {
                 child = child.next(tree);
-                if child == last_child { break; }
                 child.renew_window(tree, children_parent_window);
+                if child == last_child { break; }
             }
         }
     }
@@ -249,12 +256,12 @@ impl View {
                 let mut child = last_child;
                 loop {
                     child = child.next(tree);
-                    if child == last_child { break; }
                     child.renew_window(tree, parent_window);
+                    if child == last_child { break; }
                 }
             }
+            self.invalidate_measure(tree);
         }
-        self.invalidate_measure(tree);
     }
 
     pub fn set_decorator<D: Decorator>(self, tree: &mut ViewTree, decorator: D) {
@@ -276,11 +283,34 @@ impl View {
                 let mut child = last_child;
                 loop {
                     child = child.next(tree);
-                    if child == last_child { break; }
                     child.renew_window(tree, Some(window));
+                    if child == last_child { break; }
                 }
             }
         }
+        self.invalidate_measure(tree);
+    }
+
+    pub fn unset_layout(self, tree: &mut ViewTree) {
+        if tree.arena[self.0].layout.take().is_some() {
+            self.parent(tree).map(|parent| parent.invalidate_measure(tree));
+        }
+    }
+
+    pub fn set_layout<L: Layout>(self, tree: &mut ViewTree, layout: L) {
+        if self == tree.root { panic!("root view layout can not be changed"); }
+        tree.arena[self.0].layout = Some(Box::new(layout) as _);
+        self.parent(tree).map(|parent| parent.invalidate_measure(tree));
+    }
+
+    pub fn unset_panel(self, tree: &mut ViewTree) {
+        if tree.arena[self.0].panel.take().is_some() {
+            self.invalidate_measure(tree);
+        }
+    }
+
+    pub fn set_panel<P: Panel>(self, tree: &mut ViewTree, panel: P) {
+        tree.arena[self.0].panel = Some(Box::new(panel) as _);
         self.invalidate_measure(tree);
     }
 
@@ -302,9 +332,9 @@ impl View {
         let last_child = self.last_child(tree);
         let mut view = last_child;
         iter::from_fn(move || {
-            view = view.map(|view| view.next(tree));
-            if view == last_child { view = None; }
-            view
+            let item = view.map(|view| view.next(tree));
+            view = if item == last_child { None } else { item };
+            item
         })
     }
 
@@ -379,6 +409,75 @@ impl View {
             .expect("invalid cast")
         ;
         prop.on_changed(decorator, on_changed);
+    }
+
+    pub fn layout_get<L: Layout + DepObj<Id=View>, T>(
+        self,
+        tree: &ViewTree,
+        prop: DepProp<L, T>,
+    ) -> &T {
+        let layout = tree.arena[self.0]
+            .layout
+            .as_ref()
+            .expect("Layout missed")
+            .downcast_ref::<L>()
+            .expect("invalid cast")
+        ;
+        prop.get(layout)
+    }
+
+    pub fn layout_set_uncond<L: Layout + DepObj<Id=View>, T>(
+        self,
+        context: &mut dyn Context,
+        prop: DepProp<L, T>,
+        value: T,
+    ) -> T {
+        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let layout = tree.arena[self.0]
+            .layout
+            .as_mut()
+            .expect("Layout missed")
+            .downcast_mut::<L>()
+            .expect("invalid cast")
+        ;
+        let (old, on_changed) = prop.set_uncond(layout, value);
+        on_changed.raise(self, context, &old);
+        old
+    }
+
+    pub fn layout_set_distinct<L: Layout + DepObj<Id=View>, T: Eq>(
+        self,
+        context: &mut dyn Context,
+        prop: DepProp<L, T>,
+        value: T,
+    ) -> T {
+        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let layout = tree.arena[self.0]
+            .layout
+            .as_mut()
+            .expect("Layout missed")
+            .downcast_mut::<L>()
+            .expect("invalid cast")
+        ;
+        let (old, on_changed) = prop.set_distinct(layout, value);
+        on_changed.raise(self, context, &old);
+        old
+    }
+
+    pub fn layout_on_changed<L: Layout + DepObj<Id=View>, T>(
+        self,
+        tree: &mut ViewTree,
+        prop: DepProp<L, T>,
+        on_changed: fn(owner: View, context: &mut dyn Context, old: &T),
+    ) {
+        let layout = tree.arena[self.0]
+            .layout
+            .as_mut()
+            .expect("Layout missed")
+            .downcast_mut::<L>()
+            .expect("invalid cast")
+        ;
+        prop.on_changed(layout, on_changed);
     }
 
     pub fn panel_get<P: Panel + DepObj<Id=View>, T>(
@@ -512,9 +611,9 @@ impl View {
                 let mut child = last_child;
                 loop {
                     child = child.next(tree);
-                    if child == last_child { break children_desired_size; }
                     child.measure(tree, children_measure_size);
                     children_desired_size = children_desired_size.max(child.desired_size(tree));
+                    if child == last_child { break children_desired_size; }
                 }
             } else {
                 Vector::null()
@@ -558,12 +657,12 @@ impl View {
                 let mut child = last_child;
                 loop {
                     child = child.next(tree);
-                    if child == last_child { break children_render_bounds; }
                     child.arrange(tree, children_arrange_bounds);
                     children_render_bounds = children_render_bounds.union_intersect(
                         child.render_bounds(tree),
                         children_arrange_bounds
                     );
+                    if child == last_child { break children_render_bounds; }
                 }
             } else {
                 children_arrange_bounds
