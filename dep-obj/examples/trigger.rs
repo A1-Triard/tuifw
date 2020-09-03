@@ -206,7 +206,7 @@ mod or_chip {
 
 mod not_chip {
     use crate::circuit::*;
-    use dep_obj::{DepObj, DepObjProps, DepPropRaw, DepProp, DepTypeBuilder, DepTypeToken};
+    use dep_obj::{DepPropRaw, DepProp, DepTypeBuilder, DepTypeToken};
     use dep_obj::{Context, ContextExt};
 
     macro_attr! {
@@ -230,10 +230,10 @@ mod not_chip {
         }
     }
 
-    #[derive(Derivative)]
-    #[derivative(Debug(bound=""))]
-    pub struct NotLegs<Tag> {
-        dep_props: DepObjProps<NotLegsType, Chip<Tag>>,
+    dep_obj! {
+        #[derive(Derivative)]
+        #[derivative(Debug(bound=""))]
+        pub struct NotLegs<Tag>: NotLegsType as Chip<Tag>;
     }
 
     impl<Tag: Send + Sync + 'static> NotLegs<Tag> {
@@ -242,9 +242,7 @@ mod not_chip {
             token: &DepTypeToken<NotLegsType>,
             tag: impl FnOnce(Chip<Tag>) -> (Tag, T)
         ) -> T {
-            let legs = Self {
-                dep_props: DepObjProps::new(token),
-            };
+            let legs = Self::new_raw(token);
             let (chip, result) = Chip::new(circuit, |chip| {
                 let (tag, result) = tag(chip);
                 (Box::new(legs) as _, tag, (chip, result))
@@ -260,13 +258,6 @@ mod not_chip {
             let out = token.type_().out();
             chip.set_distinct(context, out, !in_);
         }
-    }
-
-    impl<Tag> DepObj for NotLegs<Tag> {
-        type Type = NotLegsType;
-        type Id = Chip<Tag>;
-        fn dep_props(&self) -> &DepObjProps<Self::Type, Self::Id> { &self.dep_props }
-        fn dep_props_mut(&mut self) -> &mut DepObjProps<Self::Type, Self::Id> { &mut self.dep_props }
     }
 
     impl<Tag: Send + Sync + 'static> ChipLegs for NotLegs<Tag> { }
