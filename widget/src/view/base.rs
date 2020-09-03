@@ -689,7 +689,7 @@ dep_obj! {
     }
 }
 
-pub static ROOT_DECORATOR_TOKEN: sync::Lazy<DepTypeToken<RootDecoratorType>> = sync::Lazy::new(||
+static ROOT_DECORATOR_TOKEN: sync::Lazy<DepTypeToken<RootDecoratorType>> = sync::Lazy::new(||
     RootDecoratorType::new_raw().expect("RootDecoratorType builder locked")
 );
 

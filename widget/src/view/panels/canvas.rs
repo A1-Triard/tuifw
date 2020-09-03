@@ -11,7 +11,7 @@ dep_obj! {
     }
 }
 
-pub static CANVAS_LAYOUT_TOKEN: sync::Lazy<DepTypeToken<CanvasLayoutType>> = sync::Lazy::new(||
+static CANVAS_LAYOUT_TOKEN: sync::Lazy<DepTypeToken<CanvasLayoutType>> = sync::Lazy::new(||
     CanvasLayoutType::new_raw().expect("CanvasLayoutType builder locked")
 );
 

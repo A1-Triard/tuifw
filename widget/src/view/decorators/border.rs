@@ -20,7 +20,7 @@ dep_obj! {
     }
 }
 
-pub static BORDER_DECORATOR_TOKEN: sync::Lazy<DepTypeToken<BorderDecoratorType>> = sync::Lazy::new(||
+static BORDER_DECORATOR_TOKEN: sync::Lazy<DepTypeToken<BorderDecoratorType>> = sync::Lazy::new(||
     BorderDecoratorType::new_raw().expect("BorderDecoratorType builder locked")
 );
 

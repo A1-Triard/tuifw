@@ -16,7 +16,7 @@ dep_obj! {
     }
 }
 
-pub static LINE_DECORATOR_TOKEN: sync::Lazy<DepTypeToken<LineDecoratorType>> = sync::Lazy::new(||
+static LINE_DECORATOR_TOKEN: sync::Lazy<DepTypeToken<LineDecoratorType>> = sync::Lazy::new(||
     LineDecoratorType::new_raw().expect("LineDecoratorType builder locked")
 );
 
