@@ -2,5 +2,5 @@ mod base;
 
 pub use base::*;
 
-pub mod border;
-pub mod line;
+pub mod decorators;
+pub mod panels;
