@@ -309,26 +309,108 @@ macro_rules! DepType {
 macro_rules! dep_obj {
     ( $(#[$($a:tt)+])* struct $name:ident 
         $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ $(,)?>)?
-        : $type_:ty as $id:ty ; ) => {
+        : $type_:ident as $id:ty {
+            $(
+               $field:ident : $field_type:ty = $val:expr
+            ),+
+            $(,)?
+        }) => {
         dep_obj! {
-            @impl [$(#[$($a)+])*] () $name : $type_ as $id ;
-            [ $( $lt ),+ ],
-            [ $( $lt $( : $clt $(+ $dlt )* )? ),+ ]
-        }
-    };
-    ( $(#[$($a:tt)+])* pub $(($($vis:tt)+))? struct $name:ident
-        $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ $(,)?>)?
-        : $type_:ty as $id:ty ; ) => {
-        dep_obj! {
-            @impl [$(#[$($a)+])*] (pub $(($($vis)+))?) $name : $type_ as $id ;
+            @impl builder [$(#[$($a)+])*] () $name : $type_ as $id ;
+            [] [] [] [] [$($field : $field_type = $val),+];
             $(
                 [ $( $lt ),+ ],
                 [ $( $lt $( : $clt $(+ $dlt )* )? ),+ ]
             )?
         }
     };
-    ( @impl [$(#[$($a:tt)+])*] ($($vis:tt)*) $name:ident : $type_:ty as $id:ty ;
+    ( $(#[$($a:tt)+])* pub $(($($vis:tt)+))? struct $name:ident
+        $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ $(,)?>)?
+        : $type_:ident as $id:ty {
+            $(
+               $field:ident : $field_type:ty = $val:expr
+            ),+
+            $(,)?
+        }) => {
+        dep_obj! {
+            @impl builder [$(#[$($a)+])*] (pub $(($($vis)+))?) $name : $type_ as $id ;
+            [] [] [] [] [$($field : $field_type = $val),+];
+            $(
+                [ $( $lt ),+ ],
+                [ $( $lt $( : $clt $(+ $dlt )* )? ),+ ]
+            )?
+        }
+    };
+    ( $(#[$($a:tt)+])* struct $name:ident 
+        $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ $(,)?>)?
+        : $type_:ident as $id:ty {
+        }) => {
+        dep_obj! {
+            @impl builder [$(#[$($a)+])*] () $name : $type_ as $id ;
+            [] [] [] [] [];
+            $(
+                [ $( $lt ),+ ],
+                [ $( $lt $( : $clt $(+ $dlt )* )? ),+ ]
+            )?
+        }
+    };
+    ( $(#[$($a:tt)+])* pub $(($($vis:tt)+))? struct $name:ident
+        $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ $(,)?>)?
+        : $type_:ident as $id:ty {
+        }) => {
+        dep_obj! {
+            @impl builder [$(#[$($a)+])*] (pub $(($($vis)+))?) $name : $type_ as $id ;
+            [] [] [] [] [];
+            $(
+                [ $( $lt ),+ ],
+                [ $( $lt $( : $clt $(+ $dlt )* )? ),+ ]
+            )?
+        }
+    };
+    ( @impl $builder:ident [$(#[$($a:tt)+])*] ($($vis:tt)*) $name:ident : $type_:ident as $id:ty ;
+        [$($s:tt)*] [$($p:tt)*] [$($c:tt)*] [$($l:tt)*] [$field:ident : $field_type:ty = $val:expr $(, $($tail:tt)+)?];
         $([ $($g:tt)+ ], [ $($r:tt)+ ])? ) => {
+        dep_obj! {
+            @impl $builder [$(#[$($a)+])*] ($($vis)*) $name : $type_ as $id ;
+            [$field : $crate::DepPropRaw<$type_, $field_type>, $($s)*]
+            [
+                pub fn $field $(< $($g)+ >)? (&self) -> $crate::DepProp<$name $(< $($r)+ >)?, $field_type> {
+                    self.$field.owned_by() 
+                }
+                $($p)*
+            ]
+            [
+                let $field = $builder.prop(|| $val);
+                $($c)*
+            ]
+            [$field, $($l)*]
+            [$($($tail)+)?];
+            $([ $($g)+ ], [ $($r)+ ])?
+        }
+    };
+    ( @impl $builder:ident [$(#[$($a:tt)+])*] ($($vis:tt)*) $name:ident : $type_:ident as $id:ty ;
+        [$($s:tt)*] [$($p:tt)*] [$($c:tt)*] [$($l:tt)*] [];
+        $([ $($g:tt)+ ], [ $($r:tt)+ ])? ) => {
+        $($vis)* struct $type_ { $($s)* }
+
+        unsafe impl $crate::DepType for $type_ {
+            fn lock() -> &'static $crate::DepTypeLock {
+                static LOCK: $crate::DepTypeLock = $crate::DepTypeLock::new();
+                &LOCK
+            }
+        }
+
+        impl $type_ {
+            $($p)*
+
+            fn new_raw() -> Option<$crate::DepTypeToken<Self>> {
+                $crate::DepTypeBuilder::new().map(|mut $builder| {
+                    $($c)*
+                    $builder.build(Self { $($l)* })
+                })
+            }
+        }
+
         $(#[$($a)+])*
         $($vis)* struct $name $(< $($g)+ >)? {
             dep_props: $crate::DepObjProps<$type_, $id>,

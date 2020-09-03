@@ -142,37 +142,20 @@ mod circuit {
 
 mod or_chip {
     use crate::circuit::*;
-    use dep_obj::{DepPropRaw, DepProp, DepTypeBuilder, DepTypeToken};
-    use dep_obj::{Context, ContextExt};
-
-    macro_attr! {
-        #[derive(DepType!)]
-        pub struct OrLegsType {
-            in_1: DepPropRaw<OrLegsType, bool>,
-            in_2: DepPropRaw<OrLegsType, bool>,
-            out: DepPropRaw<OrLegsType, bool>,
-        }
-    }
-
-    impl OrLegsType {
-        pub fn in_1<Tag>(&self) -> DepProp<OrLegs<Tag>, bool> { self.in_1.owned_by() }
-        pub fn in_2<Tag>(&self) -> DepProp<OrLegs<Tag>, bool> { self.in_2.owned_by() }
-        pub fn out<Tag>(&self) -> DepProp<OrLegs<Tag>, bool> { self.out.owned_by() }
-
-        pub fn new() -> Option<DepTypeToken<Self>> {
-            DepTypeBuilder::new().map(|mut builder| {
-                let in_1 = builder.prop(|| false);
-                let in_2 = builder.prop(|| false);
-                let out = builder.prop(|| false);
-                builder.build(OrLegsType { in_1, in_2, out })
-            })
-        }
-    }
+    use dep_obj::{DepTypeToken, Context, ContextExt};
 
     dep_obj! {
         #[derive(Derivative)]
         #[derivative(Debug(bound=""))]
-        pub struct OrLegs<Tag>: OrLegsType as Chip<Tag>;
+        pub struct OrLegs<Tag>: OrLegsType as Chip<Tag> {
+            in_1: bool = false,
+            in_2: bool = false,
+            out: bool = false,
+        }
+    }
+
+    impl OrLegsType {
+        pub fn new() -> Option<DepTypeToken<Self>> { Self::new_raw() }
     }
 
     impl<Tag: Send + Sync + 'static> OrLegs<Tag> {
@@ -206,34 +189,19 @@ mod or_chip {
 
 mod not_chip {
     use crate::circuit::*;
-    use dep_obj::{DepPropRaw, DepProp, DepTypeBuilder, DepTypeToken};
-    use dep_obj::{Context, ContextExt};
-
-    macro_attr! {
-        #[derive(DepType!)]
-        pub struct NotLegsType {
-            in_: DepPropRaw<NotLegsType, bool>,
-            out: DepPropRaw<NotLegsType, bool>,
-        }
-    }
-
-    impl NotLegsType {
-        pub fn in_<Tag>(&self) -> DepProp<NotLegs<Tag>, bool> { self.in_.owned_by() }
-        pub fn out<Tag>(&self) -> DepProp<NotLegs<Tag>, bool> { self.out.owned_by() }
-
-        pub fn new() -> Option<DepTypeToken<Self>> {
-            DepTypeBuilder::new().map(|mut builder| {
-                let in_ = builder.prop(|| false);
-                let out = builder.prop(|| true);
-                builder.build(NotLegsType { in_, out })
-            })
-        }
-    }
+    use dep_obj::{DepTypeToken, Context, ContextExt};
 
     dep_obj! {
         #[derive(Derivative)]
         #[derivative(Debug(bound=""))]
-        pub struct NotLegs<Tag>: NotLegsType as Chip<Tag>;
+        pub struct NotLegs<Tag>: NotLegsType as Chip<Tag> {
+            in_: bool = false,
+            out: bool = true,
+        }
+    }
+
+    impl NotLegsType {
+        pub fn new() -> Option<DepTypeToken<Self>> { Self::new_raw() }
     }
 
     impl<Tag: Send + Sync + 'static> NotLegs<Tag> {
