@@ -111,6 +111,7 @@ impl<Type: DepType> DepTypeBuilder<Type> {
         let padding = (align - self.size % align) % align;
         self.size = self.size.checked_add(padding).expect("out of memory");
         let offset = self.size.try_into().expect("out of memory");
+        debug_assert_ne!(size_of::<Entry<PropType>>(), 0);
         self.size = self.size.checked_add(size_of::<Entry<PropType>>()).expect("out of memory");
         self.default.push((offset, store_default::<PropType>, default as usize));
         self.drop.push((offset, drop_entry::<PropType>));
