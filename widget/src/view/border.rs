@@ -59,13 +59,10 @@ impl BorderDecorator {
     #[allow(clippy::new_ret_no_self)]
     pub fn new(
         tree: &mut ViewTree,
-        parent: View,
-    ) -> View {
-        let view = View::new(tree, parent, |view| {
-            let decorator = BorderDecorator {
-                dep_props: DepObjProps::new(&BORDER_DECORATOR_TOKEN)
-            };
-            (Some(Box::new(decorator) as _), None, view)
+        view: View,
+    ) {
+        view.set_decorator(tree, BorderDecorator {
+            dep_props: DepObjProps::new(&BORDER_DECORATOR_TOKEN)
         });
         view.decorator_on_changed(tree, border_decorator_type().tl(), Self::invalidate_tl);
         view.decorator_on_changed(tree, border_decorator_type().tr(), Self::invalidate_tr);
@@ -75,7 +72,6 @@ impl BorderDecorator {
         view.decorator_on_changed(tree, border_decorator_type().t(), Self::invalidate_t);
         view.decorator_on_changed(tree, border_decorator_type().r(), Self::invalidate_r);
         view.decorator_on_changed(tree, border_decorator_type().b(), Self::invalidate_b);
-        view
     }
 
     fn invalidate_tl(view: View, context: &mut dyn Context, _old: &Option<Text>) {

@@ -187,38 +187,16 @@ impl ComponentId for View {
 }
 
 impl View {
-    #[allow(clippy::new_ret_no_self)]
-    pub fn new<T>(
+    pub fn new(
         tree: &mut ViewTree,
         parent: View,
-        decorator_and_panel: impl FnOnce(View) -> (
-            Option<Box<dyn Decorator>>,
-            Option<Box<dyn Panel>>,
-            T
-        )
-    ) -> T {
-        let parent_window = parent
-            .self_and_parents(tree)
-            .find_map(|view| tree.arena[view.0].window)
-        ;
+    ) -> View {
         let arena = &mut tree.arena;
-        let window_tree = tree.window_tree.as_mut().expect("ViewTree is in invalid state");
-        let (view, result) = arena.insert(|view| {
-            let (decorator, panel, result) = decorator_and_panel(View(view));
-            let window = if decorator.is_none() {
-                None
-            } else {
-                Some(Window::new(
-                    window_tree,
-                    parent_window,
-                    Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() },
-                    |window| (View(view), window)
-                ))
-            };
+        let view = arena.insert(|view| {
             (ViewNode {
-                decorator,
-                window,
-                panel,
+                decorator: None,
+                window: None,
+                panel: None,
                 parent: Some(parent),
                 next: View(view),
                 last_child: None,
@@ -226,10 +204,84 @@ impl View {
                 desired_size: Vector::null(),
                 arrange_bounds: Some(Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() }),
                 render_bounds: Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() },
-            }, (view, result))
+            }, view)
         });
         View(view).invalidate_measure(tree);
-        result
+        View(view)
+    }
+
+    fn renew_window(self, tree: &mut ViewTree, parent_window: Option<Window<View, ViewTree>>) {
+        let children_parent_window = if let Some(window) = tree.arena[self.0].window {
+            window.drop(tree.window_tree());
+            let render_bounds = self.render_bounds(tree);
+            let window = Window::new(
+                tree.window_tree(),
+                parent_window,
+                render_bounds,
+                |window| (self, window)
+            );
+            tree.arena[self.0].window = Some(window);
+            Some(window)
+        } else {
+            parent_window
+        };
+        if let Some(last_child) = self.last_child(tree) {
+            let mut child = last_child;
+            loop {
+                child = child.next(tree);
+                if child == last_child { break; }
+                child.renew_window(tree, children_parent_window);
+            }
+        }
+    }
+
+    pub fn unset_decorator(self, tree: &mut ViewTree) {
+        if self == tree.root { panic!("root view decorator can not be changed"); }
+        if tree.arena[self.0].decorator.take().is_some() {
+            let window = tree.arena[self.0].window.unwrap();
+            window.drop(tree.window_tree());
+            tree.arena[self.0].window = None;
+            if let Some(last_child) = self.last_child(tree) {
+                let parent_window = self
+                    .self_and_parents(tree)
+                    .find_map(|view| tree.arena[view.0].window)
+                ;
+                let mut child = last_child;
+                loop {
+                    child = child.next(tree);
+                    if child == last_child { break; }
+                    child.renew_window(tree, parent_window);
+                }
+            }
+        }
+        self.invalidate_measure(tree);
+    }
+
+    pub fn set_decorator<D: Decorator>(self, tree: &mut ViewTree, decorator: D) {
+        if self == tree.root { panic!("root view decorator can not be changed"); }
+        if tree.arena[self.0].decorator.replace(Box::new(decorator) as _).is_none() {
+            let parent_window = self
+                .self_and_parents(tree)
+                .find_map(|view| tree.arena[view.0].window)
+            ;
+            let render_bounds = self.render_bounds(tree);
+            let window = Window::new(
+                tree.window_tree(),
+                parent_window,
+                render_bounds,
+                |window| (self, window)
+            );
+            tree.arena[self.0].window = Some(window);
+            if let Some(last_child) = self.last_child(tree) {
+                let mut child = last_child;
+                loop {
+                    child = child.next(tree);
+                    if child == last_child { break; }
+                    child.renew_window(tree, Some(window));
+                }
+            }
+        }
+        self.invalidate_measure(tree);
     }
 
     pub fn parent(self, tree: &ViewTree) -> Option<View> { tree.arena[self.0].parent }

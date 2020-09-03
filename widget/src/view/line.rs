@@ -48,20 +48,16 @@ impl LineDecorator {
     #[allow(clippy::new_ret_no_self)]
     pub fn new(
         tree: &mut ViewTree,
-        parent: View,
-    ) -> View {
-        let view = View::new(tree, parent, |view| {
-            let decorator = LineDecorator {
-                dep_props: DepObjProps::new(&LINE_DECORATOR_TOKEN)
-            };
-            (Some(Box::new(decorator) as _), None, view)
+        view: View,
+    ) {
+        view.set_decorator(tree, LineDecorator {
+            dep_props: DepObjProps::new(&LINE_DECORATOR_TOKEN)
         });
         view.decorator_on_changed(tree, line_decorator_type().orient(), Self::invalidate_measure);
         view.decorator_on_changed(tree, line_decorator_type().length(), Self::invalidate_measure);
         view.decorator_on_changed(tree, line_decorator_type().near(), Self::invalidate_near);
         view.decorator_on_changed(tree, line_decorator_type().stroke(), Self::invalidate_stroke);
         view.decorator_on_changed(tree, line_decorator_type().far(), Self::invalidate_far);
-        view
     }
 
     fn invalidate_measure<T>(view: View, context: &mut dyn Context, _old: &T) {
