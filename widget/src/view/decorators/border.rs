@@ -1,59 +1,30 @@
 use std::fmt::Debug;
 use tuifw_screen_base::{Vector, Point, Rect};
 use tuifw_window::{RenderPort};
-use dep_obj::{DepPropRaw, DepObjProps, DepTypeBuilder, DepProp, DepTypeToken, DepObj};
-use dep_obj::{Context, ContextExt};
+use dep_obj::{DepTypeToken, Context, ContextExt};
 use once_cell::sync::{self};
 use either::{Left, Right};
 use crate::view::base::*;
 
-macro_attr! {
-    #[derive(DepType!)]
-    pub struct BorderDecoratorType {
-        tl: DepPropRaw<Self, Option<Text>>,
-        tr: DepPropRaw<Self, Option<Text>>,
-        bl: DepPropRaw<Self, Option<Text>>,
-        br: DepPropRaw<Self, Option<Text>>,
-        l: DepPropRaw<Self, Option<Text>>,
-        t: DepPropRaw<Self, Option<Text>>,
-        r: DepPropRaw<Self, Option<Text>>,
-        b: DepPropRaw<Self, Option<Text>>,
+dep_obj! {
+    #[derive(Debug)]
+    pub struct BorderDecorator as View: BorderDecoratorType {
+        tl: Option<Text> = None,
+        tr: Option<Text> = None,
+        bl: Option<Text> = None,
+        br: Option<Text> = None,
+        l: Option<Text> = None,
+        t: Option<Text> = None,
+        r: Option<Text> = None,
+        b: Option<Text> = None,
     }
 }
 
-impl BorderDecoratorType {
-    pub fn tl(&self) -> DepProp<BorderDecorator, Option<Text>> { self.tl.owned_by() }
-    pub fn tr(&self) -> DepProp<BorderDecorator, Option<Text>> { self.tr.owned_by() }
-    pub fn bl(&self) -> DepProp<BorderDecorator, Option<Text>> { self.bl.owned_by() }
-    pub fn br(&self) -> DepProp<BorderDecorator, Option<Text>> { self.br.owned_by() }
-    pub fn l(&self) -> DepProp<BorderDecorator, Option<Text>> { self.l.owned_by() }
-    pub fn t(&self) -> DepProp<BorderDecorator, Option<Text>> { self.t.owned_by() }
-    pub fn r(&self) -> DepProp<BorderDecorator, Option<Text>> { self.r.owned_by() }
-    pub fn b(&self) -> DepProp<BorderDecorator, Option<Text>> { self.b.owned_by() }
-}
-
-pub static BORDER_DECORATOR_TOKEN: sync::Lazy<DepTypeToken<BorderDecoratorType>> = sync::Lazy::new(|| {
-    let mut builder = DepTypeBuilder::new().expect("BorderDecoratorType builder locked");
-    let tl = builder.prop(|| None);
-    let tr = builder.prop(|| None);
-    let bl = builder.prop(|| None);
-    let br = builder.prop(|| None);
-    let l = builder.prop(|| None);
-    let t = builder.prop(|| None);
-    let r = builder.prop(|| None);
-    let b = builder.prop(|| None);
-    builder.build(BorderDecoratorType {
-        tl, tr, bl, br,
-        l, t, r, b,
-    })
-});
+pub static BORDER_DECORATOR_TOKEN: sync::Lazy<DepTypeToken<BorderDecoratorType>> = sync::Lazy::new(||
+    BorderDecoratorType::new_raw().expect("BorderDecoratorType builder locked")
+);
 
 pub fn border_decorator_type() -> &'static BorderDecoratorType { BORDER_DECORATOR_TOKEN.type_() }
-
-#[derive(Debug)]
-pub struct BorderDecorator {
-    dep_props: DepObjProps<BorderDecoratorType, View>,
-}
 
 impl BorderDecorator {
     #[allow(clippy::new_ret_no_self)]
@@ -61,9 +32,7 @@ impl BorderDecorator {
         tree: &mut ViewTree,
         view: View,
     ) {
-        view.set_decorator(tree, BorderDecorator {
-            dep_props: DepObjProps::new(&BORDER_DECORATOR_TOKEN)
-        });
+        view.set_decorator(tree, BorderDecorator::new_raw(&BORDER_DECORATOR_TOKEN));
         view.decorator_on_changed(tree, border_decorator_type().tl(), Self::invalidate_tl);
         view.decorator_on_changed(tree, border_decorator_type().tr(), Self::invalidate_tr);
         view.decorator_on_changed(tree, border_decorator_type().bl(), Self::invalidate_bl);
@@ -144,13 +113,6 @@ impl BorderDecorator {
             size: Vector { x: size.x, y: 1 }
         }).unwrap();
     }
-}
-
-impl DepObj for BorderDecorator {
-    type Type = BorderDecoratorType;
-    type Id = View;
-    fn dep_props(&self) -> &DepObjProps<Self::Type, Self::Id> { &self.dep_props }
-    fn dep_props_mut(&mut self) -> &mut DepObjProps<Self::Type, Self::Id> { &mut self.dep_props }
 }
 
 impl Decorator for BorderDecorator {

@@ -6,7 +6,7 @@ use std::num::{NonZeroUsize};
 use boow::Bow;
 use components_arena::{Id, Arena, ComponentClassMutex, ComponentId};
 use dep_obj::{Context, ContextExt};
-use dep_obj::{DepProp, DepPropRaw, DepObj, DepTypeBuilder, DepObjProps, DepTypeToken};
+use dep_obj::{DepProp, DepObj, DepTypeToken};
 use downcast::Any;
 use once_cell::sync::{self};
 use tuifw_screen_base::{Event, Screen, Vector, Point, Rect, Attr, Color};
@@ -122,7 +122,7 @@ impl ViewTree {
         let (window_tree, root) = arena.insert(|view| {
             let window_tree = WindowTree::new(screen, render_view, View(view));
             let screen_size = window_tree.screen_size();
-            let decorator = RootDecorator { dep_props: DepObjProps::new(&ROOT_DECORATOR_TOKEN) };
+            let decorator = RootDecorator::new_raw(&ROOT_DECORATOR_TOKEN);
             (ViewNode {
                 decorator: Some(Box::new(decorator) as _),
                 window: None,
@@ -682,42 +682,24 @@ impl View {
     }
 }
 
-macro_attr! {
-    #[derive(DepType!)]
-    pub struct RootDecoratorType {
-        bg: DepPropRaw<Self, Text>,
+dep_obj! {
+    #[derive(Debug)]
+    pub struct RootDecorator as View: RootDecoratorType {
+        bg: Text = Text::SPACE.clone(),
     }
 }
 
-impl RootDecoratorType {
-    pub fn bg(&self) -> DepProp<RootDecorator, Text> { self.bg.owned_by() }
-}
-
-pub static ROOT_DECORATOR_TOKEN: sync::Lazy<DepTypeToken<RootDecoratorType>> = sync::Lazy::new(|| {
-    let mut builder = DepTypeBuilder::new().expect("RootDecoratorType builder locked");
-    let bg = builder.prop(|| Text::SPACE.clone());
-    builder.build(RootDecoratorType { bg })
-});
+pub static ROOT_DECORATOR_TOKEN: sync::Lazy<DepTypeToken<RootDecoratorType>> = sync::Lazy::new(||
+    RootDecoratorType::new_raw().expect("RootDecoratorType builder locked")
+);
 
 pub fn root_decorator_type() -> &'static RootDecoratorType { ROOT_DECORATOR_TOKEN.type_() }
-
-#[derive(Debug)]
-pub struct RootDecorator {
-    dep_props: DepObjProps<RootDecoratorType, View>,
-}
 
 impl RootDecorator {
     fn invalidate_bg(_view: View, context: &mut dyn Context, _old: &Text) {
         let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
         tree.window_tree().invalidate_screen();
     }
-}
-
-impl DepObj for RootDecorator {
-    type Type = RootDecoratorType;
-    type Id = View;
-    fn dep_props(&self) -> &DepObjProps<Self::Type, Self::Id> { &self.dep_props }
-    fn dep_props_mut(&mut self) -> &mut DepObjProps<Self::Type, Self::Id> { &mut self.dep_props }
 }
 
 impl Decorator for RootDecorator {

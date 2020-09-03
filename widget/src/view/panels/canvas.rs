@@ -1,35 +1,21 @@
 use std::fmt::Debug;
 use tuifw_screen_base::{Vector, Point, Rect};
-use dep_obj::{DepPropRaw, DepObjProps, DepTypeBuilder, DepProp, DepTypeToken, DepObj};
-use dep_obj::{Context, ContextExt};
+use dep_obj::{DepTypeToken, Context, ContextExt};
 use once_cell::sync::{self};
 use crate::view::base::*;
 
-macro_attr! {
-    #[derive(DepType!)]
-    pub struct CanvasLayoutType {
-        tl: DepPropRaw<Self, Point>,
+dep_obj! {
+    #[derive(Debug)]
+    pub struct CanvasLayout as View: CanvasLayoutType {
+        tl: Point = Point { x: 0, y: 0 },
     }
 }
 
-impl CanvasLayoutType {
-    pub fn tl(&self) -> DepProp<CanvasLayout, Point> { self.tl.owned_by() }
-}
-
-pub static CANVAS_LAYOUT_TOKEN: sync::Lazy<DepTypeToken<CanvasLayoutType>> = sync::Lazy::new(|| {
-    let mut builder = DepTypeBuilder::new().expect("CanvasLayoutType builder locked");
-    let tl = builder.prop(|| Point { x: 0, y: 0 });
-    builder.build(CanvasLayoutType {
-        tl,
-    })
-});
+pub static CANVAS_LAYOUT_TOKEN: sync::Lazy<DepTypeToken<CanvasLayoutType>> = sync::Lazy::new(||
+    CanvasLayoutType::new_raw().expect("CanvasLayoutType builder locked")
+);
 
 pub fn canvas_layout_type() -> &'static CanvasLayoutType { CANVAS_LAYOUT_TOKEN.type_() }
-
-#[derive(Debug)]
-pub struct CanvasLayout {
-    dep_props: DepObjProps<CanvasLayoutType, View>,
-}
 
 impl CanvasLayout {
     #[allow(clippy::new_ret_no_self)]
@@ -37,9 +23,7 @@ impl CanvasLayout {
         tree: &mut ViewTree,
         view: View,
     ) {
-        view.set_layout(tree, CanvasLayout {
-            dep_props: DepObjProps::new(&CANVAS_LAYOUT_TOKEN)
-        });
+        view.set_layout(tree, CanvasLayout::new_raw(&CANVAS_LAYOUT_TOKEN));
         view.layout_on_changed(tree, canvas_layout_type().tl(), Self::invalidate_parent_arrange);
     }
 
@@ -47,13 +31,6 @@ impl CanvasLayout {
         let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
         view.parent(tree).map(|parent| parent.invalidate_arrange(tree));
     }
-}
-
-impl DepObj for CanvasLayout {
-    type Type = CanvasLayoutType;
-    type Id = View;
-    fn dep_props(&self) -> &DepObjProps<Self::Type, Self::Id> { &self.dep_props }
-    fn dep_props_mut(&mut self) -> &mut DepObjProps<Self::Type, Self::Id> { &mut self.dep_props }
 }
 
 impl Layout for CanvasLayout { }

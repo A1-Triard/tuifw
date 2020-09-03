@@ -1,48 +1,26 @@
 use std::fmt::Debug;
 use tuifw_screen_base::{Vector, Point, Rect};
 use tuifw_window::{RenderPort};
-use dep_obj::{DepPropRaw, DepObjProps, DepTypeBuilder, DepProp, DepTypeToken, DepObj};
-use dep_obj::{Context, ContextExt};
+use dep_obj::{DepTypeToken, Context, ContextExt};
 use once_cell::sync::{self};
 use crate::view::base::*;
 
-macro_attr! {
-    #[derive(DepType!)]
-    pub struct LineDecoratorType {
-        orient: DepPropRaw<Self, Orient>,
-        length: DepPropRaw<Self, i16>,
-        near: DepPropRaw<Self, Option<Text>>,
-        stroke: DepPropRaw<Self, Option<Text>>,
-        far: DepPropRaw<Self, Option<Text>>,
+dep_obj! {
+    #[derive(Debug)]
+    pub struct LineDecorator as View: LineDecoratorType {
+        orient: Orient = Orient::Hor,
+        length: i16 = 3,
+        near: Option<Text> = None,
+        stroke: Option<Text> = None,
+        far: Option<Text> = None,
     }
 }
 
-impl LineDecoratorType {
-    pub fn orient(&self) -> DepProp<LineDecorator, Orient> { self.orient.owned_by() }
-    pub fn length(&self) -> DepProp<LineDecorator, i16> { self.length.owned_by() }
-    pub fn near(&self) -> DepProp<LineDecorator, Option<Text>> { self.near.owned_by() }
-    pub fn stroke(&self) -> DepProp<LineDecorator, Option<Text>> { self.stroke.owned_by() }
-    pub fn far(&self) -> DepProp<LineDecorator, Option<Text>> { self.far.owned_by() }
-}
-
-pub static LINE_DECORATOR_TOKEN: sync::Lazy<DepTypeToken<LineDecoratorType>> = sync::Lazy::new(|| {
-    let mut builder = DepTypeBuilder::new().expect("LineDecoratorType builder locked");
-    let orient = builder.prop(|| Orient::Hor);
-    let length = builder.prop(|| 3);
-    let near = builder.prop(|| None);
-    let stroke = builder.prop(|| None);
-    let far = builder.prop(|| None);
-    builder.build(LineDecoratorType {
-        orient, length, near, stroke, far,
-    })
-});
+pub static LINE_DECORATOR_TOKEN: sync::Lazy<DepTypeToken<LineDecoratorType>> = sync::Lazy::new(||
+    LineDecoratorType::new_raw().expect("LineDecoratorType builder locked")
+);
 
 pub fn line_decorator_type() -> &'static LineDecoratorType { LINE_DECORATOR_TOKEN.type_() }
-
-#[derive(Debug)]
-pub struct LineDecorator {
-    dep_props: DepObjProps<LineDecoratorType, View>,
-}
 
 impl LineDecorator {
     #[allow(clippy::new_ret_no_self)]
@@ -50,9 +28,7 @@ impl LineDecorator {
         tree: &mut ViewTree,
         view: View,
     ) {
-        view.set_decorator(tree, LineDecorator {
-            dep_props: DepObjProps::new(&LINE_DECORATOR_TOKEN)
-        });
+        view.set_decorator(tree, LineDecorator::new_raw(&LINE_DECORATOR_TOKEN));
         view.decorator_on_changed(tree, line_decorator_type().orient(), Self::invalidate_measure);
         view.decorator_on_changed(tree, line_decorator_type().length(), Self::invalidate_measure);
         view.decorator_on_changed(tree, line_decorator_type().near(), Self::invalidate_near);
@@ -87,13 +63,6 @@ impl LineDecorator {
         };
         view.invalidate_rect(tree, invalidated).unwrap();
     }
-}
-
-impl DepObj for LineDecorator {
-    type Type = LineDecoratorType;
-    type Id = View;
-    fn dep_props(&self) -> &DepObjProps<Self::Type, Self::Id> { &self.dep_props }
-    fn dep_props_mut(&mut self) -> &mut DepObjProps<Self::Type, Self::Id> { &mut self.dep_props }
 }
 
 impl Decorator for LineDecorator {
