@@ -147,7 +147,7 @@ mod or_chip {
     dep_obj! {
         #[derive(Derivative)]
         #[derivative(Debug(bound=""))]
-        pub struct OrLegs<Tag>: OrLegsType as Chip<Tag> {
+        pub struct OrLegs<Tag> as Chip<Tag>: OrLegsType {
             in_1: bool = false,
             in_2: bool = false,
             out: bool = false,
@@ -194,7 +194,7 @@ mod not_chip {
     dep_obj! {
         #[derive(Derivative)]
         #[derivative(Debug(bound=""))]
-        pub struct NotLegs<Tag>: NotLegsType as Chip<Tag> {
+        pub struct NotLegs<Tag> as Chip<Tag>: NotLegsType {
             in_: bool = false,
             out: bool = true,
         }
