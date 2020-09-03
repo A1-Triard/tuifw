@@ -1,7 +1,7 @@
 #[macro_export]
 macro_rules! context {
-    (mod $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ $(,)?>)? $name:ident  {
-        $($field:ident $(($field_mut:ident))? : $ref_mut:tt $type_:ty ),*
+    (mod $name:ident $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ $(,)?>)? {
+        $($field:ident $(/ $field_mut:ident)? : $ref_mut:tt $type_:ty ),+
         $(,)?
     }) => {
         mod $name {
@@ -9,7 +9,17 @@ macro_rules! context {
             use super::*;
 
             context! { @impl Context [ $(< $( $lt $( : $clt $(+ $dlt )* )? ),+ >)?] [ $(< $( $lt ),+ >)?]
-                {} {} {} {} { $($field $(($field_mut))? : $ref_mut $type_),* } }
+                {} {} {} {} { $($field $(/ $field_mut)? : $ref_mut $type_),+ } }
+        }
+    };
+    (mod $name:ident $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ $(,)?>)? {
+    }) => {
+        mod $name {
+            #[allow(unused_imports)]
+            use super::*;
+
+            context! { @impl Context [ $(< $( $lt $( : $clt $(+ $dlt )* )? ),+ >)?] [ $(< $( $lt ),+ >)?]
+                {} {} {} {} {} }
         }
     };
     (@impl $c:ident [$($i:tt)*] [$($r:tt)*]
@@ -38,7 +48,7 @@ macro_rules! context {
     };
     (@impl $c:ident [$($i:tt)*] [$($r:tt)*]
         {$({$($f:tt)*})*} {$({$($p:tt)*})*} {$({$($a:tt)*})*} {$({$($b:tt)*})*}
-        {$field:ident : ref $type_:ty $(, $ft:ident $(($fm:ident))? : $rt:tt $t:ty)*}) => {
+        {$field:ident : ref $type_:ty $(, $ft:ident $(/ $fm:ident)? : $rt:tt $t:ty)*}) => {
 
         context! { @impl $c [$($i)*] [$($r)*]
             {$({$($f)*})* {$field : *const $type_}}
@@ -47,12 +57,12 @@ macro_rules! context {
             {$({$($b)*})* {
                 pub fn $field (&self) -> &$type_ { unsafe { &*self.$field } }
             }}
-            {$($ft $(($fm))? : $rt $t),*}
+            {$($ft $(/ $fm)? : $rt $t),*}
         }
     };
     (@impl $c:ident [$($i:tt)*] [$($r:tt)*]
         {$({$($f:tt)*})*} {$({$($p:tt)*})*} {$({$($a:tt)*})*} {$({$($b:tt)*})*}
-        {$field:ident ($field_mut:ident) : mut $type_:ty $(, $ft:ident $(($fm:ident))? : $rt:tt $t:ty)*}) => {
+        {$field:ident / $field_mut:ident : mut $type_:ty $(, $ft:ident $(/ $fm:ident)? : $rt:tt $t:ty)*}) => {
 
         context! { @impl $c [$($i)*] [$($r)*]
             {$({$($f)*})* {$field : *mut $type_}}
@@ -64,12 +74,12 @@ macro_rules! context {
                 #[allow(dead_code)]
                 pub fn $field_mut (&mut self) -> &mut $type_ { unsafe { &mut *self.$field } }
             }}
-            {$($ft $(($fm))? : $rt $t),*}
+            {$($ft $(/ $fm)? : $rt $t),*}
         }
     };
     (@impl $c:ident [$($i:tt)*] [$($r:tt)*]
         {$({$($f:tt)*})*} {$({$($p:tt)*})*} {$({$($a:tt)*})*} {$({$($b:tt)*})*}
-        {$field:ident : const $type_:ty $(, $ft:ident $(($fm:ident))? : $rt:tt $t:ty)*}) => {
+        {$field:ident : const $type_:ty $(, $ft:ident $(/ $fm:ident)? : $rt:tt $t:ty)*}) => {
 
         context! { @impl $c [$($i)*] [$($r)*]
             {$({$($f)*})* {$field : $type_}}
@@ -78,7 +88,7 @@ macro_rules! context {
             {$({$($b)*})* {
                 pub fn $field (&self) -> $type_ { self.$field }
             }}
-            {$($ft $(($fm))? : $rt $t),*}
+            {$($ft $(/ $fm)? : $rt $t),*}
         }
     };
 }
@@ -111,7 +121,7 @@ mod test {
         mod context_1 {
             a: const u8,
             b: ref u16,
-            c (c_mut): mut u32,
+            c/c_mut: mut u32,
         }
     }
 
@@ -134,7 +144,7 @@ mod test {
         mod context_2 {
             a: const u8,
             b: ref u16,
-            c (c_mut): mut u32,
+            c/c_mut: mut u32,
         }
     }
 

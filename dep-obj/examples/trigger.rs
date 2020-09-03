@@ -241,9 +241,9 @@ use not_chip::*;
 
 context! {
     mod trigger_context {
-        circuit (circuit_mut): mut Circuit<(usize, NonZeroUsize)>,
-        or_legs_type_token: ref DepTypeToken<OrLegsType>,
-        not_legs_type_token: ref DepTypeToken<NotLegsType>,
+        circuit/circuit_mut: mut Circuit<(usize, NonZeroUsize)>,
+        or_legs_token: ref DepTypeToken<OrLegsType>,
+        not_legs_token: ref DepTypeToken<NotLegsType>,
     }
 }
 
@@ -254,9 +254,9 @@ impl Context for TriggerContext {
         if type_ == TypeId::of::<Circuit<(usize, NonZeroUsize)>>() {
             Some(self.circuit())
         } else if type_ == TypeId::of::<DepTypeToken<OrLegsType>>() {
-            Some(self.or_legs_type_token())
+            Some(self.or_legs_token())
         } else if type_ == TypeId::of::<DepTypeToken<NotLegsType>>() {
-            Some(self.not_legs_type_token())
+            Some(self.not_legs_token())
         } else {
             None
         }
@@ -289,7 +289,7 @@ fn main() {
         let or_2: Chip<(usize, NonZeroUsize)> = Chip::from_raw_parts(*not_1.tag(circuit));
         let &out = not_1.get(circuit, not_legs_token.type_().out());
         let in_2 = or_legs_token.type_().in_2();
-        or_2.set_distinct(context, in_2, out);
+        or_2.set_uncond(context, in_2, out);
     });
     not_2.on_changed(circuit, not_legs_token.type_().out(), |not_2, context, _old| {
         let not_legs_token = context.get::<DepTypeToken<NotLegsType>>().expect("NotLegsType required");
@@ -298,7 +298,7 @@ fn main() {
         let or_1: Chip<(usize, NonZeroUsize)> = Chip::from_raw_parts(*not_2.tag(circuit));
         let &out = not_2.get(circuit, not_legs_token.type_().out());
         let in_2 = or_legs_token.type_().in_2();
-        or_1.set_distinct(context, in_2, out);
+        or_1.set_uncond(context, in_2, out);
     });
     or_1.on_changed(circuit, or_legs_token.type_().out(), |or_1, context, _old| {
         let not_legs_token = context.get::<DepTypeToken<NotLegsType>>().expect("NotLegsType required");
@@ -307,7 +307,7 @@ fn main() {
         let not_1: Chip<(usize, NonZeroUsize)> = Chip::from_raw_parts(*or_1.tag(circuit));
         let &out = or_1.get(circuit, or_legs_token.type_().out());
         let in_ = not_legs_token.type_().in_();
-        not_1.set_distinct(context, in_, out);
+        not_1.set_uncond(context, in_, out);
     });
     or_2.on_changed(circuit, or_legs_token.type_().out(), |or_2, context, _old| {
         let not_legs_token = context.get::<DepTypeToken<NotLegsType>>().expect("NotLegsType required");
@@ -316,13 +316,13 @@ fn main() {
         let not_2: Chip<(usize, NonZeroUsize)> = Chip::from_raw_parts(*or_2.tag(circuit));
         let &out = or_2.get(circuit, or_legs_token.type_().out());
         let in_ = not_legs_token.type_().in_();
-        not_2.set_distinct(context, in_, out);
+        not_2.set_uncond(context, in_, out);
     });
     not_1.on_changed(circuit, not_legs_token.type_().out(), |not_1, context, _old| {
         let not_legs_token = context.get::<DepTypeToken<NotLegsType>>().expect("NotLegsType required");
         let circuit = context.get::<Circuit<(usize, NonZeroUsize)>>().expect("Cicuit required");
         let &out = not_1.get(circuit, not_legs_token.type_().out());
-        println!("{}", if out { 1 } else { 0 });
+        println!("{}", if out { "0 -> 1" } else { "1 -> 0" });
     });
     TriggerContext::call(circuit, &or_legs_token, &not_legs_token, |context| {
         or_1.set_distinct(context, or_legs_token.type_().in_1(), true);
