@@ -1,6 +1,5 @@
 use std::fmt::Debug;
 use tuifw_screen_base::{Vector, Point, Rect};
-use tuifw_window::{RenderPort};
 use dep_obj::{DepPropRaw, DepObjProps, DepTypeBuilder, DepProp, DepTypeToken, DepObj};
 use dep_obj::{Context, ContextExt};
 use once_cell::sync::{self};
@@ -25,7 +24,7 @@ pub static CANVAS_LAYOUT_TOKEN: sync::Lazy<DepTypeToken<CanvasLayoutType>> = syn
     })
 });
 
-pub fn canvas_layout_type() -> &'static CanvasLayoutType { CANVAS_LAYOUT_TYPE.type_() }
+pub fn canvas_layout_type() -> &'static CanvasLayoutType { CANVAS_LAYOUT_TOKEN.type_() }
 
 #[derive(Debug)]
 pub struct CanvasLayout {
@@ -50,6 +49,16 @@ impl CanvasLayout {
     }
 }
 
+impl DepObj for CanvasLayout {
+    type Type = CanvasLayoutType;
+    type Id = View;
+    fn dep_props(&self) -> &DepObjProps<Self::Type, Self::Id> { &self.dep_props }
+    fn dep_props_mut(&mut self) -> &mut DepObjProps<Self::Type, Self::Id> { &mut self.dep_props }
+}
+
+impl Layout for CanvasLayout { }
+
+#[derive(Debug)]
 pub struct CanvasPanel(());
 
 impl CanvasPanel {
@@ -95,7 +104,7 @@ impl PanelBehavior for CanvasPanelBehavior {
         tree: &mut ViewTree,
         children_arrange_bounds: Rect
     ) -> Rect {
-        if let Some(last_child) = self.last_child(tree) {
+        if let Some(last_child) = view.last_child(tree) {
             let mut child = last_child;
             loop {
                 child = child.next(tree);
