@@ -304,3 +304,47 @@ macro_rules! DepType {
         }
     };
 }
+
+#[macro_export]
+macro_rules! dep_obj {
+    ( $(#[$($a:tt)+])* struct $name:ident 
+        $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ $(,)?>)?
+        : $type_:ty as $id:ty ; ) => {
+        dep_obj! {
+            @impl [$(#[$($a)+])*] () $name : $type_ as $id ;
+            [ $( $lt ),+ ],
+            [ $( $lt $( : $clt $(+ $dlt )* )? ),+ ]
+        }
+    };
+    ( $(#[$($a:tt)+])* pub $(($($vis:tt)+))? struct $name:ident
+        $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ $(,)?>)?
+        : $type_:ty as $id:ty ; ) => {
+        dep_obj! {
+            @impl [$(#[$($a)+])*] (pub $(($($vis)+))?) $name : $type_ as $id ;
+            $(
+                [ $( $lt ),+ ],
+                [ $( $lt $( : $clt $(+ $dlt )* )? ),+ ]
+            )?
+        }
+    };
+    ( @impl [$(#[$($a:tt)+])*] ($($vis:tt)*) $name:ident : $type_:ty as $id:ty ;
+        $([ $($g:tt)+ ], [ $($r:tt)+ ])? ) => {
+        $(#[$($a)+])*
+        $($vis)* struct $name $(< $($g)+ >)? {
+            dep_props: $crate::DepObjProps<$type_, $id>,
+        }
+
+        impl $(< $($g)+ >)? $crate::DepObj for $name $(< $($r)+ >)? {
+            type Type = $type_;
+            type Id = $id;
+            fn dep_props(&self) -> &$crate::DepObjProps<Self::Type, Self::Id> { &self.dep_props }
+            fn dep_props_mut(&mut self) -> &mut $crate::DepObjProps<Self::Type, Self::Id> { &mut self.dep_props }
+        }
+
+        impl $(< $($g)+ >)? $name $(< $($r)+ >)? {
+            fn new_raw(token: &$crate::DepTypeToken<$type_>) -> Self {
+                Self { dep_props: $crate::DepObjProps::new(token) }
+            }
+        }
+    };
+}

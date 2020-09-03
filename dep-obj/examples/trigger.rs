@@ -142,7 +142,7 @@ mod circuit {
 
 mod or_chip {
     use crate::circuit::*;
-    use dep_obj::{DepObj, DepObjProps, DepPropRaw, DepProp, DepTypeBuilder, DepTypeToken};
+    use dep_obj::{DepPropRaw, DepProp, DepTypeBuilder, DepTypeToken};
     use dep_obj::{Context, ContextExt};
 
     macro_attr! {
@@ -169,10 +169,10 @@ mod or_chip {
         }
     }
 
-    #[derive(Derivative)]
-    #[derivative(Debug(bound=""))]
-    pub struct OrLegs<Tag> {
-        dep_props: DepObjProps<OrLegsType, Chip<Tag>>,
+    dep_obj! {
+        #[derive(Derivative)]
+        #[derivative(Debug(bound=""))]
+        pub struct OrLegs<Tag>: OrLegsType as Chip<Tag>;
     }
 
     impl<Tag: Send + Sync + 'static> OrLegs<Tag> {
@@ -181,9 +181,7 @@ mod or_chip {
             token: &DepTypeToken<OrLegsType>,
             tag: impl FnOnce(Chip<Tag>) -> (Tag, T)
         ) -> T {
-            let legs = Self {
-                dep_props: DepObjProps::new(token)
-            };
+            let legs = Self::new_raw(token);
             let (chip, result) = Chip::new(circuit, |chip| {
                 let (tag, result) = tag(chip);
                 (Box::new(legs) as _, tag, (chip, result))
@@ -201,13 +199,6 @@ mod or_chip {
             let out = token.type_().out();
             chip.set_distinct(context, out, in_1 | in_2);
         }
-    }
-
-    impl<Tag> DepObj for OrLegs<Tag> {
-        type Type = OrLegsType;
-        type Id = Chip<Tag>;
-        fn dep_props(&self) -> &DepObjProps<Self::Type, Self::Id> { &self.dep_props }
-        fn dep_props_mut(&mut self) -> &mut DepObjProps<Self::Type, Self::Id> { &mut self.dep_props }
     }
 
     impl<Tag: Send + Sync + 'static> ChipLegs for OrLegs<Tag> { }
