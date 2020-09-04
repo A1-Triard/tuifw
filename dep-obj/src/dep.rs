@@ -388,46 +388,29 @@ macro_rules! DepType {
 
 #[macro_export]
 macro_rules! dep_obj {
-    ( $(#[$($a:tt)+])* struct $name:ident 
+    ( $(#[$($a:tt)+])* $v:vis struct $name:ident 
         $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ $(,)?>)?
         as $id:ty : $type_:ident {
             $(
-               $field:ident : $field_type:ty = $val:expr
+               $f1:ident $($f2:ident)? : $field_type:ty $(= $val:expr)?
             ),+
             $(,)?
         }) => {
         dep_obj! {
-            @impl builder [$(#[$($a)+])*] () $name as $id : $type_ ;
-            [] [] [] [] [$($field : $field_type = $val),+];
+            @impl builder [$(#[$($a)+])*] ($v) $name as $id : $type_ ;
+            [] [] [] [] [$($f1 $($f2)? : $field_type $(= $val)?),+];
             $(
                 [ $( $lt ),+ ],
                 [ $( $lt $( : $clt $(+ $dlt )* )? ),+ ]
             )?
         }
     };
-    ( $(#[$($a:tt)+])* pub $(($($vis:tt)+))? struct $name:ident
-        $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ $(,)?>)?
-        as $id:ty : $type_:ident {
-            $(
-               $field:ident : $field_type:ty = $val:expr
-            ),+
-            $(,)?
-        }) => {
-        dep_obj! {
-            @impl builder [$(#[$($a)+])*] (pub $(($($vis)+))?) $name as $id : $type_ ;
-            [] [] [] [] [$($field : $field_type = $val),+];
-            $(
-                [ $( $lt ),+ ],
-                [ $( $lt $( : $clt $(+ $dlt )* )? ),+ ]
-            )?
-        }
-    };
-    ( $(#[$($a:tt)+])* struct $name:ident 
+    ( $(#[$($a:tt)+])* $v:vis struct $name:ident 
         $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ $(,)?>)?
         as $id:ty : $type_:ident {
         }) => {
         dep_obj! {
-            @impl builder [$(#[$($a)+])*] () $name as $id : $type_ ;
+            @impl builder [$(#[$($a)+])*] ($v) $name as $id : $type_ ;
             [] [] [] [] [];
             $(
                 [ $( $lt ),+ ],
@@ -435,24 +418,11 @@ macro_rules! dep_obj {
             )?
         }
     };
-    ( $(#[$($a:tt)+])* pub $(($($vis:tt)+))? struct $name:ident
-        $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ $(,)?>)?
-        as $id:ty : $type_:ident {
-        }) => {
-        dep_obj! {
-            @impl builder [$(#[$($a)+])*] (pub $(($($vis)+))?) $name as $id : $type_ ;
-            [] [] [] [] [];
-            $(
-                [ $( $lt ),+ ],
-                [ $( $lt $( : $clt $(+ $dlt )* )? ),+ ]
-            )?
-        }
-    };
-    ( @impl $builder:ident [$(#[$($a:tt)+])*] ($($vis:tt)*) $name:ident as $id:ty : $type_:ident ;
+    ( @impl $builder:ident [$(#[$($a:tt)+])*] ($v:vis) $name:ident as $id:ty : $type_:ident ;
         [$($s:tt)*] [$($p:tt)*] [$($c:tt)*] [$($l:tt)*] [$field:ident : $field_type:ty = $val:expr $(, $($tail:tt)+)?];
         $([ $($g:tt)+ ], [ $($r:tt)+ ])? ) => {
         dep_obj! {
-            @impl $builder [$(#[$($a)+])*] ($($vis)*) $name as $id : $type_ ;
+            @impl $builder [$(#[$($a)+])*] ($v) $name as $id : $type_ ;
             [$field : $crate::DepPropRaw<$type_, $field_type>, $($s)*]
             [
                 pub fn $field $(< $($g)+ >)? (&self) -> $crate::DepProp<$name $(< $($r)+ >)?, $field_type> {
@@ -469,10 +439,31 @@ macro_rules! dep_obj {
             $([ $($g)+ ], [ $($r)+ ])?
         }
     };
-    ( @impl $builder:ident [$(#[$($a:tt)+])*] ($($vis:tt)*) $name:ident as $id:ty : $type_:ident ;
+    ( @impl $builder:ident [$(#[$($a:tt)+])*] ($v:vis) $name:ident as $id:ty : $type_:ident ;
+        [$($s:tt)*] [$($p:tt)*] [$($c:tt)*] [$($l:tt)*] [yield $field:ident : $field_type:ty $(, $($tail:tt)+)?];
+        $([ $($g:tt)+ ], [ $($r:tt)+ ])? ) => {
+        dep_obj! {
+            @impl $builder [$(#[$($a)+])*] ($v) $name as $id : $type_ ;
+            [$field : $crate::DepEventRaw<$type_, $field_type>, $($s)*]
+            [
+                pub fn $field $(< $($g)+ >)? (&self) -> $crate::DepEvent<$name $(< $($r)+ >)?, $field_type> {
+                    self.$field.owned_by() 
+                }
+                $($p)*
+            ]
+            [
+                let $field = $builder.event(|| $val);
+                $($c)*
+            ]
+            [$field, $($l)*]
+            [$($($tail)+)?];
+            $([ $($g)+ ], [ $($r)+ ])?
+        }
+    };
+    ( @impl $builder:ident [$(#[$($a:tt)+])*] ($v:vis) $name:ident as $id:ty : $type_:ident ;
         [$($s:tt)*] [$($p:tt)*] [$($c:tt)*] [$($l:tt)*] [];
         $([ $($g:tt)+ ], [ $($r:tt)+ ])? ) => {
-        $($vis)* struct $type_ { $($s)* }
+        $v struct $type_ { $($s)* }
 
         unsafe impl $crate::DepType for $type_ {
             fn lock() -> &'static $crate::DepTypeLock {
@@ -493,7 +484,7 @@ macro_rules! dep_obj {
         }
 
         $(#[$($a)+])*
-        $($vis)* struct $name $(< $($g)+ >)? {
+        $v struct $name $(< $($g)+ >)? {
             core: $crate::DepObjCore<$type_, $id>,
         }
 
