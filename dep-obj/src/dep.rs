@@ -36,11 +36,12 @@ impl Default for DepTypeLock {
     fn default() -> Self { DepTypeLock::new() }
 }
 
-pub struct DepTypeToken<Type: DepType> {
+pub struct DepTypeToken<OwnerType: DepType> {
     layout: Layout,
     default: Vec<(isize, unsafe fn(usize, *mut u8), usize)>,
     drop: Vec<(isize, unsafe fn(*mut u8))>,
-    type_: Type,
+    events: usize,
+    type_: OwnerType,
 }
 
 impl<Type: DepType> DepTypeToken<Type> {
@@ -54,42 +55,43 @@ pub unsafe trait DepType {
 pub trait DepObj {
     type Type: DepType;
     type Id: ComponentId;
-    fn dep_props(&self) -> &DepObjProps<Self::Type, Self::Id> where Self: Sized;
-    fn dep_props_mut(&mut self) -> &mut DepObjProps<Self::Type, Self::Id> where Self: Sized;
+    fn core(&self) -> &DepObjCore<Self::Type, Self::Id> where Self: Sized;
+    fn core_mut(&mut self) -> &mut DepObjCore<Self::Type, Self::Id> where Self: Sized;
+}
+
+#[derive(Debug)]
+struct Entry<PropType> {
+    value: PropType,
+    on_changed: Option<Vec<usize>>,
+}
+
+unsafe fn store_default<PropType>(fn_ptr: usize, props: *mut u8) {
+    let fn_ptr: fn() -> PropType = transmute(fn_ptr);
+    ptr::write(props as *mut Entry<PropType>, Entry { value: fn_ptr(), on_changed: None });
+}
+
+unsafe fn drop_entry<PropType>(props: *mut u8) {
+    ptr::drop_in_place(props as *mut Entry<PropType>);
 }
 
 #[derive(Derivative)]
 #[derivative(Debug(bound=""))]
-pub struct DepTypeBuilder<Type: DepType> {
+pub struct DepTypeBuilder<OwnerType: DepType> {
     align: usize,
     size: usize,
     default: Vec<(isize, unsafe fn(usize, *mut u8), usize)>,
     drop: Vec<(isize, unsafe fn(*mut u8))>,
-    phantom: PhantomData<Type>,
+    events: usize,
+    phantom: PhantomData<OwnerType>,
 }
 
-unsafe impl<Type: DepType> Send for DepTypeBuilder<Type> { }
-unsafe impl<Type: DepType> Sync for DepTypeBuilder<Type> { }
-impl<Type: DepType> Unpin for DepTypeBuilder<Type> { }
+unsafe impl<OwnerType: DepType> Send for DepTypeBuilder<OwnerType> { }
+unsafe impl<OwnerType: DepType> Sync for DepTypeBuilder<OwnerType> { }
+impl<OwnerType: DepType> Unpin for DepTypeBuilder<OwnerType> { }
 
-#[derive(Debug)]
-struct Entry<Type> {
-    value: Type,
-    on_changed: Option<Vec<usize>>,
-}
-
-unsafe fn store_default<Type>(fn_ptr: usize, storage: *mut u8) {
-    let fn_ptr: fn() -> Type = transmute(fn_ptr);
-    ptr::write(storage as *mut Entry<Type>, Entry { value: fn_ptr(), on_changed: None });
-}
-
-unsafe fn drop_entry<Type>(storage: *mut u8) {
-    ptr::drop_in_place(storage as *mut Entry<Type>);
-}
-
-impl<Type: DepType> DepTypeBuilder<Type> {
-    pub fn new() -> Option<DepTypeBuilder<Type>> {
-        let lock = Type::lock();
+impl<OwnerType: DepType> DepTypeBuilder<OwnerType> {
+    pub fn new() -> Option<Self> {
+        let lock = OwnerType::lock();
         if lock.0.compare_and_swap(false, true, Ordering::Relaxed) {
             None
         } else {
@@ -98,14 +100,13 @@ impl<Type: DepType> DepTypeBuilder<Type> {
                 align: 1,
                 default: Vec::new(),
                 drop: Vec::new(),
+                events: 0,
                 phantom: PhantomData
             })
         }
     }
-}
 
-impl<Type: DepType> DepTypeBuilder<Type> {
-    pub fn prop<PropType>(&mut self, default: fn() -> PropType) -> DepPropRaw<Type, PropType> {
+    pub fn prop<PropType>(&mut self, default: fn() -> PropType) -> DepPropRaw<OwnerType, PropType> {
         let align = align_of::<Entry<PropType>>();
         self.align = max(self.align, align);
         let padding = (align - self.size % align) % align;
@@ -118,28 +119,106 @@ impl<Type: DepType> DepTypeBuilder<Type> {
         DepPropRaw { offset, phantom: (PhantomData, PhantomData) }
     }
 
-    pub fn build(mut self, type_: Type) -> DepTypeToken<Type> {
+    pub fn event<ArgsType>(&mut self) -> DepEventRaw<OwnerType, ArgsType> {
+        let index = self.events;
+        self.events = index.checked_add(1).expect("out of memory");
+        DepEventRaw { index, phantom: (PhantomData, PhantomData) }
+    }
+
+    pub fn build(mut self, type_: OwnerType) -> DepTypeToken<OwnerType> {
         self.default.shrink_to_fit();
         self.drop.shrink_to_fit();
         DepTypeToken {
             layout: Layout::from_size_align(self.size, self.align).expect("out of memory"),
             default: self.default,
             drop: self.drop,
+            events: self.events,
             type_
         }
     }
 }
 
-pub struct OnChanged<OwnerId: ComponentId, Type>(
+pub struct OnRaised<OwnerId: ComponentId, ArgsType>(
     Option<Vec<usize>>,
-    (PhantomData<OwnerId>, PhantomData<Type>),
+    (PhantomData<OwnerId>, PhantomData<ArgsType>),
 );
 
-impl<OwnerId: ComponentId, Type> OnChanged<OwnerId, Type> {
-    pub fn raise(self, owner_id: OwnerId, context: &mut dyn Context, old: &Type) {
+impl<OwnerId: ComponentId, ArgsType> OnRaised<OwnerId, ArgsType> {
+    pub fn raise(self, owner_id: OwnerId, context: &mut dyn Context, args: &mut ArgsType) {
+        if let Some(on_raised) = self.0 {
+            for on_raised in on_raised {
+                let on_raised: fn(owner_id: OwnerId, context: &mut dyn Context, args: &mut ArgsType) =
+                    unsafe { transmute(on_raised) };
+                on_raised(owner_id, context, args);
+            }
+        }
+    }
+}
+
+#[derive(Derivative)]
+#[derivative(Debug(bound=""), Copy(bound=""), Clone(bound=""), Eq(bound=""), PartialEq(bound=""))]
+#[derivative(Hash(bound=""), Ord(bound=""), PartialOrd(bound=""))]
+pub struct DepEventRaw<OwnerType: DepType, ArgsType> {
+    index: usize,
+    phantom: (PhantomData<OwnerType>, PhantomData<ArgsType>),
+}
+
+unsafe impl<OwnerType: DepType, ArgsType> Send for DepEventRaw<OwnerType, ArgsType> { }
+unsafe impl<OwnerType: DepType, ArgsType> Sync for DepEventRaw<OwnerType, ArgsType> { }
+impl<OwnerType: DepType, ArgsType> Unpin for DepEventRaw<OwnerType, ArgsType> { }
+
+impl<OwnerType: DepType, ArgsType> DepEventRaw<OwnerType, ArgsType> {
+    pub fn owned_by<Owner: DepObj<Type=OwnerType>>(self) -> DepEvent<Owner, ArgsType> {
+        DepEvent(self, PhantomData)
+    }
+}
+
+#[derive(Derivative)]
+#[derivative(Debug(bound=""), Copy(bound=""), Clone(bound=""), Eq(bound=""), PartialEq(bound=""))]
+#[derivative(Hash(bound=""), Ord(bound=""), PartialOrd(bound=""))]
+pub struct DepEvent<Owner: DepObj, ArgsType>(
+    DepEventRaw<Owner::Type, ArgsType>,
+    PhantomData<Owner>,
+);
+
+unsafe impl<Owner: DepObj, ArgsType> Send for DepEvent<Owner, ArgsType> { }
+unsafe impl<Owner: DepObj, ArgsType> Sync for DepEvent<Owner, ArgsType> { }
+impl<Owner: DepObj, ArgsType> Unpin for DepEvent<Owner, ArgsType> { }
+
+impl<Owner: DepObj, ArgsType> DepEvent<Owner, ArgsType> {
+    pub fn on_raised(
+        self,
+        obj: &mut Owner,
+        callback: fn(owner_id: Owner::Id, context: &mut dyn Context, args: &mut ArgsType)
+    ) {
+        let callback = unsafe { transmute(callback) };
+        let on_raised = unsafe { obj.core_mut().events.get_unchecked_mut(self.0.index) };
+        if let Some(on_raised) = on_raised.as_mut() {
+            on_raised.push(callback);
+        } else {
+            on_raised.replace(vec![callback]);
+        }
+    }
+
+    pub fn raise(
+        self,
+        obj: &mut Owner,
+    ) -> OnRaised<Owner::Id, ArgsType> {
+        let on_raised = unsafe { obj.core_mut().events.get_unchecked(self.0.index) };
+        OnRaised(on_raised.clone(), (PhantomData, PhantomData))
+    }
+}
+
+pub struct OnChanged<OwnerId: ComponentId, PropType>(
+    Option<Vec<usize>>,
+    (PhantomData<OwnerId>, PhantomData<PropType>),
+);
+
+impl<OwnerId: ComponentId, PropType> OnChanged<OwnerId, PropType> {
+    pub fn raise(self, owner_id: OwnerId, context: &mut dyn Context, old: &PropType) {
         if let Some(on_changed) = self.0 {
             for on_changed in on_changed {
-                let on_changed: fn(owner_id: OwnerId, context: &mut dyn Context, old: &Type) =
+                let on_changed: fn(owner_id: OwnerId, context: &mut dyn Context, old: &PropType) =
                     unsafe { transmute(on_changed) };
                 on_changed(owner_id, context, old);
             }
@@ -150,67 +229,67 @@ impl<OwnerId: ComponentId, Type> OnChanged<OwnerId, Type> {
 #[derive(Derivative)]
 #[derivative(Debug(bound=""), Copy(bound=""), Clone(bound=""), Eq(bound=""), PartialEq(bound=""))]
 #[derivative(Hash(bound=""), Ord(bound=""), PartialOrd(bound=""))]
-pub struct DepPropRaw<OwnerType: DepType, Type> {
+pub struct DepPropRaw<OwnerType: DepType, PropType> {
     offset: isize,
-    phantom: (PhantomData<OwnerType>, PhantomData<Type>),
+    phantom: (PhantomData<OwnerType>, PhantomData<PropType>),
 }
 
-unsafe impl<OwnerType: DepType, Type> Send for DepPropRaw<OwnerType, Type> { }
-unsafe impl<OwnerType: DepType, Type> Sync for DepPropRaw<OwnerType, Type> { }
-impl<OwnerType: DepType, Type> Unpin for DepPropRaw<OwnerType, Type> { }
+unsafe impl<OwnerType: DepType, PropType> Send for DepPropRaw<OwnerType, PropType> { }
+unsafe impl<OwnerType: DepType, PropType> Sync for DepPropRaw<OwnerType, PropType> { }
+impl<OwnerType: DepType, PropType> Unpin for DepPropRaw<OwnerType, PropType> { }
 
-impl<OwnerType: DepType, Type> DepPropRaw<OwnerType, Type> {
-    pub fn owned_by<Owner: DepObj<Type=OwnerType>>(self) -> DepProp<Owner, Type> {
+impl<OwnerType: DepType, PropType> DepPropRaw<OwnerType, PropType> {
+    pub fn owned_by<Owner: DepObj<Type=OwnerType>>(self) -> DepProp<Owner, PropType> {
         DepProp(self, PhantomData)
     }
 
     fn get_entry<OwnerId: ComponentId>(
         self,
-        obj_props: &DepObjProps<OwnerType, OwnerId>
-    ) -> &Entry<Type> {
-        unsafe { &*(obj_props.storage.offset(self.offset) as *const Entry<Type>) }
+        obj_props: &DepObjCore<OwnerType, OwnerId>
+    ) -> &Entry<PropType> {
+        unsafe { &*(obj_props.props.offset(self.offset) as *const Entry<PropType>) }
     }
 
     fn get_entry_mut<OwnerId: ComponentId>(
         self,
-        obj_props: &mut DepObjProps<OwnerType, OwnerId>
-    ) -> &mut Entry<Type> {
-        unsafe { &mut *(obj_props.storage.offset(self.offset) as *mut Entry<Type>) }
+        obj_props: &mut DepObjCore<OwnerType, OwnerId>
+    ) -> &mut Entry<PropType> {
+        unsafe { &mut *(obj_props.props.offset(self.offset) as *mut Entry<PropType>) }
     }
 }
 
 #[derive(Derivative)]
 #[derivative(Debug(bound=""), Copy(bound=""), Clone(bound=""), Eq(bound=""), PartialEq(bound=""))]
 #[derivative(Hash(bound=""), Ord(bound=""), PartialOrd(bound=""))]
-pub struct DepProp<Owner: DepObj, Type>(
-    DepPropRaw<Owner::Type, Type>,
+pub struct DepProp<Owner: DepObj, PropType>(
+    DepPropRaw<Owner::Type, PropType>,
     PhantomData<Owner>,
 );
 
-unsafe impl<Owner: DepObj, Type> Send for DepProp<Owner, Type> { }
-unsafe impl<Owner: DepObj, Type> Sync for DepProp<Owner, Type> { }
-impl<Owner: DepObj, Type> Unpin for DepProp<Owner, Type> { }
+unsafe impl<Owner: DepObj, PropType> Send for DepProp<Owner, PropType> { }
+unsafe impl<Owner: DepObj, PropType> Sync for DepProp<Owner, PropType> { }
+impl<Owner: DepObj, PropType> Unpin for DepProp<Owner, PropType> { }
 
-impl<Owner: DepObj, Type: Eq> DepProp<Owner, Type> {
+impl<Owner: DepObj, PropType: Eq> DepProp<Owner, PropType> {
     pub fn set_distinct(
         self,
         obj: &mut Owner,
-        value: Type
-    ) -> (Type, OnChanged<Owner::Id, Type>) {
-        let entry = self.0.get_entry_mut(obj.dep_props_mut());
+        value: PropType
+    ) -> (PropType, OnChanged<Owner::Id, PropType>) {
+        let entry = self.0.get_entry_mut(obj.core_mut());
         let old = replace(&mut entry.value, value);
         let on_changed = if old == entry.value { None } else { entry.on_changed.clone() };
         (old, OnChanged(on_changed, (PhantomData, PhantomData)))
     }
 }
 
-impl<Owner: DepObj, Type> DepProp<Owner, Type> {
+impl<Owner: DepObj, PropType> DepProp<Owner, PropType> {
     pub fn set_uncond(
         self,
         obj: &mut Owner,
-        value: Type
-    ) -> (Type, OnChanged<Owner::Id, Type>) {
-        let entry = self.0.get_entry_mut(obj.dep_props_mut());
+        value: PropType
+    ) -> (PropType, OnChanged<Owner::Id, PropType>) {
+        let entry = self.0.get_entry_mut(obj.core_mut());
         let old = replace(&mut entry.value, value);
         (old, OnChanged(entry.on_changed.clone(), (PhantomData, PhantomData)))
     }
@@ -218,17 +297,17 @@ impl<Owner: DepObj, Type> DepProp<Owner, Type> {
     pub fn get(
         self,
         obj: &Owner
-    ) -> &Type {
-        &self.0.get_entry(obj.dep_props()).value
+    ) -> &PropType {
+        &self.0.get_entry(obj.core()).value
     }
 
     pub fn on_changed(
         self,
         obj: &mut Owner,
-        callback: fn(owner_id: Owner::Id, context: &mut dyn Context, old: &Type)
+        callback: fn(owner_id: Owner::Id, context: &mut dyn Context, old: &PropType)
     ) {
         let callback = unsafe { transmute(callback) };
-        let entry = self.0.get_entry_mut(obj.dep_props_mut());
+        let entry = self.0.get_entry_mut(obj.core_mut());
         if let Some(on_changed) = entry.on_changed.as_mut() {
             on_changed.push(callback);
         } else {
@@ -239,44 +318,46 @@ impl<Owner: DepObj, Type> DepProp<Owner, Type> {
 
 #[derive(Derivative)]
 #[derivative(Debug(bound=""))]
-pub struct DepObjProps<OwnerType: DepType, OwnerId: ComponentId> {
+pub struct DepObjCore<OwnerType: DepType, OwnerId: ComponentId> {
     layout: Layout,
-    storage: *mut u8,
+    props: *mut u8,
     drop: Vec<(isize, unsafe fn(*mut u8))>,
+    events: Vec<Option<Vec<usize>>>,
     phantom: (PhantomData<OwnerType>, PhantomData<OwnerId>)
 }
 
-unsafe impl<OwnerType: DepType, OwnerId: ComponentId> Send for DepObjProps<OwnerType, OwnerId> { }
-unsafe impl<OwnerType: DepType, OwnerId: ComponentId> Sync for DepObjProps<OwnerType, OwnerId> { }
-impl<OwnerType: DepType, OwnerId: ComponentId> Unpin for DepObjProps<OwnerType, OwnerId> { }
+unsafe impl<OwnerType: DepType, OwnerId: ComponentId> Send for DepObjCore<OwnerType, OwnerId> { }
+unsafe impl<OwnerType: DepType, OwnerId: ComponentId> Sync for DepObjCore<OwnerType, OwnerId> { }
+impl<OwnerType: DepType, OwnerId: ComponentId> Unpin for DepObjCore<OwnerType, OwnerId> { }
 
-impl<OwnerType: DepType, OwnerId: ComponentId> DepObjProps<OwnerType, OwnerId> {
-    pub fn new(type_token: &DepTypeToken<OwnerType>) -> DepObjProps<OwnerType, OwnerId> {
-        let storage = if type_token.layout.size() == 0 {
+impl<OwnerType: DepType, OwnerId: ComponentId> DepObjCore<OwnerType, OwnerId> {
+    pub fn new(type_token: &DepTypeToken<OwnerType>) -> DepObjCore<OwnerType, OwnerId> {
+        let props = if type_token.layout.size() == 0 {
             null_mut()
         } else {
             NonNull::new(unsafe { alloc(type_token.layout) }).expect("out of memory").as_ptr()
         };
         for &(offset, store, fn_ptr) in &type_token.default {
-            unsafe { store(fn_ptr, storage.offset(offset)) };
+            unsafe { store(fn_ptr, props.offset(offset)) };
         }
-        DepObjProps {
+        DepObjCore {
             layout: type_token.layout,
-            storage,
+            props,
             drop: type_token.drop.clone(),
+            events: vec![None; type_token.events],
             phantom: (PhantomData, PhantomData)
         }
     }
 }
 
-impl<OwnerType: DepType, OwnerId: ComponentId> Drop for DepObjProps<OwnerType, OwnerId> {
+impl<OwnerType: DepType, OwnerId: ComponentId> Drop for DepObjCore<OwnerType, OwnerId> {
     fn drop(&mut self) {
-        if !self.storage.is_null() {
+        if !self.props.is_null() {
             for &(offset, drop_entry) in &self.drop {
-                unsafe { drop_entry(self.storage.offset(offset)) };
+                unsafe { drop_entry(self.props.offset(offset)) };
             }
-            unsafe { dealloc(self.storage, self.layout) };
-            self.storage = null_mut();
+            unsafe { dealloc(self.props, self.layout) };
+            self.props = null_mut();
         }
     }
 }
@@ -413,19 +494,19 @@ macro_rules! dep_obj {
 
         $(#[$($a)+])*
         $($vis)* struct $name $(< $($g)+ >)? {
-            dep_props: $crate::DepObjProps<$type_, $id>,
+            core: $crate::DepObjCore<$type_, $id>,
         }
 
         impl $(< $($g)+ >)? $crate::DepObj for $name $(< $($r)+ >)? {
             type Type = $type_;
             type Id = $id;
-            fn dep_props(&self) -> &$crate::DepObjProps<Self::Type, Self::Id> { &self.dep_props }
-            fn dep_props_mut(&mut self) -> &mut $crate::DepObjProps<Self::Type, Self::Id> { &mut self.dep_props }
+            fn core(&self) -> &$crate::DepObjCore<Self::Type, Self::Id> { &self.core }
+            fn core_mut(&mut self) -> &mut $crate::DepObjCore<Self::Type, Self::Id> { &mut self.core }
         }
 
         impl $(< $($g)+ >)? $name $(< $($r)+ >)? {
             fn new_raw(token: &$crate::DepTypeToken<$type_>) -> Self {
-                Self { dep_props: $crate::DepObjProps::new(token) }
+                Self { core: $crate::DepObjCore::new(token) }
             }
         }
     };
