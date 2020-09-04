@@ -392,13 +392,13 @@ macro_rules! dep_obj {
         $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ $(,)?>)?
         as $id:ty : $type_:ident {
             $(
-               $f1:ident $($f2:ident)? : $field_type:ty $(= $val:expr)?
+               $field:ident $delim:tt $field_type:ty $(= $val:expr)?
             ),+
             $(,)?
         }) => {
         dep_obj! {
             @impl builder [$(#[$($a)+])*] ($v) $name as $id : $type_ ;
-            [] [] [] [] [$($f1 $($f2)? : $field_type $(= $val)?),+];
+            [] [] [] [] [$($field $delim $field_type $(= $val)?),+];
             $(
                 [ $( $lt ),+ ],
                 [ $( $lt $( : $clt $(+ $dlt )* )? ),+ ]
@@ -440,7 +440,7 @@ macro_rules! dep_obj {
         }
     };
     ( @impl $builder:ident [$(#[$($a:tt)+])*] ($v:vis) $name:ident as $id:ty : $type_:ident ;
-        [$($s:tt)*] [$($p:tt)*] [$($c:tt)*] [$($l:tt)*] [yield $field:ident : $field_type:ty $(, $($tail:tt)+)?];
+        [$($s:tt)*] [$($p:tt)*] [$($c:tt)*] [$($l:tt)*] [$field:ident yield $field_type:ty $(, $($tail:tt)+)?];
         $([ $($g:tt)+ ], [ $($r:tt)+ ])? ) => {
         dep_obj! {
             @impl $builder [$(#[$($a)+])*] ($v) $name as $id : $type_ ;
