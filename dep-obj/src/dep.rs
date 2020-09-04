@@ -452,7 +452,7 @@ macro_rules! dep_obj {
                 $($p)*
             ]
             [
-                let $field = $builder.event(|| $val);
+                let $field = $builder.event();
                 $($c)*
             ]
             [$field, $($l)*]
