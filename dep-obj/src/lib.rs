@@ -8,7 +8,7 @@ pub(crate) mod std {
 }
 
 #[macro_use]
-extern crate derivative;
+extern crate educe;
 
 #[doc(hidden)]
 pub use core::ops::FnOnce as std_ops_FnOnce;

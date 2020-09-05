@@ -10,7 +10,7 @@ extern crate dep_obj;
 #[macro_use]
 extern crate downcast;
 #[macro_use]
-extern crate derivative;
+extern crate educe;
 
 mod circuit {
     use dep_obj::{DepObj, DepProp};
@@ -34,9 +34,9 @@ mod circuit {
         }
     }
 
-    #[derive(Derivative)]
-    #[derivative(Debug(bound=""), Copy(bound=""), Clone(bound=""), Eq(bound=""), PartialEq(bound=""))]
-    #[derivative(Hash(bound=""), Ord(bound=""), PartialOrd(bound=""))]
+    #[derive(Educe)]
+    #[educe(Debug, Copy, Clone, Eq, PartialEq)]
+    #[educe(Hash, Ord, PartialOrd)]
     pub struct Chip<Tag>(Id<ChipNode<Tag>>);
 
     impl<Tag: 'static> Chip<Tag> {
@@ -145,8 +145,8 @@ mod or_chip {
     use dep_obj::{DepTypeToken, Context, ContextExt};
 
     dep_obj! {
-        #[derive(Derivative)]
-        #[derivative(Debug(bound=""))]
+        #[derive(Educe)]
+        #[educe(Debug)]
         pub struct OrLegs<Tag> as Chip<Tag>: OrLegsType {
             in_1: bool = false,
             in_2: bool = false,
@@ -192,8 +192,8 @@ mod not_chip {
     use dep_obj::{DepTypeToken, Context, ContextExt};
 
     dep_obj! {
-        #[derive(Derivative)]
-        #[derivative(Debug(bound=""))]
+        #[derive(Educe)]
+        #[educe(Debug)]
         pub struct NotLegs<Tag> as Chip<Tag>: NotLegsType {
             in_: bool = false,
             out: bool = true,

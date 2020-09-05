@@ -74,8 +74,8 @@ unsafe fn drop_entry<PropType>(props: *mut u8) {
     ptr::drop_in_place(props as *mut Entry<PropType>);
 }
 
-#[derive(Derivative)]
-#[derivative(Debug(bound=""))]
+#[derive(Educe)]
+#[educe(Debug)]
 pub struct DepTypeBuilder<OwnerType: DepType> {
     align: usize,
     size: usize,
@@ -155,9 +155,9 @@ impl<OwnerId: ComponentId, ArgsType> OnRaised<OwnerId, ArgsType> {
     }
 }
 
-#[derive(Derivative)]
-#[derivative(Debug(bound=""), Copy(bound=""), Clone(bound=""), Eq(bound=""), PartialEq(bound=""))]
-#[derivative(Hash(bound=""), Ord(bound=""), PartialOrd(bound=""))]
+#[derive(Educe)]
+#[educe(Debug, Copy, Clone, Eq, PartialEq)]
+#[educe(Hash, Ord, PartialOrd)]
 pub struct DepEventRaw<OwnerType: DepType, ArgsType> {
     index: usize,
     phantom: (PhantomData<OwnerType>, PhantomData<ArgsType>),
@@ -173,9 +173,9 @@ impl<OwnerType: DepType, ArgsType> DepEventRaw<OwnerType, ArgsType> {
     }
 }
 
-#[derive(Derivative)]
-#[derivative(Debug(bound=""), Copy(bound=""), Clone(bound=""), Eq(bound=""), PartialEq(bound=""))]
-#[derivative(Hash(bound=""), Ord(bound=""), PartialOrd(bound=""))]
+#[derive(Educe)]
+#[educe(Debug, Copy, Clone, Eq, PartialEq)]
+#[educe(Hash, Ord, PartialOrd)]
 pub struct DepEvent<Owner: DepObj, ArgsType>(
     DepEventRaw<Owner::Type, ArgsType>,
     PhantomData<Owner>,
@@ -226,9 +226,9 @@ impl<OwnerId: ComponentId, PropType> OnChanged<OwnerId, PropType> {
     }
 }
 
-#[derive(Derivative)]
-#[derivative(Debug(bound=""), Copy(bound=""), Clone(bound=""), Eq(bound=""), PartialEq(bound=""))]
-#[derivative(Hash(bound=""), Ord(bound=""), PartialOrd(bound=""))]
+#[derive(Educe)]
+#[educe(Debug, Copy, Clone, Eq, PartialEq)]
+#[educe(Hash, Ord, PartialOrd)]
 pub struct DepPropRaw<OwnerType: DepType, PropType> {
     offset: isize,
     phantom: (PhantomData<OwnerType>, PhantomData<PropType>),
@@ -258,9 +258,9 @@ impl<OwnerType: DepType, PropType> DepPropRaw<OwnerType, PropType> {
     }
 }
 
-#[derive(Derivative)]
-#[derivative(Debug(bound=""), Copy(bound=""), Clone(bound=""), Eq(bound=""), PartialEq(bound=""))]
-#[derivative(Hash(bound=""), Ord(bound=""), PartialOrd(bound=""))]
+#[derive(Educe)]
+#[educe(Debug, Copy, Clone, Eq, PartialEq)]
+#[educe(Hash, Ord, PartialOrd)]
 pub struct DepProp<Owner: DepObj, PropType>(
     DepPropRaw<Owner::Type, PropType>,
     PhantomData<Owner>,
@@ -316,8 +316,8 @@ impl<Owner: DepObj, PropType> DepProp<Owner, PropType> {
     }
 }
 
-#[derive(Derivative)]
-#[derivative(Debug(bound=""))]
+#[derive(Educe)]
+#[educe(Debug)]
 pub struct DepObjCore<OwnerType: DepType, OwnerId: ComponentId> {
     layout: Layout,
     props: *mut u8,
@@ -395,7 +395,7 @@ macro_rules! DepType {
 #[macro_export]
 macro_rules! dep_obj {
     (
-        $(#[$($attr:tt)+])* $vis:vis struct $name:ident
+        $(#[$attr:meta])* $vis:vis struct $name:ident
         $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ $(,)?>)?
         as $id:ty : $ty:ident {
             $($(
@@ -404,7 +404,7 @@ macro_rules! dep_obj {
         }
     ) => {
         dep_obj! {
-            @impl builder [$(#[$($attr)+])*] ($vis) $name as $id : $ty ;
+            @impl builder [$(#[$attr])*] ($vis) $name as $id : $ty ;
             [] [] [] [] [$($($field $delim $field_ty $(= $field_val)?),+)?];
             $(
                 [ $( $lt ),+ ],
@@ -413,7 +413,7 @@ macro_rules! dep_obj {
         }
     };
     (
-        @impl $builder:ident [$(#[$($attr:tt)+])*] ($vis:vis) $name:ident as $id:ty : $ty:ident ;
+        @impl $builder:ident [$(#[$attr:meta])*] ($vis:vis) $name:ident as $id:ty : $ty:ident ;
         [$($s:tt)*]
         [$($p:tt)*]
         [$($c:tt)*]
@@ -422,7 +422,7 @@ macro_rules! dep_obj {
         $([ $($g:tt)+ ], [ $($r:tt)+ ])?
     ) => {
         dep_obj! {
-            @impl $builder [$(#[$($attr)+])*] ($vis) $name as $id : $ty ;
+            @impl $builder [$(#[$attr])*] ($vis) $name as $id : $ty ;
             [
                 $($s)*
                 $field : $crate::DepPropRaw<$ty, $field_ty>,
@@ -446,7 +446,7 @@ macro_rules! dep_obj {
         }
     };
     (
-        @impl $builder:ident [$(#[$($attr:tt)+])*] ($vis:vis) $name:ident as $id:ty : $ty:ident ;
+        @impl $builder:ident [$(#[$attr:meta])*] ($vis:vis) $name:ident as $id:ty : $ty:ident ;
         [$($s:tt)*]
         [$($p:tt)*]
         [$($c:tt)*]
@@ -455,7 +455,7 @@ macro_rules! dep_obj {
         $([ $($g:tt)+ ], [ $($r:tt)+ ])?
     ) => {
         dep_obj! {
-            @impl $builder [$(#[$($attr)+])*] ($vis) $name as $id : $ty ;
+            @impl $builder [$(#[$attr])*] ($vis) $name as $id : $ty ;
             [
                 $($s)*
                 $field : $crate::DepEventRaw<$ty, $field_ty>,
@@ -479,7 +479,7 @@ macro_rules! dep_obj {
         }
     };
     (
-        @impl $builder:ident [$(#[$($attr:tt)+])*] ($vis:vis) $name:ident as $id:ty : $ty:ident ;
+        @impl $builder:ident [$(#[$attr:meta])*] ($vis:vis) $name:ident as $id:ty : $ty:ident ;
         [$($s:tt)*] [$($p:tt)*] [$($c:tt)*] [$($l:tt)*] [];
         $([ $($g:tt)+ ], [ $($r:tt)+ ])?
     ) => {
@@ -503,7 +503,7 @@ macro_rules! dep_obj {
             }
         }
 
-        $(#[$($attr)+])*
+        $(#[$attr])*
         $vis struct $name $(< $($g)+ >)? {
             core: $crate::DepObjCore<$ty, $id>,
         }

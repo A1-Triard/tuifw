@@ -16,8 +16,8 @@ rustc-args = ["--cfg", "docsrs"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-derivative = "2.1.1"
-components-arena = { version = "0.6.2", default-features = false }
+educe = "0.4.13"
+components-arena = { version = "0.6.3", default-features = false }
 
 [dev-dependencies]
 macro-attr = "0.2.0"
