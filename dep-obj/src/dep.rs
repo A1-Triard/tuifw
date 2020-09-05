@@ -10,8 +10,8 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use components_arena::ComponentId;
 
 pub trait Context {
-    fn get_raw(&self, type_: TypeId) -> Option<&dyn Any>;
-    fn get_mut_raw(&mut self, type_: TypeId) -> Option<&mut dyn Any>;
+    fn get_raw(&self, ty: TypeId) -> Option<&dyn Any>;
+    fn get_mut_raw(&mut self, ty: TypeId) -> Option<&mut dyn Any>;
 }
 
 pub trait ContextExt: Context {
@@ -41,11 +41,11 @@ pub struct DepTypeToken<OwnerType: DepType> {
     default: Vec<(isize, unsafe fn(usize, *mut u8), usize)>,
     drop: Vec<(isize, unsafe fn(*mut u8))>,
     events: usize,
-    type_: OwnerType,
+    ty: OwnerType,
 }
 
 impl<Type: DepType> DepTypeToken<Type> {
-    pub fn type_(&self) -> &Type { &self.type_ }
+    pub fn ty(&self) -> &Type { &self.ty }
 }
 
 pub unsafe trait DepType {
@@ -125,7 +125,7 @@ impl<OwnerType: DepType> DepTypeBuilder<OwnerType> {
         DepEventRaw { index, phantom: (PhantomData, PhantomData) }
     }
 
-    pub fn build(mut self, type_: OwnerType) -> DepTypeToken<OwnerType> {
+    pub fn build(mut self, ty: OwnerType) -> DepTypeToken<OwnerType> {
         self.default.shrink_to_fit();
         self.drop.shrink_to_fit();
         DepTypeToken {
@@ -133,7 +133,7 @@ impl<OwnerType: DepType> DepTypeBuilder<OwnerType> {
             default: self.default,
             drop: self.drop,
             events: self.events,
-            type_
+            ty
         }
     }
 }
@@ -331,20 +331,20 @@ unsafe impl<OwnerType: DepType, OwnerId: ComponentId> Sync for DepObjCore<OwnerT
 impl<OwnerType: DepType, OwnerId: ComponentId> Unpin for DepObjCore<OwnerType, OwnerId> { }
 
 impl<OwnerType: DepType, OwnerId: ComponentId> DepObjCore<OwnerType, OwnerId> {
-    pub fn new(type_token: &DepTypeToken<OwnerType>) -> DepObjCore<OwnerType, OwnerId> {
-        let props = if type_token.layout.size() == 0 {
+    pub fn new(tytoken: &DepTypeToken<OwnerType>) -> DepObjCore<OwnerType, OwnerId> {
+        let props = if tytoken.layout.size() == 0 {
             null_mut()
         } else {
-            NonNull::new(unsafe { alloc(type_token.layout) }).expect("out of memory").as_ptr()
+            NonNull::new(unsafe { alloc(tytoken.layout) }).expect("out of memory").as_ptr()
         };
-        for &(offset, store, fn_ptr) in &type_token.default {
+        for &(offset, store, fn_ptr) in &tytoken.default {
             unsafe { store(fn_ptr, props.offset(offset)) };
         }
         DepObjCore {
-            layout: type_token.layout,
+            layout: tytoken.layout,
             props,
-            drop: type_token.drop.clone(),
-            events: vec![None; type_token.events],
+            drop: tytoken.drop.clone(),
+            events: vec![None; tytoken.events],
             phantom: (PhantomData, PhantomData)
         }
     }
@@ -364,19 +364,25 @@ impl<OwnerType: DepType, OwnerId: ComponentId> Drop for DepObjCore<OwnerType, Ow
 
 #[macro_export]
 macro_rules! DepType {
-    (()
-        $(pub $(($($vis:tt)+))?)? enum $name:ident $($tail:tt)+ ) => {
+    (
+        ()
+        $vis:vis enum $name:ident $($tail:tt)+
+    ) => {
         DepType! {
             @impl $name
         }
     };
-    (()
-        $(pub $(($($vis:tt)+))?)? struct $name:ident $($tail:tt)+ ) => {
+    (
+        ()
+        $vis:vis struct $name:ident $($tail:tt)+
+    ) => {
         DepType! {
             @impl $name
         }
     };
-    (@impl $name:ident) => {
+    (
+        @impl $name:ident
+    ) => {
         unsafe impl $crate::DepType for $name {
             fn lock() -> &'static $crate::DepTypeLock {
                 static LOCK: $crate::DepTypeLock = $crate::DepTypeLock::new();
@@ -388,66 +394,66 @@ macro_rules! DepType {
 
 #[macro_export]
 macro_rules! dep_obj {
-    ( $(#[$($a:tt)+])* $v:vis struct $name:ident 
+    (
+        $(#[$($attr:tt)+])* $vis:vis struct $name:ident
         $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ $(,)?>)?
-        as $id:ty : $type_:ident {
-            $(
-               $field:ident $delim:tt $field_type:ty $(= $val:expr)?
-            ),+
-            $(,)?
-        }) => {
+        as $id:ty : $ty:ident {
+            $($(
+               $field:ident $delim:tt $field_ty:ty $(= $field_val:expr)?
+            ),+ $(,)?)?
+        }
+    ) => {
         dep_obj! {
-            @impl builder [$(#[$($a)+])*] ($v) $name as $id : $type_ ;
-            [] [] [] [] [$($field $delim $field_type $(= $val)?),+];
+            @impl builder [$(#[$($attr)+])*] ($vis) $name as $id : $ty ;
+            [] [] [] [] [$($($field $delim $field_ty $(= $field_val)?),+)?];
             $(
                 [ $( $lt ),+ ],
                 [ $( $lt $( : $clt $(+ $dlt )* )? ),+ ]
             )?
         }
     };
-    ( $(#[$($a:tt)+])* $v:vis struct $name:ident 
-        $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ $(,)?>)?
-        as $id:ty : $type_:ident {
-        }) => {
+    (
+        @impl $builder:ident [$(#[$($attr:tt)+])*] ($vis:vis) $name:ident as $id:ty : $ty:ident ;
+        [$($s:tt)*]
+        [$($p:tt)*]
+        [$($c:tt)*]
+        [$($l:tt)*]
+        [$field:ident : $field_ty:ty = $field_val:expr $(, $($other_fields:tt)+)?];
+        $([ $($g:tt)+ ], [ $($r:tt)+ ])?
+    ) => {
         dep_obj! {
-            @impl builder [$(#[$($a)+])*] ($v) $name as $id : $type_ ;
-            [] [] [] [] [];
-            $(
-                [ $( $lt ),+ ],
-                [ $( $lt $( : $clt $(+ $dlt )* )? ),+ ]
-            )?
-        }
-    };
-    ( @impl $builder:ident [$(#[$($a:tt)+])*] ($v:vis) $name:ident as $id:ty : $type_:ident ;
-        [$($s:tt)*] [$($p:tt)*] [$($c:tt)*] [$($l:tt)*] [$field:ident : $field_type:ty = $val:expr $(, $($tail:tt)+)?];
-        $([ $($g:tt)+ ], [ $($r:tt)+ ])? ) => {
-        dep_obj! {
-            @impl $builder [$(#[$($a)+])*] ($v) $name as $id : $type_ ;
-            [$field : $crate::DepPropRaw<$type_, $field_type>, $($s)*]
+            @impl $builder [$(#[$($attr)+])*] ($vis) $name as $id : $ty ;
+            [$field : $crate::DepPropRaw<$ty, $field_ty>, $($s)*]
             [
-                pub fn $field $(< $($g)+ >)? (&self) -> $crate::DepProp<$name $(< $($r)+ >)?, $field_type> {
+                pub fn $field $(< $($g)+ >)? (&self) -> $crate::DepProp<$name $(< $($r)+ >)?, $field_ty> {
                     self.$field.owned_by() 
                 }
                 $($p)*
             ]
             [
-                let $field = $builder.prop(|| $val);
+                let $field = $builder.prop(|| $field_val);
                 $($c)*
             ]
             [$field, $($l)*]
-            [$($($tail)+)?];
+            [$($($other_fields)+)?];
             $([ $($g)+ ], [ $($r)+ ])?
         }
     };
-    ( @impl $builder:ident [$(#[$($a:tt)+])*] ($v:vis) $name:ident as $id:ty : $type_:ident ;
-        [$($s:tt)*] [$($p:tt)*] [$($c:tt)*] [$($l:tt)*] [$field:ident yield $field_type:ty $(, $($tail:tt)+)?];
-        $([ $($g:tt)+ ], [ $($r:tt)+ ])? ) => {
+    (
+        @impl $builder:ident [$(#[$($attr:tt)+])*] ($vis:vis) $name:ident as $id:ty : $ty:ident ;
+        [$($s:tt)*]
+        [$($p:tt)*]
+        [$($c:tt)*]
+        [$($l:tt)*]
+        [$field:ident yield $field_ty:ty $(, $($other_fields:tt)+)?];
+        $([ $($g:tt)+ ], [ $($r:tt)+ ])?
+    ) => {
         dep_obj! {
-            @impl $builder [$(#[$($a)+])*] ($v) $name as $id : $type_ ;
-            [$field : $crate::DepEventRaw<$type_, $field_type>, $($s)*]
+            @impl $builder [$(#[$($attr)+])*] ($vis) $name as $id : $ty ;
+            [$field : $crate::DepEventRaw<$ty, $field_ty>, $($s)*]
             [
-                pub fn $field $(< $($g)+ >)? (&self) -> $crate::DepEvent<$name $(< $($r)+ >)?, $field_type> {
-                    self.$field.owned_by() 
+                pub fn $field $(< $($g)+ >)? (&self) -> $crate::DepEvent<$name $(< $($r)+ >)?, $field_ty> {
+                    self.$field.owned_by()
                 }
                 $($p)*
             ]
@@ -456,23 +462,25 @@ macro_rules! dep_obj {
                 $($c)*
             ]
             [$field, $($l)*]
-            [$($($tail)+)?];
+            [$($($other_fields)+)?];
             $([ $($g)+ ], [ $($r)+ ])?
         }
     };
-    ( @impl $builder:ident [$(#[$($a:tt)+])*] ($v:vis) $name:ident as $id:ty : $type_:ident ;
+    (
+        @impl $builder:ident [$(#[$($attr:tt)+])*] ($vis:vis) $name:ident as $id:ty : $ty:ident ;
         [$($s:tt)*] [$($p:tt)*] [$($c:tt)*] [$($l:tt)*] [];
-        $([ $($g:tt)+ ], [ $($r:tt)+ ])? ) => {
-        $v struct $type_ { $($s)* }
+        $([ $($g:tt)+ ], [ $($r:tt)+ ])?
+    ) => {
+        $vis struct $ty { $($s)* }
 
-        unsafe impl $crate::DepType for $type_ {
+        unsafe impl $crate::DepType for $ty {
             fn lock() -> &'static $crate::DepTypeLock {
                 static LOCK: $crate::DepTypeLock = $crate::DepTypeLock::new();
                 &LOCK
             }
         }
 
-        impl $type_ {
+        impl $ty {
             $($p)*
 
             fn new_raw() -> Option<$crate::DepTypeToken<Self>> {
@@ -483,20 +491,20 @@ macro_rules! dep_obj {
             }
         }
 
-        $(#[$($a)+])*
-        $v struct $name $(< $($g)+ >)? {
-            core: $crate::DepObjCore<$type_, $id>,
+        $(#[$($attr)+])*
+        $vis struct $name $(< $($g)+ >)? {
+            core: $crate::DepObjCore<$ty, $id>,
         }
 
         impl $(< $($g)+ >)? $crate::DepObj for $name $(< $($r)+ >)? {
-            type Type = $type_;
+            type Type = $ty;
             type Id = $id;
             fn core(&self) -> &$crate::DepObjCore<Self::Type, Self::Id> { &self.core }
             fn core_mut(&mut self) -> &mut $crate::DepObjCore<Self::Type, Self::Id> { &mut self.core }
         }
 
         impl $(< $($g)+ >)? $name $(< $($r)+ >)? {
-            fn new_raw(token: &$crate::DepTypeToken<$type_>) -> Self {
+            fn new_raw(token: &$crate::DepTypeToken<$ty>) -> Self {
                 Self { core: $crate::DepObjCore::new(token) }
             }
         }

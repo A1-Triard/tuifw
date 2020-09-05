@@ -169,17 +169,17 @@ mod or_chip {
                 let (tag, result) = tag(chip);
                 (Box::new(legs) as _, tag, (chip, result))
             });
-            chip.on_changed(circuit, token.type_().in_1(), Self::update);
-            chip.on_changed(circuit, token.type_().in_2(), Self::update);
+            chip.on_changed(circuit, token.ty().in_1(), Self::update);
+            chip.on_changed(circuit, token.ty().in_2(), Self::update);
             result
         }
 
         fn update(chip: Chip<Tag>, context: &mut dyn Context, _old: &bool) {
             let token = context.get::<DepTypeToken<OrLegsType>>().expect("OrLegsType required");
             let circuit = context.get::<Circuit<Tag>>().expect("Cicuit required");
-            let in_1 = *chip.get(circuit, token.type_().in_1());
-            let in_2 = *chip.get(circuit, token.type_().in_2());
-            let out = token.type_().out();
+            let in_1 = *chip.get(circuit, token.ty().in_1());
+            let in_2 = *chip.get(circuit, token.ty().in_2());
+            let out = token.ty().out();
             chip.set_distinct(context, out, in_1 | in_2);
         }
     }
@@ -215,15 +215,15 @@ mod not_chip {
                 let (tag, result) = tag(chip);
                 (Box::new(legs) as _, tag, (chip, result))
             });
-            chip.on_changed(circuit, token.type_().in_(), Self::update);
+            chip.on_changed(circuit, token.ty().in_(), Self::update);
             result
         }
 
         fn update(chip: Chip<Tag>, context: &mut dyn Context, _old: &bool) {
             let token = context.get::<DepTypeToken<NotLegsType>>().expect("NotLegsType required");
             let circuit = context.get::<Circuit<Tag>>().expect("Cicuit required");
-            let in_ = *chip.get(circuit, token.type_().in_());
-            let out = token.type_().out();
+            let in_ = *chip.get(circuit, token.ty().in_());
+            let out = token.ty().out();
             chip.set_distinct(context, out, !in_);
         }
     }
@@ -250,20 +250,20 @@ context! {
 use trigger_context::Context as TriggerContext;
 
 impl Context for TriggerContext {
-    fn get_raw(&self, type_: TypeId) -> Option<&dyn Any> {
-        if type_ == TypeId::of::<Circuit<(usize, NonZeroUsize)>>() {
+    fn get_raw(&self, ty: TypeId) -> Option<&dyn Any> {
+        if ty == TypeId::of::<Circuit<(usize, NonZeroUsize)>>() {
             Some(self.circuit())
-        } else if type_ == TypeId::of::<DepTypeToken<OrLegsType>>() {
+        } else if ty == TypeId::of::<DepTypeToken<OrLegsType>>() {
             Some(self.or_legs_token())
-        } else if type_ == TypeId::of::<DepTypeToken<NotLegsType>>() {
+        } else if ty == TypeId::of::<DepTypeToken<NotLegsType>>() {
             Some(self.not_legs_token())
         } else {
             None
         }
     }
 
-    fn get_mut_raw(&mut self, type_: TypeId) -> Option<&mut dyn Any> {
-        if type_ == TypeId::of::<Circuit<(usize, NonZeroUsize)>>() {
+    fn get_mut_raw(&mut self, ty: TypeId) -> Option<&mut dyn Any> {
+        if ty == TypeId::of::<Circuit<(usize, NonZeroUsize)>>() {
             Some(self.circuit_mut())
         } else {
             None
@@ -282,56 +282,56 @@ fn main() {
     let or_2 = OrLegs::new(circuit, &or_legs_token, |chip| (not_2.into_raw_parts(), chip));
     *not_1.tag_mut(circuit) = or_2.into_raw_parts();
     *not_2.tag_mut(circuit) = or_1.into_raw_parts();
-    not_1.on_changed(circuit, not_legs_token.type_().out(), |not_1, context, _old| {
+    not_1.on_changed(circuit, not_legs_token.ty().out(), |not_1, context, _old| {
         let not_legs_token = context.get::<DepTypeToken<NotLegsType>>().expect("NotLegsType required");
         let or_legs_token = context.get::<DepTypeToken<OrLegsType>>().expect("OrLegsType required");
         let circuit = context.get::<Circuit<(usize, NonZeroUsize)>>().expect("Cicuit required");
         let or_2: Chip<(usize, NonZeroUsize)> = Chip::from_raw_parts(*not_1.tag(circuit));
-        let &out = not_1.get(circuit, not_legs_token.type_().out());
-        let in_2 = or_legs_token.type_().in_2();
+        let &out = not_1.get(circuit, not_legs_token.ty().out());
+        let in_2 = or_legs_token.ty().in_2();
         or_2.set_uncond(context, in_2, out);
     });
-    not_2.on_changed(circuit, not_legs_token.type_().out(), |not_2, context, _old| {
+    not_2.on_changed(circuit, not_legs_token.ty().out(), |not_2, context, _old| {
         let not_legs_token = context.get::<DepTypeToken<NotLegsType>>().expect("NotLegsType required");
         let or_legs_token = context.get::<DepTypeToken<OrLegsType>>().expect("OrLegsType required");
         let circuit = context.get::<Circuit<(usize, NonZeroUsize)>>().expect("Cicuit required");
         let or_1: Chip<(usize, NonZeroUsize)> = Chip::from_raw_parts(*not_2.tag(circuit));
-        let &out = not_2.get(circuit, not_legs_token.type_().out());
-        let in_2 = or_legs_token.type_().in_2();
+        let &out = not_2.get(circuit, not_legs_token.ty().out());
+        let in_2 = or_legs_token.ty().in_2();
         or_1.set_uncond(context, in_2, out);
     });
-    or_1.on_changed(circuit, or_legs_token.type_().out(), |or_1, context, _old| {
+    or_1.on_changed(circuit, or_legs_token.ty().out(), |or_1, context, _old| {
         let not_legs_token = context.get::<DepTypeToken<NotLegsType>>().expect("NotLegsType required");
         let or_legs_token = context.get::<DepTypeToken<OrLegsType>>().expect("OrLegsType required");
         let circuit = context.get::<Circuit<(usize, NonZeroUsize)>>().expect("Cicuit required");
         let not_1: Chip<(usize, NonZeroUsize)> = Chip::from_raw_parts(*or_1.tag(circuit));
-        let &out = or_1.get(circuit, or_legs_token.type_().out());
-        let in_ = not_legs_token.type_().in_();
+        let &out = or_1.get(circuit, or_legs_token.ty().out());
+        let in_ = not_legs_token.ty().in_();
         not_1.set_uncond(context, in_, out);
     });
-    or_2.on_changed(circuit, or_legs_token.type_().out(), |or_2, context, _old| {
+    or_2.on_changed(circuit, or_legs_token.ty().out(), |or_2, context, _old| {
         let not_legs_token = context.get::<DepTypeToken<NotLegsType>>().expect("NotLegsType required");
         let or_legs_token = context.get::<DepTypeToken<OrLegsType>>().expect("OrLegsType required");
         let circuit = context.get::<Circuit<(usize, NonZeroUsize)>>().expect("Cicuit required");
         let not_2: Chip<(usize, NonZeroUsize)> = Chip::from_raw_parts(*or_2.tag(circuit));
-        let &out = or_2.get(circuit, or_legs_token.type_().out());
-        let in_ = not_legs_token.type_().in_();
+        let &out = or_2.get(circuit, or_legs_token.ty().out());
+        let in_ = not_legs_token.ty().in_();
         not_2.set_uncond(context, in_, out);
     });
-    not_1.on_changed(circuit, not_legs_token.type_().out(), |not_1, context, _old| {
+    not_1.on_changed(circuit, not_legs_token.ty().out(), |not_1, context, _old| {
         let not_legs_token = context.get::<DepTypeToken<NotLegsType>>().expect("NotLegsType required");
         let circuit = context.get::<Circuit<(usize, NonZeroUsize)>>().expect("Cicuit required");
-        let &out = not_1.get(circuit, not_legs_token.type_().out());
+        let &out = not_1.get(circuit, not_legs_token.ty().out());
         println!("{}", if out { "0 -> 1" } else { "1 -> 0" });
     });
     TriggerContext::call(circuit, &or_legs_token, &not_legs_token, |context| {
-        or_1.set_distinct(context, or_legs_token.type_().in_1(), true);
-        or_1.set_distinct(context, or_legs_token.type_().in_1(), false);
-        or_2.set_distinct(context, or_legs_token.type_().in_1(), true);
-        or_2.set_distinct(context, or_legs_token.type_().in_1(), false);
-        or_1.set_distinct(context, or_legs_token.type_().in_1(), true);
-        or_1.set_distinct(context, or_legs_token.type_().in_1(), false);
-        or_2.set_distinct(context, or_legs_token.type_().in_1(), true);
-        or_2.set_distinct(context, or_legs_token.type_().in_1(), false);
+        or_1.set_distinct(context, or_legs_token.ty().in_1(), true);
+        or_1.set_distinct(context, or_legs_token.ty().in_1(), false);
+        or_2.set_distinct(context, or_legs_token.ty().in_1(), true);
+        or_2.set_distinct(context, or_legs_token.ty().in_1(), false);
+        or_1.set_distinct(context, or_legs_token.ty().in_1(), true);
+        or_1.set_distinct(context, or_legs_token.ty().in_1(), false);
+        or_2.set_distinct(context, or_legs_token.ty().in_1(), true);
+        or_2.set_distinct(context, or_legs_token.ty().in_1(), false);
     });
 }

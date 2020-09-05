@@ -1,35 +1,137 @@
 #[macro_export]
 macro_rules! context {
-    (mod $name:ident $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ $(,)?>)? {
-        $($field:ident $(/ $field_mut:ident)? : $ref_mut:tt $type_:ty ),+
-        $(,)?
-    }) => {
+    (
+        mod $name:ident
+        $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ $(,)?>)?
+        {
+            $($(
+                $field:ident $(/ $field_mut:ident)? : $field_mod:ident $field_ty:ty
+            ),+ $(,)?)?
+        }
+    ) => {
         mod $name {
             #[allow(unused_imports)]
             use super::*;
 
-            context! { @impl Context [ $(< $( $lt $( : $clt $(+ $dlt )* )? ),+ >)?] [ $(< $( $lt ),+ >)?]
-                {} {} {} {} { $($field $(/ $field_mut)? : $ref_mut $type_),+ } }
+            context! {
+                @impl Context
+                [ $(< $( $lt $( : $clt $(+ $dlt )* )? ),+ >)?] [ $(< $( $lt ),+ >)?]
+                {} {} {} {} { $($($field $(/ $field_mut)? : $field_mod $field_ty),+)? }
+            }
         }
     };
-    (mod $name:ident $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ $(,)?>)? {
-    }) => {
-        mod $name {
-            #[allow(unused_imports)]
-            use super::*;
-
-            context! { @impl Context [ $(< $( $lt $( : $clt $(+ $dlt )* )? ),+ >)?] [ $(< $( $lt ),+ >)?]
-                {} {} {} {} {} }
+    (
+        @impl $name:ident
+        [$($g:tt)*] [$($r:tt)*]
+        {$({$($f:tt)*})*}
+        {$({$($p:tt)*})*}
+        {$({$($a:tt)*})*}
+        {$({$($b:tt)*})*}
+        {$field:ident : ref $ty:ty $(, $($other_fields:tt)+)?}
+    ) => {
+        context! {
+            @impl $name
+            [$($g)*] [$($r)*]
+            {
+                {$field : *const $ty}
+                $({$($f)*})*
+            }
+            {
+                {$field : &$ty}
+                $({$($p)*})*
+            }
+            {
+                {$field : $field as *const $ty}
+                $({$($a)*})*
+            }
+            {
+                {
+                    pub fn $field (&self) -> &$ty { unsafe { &*self.$field } }
+                }
+                $({$($b)*})*
+            }
+            {$($($other_fields)+)?}
         }
     };
-    (@impl $c:ident [$($i:tt)*] [$($r:tt)*]
-        {$({$($f:tt)*})*} {$({$($p:tt)*})*} {$({$($a:tt)*})*} {$({$($b:tt)*})*} {}) => {
-        
-        pub struct $c $($i)* {
+    (
+        @impl $name:ident
+        [$($g:tt)*] [$($r:tt)*]
+        {$({$($f:tt)*})*}
+        {$({$($p:tt)*})*}
+        {$({$($a:tt)*})*}
+        {$({$($b:tt)*})*}
+        {$field:ident / $field_mut:ident : mut $ty:ty $(, $($other_fields:tt)+)?}
+    ) => {
+        context! {
+            @impl $name
+            [$($g)*] [$($r)*]
+            {
+                {$field : *mut $ty}
+                $({$($f)*})*
+            }
+            {
+                {$field : &mut $ty}
+                $({$($p)*})*
+            }
+            {
+                {$field : $field as *mut $ty}
+                $({$($a)*})*
+            }
+            {
+                {
+                    #[allow(dead_code)]
+                    pub fn $field (&self) -> &$ty { unsafe { &*self.$field } }
+                    #[allow(dead_code)]
+                    pub fn $field_mut (&mut self) -> &mut $ty { unsafe { &mut *self.$field } }
+                }
+                $({$($b)*})*
+            }
+            {$($($other_fields)+)?}
+        }
+    };
+    (
+        @impl $name:ident
+        [$($g:tt)*] [$($r:tt)*]
+        {$({$($f:tt)*})*}
+        {$({$($p:tt)*})*}
+        {$({$($a:tt)*})*}
+        {$({$($b:tt)*})*}
+        {$field:ident : const $ty:ty $(, $($other_fields:tt)+)?}
+    ) => {
+        context! {
+            @impl $name
+            [$($g)*] [$($r)*]
+            {
+                {$field : $ty}
+                $({$($f)*})*
+            }
+            {
+                {$field : $ty}
+                $({$($p)*})*
+            }
+            {
+                {$field : $field}
+                $({$($a)*})*
+            }
+            {
+                {
+                    pub fn $field (&self) -> $ty { self.$field }
+                }
+                $({$($b)*})*
+            }
+            {$($($other_fields)+)?}
+        }
+    };
+    (
+        @impl $name:ident
+        [$($g:tt)*] [$($r:tt)*]
+        {$({$($f:tt)*})*} {$({$($p:tt)*})*} {$({$($a:tt)*})*} {$({$($b:tt)*})*} {}
+    ) => {
+        pub struct $name $($g)* {
             $($($f)*),*
         }
 
-        impl $($i)* $c $($r)* {
+        impl $($g)* $name $($r)* {
             pub fn call<ContextCallReturnType>(
                 $($($p)*),*,
                 f: impl $crate::std_ops_FnOnce(&mut Self) -> ContextCallReturnType 
@@ -43,53 +145,8 @@ macro_rules! context {
             $($($b)*)*
         }
 
-        unsafe impl $($i)* Send for $c $($r)* { }
-        unsafe impl $($i)* Sync for $c $($r)* { }
-    };
-    (@impl $c:ident [$($i:tt)*] [$($r:tt)*]
-        {$({$($f:tt)*})*} {$({$($p:tt)*})*} {$({$($a:tt)*})*} {$({$($b:tt)*})*}
-        {$field:ident : ref $type_:ty $(, $ft:ident $(/ $fm:ident)? : $rt:tt $t:ty)*}) => {
-
-        context! { @impl $c [$($i)*] [$($r)*]
-            {$({$($f)*})* {$field : *const $type_}}
-            {$({$($p)*})* {$field : &$type_}}
-            {$({$($a)*})* {$field : $field as *const $type_}}
-            {$({$($b)*})* {
-                pub fn $field (&self) -> &$type_ { unsafe { &*self.$field } }
-            }}
-            {$($ft $(/ $fm)? : $rt $t),*}
-        }
-    };
-    (@impl $c:ident [$($i:tt)*] [$($r:tt)*]
-        {$({$($f:tt)*})*} {$({$($p:tt)*})*} {$({$($a:tt)*})*} {$({$($b:tt)*})*}
-        {$field:ident / $field_mut:ident : mut $type_:ty $(, $ft:ident $(/ $fm:ident)? : $rt:tt $t:ty)*}) => {
-
-        context! { @impl $c [$($i)*] [$($r)*]
-            {$({$($f)*})* {$field : *mut $type_}}
-            {$({$($p)*})* {$field : &mut $type_}}
-            {$({$($a)*})* {$field : $field as *mut $type_}}
-            {$({$($b)*})* {
-                #[allow(dead_code)]
-                pub fn $field (&self) -> &$type_ { unsafe { &*self.$field } }
-                #[allow(dead_code)]
-                pub fn $field_mut (&mut self) -> &mut $type_ { unsafe { &mut *self.$field } }
-            }}
-            {$($ft $(/ $fm)? : $rt $t),*}
-        }
-    };
-    (@impl $c:ident [$($i:tt)*] [$($r:tt)*]
-        {$({$($f:tt)*})*} {$({$($p:tt)*})*} {$({$($a:tt)*})*} {$({$($b:tt)*})*}
-        {$field:ident : const $type_:ty $(, $ft:ident $(/ $fm:ident)? : $rt:tt $t:ty)*}) => {
-
-        context! { @impl $c [$($i)*] [$($r)*]
-            {$({$($f)*})* {$field : $type_}}
-            {$({$($p)*})* {$field : $type_}}
-            {$({$($a)*})* {$field}}
-            {$({$($b)*})* {
-                pub fn $field (&self) -> $type_ { self.$field }
-            }}
-            {$($ft $(/ $fm)? : $rt $t),*}
-        }
+        unsafe impl $($g)* Send for $name $($r)* { }
+        unsafe impl $($g)* Sync for $name $($r)* { }
     };
 }
 
@@ -104,7 +161,7 @@ pub mod example {
 
     context! {
         mod example_context {
-            data (data_mut): mut Data,
+            data/data_mut: mut Data,
             display: ref dyn Display,
             id: const usize,
         }
