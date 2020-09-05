@@ -33,22 +33,22 @@ macro_rules! context {
             @impl $name
             [$($g)*] [$($r)*]
             {
-                {$field : *const $ty}
                 $({$($f)*})*
+                {$field : *const $ty}
             }
             {
-                {$field : &$ty}
                 $({$($p)*})*
+                {$field : &$ty}
             }
             {
-                {$field : $field as *const $ty}
                 $({$($a)*})*
+                {$field : $field as *const $ty}
             }
             {
+                $({$($b)*})*
                 {
                     pub fn $field (&self) -> &$ty { unsafe { &*self.$field } }
                 }
-                $({$($b)*})*
             }
             {$($($other_fields)+)?}
         }
@@ -66,25 +66,25 @@ macro_rules! context {
             @impl $name
             [$($g)*] [$($r)*]
             {
-                {$field : *mut $ty}
                 $({$($f)*})*
+                {$field : *mut $ty}
             }
             {
-                {$field : &mut $ty}
                 $({$($p)*})*
+                {$field : &mut $ty}
             }
             {
-                {$field : $field as *mut $ty}
                 $({$($a)*})*
+                {$field : $field as *mut $ty}
             }
             {
+                $({$($b)*})*
                 {
                     #[allow(dead_code)]
                     pub fn $field (&self) -> &$ty { unsafe { &*self.$field } }
                     #[allow(dead_code)]
                     pub fn $field_mut (&mut self) -> &mut $ty { unsafe { &mut *self.$field } }
                 }
-                $({$($b)*})*
             }
             {$($($other_fields)+)?}
         }
@@ -102,22 +102,22 @@ macro_rules! context {
             @impl $name
             [$($g)*] [$($r)*]
             {
-                {$field : $ty}
                 $({$($f)*})*
-            }
-            {
                 {$field : $ty}
+            }
+            {
                 $({$($p)*})*
+                {$field : $ty}
             }
             {
-                {$field : $field}
                 $({$($a)*})*
+                {$field}
             }
             {
+                $({$($b)*})*
                 {
                     pub fn $field (&self) -> $ty { self.$field }
                 }
-                $({$($b)*})*
             }
             {$($($other_fields)+)?}
         }

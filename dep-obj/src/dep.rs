@@ -423,18 +423,24 @@ macro_rules! dep_obj {
     ) => {
         dep_obj! {
             @impl $builder [$(#[$($attr)+])*] ($vis) $name as $id : $ty ;
-            [$field : $crate::DepPropRaw<$ty, $field_ty>, $($s)*]
             [
+                $($s)*
+                $field : $crate::DepPropRaw<$ty, $field_ty>,
+            ]
+            [
+                $($p)*
                 pub fn $field $(< $($g)+ >)? (&self) -> $crate::DepProp<$name $(< $($r)+ >)?, $field_ty> {
                     self.$field.owned_by() 
                 }
-                $($p)*
             ]
             [
-                let $field = $builder.prop(|| $field_val);
                 $($c)*
+                let $field = $builder.prop(|| $field_val);
             ]
-            [$field, $($l)*]
+            [
+                $($l)*
+                $field,
+            ]
             [$($($other_fields)+)?];
             $([ $($g)+ ], [ $($r)+ ])?
         }
@@ -450,18 +456,24 @@ macro_rules! dep_obj {
     ) => {
         dep_obj! {
             @impl $builder [$(#[$($attr)+])*] ($vis) $name as $id : $ty ;
-            [$field : $crate::DepEventRaw<$ty, $field_ty>, $($s)*]
             [
+                $($s)*
+                $field : $crate::DepEventRaw<$ty, $field_ty>,
+            ]
+            [
+                $($p)*
                 pub fn $field $(< $($g)+ >)? (&self) -> $crate::DepEvent<$name $(< $($r)+ >)?, $field_ty> {
                     self.$field.owned_by()
                 }
-                $($p)*
             ]
             [
-                let $field = $builder.event();
                 $($c)*
+                let $field = $builder.event();
             ]
-            [$field, $($l)*]
+            [
+                $($l)*
+                $field,
+            ]
             [$($($other_fields)+)?];
             $([ $($g)+ ], [ $($r)+ ])?
         }
