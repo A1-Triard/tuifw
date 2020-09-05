@@ -1,12 +1,18 @@
-macro_rules! pub_bitflags_display {
-    ($flags:ident, $ty:ty, $($name:ident = $value:expr),+) => {
+macro_rules! bitflags_display {
+    (
+        $vis:vis struct $flags:ident : $ty:ty {
+            $($(
+                $name:ident = $value:expr
+            ),+ $(,)?)?
+        }
+    ) => {
         bitflags! {
             #[derive(Default)]
-            pub struct $flags: $ty {
+            $vis struct $flags: $ty {
                 $(const $name = $value;)*
             }
         }
-        
+
         impl ::core::fmt::Display for $flags {
             fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
                 let mut start = true;

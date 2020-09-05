@@ -21,6 +21,28 @@ macro_attr! {
     }
 }
 
+
+#[derive(Debug, Clone)]
+pub struct Text {
+    pub fg: Color,
+    pub bg: Option<Color>,
+    pub attr: Attr,
+    pub value: Bow<'static, &'static str>,
+}
+
+impl Text {
+    pub const SPACE: Text = Text {
+        fg: Color::Black,
+        bg: None,
+        attr: Attr::empty(),
+        value: Bow::Borrowed(&" ")
+    };
+}
+
+impl Default for Text {
+    fn default() -> Text { Text::SPACE.clone() }
+}
+
 pub trait Layout: Any + Debug + Send + Sync { }
 
 downcast!(dyn Layout);
@@ -179,17 +201,10 @@ fn render_view(
     context.arena[tag.0].decorator.as_ref().unwrap().behavior().render(*tag, context, port);
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub struct View(Id<ViewNode>);
-
-impl ComponentId for View {
-    fn from_raw_parts(raw_parts: (usize, NonZeroUsize)) -> Self {
-        View(Id::from_raw_parts(raw_parts))
-    }
-
-    fn into_raw_parts(self) -> (usize, NonZeroUsize) {
-        self.0.into_raw_parts()
-    }
+macro_attr! {
+    #[derive(ComponentId!)
+    #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+    pub struct View(Id<ViewNode>);
 }
 
 impl View {
@@ -739,19 +754,11 @@ impl DecoratorBehavior for RootDecoratorBehavior {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct Text {
-    pub fg: Color,
-    pub bg: Option<Color>,
-    pub attr: Attr,
-    pub value: Bow<'static, &'static str>,
-}
-
-impl Text {
-    pub const SPACE: Text = Text {
-        fg: Color::Black,
-        bg: None,
-        attr: Attr::empty(),
-        value: Bow::Borrowed(&" ")
-    };
+dep_obj! {
+    #[derive(Debug)]
+    pub struct ViewBase as View: ViewBaseType {
+        min_size: Vector,
+        max_size: Vector,
+        size: Vector,
+    }
 }

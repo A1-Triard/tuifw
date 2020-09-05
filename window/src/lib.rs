@@ -7,14 +7,15 @@
 #[macro_use]
 extern crate components_arena;
 #[macro_use]
-extern crate derivative;
+extern crate educe;
+#[macro_use]
+extern crate macro_attr;
 
 use std::any::Any;
 use std::cmp::{min, max};
 use std::hint::{unreachable_unchecked};
 use std::marker::PhantomData;
 use std::mem::replace;
-use std::num::NonZeroUsize;
 use std::ops::Range;
 use std::panic::{UnwindSafe, RefUnwindSafe};
 use components_arena::{Arena, Id, ComponentClassMutex, ComponentId};
@@ -51,10 +52,10 @@ fn rect_invalidated(invalidated: (&Vec<Range<i16>>, Vector), rect: Rect) -> bool
     false
 }
 
-#[derive(Derivative)]
-#[derivative(Debug)]
+#[derive(Educe)]
+#[educe(Debug)]
 pub struct RenderPort {
-    #[derivative(Debug="ignore")]
+    #[educe(Debug(ignore))]
     screen: Box<dyn Screen>,
     invalidated: Vec<Range<i16>>,
     offset: Vector,
@@ -119,18 +120,19 @@ impl RenderPort {
     }
 }
 
-#[derive(Derivative)]
-#[derivative(Debug(bound=""))]
-struct WindowNode<Tag> {
-    parent: Option<Id<WindowNode<Tag>>>,
-    next: Id<WindowNode<Tag>>,
-    last_child: Option<Id<WindowNode<Tag>>>,
-    bounds: Rect,
-    #[derivative(Debug="ignore")]
-    tag: Tag,
+macro_attr! {
+    #[derive(Component!(class=WindowNodeComponent))]
+    #[derive(Educe)]
+    #[educe(Debug)]
+    struct WindowNode<Tag> {
+        parent: Option<Id<WindowNode<Tag>>>,
+        next: Id<WindowNode<Tag>>,
+        last_child: Option<Id<WindowNode<Tag>>>,
+        bounds: Rect,
+        #[educe(Debug(ignore))]
+        tag: Tag,
+    }
 }
-
-Component!((class=WindowNodeComponent) struct WindowNode<Tag> { ... });
 
 static WINDOW_NODE: ComponentClassMutex<WindowNodeComponent> = ComponentClassMutex::new();
 
@@ -147,26 +149,18 @@ fn offset_from_root<Tag, RenderContext>(mut window: Id<WindowNode<Tag>>, tree: &
     offset
 }
 
-#[derive(Derivative)]
-#[derivative(Debug(bound=""), Copy(bound=""), Clone(bound=""), Eq(bound=""), PartialEq(bound=""))]
-#[derivative(Hash(bound=""), Ord(bound=""), PartialOrd(bound=""))]
-pub struct Window<Tag, RenderContext>(Id<WindowNode<Tag>>, PhantomData<RenderContext>);
+macro_attr! {
+    #[derive(ComponentId!)]
+    #[derive(Educe)]
+    #[educe(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+    pub struct Window<Tag, RenderContext>(Id<WindowNode<Tag>>, PhantomData<RenderContext>);
+}
 
 impl<Tag, RenderContext> RefUnwindSafe for Window<Tag, RenderContext> { }
 unsafe impl<Tag, RenderContext> Send for Window<Tag, RenderContext> { }
 unsafe impl<Tag, RenderContext> Sync for Window<Tag, RenderContext> { }
 impl<Tag, RenderContext> Unpin for Window<Tag, RenderContext> { }
 impl<Tag, RenderContext> UnwindSafe for Window<Tag, RenderContext> { }
-
-impl<Tag, RenderContext> ComponentId for Window<Tag, RenderContext> {
-    fn from_raw_parts(raw_parts: (usize, NonZeroUsize)) -> Self {
-        Window(Id::from_raw_parts(raw_parts), PhantomData)
-    }
-
-    fn into_raw_parts(self) -> (usize, NonZeroUsize) {
-        self.0.into_raw_parts()
-    }
-}
 
 impl<Tag, RenderContext> Window<Tag, RenderContext> {
     #[allow(clippy::new_ret_no_self)]
@@ -243,14 +237,14 @@ impl<Tag, RenderContext> Window<Tag, RenderContext> {
     }
 }
 
-#[derive(Derivative)]
-#[derivative(Debug)]
+#[derive(Educe)]
+#[educe(Debug)]
 pub struct WindowTree<Tag, RenderContext> {
-    #[derivative(Debug="ignore")]
+    #[educe(Debug(ignore))]
     screen: Option<(Box<dyn Screen>, Vec<Range<i16>>)>,
     arena: Arena<WindowNode<Tag>>,
     root: Id<WindowNode<Tag>>,
-    #[derivative(Debug="ignore")]
+    #[educe(Debug(ignore))]
     render: fn(
         tree: &WindowTree<Tag, RenderContext>,
         window: Option<Window<Tag, RenderContext>>,

@@ -50,10 +50,12 @@ macro_attr! {
     }
 }
 
-pub_bitflags_display!(Attr, u8,
-    REVERSE = 1 << 0,
-    INTENSITY = 1 << 1
-);
+bitflags_display! {
+    pub struct Attr: u8 {
+        REVERSE = 1 << 0,
+        INTENSITY = 1 << 1,
+    }
+}
 
 #[derive(Eq, PartialEq, Debug, Hash, Clone, Copy, Ord, PartialOrd)]
 pub enum Ctrl {

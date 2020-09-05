@@ -15,5 +15,16 @@ repository = "https://github.com/A1-Triard/tuifw"
 tuifw-screen-base = { path = "../screen-base", version = "0.1.10" }
 unicode-segmentation = "1.6.0"
 either = "1.5.3"
-winapi = { version = "0.3.9", features = ["wincontypes", "wincon", "consoleapi", "winnls", "stringapiset", "winbase", "handleapi", "processenv", "impl-default", "winuser"] }
 num-traits = "0.2.12"
+winapi = { version = "0.3.9", features = [
+    "wincontypes",
+    "wincon",
+    "consoleapi",
+    "winnls",
+    "stringapiset",
+    "winbase",
+    "handleapi",
+    "processenv",
+    "impl-default",
+    "winuser"
+] }
