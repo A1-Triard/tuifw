@@ -122,6 +122,7 @@ pub struct ViewTree {
     screen_size: Vector,
     root: View,
     focused: View,
+    quit: bool,
 }
 
 impl Context for ViewTree {
@@ -177,9 +178,14 @@ impl ViewTree {
             screen_size,
             root,
             focused: root,
+            quit: false,
         };
         root.decorator_on_changed(&mut tree, root_decorator_type().bg(), RootDecorator::invalidate_bg);
         result(tree)
+    }
+
+    pub fn quit(&mut self) {
+        self.quit = true;
     }
 
     fn window_tree(&mut self) -> &mut WindowTree {
@@ -188,7 +194,7 @@ impl ViewTree {
 
     pub fn root(&self) -> View { self.root }
 
-    pub fn update(context: &mut dyn Context, wait: bool) -> Result<(), Box<dyn Any>> {
+    pub fn update(context: &mut dyn Context, wait: bool) -> Result<bool, Box<dyn Any>> {
         let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
         tree.root.measure(tree, (Some(tree.screen_size.x), Some(tree.screen_size.y)));
         tree.root.arrange(tree, Rect { tl: Point { x: 0, y: 0 }, size: tree.screen_size });
@@ -215,7 +221,8 @@ impl ViewTree {
                 }
             }
         }
-        Ok(())
+        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        Ok(!tree.quit)
     }
 }
 
