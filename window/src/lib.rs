@@ -10,7 +10,7 @@ use std::hint::{unreachable_unchecked};
 use std::mem::replace;
 use std::ops::Range;
 use components_arena::{RawId, Component, Arena, Id, ComponentClassMutex, ComponentId};
-use dep_obj::Context;
+use dyn_context::Context;
 use tuifw_screen_base::{Screen, Rect, Point, Vector, Attr, Color, Event};
 use educe::Educe;
 use macro_attr_2018::macro_attr;

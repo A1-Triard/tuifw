@@ -1,7 +1,8 @@
 use std::fmt::Debug;
 use tuifw_screen_base::{Vector, Point, Rect};
 use tuifw_window::{RenderPort};
-use dep_obj::{dep_obj, DepTypeToken, Context, ContextExt};
+use dep_obj::{dep_obj, DepTypeToken};
+use dyn_context::{Context, ContextExt};
 use once_cell::sync::{self};
 use crate::view::base::*;
 

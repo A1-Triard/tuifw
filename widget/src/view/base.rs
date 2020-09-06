@@ -1,11 +1,12 @@
-use std::any::{Any, TypeId};
+use std::any::{Any};
 use std::fmt::Debug;
 use std::iter::{self};
 use std::mem::{replace};
 use std::num::{NonZeroU16};
 use boow::Bow;
 use components_arena::{RawId, Component, Id, Arena, ComponentClassMutex, ComponentId};
-use dep_obj::{dep_obj, Context, ContextExt, DepEvent, DepProp, DepObj, DepTypeToken};
+use dep_obj::{dep_obj, DepEvent, DepProp, DepObj, DepTypeToken};
+use dyn_context::{TrivialContext, Context, ContextExt};
 use downcast_rs::{Downcast, impl_downcast};
 use once_cell::sync::{self};
 use tuifw_screen_base::{Key, Event, Screen, Vector, Point, Rect, Attr, Color};
@@ -124,23 +125,7 @@ pub struct ViewTree {
     quit: bool,
 }
 
-impl Context for ViewTree {
-    fn get_raw(&self, ty: TypeId) -> Option<&dyn Any> {
-        if ty == TypeId::of::<ViewTree>() {
-            Some(self as _)
-        } else {
-            None
-        }
-    }
-
-    fn get_mut_raw(&mut self, ty: TypeId) -> Option<&mut dyn Any> {
-        if ty == TypeId::of::<ViewTree>() {
-            Some(self as _)
-        } else {
-            None
-        }
-    }
-}
+impl TrivialContext for ViewTree { }
 
 impl ViewTree {
     pub fn new<Tag: ComponentId, T, F: FnOnce(Self) -> T>(

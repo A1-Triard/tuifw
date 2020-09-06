@@ -1,7 +1,7 @@
 #![windows_subsystem = "windows"]
 #![deny(warnings)]
 
-use dep_obj::Context;
+use dyn_context::Context;
 use tuifw_screen_base::{Point, Color, Attr, Vector, Event, Key, Rect};
 use tuifw_window::{WindowTree, Window, RenderPort};
 
