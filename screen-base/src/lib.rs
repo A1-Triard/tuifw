@@ -418,6 +418,7 @@ pub trait Screen {
 
 #[cfg(test)]
 mod tests {
+    use quickcheck_macros::quickcheck;
     use crate::*;
 
     #[quickcheck]
