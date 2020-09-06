@@ -97,7 +97,7 @@ macro_attr! {
     #[derive(Component!)]
     struct ViewNode {
         decorator: Option<Box<dyn Decorator>>,
-        window: Option<Window<View, ViewTree>>,
+        window: Option<Window>,
         panel: Option<Box<dyn Panel>>,
         layout: Option<Box<dyn Layout>>,
         base: ViewBase,
@@ -117,7 +117,7 @@ static VIEW_NODE: ComponentClassMutex<ViewNode> = ComponentClassMutex::new();
 #[derive(Debug)]
 pub struct ViewTree {
     arena: Arena<ViewNode>,
-    window_tree: Option<WindowTree<View, ViewTree>>,
+    window_tree: Option<WindowTree>,
     screen_size: Vector,
     root: View,
     focused: View,
@@ -145,7 +145,7 @@ impl ViewTree {
     pub fn new(screen: Box<dyn Screen>) -> Self {
         let mut arena = Arena::new(&mut VIEW_NODE.lock().unwrap());
         let (window_tree, root) = arena.insert(|view| {
-            let window_tree = WindowTree::new(screen, render_view, View(view));
+            let window_tree = WindowTree::new(screen, render_view);
             let screen_size = window_tree.screen_size();
             let decorator = RootDecorator::new_raw(&ROOT_DECORATOR_TOKEN);
             (ViewNode {
@@ -176,7 +176,7 @@ impl ViewTree {
         tree
     }
 
-    fn window_tree(&mut self) -> &mut WindowTree<View, ViewTree> {
+    fn window_tree(&mut self) -> &mut WindowTree {
         self.window_tree.as_mut().expect("ViewTree is in invalid state")
     }
 
@@ -214,13 +214,14 @@ impl ViewTree {
 }
 
 fn render_view(
-    _tree: &WindowTree<View, ViewTree>,
-    _window: Option<Window<View, ViewTree>>,
+    tree: &WindowTree,
+    window: Option<Window>,
     port: &mut RenderPort,
-    tag: &View,
-    context: &mut ViewTree
+    context: &mut dyn Context,
 ) {
-    context.arena[tag.0].decorator.as_ref().unwrap().behavior().render(*tag, context, port);
+    let view_tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+    let view: View = window.map(|window| window.tag(tree)).unwrap_or(view_tree.root);
+    view_tree.arena[view.0].decorator.as_ref().unwrap().behavior().render(view, view_tree, port);
 }
 
 macro_attr! {
@@ -260,7 +261,7 @@ impl View {
         tree.focused = self;
     }
 
-    fn renew_window(self, tree: &mut ViewTree, parent_window: Option<Window<View, ViewTree>>) {
+    fn renew_window(self, tree: &mut ViewTree, parent_window: Option<Window>) {
         let children_parent_window = if let Some(window) = tree.arena[self.0].window {
             window.drop(tree.window_tree());
             let render_bounds = self.render_bounds(tree);
