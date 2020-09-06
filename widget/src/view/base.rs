@@ -167,7 +167,6 @@ impl ViewTree {
                 desired_size: screen_size,
                 arrange_bounds: Some(Rect { tl: Point { x: 0, y: 0 }, size: screen_size }),
                 render_bounds: Rect { tl: Point { x: 0, y: 0 }, size: screen_size },
-                focusable: true,
             }, (result, window_tree, View(view)))
         });
         let screen_size = window_tree.screen_size();
@@ -180,7 +179,7 @@ impl ViewTree {
             quit: false,
         };
         root.decorator_on_changed(&mut tree, root_decorator_type().bg(), RootDecorator::invalidate_bg);
-        root.base_set(&mut tree, view_base_type().focused(), true);
+        root.base_set_distinct(&mut tree, view_base_type().focused(), true);
         result(tree)
     }
 
@@ -266,7 +265,6 @@ impl View {
                 desired_size: Vector::null(),
                 arrange_bounds: Some(Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() }),
                 render_bounds: Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() },
-                focusable: false,
             }, (view, result))
         });
         View(view).invalidate_measure(tree);
