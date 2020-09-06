@@ -4,7 +4,7 @@ use std::iter::{self};
 use std::mem::{replace};
 use std::num::{NonZeroU16};
 use boow::Bow;
-use components_arena::{Component, Id, Arena, ComponentClassMutex, ComponentId};
+use components_arena::{RawId, Component, Id, Arena, ComponentClassMutex, ComponentId};
 use dep_obj::{dep_obj, Context, ContextExt, DepEvent, DepProp, DepObj, DepTypeToken};
 use downcast_rs::{Downcast, impl_downcast};
 use once_cell::sync::{self};
@@ -96,6 +96,7 @@ macro_attr! {
     #[derive(Debug)]
     #[derive(Component!)]
     struct ViewNode {
+        tag: RawId,
         decorator: Option<Box<dyn Decorator>>,
         window: Option<Window>,
         panel: Option<Box<dyn Panel>>,
@@ -142,13 +143,18 @@ impl Context for ViewTree {
 }
 
 impl ViewTree {
-    pub fn new(screen: Box<dyn Screen>) -> Self {
+    pub fn new<Tag: ComponentId, T, F: FnOnce(Self) -> T>(
+        screen: Box<dyn Screen>,
+        root_tag: impl FnOnce(View) -> (Tag, F)
+    ) -> T {
         let mut arena = Arena::new(&mut VIEW_NODE.lock().unwrap());
-        let (window_tree, root) = arena.insert(|view| {
+        let (result, window_tree, root) = arena.insert(|view| {
             let window_tree = WindowTree::new(screen, render_view);
             let screen_size = window_tree.screen_size();
             let decorator = RootDecorator::new_raw(&ROOT_DECORATOR_TOKEN);
+            let (tag, result) = root_tag(View(view));
             (ViewNode {
+                tag: tag.into_raw(),
                 base: ViewBase::new_raw(&VIEW_BASE_TOKEN),
                 decorator: Some(Box::new(decorator) as _),
                 window: None,
@@ -162,7 +168,7 @@ impl ViewTree {
                 arrange_bounds: Some(Rect { tl: Point { x: 0, y: 0 }, size: screen_size }),
                 render_bounds: Rect { tl: Point { x: 0, y: 0 }, size: screen_size },
                 focusable: true,
-            }, (window_tree, View(view)))
+            }, (result, window_tree, View(view)))
         });
         let screen_size = window_tree.screen_size();
         let mut tree = ViewTree {
@@ -173,7 +179,7 @@ impl ViewTree {
             focused: root,
         };
         root.decorator_on_changed(&mut tree, root_decorator_type().bg(), RootDecorator::invalidate_bg);
-        tree
+        result(tree)
     }
 
     fn window_tree(&mut self) -> &mut WindowTree {
@@ -231,13 +237,16 @@ macro_attr! {
 }
 
 impl View {
-    pub fn new(
+    pub fn new<Tag: ComponentId, T>(
         tree: &mut ViewTree,
         parent: View,
-    ) -> View {
+        tag: impl FnOnce(View) -> (Tag, T)
+    ) -> T {
         let arena = &mut tree.arena;
-        let view = arena.insert(|view| {
+        let (view, result) = arena.insert(|view| {
+            let (tag, result) = tag(View(view));
             (ViewNode {
+                tag: tag.into_raw(),
                 base: ViewBase::new_raw(&VIEW_BASE_TOKEN),
                 decorator: None,
                 window: None,
@@ -251,10 +260,18 @@ impl View {
                 arrange_bounds: Some(Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() }),
                 render_bounds: Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() },
                 focusable: false,
-            }, view)
+            }, (view, result))
         });
         View(view).invalidate_measure(tree);
-        View(view)
+        result
+    }
+
+    pub fn tag<Tag: ComponentId>(self, tree: &ViewTree) -> Tag {
+        Tag::from_raw(tree.arena[self.0].tag)
+    }
+
+    pub fn set_tag<Tag: ComponentId>(self, tree: &mut ViewTree, tag: Tag) -> Tag {
+        Tag::from_raw(replace(&mut tree.arena[self.0].tag, tag.into_raw()))
     }
 
     pub fn focus(self, tree: &mut ViewTree) {
