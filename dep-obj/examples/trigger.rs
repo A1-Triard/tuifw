@@ -3,7 +3,7 @@
 
 mod circuit {
     use dep_obj::{DepObj, DepProp};
-    use dep_obj::{Context, ContextExt};
+    use dyn_context::{Context, ContextExt};
     use components_arena::{RawId, Component, ComponentId, Id, Arena, ComponentClassToken};
     use std::fmt::Debug;
     use std::mem::replace;
@@ -126,7 +126,8 @@ mod circuit {
 mod or_chip {
     use crate::circuit::*;
     use components_arena::ComponentId;
-    use dep_obj::{dep_obj, DepTypeToken, Context, ContextExt};
+    use dep_obj::{dep_obj, DepTypeToken};
+    use dyn_context::{Context, ContextExt};
 
     dep_obj! {
         #[derive(Debug)]
@@ -173,7 +174,8 @@ mod or_chip {
 mod not_chip {
     use crate::circuit::*;
     use components_arena::ComponentId;
-    use dep_obj::{dep_obj, DepTypeToken, Context, ContextExt};
+    use dep_obj::{dep_obj, DepTypeToken};
+    use dyn_context::{Context, ContextExt};
 
     dep_obj! {
         #[derive(Debug)]
@@ -216,8 +218,8 @@ mod not_chip {
 
 use std::any::{Any, TypeId};
 use std::num::NonZeroUsize;
-use dep_obj::{Context, ContextExt, DepTypeToken};
-use dep_obj::context;
+use dep_obj::{DepTypeToken};
+use dyn_context::{Context, ContextExt, context};
 use circuit::*;
 use or_chip::*;
 use not_chip::*;
