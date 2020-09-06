@@ -1,7 +1,6 @@
 #![windows_subsystem = "windows"]
 #![deny(warnings)]
 
-use std::num::NonZeroUsize;
 use dep_obj::Context;
 use tuifw_screen_base::{Point, Color, Attr, Vector, Event, Key, Rect};
 use tuifw_window::{WindowTree, Window, RenderPort};
@@ -32,7 +31,7 @@ fn main() {
         tl: Point { x: (tree.screen_size().x - 13) / 2, y: (tree.screen_size().y - 7) / 2 },
         size: Vector { x: 13, y: 7 }
     };
-    let window = Window::new(tree, None, bounds, |window| ((0, unsafe { NonZeroUsize::new_unchecked(1) }), window));
+    let window = Window::new(tree, None, bounds, |window| ((), window));
     loop {
         if let Some(e) = tree.update(true, &mut ()).unwrap() {
             let d = match e {
