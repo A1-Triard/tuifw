@@ -2,6 +2,7 @@ use std::any::{Any, TypeId};
 use std::fmt::Debug;
 use std::iter::{self};
 use std::mem::{replace};
+use std::num::{NonZeroU16};
 use boow::Bow;
 use components_arena::{Component, Id, Arena, ComponentClassMutex, ComponentId};
 use dep_obj::{dep_obj, Context, ContextExt, DepEvent, DepProp, DepObj, DepTypeToken};
@@ -182,18 +183,34 @@ impl ViewTree {
 
     pub fn root(&self) -> View { self.root }
 
-    pub fn update(&mut self, wait: bool) -> Result<Option<Event>, Box<dyn Any>> {
-        self.root.measure(self, (Some(self.screen_size.x), Some(self.screen_size.y)));
-        self.root.arrange(self, Rect { tl: Point { x: 0, y: 0 }, size: self.screen_size });
-        let mut window_tree = self.window_tree.take().expect("ViewTree is in invalid state");
-        let result = window_tree.update(wait, self);
-        if let Ok(result) = &result {
-            if result == &Some(Event::Resize) {
-                self.screen_size = window_tree.screen_size();
+    pub fn update(context: &mut dyn Context, wait: bool) -> Result<(), Box<dyn Any>> {
+        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        tree.root.measure(tree, (Some(tree.screen_size.x), Some(tree.screen_size.y)));
+        tree.root.arrange(tree, Rect { tl: Point { x: 0, y: 0 }, size: tree.screen_size });
+        let mut window_tree = tree.window_tree.take().expect("ViewTree is in invalid state");
+        let event = window_tree.update(wait, tree);
+        if let Ok(event) = &event {
+            if event == &Some(Event::Resize) {
+                tree.screen_size = window_tree.screen_size();
             }
         }
-        self.window_tree.replace(window_tree);
-        result
+        tree.window_tree.replace(window_tree);
+        let event = event?;
+        if let Some(Event::Key(n, key)) = event {
+            let mut input = ViewInput { key: (n, key), handled: false };
+            let mut view = tree.focused;
+            loop {
+                view.base_raise(context, view_base_type().input(), &mut input);
+                if input.handled { break; }
+                let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+                if let Some(parent) = view.parent(tree) {
+                    view = parent;
+                } else {
+                    break;
+                }
+            }
+        }
+        Ok(())
     }
 }
 
@@ -833,8 +850,17 @@ impl DecoratorBehavior for RootDecoratorBehavior {
     }
 }
 
-pub enum ViewInput {
-    Key(Key)
+pub struct ViewInput {
+    key: (NonZeroU16, Key),
+    handled: bool,
+}
+
+impl ViewInput {
+    pub fn key(&self) -> (NonZeroU16, Key) { self.key }
+
+    pub fn mark_as_handled(&mut self) {
+        self.handled = true;
+    }
 }
 
 dep_obj! {
