@@ -4,10 +4,10 @@ use std::iter::{self};
 use std::mem::{replace};
 use boow::Bow;
 use components_arena::{Component, Id, Arena, ComponentClassMutex, ComponentId};
-use dep_obj::{dep_obj, Context, ContextExt, DepProp, DepObj, DepTypeToken};
+use dep_obj::{dep_obj, Context, ContextExt, DepEvent, DepProp, DepObj, DepTypeToken};
 use downcast_rs::{Downcast, impl_downcast};
 use once_cell::sync::{self};
-use tuifw_screen_base::{Event, Screen, Vector, Point, Rect, Attr, Color};
+use tuifw_screen_base::{Key, Event, Screen, Vector, Point, Rect, Attr, Color};
 use tuifw_window::{RenderPort, WindowTree, Window};
 use macro_attr_2018::macro_attr;
 use enum_derive_2018::{EnumDisplay, EnumFromStr};
@@ -100,6 +100,7 @@ macro_attr! {
         window: Option<Window<View, ViewTree>>,
         panel: Option<Box<dyn Panel>>,
         layout: Option<Box<dyn Layout>>,
+        base: ViewBase,
         parent: Option<View>,
         next: View,
         last_child: Option<View>,
@@ -107,6 +108,7 @@ macro_attr! {
         desired_size: Vector,
         arrange_bounds: Option<Rect>,
         render_bounds: Rect,
+        focusable: bool,
     }
 }
 
@@ -118,6 +120,7 @@ pub struct ViewTree {
     window_tree: Option<WindowTree<View, ViewTree>>,
     screen_size: Vector,
     root: View,
+    focused: View,
 }
 
 impl Context for ViewTree {
@@ -146,6 +149,7 @@ impl ViewTree {
             let screen_size = window_tree.screen_size();
             let decorator = RootDecorator::new_raw(&ROOT_DECORATOR_TOKEN);
             (ViewNode {
+                base: ViewBase::new_raw(&VIEW_BASE_TOKEN),
                 decorator: Some(Box::new(decorator) as _),
                 window: None,
                 layout: None,
@@ -157,6 +161,7 @@ impl ViewTree {
                 desired_size: screen_size,
                 arrange_bounds: Some(Rect { tl: Point { x: 0, y: 0 }, size: screen_size }),
                 render_bounds: Rect { tl: Point { x: 0, y: 0 }, size: screen_size },
+                focusable: true,
             }, (window_tree, View(view)))
         });
         let screen_size = window_tree.screen_size();
@@ -165,6 +170,7 @@ impl ViewTree {
             window_tree: Some(window_tree),
             screen_size,
             root,
+            focused: root,
         };
         root.decorator_on_changed(&mut tree, root_decorator_type().bg(), RootDecorator::invalidate_bg);
         tree
@@ -215,6 +221,7 @@ impl View {
         let arena = &mut tree.arena;
         let view = arena.insert(|view| {
             (ViewNode {
+                base: ViewBase::new_raw(&VIEW_BASE_TOKEN),
                 decorator: None,
                 window: None,
                 layout: None,
@@ -226,10 +233,15 @@ impl View {
                 desired_size: Vector::null(),
                 arrange_bounds: Some(Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() }),
                 render_bounds: Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() },
+                focusable: false,
             }, view)
         });
         View(view).invalidate_measure(tree);
         View(view)
+    }
+
+    pub fn focus(self, tree: &mut ViewTree) {
+        tree.focused = self;
     }
 
     fn renew_window(self, tree: &mut ViewTree, parent_window: Option<Window<View, ViewTree>>) {
@@ -356,6 +368,73 @@ impl View {
     pub fn desired_size(self, tree: &ViewTree) -> Vector { tree.arena[self.0].desired_size }
 
     pub fn render_bounds(self, tree: &ViewTree) -> Rect { tree.arena[self.0].render_bounds }
+
+    pub fn base_get<T>(
+        self,
+        tree: &ViewTree,
+        prop: DepProp<ViewBase, T>,
+    ) -> &T {
+        let base = &tree.arena[self.0].base;
+        prop.get(base)
+    }
+
+    pub fn base_set_uncond<T>(
+        self,
+        context: &mut dyn Context,
+        prop: DepProp<ViewBase, T>,
+        value: T,
+    ) -> T {
+        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let base = &mut tree.arena[self.0].base;
+        let (old, on_changed) = prop.set_uncond(base, value);
+        on_changed.raise(self, context, &old);
+        old
+    }
+
+    pub fn base_set_distinct<T: Eq>(
+        self,
+        context: &mut dyn Context,
+        prop: DepProp<ViewBase, T>,
+        value: T,
+    ) -> T {
+        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let base = &mut tree.arena[self.0].base;
+        let (old, on_changed) = prop.set_distinct(base, value);
+        on_changed.raise(self, context, &old);
+        old
+    }
+
+    pub fn base_on_changed<T>(
+        self,
+        tree: &mut ViewTree,
+        prop: DepProp<ViewBase, T>,
+        on_changed: fn(owner: View, context: &mut dyn Context, old: &T),
+    ) {
+        let base = &mut tree.arena[self.0].base;
+        prop.on_changed(base, on_changed);
+    }
+
+    pub fn base_raise<T>(
+        self,
+        context: &mut dyn Context,
+        event: DepEvent<ViewBase, T>,
+        args: &mut T,
+    ) {
+        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let base = &mut tree.arena[self.0].base;
+        let on_raised = event.raise(base);
+        on_raised.raise(self, context, args);
+    }
+
+    pub fn base_on_raised<T>(
+        self,
+        tree: &mut ViewTree,
+        event: DepEvent<ViewBase, T>,
+        on_raised: fn(owner: View, context: &mut dyn Context, args: &mut T),
+    ) {
+        let base = &mut tree.arena[self.0].base;
+        event.on_raised(base, on_raised);
+    }
 
     pub fn decorator_get<D: Decorator + DepObj<Id=View>, T>(
         self,
@@ -754,6 +833,10 @@ impl DecoratorBehavior for RootDecoratorBehavior {
     }
 }
 
+pub enum ViewInput {
+    Key(Key)
+}
+
 dep_obj! {
     #[derive(Debug)]
     pub struct ViewBase as View: ViewBaseType {
@@ -761,5 +844,13 @@ dep_obj! {
         max_size: Vector = Vector { x: -1, y: -1 },
         w: Option<i16> = None,
         h: Option<i16> = None,
+        focused: bool = false,
+        input yield ViewInput,
     }
 }
+
+static VIEW_BASE_TOKEN: sync::Lazy<DepTypeToken<ViewBaseType>> = sync::Lazy::new(||
+    ViewBaseType::new_raw().expect("ViewBaseType builder locked")
+);
+
+pub fn view_base_type() -> &'static ViewBaseType { VIEW_BASE_TOKEN.ty() }
