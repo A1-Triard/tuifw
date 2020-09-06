@@ -39,6 +39,8 @@ impl Layout for CanvasLayout { }
 pub struct CanvasPanel(());
 
 impl CanvasPanel {
+    const BEHAVIOR: CanvasPanelBehavior = CanvasPanelBehavior;
+
     #[allow(clippy::new_ret_no_self)]
     pub fn new(
         tree: &mut ViewTree,
@@ -49,10 +51,7 @@ impl CanvasPanel {
 }
 
 impl Panel for CanvasPanel {
-    fn behavior(&self) -> &'static dyn PanelBehavior {
-        static BEHAVIOR: CanvasPanelBehavior = CanvasPanelBehavior;
-        &BEHAVIOR
-    }
+    fn behavior(&self) -> &'static dyn PanelBehavior { &Self::BEHAVIOR }
 }
 
 struct CanvasPanelBehavior;

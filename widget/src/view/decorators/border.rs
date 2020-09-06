@@ -27,6 +27,8 @@ static BORDER_DECORATOR_TOKEN: sync::Lazy<DepTypeToken<BorderDecoratorType>> = s
 pub fn border_decorator_type() -> &'static BorderDecoratorType { BORDER_DECORATOR_TOKEN.ty() }
 
 impl BorderDecorator {
+    const BEHAVIOR: BorderDecoratorBehavior = BorderDecoratorBehavior;
+
     #[allow(clippy::new_ret_no_self)]
     pub fn new(
         tree: &mut ViewTree,
@@ -116,10 +118,7 @@ impl BorderDecorator {
 }
 
 impl Decorator for BorderDecorator {
-    fn behavior(&self) -> &'static dyn DecoratorBehavior {
-        static BEHAVIOR: BorderDecoratorBehavior = BorderDecoratorBehavior;
-        &BEHAVIOR
-    }
+    fn behavior(&self) -> &'static dyn DecoratorBehavior { &Self::BEHAVIOR }
 }
 
 struct BorderDecoratorBehavior;

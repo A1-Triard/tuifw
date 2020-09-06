@@ -22,7 +22,6 @@ macro_attr! {
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub struct Text {
     pub fg: Color,
@@ -807,6 +806,7 @@ static ROOT_DECORATOR_TOKEN: sync::Lazy<DepTypeToken<RootDecoratorType>> = sync:
 pub fn root_decorator_type() -> &'static RootDecoratorType { ROOT_DECORATOR_TOKEN.ty() }
 
 impl RootDecorator {
+    const BEHAVIOR: RootDecoratorBehavior = RootDecoratorBehavior;
     fn invalidate_bg(_view: View, context: &mut dyn Context, _old: &Text) {
         let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
         tree.window_tree().invalidate_screen();
@@ -814,10 +814,7 @@ impl RootDecorator {
 }
 
 impl Decorator for RootDecorator {
-    fn behavior(&self) -> &'static dyn DecoratorBehavior {
-        static BEHAVIOR: RootDecoratorBehavior = RootDecoratorBehavior;
-        &BEHAVIOR
-    }
+    fn behavior(&self) -> &'static dyn DecoratorBehavior { &Self::BEHAVIOR }
 }
 
 struct RootDecoratorBehavior;

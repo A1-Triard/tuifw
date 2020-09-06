@@ -23,6 +23,8 @@ static LINE_DECORATOR_TOKEN: sync::Lazy<DepTypeToken<LineDecoratorType>> = sync:
 pub fn line_decorator_type() -> &'static LineDecoratorType { LINE_DECORATOR_TOKEN.ty() }
 
 impl LineDecorator {
+    const BEHAVIOR: LineDecoratorBehavior = LineDecoratorBehavior;
+
     #[allow(clippy::new_ret_no_self)]
     pub fn new(
         tree: &mut ViewTree,
@@ -66,10 +68,7 @@ impl LineDecorator {
 }
 
 impl Decorator for LineDecorator {
-    fn behavior(&self) -> &'static dyn DecoratorBehavior {
-        static BEHAVIOR: LineDecoratorBehavior = LineDecoratorBehavior;
-        &BEHAVIOR
-    }
+    fn behavior(&self) -> &'static dyn DecoratorBehavior { &Self::BEHAVIOR }
 }
 
 struct LineDecoratorBehavior;
