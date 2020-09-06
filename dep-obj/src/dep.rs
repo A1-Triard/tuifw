@@ -15,6 +15,11 @@ pub trait Context {
     fn get_mut_raw(&mut self, ty: TypeId) -> Option<&mut dyn Any>;
 }
 
+impl Context for () {
+    fn get_raw(&self, _ty: TypeId) -> Option<&dyn Any> { None }
+    fn get_mut_raw(&mut self, _ty: TypeId) -> Option<&mut dyn Any> { None }
+}
+
 pub trait ContextExt: Context {
     fn get<T: 'static>(&self) -> Option<&T> {
         self.get_raw(TypeId::of::<T>()).map(|x| x.downcast_ref::<T>().expect("invalid cast"))
