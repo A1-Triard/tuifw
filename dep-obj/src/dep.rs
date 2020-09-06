@@ -8,6 +8,7 @@ use core::mem::{replace, align_of, size_of, transmute};
 use core::ptr::{self, NonNull, null_mut};
 use core::sync::atomic::{AtomicBool, Ordering};
 use components_arena::ComponentId;
+use educe::Educe;
 
 pub trait Context {
     fn get_raw(&self, ty: TypeId) -> Option<&dyn Any>;

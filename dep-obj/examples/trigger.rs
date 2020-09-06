@@ -1,28 +1,19 @@
 #![deny(warnings)]
 #![allow(dead_code)]
 
-#[macro_use]
-extern crate macro_attr;
-#[macro_use]
-extern crate components_arena;
-#[macro_use]
-extern crate dep_obj;
-#[macro_use]
-extern crate downcast;
-#[macro_use]
-extern crate educe;
-
 mod circuit {
     use dep_obj::{DepObj, DepProp};
     use dep_obj::{Context, ContextExt};
-    use components_arena::{ComponentId, Id, Arena, ComponentClassToken};
-    use downcast::Any;
+    use components_arena::{Component, ComponentId, Id, Arena, ComponentClassToken};
     use std::fmt::Debug;
     use std::num::NonZeroUsize;
+    use educe::Educe;
+    use macro_attr_2018::macro_attr;
+    use downcast_rs::{Downcast, impl_downcast};
 
-    pub trait ChipLegs: Any + Debug + Send + Sync { }
+    pub trait ChipLegs: Downcast + Debug + Send + Sync { }
 
-    downcast!(dyn ChipLegs);
+    impl_downcast!(ChipLegs);
 
     macro_attr! {
         #[derive(Component!(class=ChipNodeComponent))]
@@ -143,6 +134,8 @@ mod circuit {
 mod or_chip {
     use crate::circuit::*;
     use dep_obj::{DepTypeToken, Context, ContextExt};
+    use dep_obj::dep_obj;
+    use educe::Educe;
 
     dep_obj! {
         #[derive(Educe)]
@@ -190,6 +183,8 @@ mod or_chip {
 mod not_chip {
     use crate::circuit::*;
     use dep_obj::{DepTypeToken, Context, ContextExt};
+    use dep_obj::dep_obj;
+    use educe::Educe;
 
     dep_obj! {
         #[derive(Educe)]
@@ -235,6 +230,7 @@ use std::any::{Any, TypeId};
 use std::num::NonZeroUsize;
 use components_arena::{ComponentId};
 use dep_obj::{Context, ContextExt, DepTypeToken};
+use dep_obj::context;
 use circuit::*;
 use or_chip::*;
 use not_chip::*;
