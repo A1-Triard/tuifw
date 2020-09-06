@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 use tuifw_screen_base::{Vector, Point, Rect};
 use tuifw_window::{RenderPort};
-use dep_obj::{DepTypeToken, Context, ContextExt};
+use dep_obj::{dep_obj, DepTypeToken, Context, ContextExt};
 use once_cell::sync::{self};
 use either::{Left, Right};
 use crate::view::base::*;
@@ -24,7 +24,7 @@ static BORDER_DECORATOR_TOKEN: sync::Lazy<DepTypeToken<BorderDecoratorType>> = s
     BorderDecoratorType::new_raw().expect("BorderDecoratorType builder locked")
 );
 
-pub fn border_decorator_type() -> &'static BorderDecoratorType { BORDER_DECORATOR_TOKEN.type_() }
+pub fn border_decorator_type() -> &'static BorderDecoratorType { BORDER_DECORATOR_TOKEN.ty() }
 
 impl BorderDecorator {
     #[allow(clippy::new_ret_no_self)]

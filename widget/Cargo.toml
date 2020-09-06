@@ -14,11 +14,11 @@ repository = "https://github.com/A1-Triard/tuifw"
 [dependencies]
 tuifw-screen-base = { path = "../screen-base", version = "0.1.10" }
 tuifw-window = { path = "../window", version = "0.1.10" }
-components-arena = "0.7.0"
-dep-obj = "0.0.11"
-macro-attr = "0.2.0"
+components-arena = "0.7.1"
+dep-obj = "0.0.12"
+macro-attr-2018 = "0.3.3"
 boow = "0.1.3"
-downcast = "0.10.0"
+downcast-rs = "1.2.0"
 once_cell = "1.4.0"
 either = "1.5.3"
-enum_derive = "0.1.7"
+enum-derive-2018 = "0.2.1"

@@ -1,16 +1,16 @@
-use std::any::TypeId;
+use std::any::{Any, TypeId};
 use std::fmt::Debug;
 use std::iter::{self};
 use std::mem::{replace};
-use std::num::{NonZeroUsize};
 use boow::Bow;
-use components_arena::{Id, Arena, ComponentClassMutex, ComponentId};
-use dep_obj::{Context, ContextExt};
-use dep_obj::{DepProp, DepObj, DepTypeToken};
-use downcast::Any;
+use components_arena::{Component, Id, Arena, ComponentClassMutex, ComponentId};
+use dep_obj::{dep_obj, Context, ContextExt, DepProp, DepObj, DepTypeToken};
+use downcast_rs::{Downcast, impl_downcast};
 use once_cell::sync::{self};
 use tuifw_screen_base::{Event, Screen, Vector, Point, Rect, Attr, Color};
 use tuifw_window::{RenderPort, WindowTree, Window};
+use macro_attr_2018::macro_attr;
+use enum_derive_2018::{EnumDisplay, EnumFromStr};
 
 macro_attr! {
     #[derive(Eq, PartialEq, Debug, Hash, Clone, Copy, Ord, PartialOrd)]
@@ -43,9 +43,9 @@ impl Default for Text {
     fn default() -> Text { Text::SPACE.clone() }
 }
 
-pub trait Layout: Any + Debug + Send + Sync { }
+pub trait Layout: Downcast + Debug + Send + Sync { }
 
-downcast!(dyn Layout);
+impl_downcast!(Layout);
 
 pub trait PanelBehavior {
     fn children_desired_size(
@@ -63,11 +63,11 @@ pub trait PanelBehavior {
     ) -> Rect;
 }
 
-pub trait Panel: Any + Debug + Send + Sync {
+pub trait Panel: Downcast + Debug + Send + Sync {
     fn behavior(&self) -> &'static dyn PanelBehavior;
 }
 
-downcast!(dyn Panel);
+impl_downcast!(Panel);
 
 pub trait DecoratorBehavior {
     fn children_measure_size(
@@ -86,11 +86,11 @@ pub trait DecoratorBehavior {
     fn render(&self, view: View, tree: &ViewTree, port: &mut RenderPort);
 }
 
-pub trait Decorator: Any + Debug + Sync + Send {
+pub trait Decorator: Downcast + Debug + Sync + Send {
     fn behavior(&self) -> &'static dyn DecoratorBehavior;
 }
 
-downcast!(dyn Decorator);
+impl_downcast!(Decorator);
 
 macro_attr! {
     #[derive(Debug)]
@@ -121,16 +121,16 @@ pub struct ViewTree {
 }
 
 impl Context for ViewTree {
-    fn get_raw(&self, type_: TypeId) -> Option<&dyn std::any::Any> {
-        if type_ == TypeId::of::<ViewTree>() {
+    fn get_raw(&self, ty: TypeId) -> Option<&dyn Any> {
+        if ty == TypeId::of::<ViewTree>() {
             Some(self as _)
         } else {
             None
         }
     }
 
-    fn get_mut_raw(&mut self, type_: TypeId) -> Option<&mut dyn std::any::Any> {
-        if type_ == TypeId::of::<ViewTree>() {
+    fn get_mut_raw(&mut self, ty: TypeId) -> Option<&mut dyn Any> {
+        if ty == TypeId::of::<ViewTree>() {
             Some(self as _)
         } else {
             None
@@ -176,7 +176,7 @@ impl ViewTree {
 
     pub fn root(&self) -> View { self.root }
 
-    pub fn update(&mut self, wait: bool) -> Result<Option<Event>, Box<dyn std::any::Any>> {
+    pub fn update(&mut self, wait: bool) -> Result<Option<Event>, Box<dyn Any>> {
         self.root.measure(self, (Some(self.screen_size.x), Some(self.screen_size.y)));
         self.root.arrange(self, Rect { tl: Point { x: 0, y: 0 }, size: self.screen_size });
         let mut window_tree = self.window_tree.take().expect("ViewTree is in invalid state");
@@ -202,7 +202,7 @@ fn render_view(
 }
 
 macro_attr! {
-    #[derive(ComponentId!)
+    #[derive(ComponentId!)]
     #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
     pub struct View(Id<ViewNode>);
 }
@@ -700,7 +700,7 @@ impl View {
 dep_obj! {
     #[derive(Debug)]
     pub struct RootDecorator as View: RootDecoratorType {
-        bg: Text = Text::SPACE.clone(),
+        bg: Text = Text::SPACE.clone()
     }
 }
 
@@ -708,7 +708,7 @@ static ROOT_DECORATOR_TOKEN: sync::Lazy<DepTypeToken<RootDecoratorType>> = sync:
     RootDecoratorType::new_raw().expect("RootDecoratorType builder locked")
 );
 
-pub fn root_decorator_type() -> &'static RootDecoratorType { ROOT_DECORATOR_TOKEN.type_() }
+pub fn root_decorator_type() -> &'static RootDecoratorType { ROOT_DECORATOR_TOKEN.ty() }
 
 impl RootDecorator {
     fn invalidate_bg(_view: View, context: &mut dyn Context, _old: &Text) {
@@ -757,8 +757,9 @@ impl DecoratorBehavior for RootDecoratorBehavior {
 dep_obj! {
     #[derive(Debug)]
     pub struct ViewBase as View: ViewBaseType {
-        min_size: Vector,
-        max_size: Vector,
-        size: Vector,
+        min_size: Vector = Vector::null(),
+        max_size: Vector = Vector { x: -1, y: -1 },
+        w: Option<i16> = None,
+        h: Option<i16> = None,
     }
 }

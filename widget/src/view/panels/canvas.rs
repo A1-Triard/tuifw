@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 use tuifw_screen_base::{Vector, Point, Rect};
-use dep_obj::{DepTypeToken, Context, ContextExt};
+use dep_obj::{dep_obj, DepTypeToken, Context, ContextExt};
 use once_cell::sync::{self};
 use crate::view::base::*;
 
@@ -15,7 +15,7 @@ static CANVAS_LAYOUT_TOKEN: sync::Lazy<DepTypeToken<CanvasLayoutType>> = sync::L
     CanvasLayoutType::new_raw().expect("CanvasLayoutType builder locked")
 );
 
-pub fn canvas_layout_type() -> &'static CanvasLayoutType { CANVAS_LAYOUT_TOKEN.type_() }
+pub fn canvas_layout_type() -> &'static CanvasLayoutType { CANVAS_LAYOUT_TOKEN.ty() }
 
 impl CanvasLayout {
     #[allow(clippy::new_ret_no_self)]

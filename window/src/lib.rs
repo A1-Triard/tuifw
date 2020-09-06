@@ -4,13 +4,6 @@
 #![allow(clippy::type_complexity)]
 #![allow(clippy::blocks_in_if_conditions)]
 
-#[macro_use]
-extern crate components_arena;
-#[macro_use]
-extern crate educe;
-#[macro_use]
-extern crate macro_attr;
-
 use std::any::Any;
 use std::cmp::{min, max};
 use std::hint::{unreachable_unchecked};
@@ -18,8 +11,10 @@ use std::marker::PhantomData;
 use std::mem::replace;
 use std::ops::Range;
 use std::panic::{UnwindSafe, RefUnwindSafe};
-use components_arena::{Arena, Id, ComponentClassMutex, ComponentId};
+use components_arena::{Component, Arena, Id, ComponentClassMutex, ComponentId};
 use tuifw_screen_base::{Screen, Rect, Point, Vector, Attr, Color, Event};
+use educe::Educe;
+use macro_attr_2018::macro_attr;
 
 fn invalidate_rect(invalidated: (&mut Vec<Range<i16>>, Vector), rect: Rect) {
     debug_assert_eq!(invalidated.0.len(), invalidated.1.y as u16 as usize);

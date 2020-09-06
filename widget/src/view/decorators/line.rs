@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 use tuifw_screen_base::{Vector, Point, Rect};
 use tuifw_window::{RenderPort};
-use dep_obj::{DepTypeToken, Context, ContextExt};
+use dep_obj::{dep_obj, DepTypeToken, Context, ContextExt};
 use once_cell::sync::{self};
 use crate::view::base::*;
 
@@ -20,7 +20,7 @@ static LINE_DECORATOR_TOKEN: sync::Lazy<DepTypeToken<LineDecoratorType>> = sync:
     LineDecoratorType::new_raw().expect("LineDecoratorType builder locked")
 );
 
-pub fn line_decorator_type() -> &'static LineDecoratorType { LINE_DECORATOR_TOKEN.type_() }
+pub fn line_decorator_type() -> &'static LineDecoratorType { LINE_DECORATOR_TOKEN.ty() }
 
 impl LineDecorator {
     #[allow(clippy::new_ret_no_self)]
