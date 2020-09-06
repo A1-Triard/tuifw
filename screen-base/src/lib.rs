@@ -8,16 +8,6 @@
 extern crate alloc;
 
 #[macro_use]
-extern crate enum_derive;
-#[macro_use]
-extern crate macro_attr;
-#[macro_use]
-extern crate bitflags;
-#[cfg(test)]
-#[macro_use]
-extern crate quickcheck_macros;
-
-#[macro_use]
 mod bitflags_ext;
 
 use alloc::boxed::Box;
@@ -28,6 +18,8 @@ use core::ops::{Add, AddAssign, Sub, SubAssign, Neg, Range};
 use core::option::{Option};
 use num_traits::Zero;
 use either::{Either, Left, Right};
+use macro_attr_2018::macro_attr;
+use enum_derive_2018::{EnumDisplay, EnumFromStr, IterVariants};
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 
@@ -50,7 +42,7 @@ macro_attr! {
     }
 }
 
-bitflags_display! {
+bitflags_ext! {
     pub struct Attr: u8 {
         REVERSE = 1 << 0,
         INTENSITY = 1 << 1,

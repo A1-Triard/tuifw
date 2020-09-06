@@ -1,14 +1,32 @@
-macro_rules! bitflags_display {
+macro_rules! bitflags_ext {
     (
-        $vis:vis struct $flags:ident : $ty:ty {
+        struct $flags:ident : $ty:ty {
             $($(
                 $name:ident = $value:expr
             ),+ $(,)?)?
         }
     ) => {
-        bitflags! {
+        bitflags_ext! {
+            @impl () $flags : $ty [$($($name = $value),+)?]
+        }
+    };
+    (
+        pub $(($($vis:tt)+))? struct $flags:ident : $ty:ty {
+            $($(
+                $name:ident = $value:expr
+            ),+ $(,)?)?
+        }
+    ) => {
+        bitflags_ext! {
+            @impl (pub $(($($vis)+))?) $flags : $ty [$($($name = $value),+)?]
+        }
+    };
+    (
+        @impl ($($vis:tt)*) $flags:ident : $ty:ty [$($name:ident = $value:expr),*]
+    ) => {
+        bitflags::bitflags! {
             #[derive(Default)]
-            $vis struct $flags: $ty {
+            $($vis)* struct $flags: $ty {
                 $(const $name = $value;)*
             }
         }
