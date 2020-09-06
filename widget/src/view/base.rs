@@ -109,7 +109,6 @@ macro_attr! {
         desired_size: Vector,
         arrange_bounds: Option<Rect>,
         render_bounds: Rect,
-        focusable: bool,
     }
 }
 
@@ -181,6 +180,7 @@ impl ViewTree {
             quit: false,
         };
         root.decorator_on_changed(&mut tree, root_decorator_type().bg(), RootDecorator::invalidate_bg);
+        root.base_set(&mut tree, view_base_type().focused(), true);
         result(tree)
     }
 
@@ -281,8 +281,17 @@ impl View {
         Tag::from_raw(replace(&mut tree.arena[self.0].tag, tag.into_raw()))
     }
 
-    pub fn focus(self, tree: &mut ViewTree) {
-        tree.focused = self;
+    pub fn focus(self, context: &mut dyn Context) -> View {
+        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let old = replace(&mut tree.focused, self);
+        if old != self {
+            old.base_set_distinct(context, view_base_type().focused(), false);
+            let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+            if tree.focused == self {
+                self.base_set_distinct(context, view_base_type().focused(), true);
+            }
+        }
+        old
     }
 
     fn renew_window(self, tree: &mut ViewTree, parent_window: Option<Window>) {
@@ -533,7 +542,7 @@ impl View {
     pub fn decorator_on_changed<D: Decorator + DepObj<Id=View>, T>(
         self,
         tree: &mut ViewTree,
-        prop: DepProp<D,T>,
+        prop: DepProp<D, T>,
         on_changed: fn(owner: View, context: &mut dyn Context, old: &T),
     ) {
         let decorator = tree.arena[self.0]
@@ -544,6 +553,40 @@ impl View {
             .expect("invalid cast")
         ;
         prop.on_changed(decorator, on_changed);
+    }
+
+    pub fn decorator_raise<D: Decorator + DepObj<Id=View>, T>(
+        self,
+        context: &mut dyn Context,
+        event: DepEvent<D, T>,
+        args: &mut T,
+    ) {
+        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let decorator = tree.arena[self.0]
+            .decorator
+            .as_mut()
+            .expect("Decorator missed")
+            .downcast_mut::<D>()
+            .expect("invalid cast")
+        ;
+        let on_raised = event.raise(decorator);
+        on_raised.raise(self, context, args);
+    }
+
+    pub fn decorator_on_raised<D: Decorator + DepObj<Id=View>, T>(
+        self,
+        tree: &mut ViewTree,
+        event: DepEvent<D, T>,
+        on_raised: fn(owner: View, context: &mut dyn Context, args: &mut T),
+    ) {
+        let decorator = tree.arena[self.0]
+            .decorator
+            .as_mut()
+            .expect("Decorator missed")
+            .downcast_mut::<D>()
+            .expect("invalid cast")
+        ;
+        event.on_raised(decorator, on_raised);
     }
 
     pub fn layout_get<L: Layout + DepObj<Id=View>, T>(
@@ -615,6 +658,40 @@ impl View {
         prop.on_changed(layout, on_changed);
     }
 
+    pub fn layout_raise<L: Layout + DepObj<Id=View>, T>(
+        self,
+        context: &mut dyn Context,
+        event: DepEvent<L, T>,
+        args: &mut T,
+    ) {
+        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let layout = tree.arena[self.0]
+            .layout
+            .as_mut()
+            .expect("Layout missed")
+            .downcast_mut::<L>()
+            .expect("invalid cast")
+        ;
+        let on_raised = event.raise(layout);
+        on_raised.raise(self, context, args);
+    }
+
+    pub fn layout_on_raised<L: Layout + DepObj<Id=View>, T>(
+        self,
+        tree: &mut ViewTree,
+        event: DepEvent<L, T>,
+        on_raised: fn(owner: View, context: &mut dyn Context, args: &mut T),
+    ) {
+        let layout = tree.arena[self.0]
+            .layout
+            .as_mut()
+            .expect("Layout missed")
+            .downcast_mut::<L>()
+            .expect("invalid cast")
+        ;
+        event.on_raised(layout, on_raised);
+    }
+
     pub fn panel_get<P: Panel + DepObj<Id=View>, T>(
         self,
         tree: &ViewTree,
@@ -682,6 +759,40 @@ impl View {
             .expect("invalid cast")
         ;
         prop.on_changed(panel, on_changed);
+    }
+
+    pub fn panel_raise<P: Panel + DepObj<Id=View>, T>(
+        self,
+        context: &mut dyn Context,
+        event: DepEvent<P, T>,
+        args: &mut T,
+    ) {
+        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let panel = tree.arena[self.0]
+            .panel
+            .as_mut()
+            .expect("Panel missed")
+            .downcast_mut::<P>()
+            .expect("invalid cast")
+        ;
+        let on_raised = event.raise(panel);
+        on_raised.raise(self, context, args);
+    }
+
+    pub fn panel_on_raised<P: Panel + DepObj<Id=View>, T>(
+        self,
+        tree: &mut ViewTree,
+        event: DepEvent<P, T>,
+        on_raised: fn(owner: View, context: &mut dyn Context, args: &mut T),
+    ) {
+        let panel = tree.arena[self.0]
+            .panel
+            .as_mut()
+            .expect("Panel missed")
+            .downcast_mut::<P>()
+            .expect("invalid cast")
+        ;
+        event.on_raised(panel, on_raised);
     }
 
     #[must_use]
@@ -832,6 +943,7 @@ pub fn root_decorator_type() -> &'static RootDecoratorType { ROOT_DECORATOR_TOKE
 
 impl RootDecorator {
     const BEHAVIOR: RootDecoratorBehavior = RootDecoratorBehavior;
+
     fn invalidate_bg(_view: View, context: &mut dyn Context, _old: &Text) {
         let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
         tree.window_tree().invalidate_screen();
