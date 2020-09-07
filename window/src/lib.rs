@@ -215,6 +215,19 @@ impl Window {
         }
         let screen_bounds = node.bounds.offset(offset_from_root(parent, tree));
         invalidate_rect(tree.invalidated(), screen_bounds);
+        Self::drop_node_tree(node, tree);
+    }
+
+    fn drop_node_tree(node: WindowNode, tree: &mut WindowTree) {
+        if let Some(last_child) = node.last_child {
+            let mut child = last_child;
+            loop {
+                child = tree.arena[child].next;
+                let child_node = tree.arena.remove(child);
+                Self::drop_node_tree(child_node, tree);
+                if child == last_child { break; }
+            }
+        }
     }
 
     pub fn invalidate_rect(self, tree: &mut WindowTree, rect: Rect) {
@@ -343,10 +356,7 @@ impl WindowTree {
 
 #[cfg(test)]
 mod tests {
-    use std::num::NonZeroUsize;
     use crate::*;
-
-    const NZ: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(1) };
 
     #[test]
     fn window_tree_new_window() {
@@ -355,25 +365,25 @@ mod tests {
         let screen = Box::new(screen) as _;
         let tree = &mut WindowTree::new(screen, render);
         assert!(tree.arena[tree.root].last_child.is_none());
-        let one = Window::new(tree, None, Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() }, |id| ((1, NZ), id));
+        let one = Window::new(tree, None, Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() }, |id| ((), id));
         assert!(tree.arena[one.0].last_child.is_none());
         assert_eq!(tree.arena[one.0].parent, Some(tree.root));
         assert_eq!(tree.arena[tree.root].last_child, Some(one.0));
         assert_eq!(tree.arena[one.0].next, one.0);
-        let two = Window::new(tree, None, Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() }, |id| ((2, NZ), id));
+        let two = Window::new(tree, None, Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() }, |id| ((), id));
         assert!(tree.arena[two.0].last_child.is_none());
         assert_eq!(tree.arena[two.0].parent, Some(tree.root));
         assert_eq!(tree.arena[tree.root].last_child, Some(two.0));
         assert_eq!(tree.arena[one.0].next, two.0);
         assert_eq!(tree.arena[two.0].next, one.0);
-        let three = Window::new(tree, None, Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() }, |id| ((2, NZ), id));
+        let three = Window::new(tree, None, Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() }, |id| ((), id));
         assert!(tree.arena[three.0].last_child.is_none());
         assert_eq!(tree.arena[three.0].parent, Some(tree.root));
         assert_eq!(tree.arena[tree.root].last_child, Some(three.0));
         assert_eq!(tree.arena[one.0].next, two.0);
         assert_eq!(tree.arena[two.0].next, three.0);
         assert_eq!(tree.arena[three.0].next, one.0);
-        let four = Window::new(tree, None, Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() }, |id| ((2, NZ), id));
+        let four = Window::new(tree, None, Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() }, |id| ((), id));
         assert!(tree.arena[four.0].last_child.is_none());
         assert_eq!(tree.arena[four.0].parent, Some(tree.root));
         assert_eq!(tree.arena[tree.root].last_child, Some(four.0));
@@ -382,4 +392,16 @@ mod tests {
         assert_eq!(tree.arena[three.0].next, four.0);
         assert_eq!(tree.arena[four.0].next, one.0);
     }
+
+    #[test]
+    fn drop_subtree() {
+        fn render(_: &WindowTree, _: Option<Window>, _: &mut RenderPort, _: &mut dyn Context) { }
+        let screen = tuifw_screen_test::Screen::new(Vector::null());
+        let screen = Box::new(screen) as _;
+        let tree = &mut WindowTree::new(screen, render);
+        let w = Window::new(tree, None, Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() }, |id| ((), id));
+        let _ = Window::new(tree, Some(w), Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() }, |id| ((), id));
+        w.drop(tree);
+        assert_eq!(tree.arena.len(), 1);
+     }
 }

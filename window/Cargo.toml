@@ -13,7 +13,7 @@ repository = "https://github.com/A1-Triard/tuifw"
 
 [dependencies]
 tuifw-screen-base = { path = "../screen-base", version = "0.4.0" }
-components-arena = "0.8.2"
+components-arena = "0.8.3"
 educe = "0.4.13"
 macro-attr-2018 = "0.3.3"
 dyn-context = "0.0.1"
