@@ -104,6 +104,7 @@ macro_attr! {
         panel: Option<Box<dyn Panel>>,
         layout: Option<Box<dyn Layout>>,
         base: ViewBase,
+        align: Option<ViewAlign>,
         parent: Option<View>,
         next: View,
         last_child: Option<View>,
@@ -142,6 +143,7 @@ impl ViewTree {
             (ViewNode {
                 tag: tag.into_raw(),
                 base: ViewBase::new_raw(&VIEW_BASE_TOKEN),
+                align: None,
                 decorator: Some(Box::new(decorator) as _),
                 window: None,
                 layout: None,
@@ -164,7 +166,7 @@ impl ViewTree {
             focused: root,
             quit: false,
         };
-        root.decorator_on_changed(&mut tree, root_decorator_type().bg(), RootDecorator::invalidate_bg);
+        root.decorator_on_changed(&mut tree, root_decorator_type().bg(), RootDecorator::invalidate_screen);
         root.base_set_distinct(&mut tree, view_base_type().focused(), true);
         result(tree)
     }
@@ -240,6 +242,7 @@ impl View {
             (ViewNode {
                 tag: tag.into_raw(),
                 base: ViewBase::new_raw(&VIEW_BASE_TOKEN),
+                align: Some(ViewAlign::new_raw(&VIEW_ALIGN_TOKEN)),
                 decorator: None,
                 window: None,
                 layout: None,
@@ -253,7 +256,14 @@ impl View {
                 render_bounds: Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() },
             }, (view, result))
         });
-        View(view).invalidate_measure(tree);
+        let view = View(view);
+        view.align_on_changed(tree, view_align_type().min_size(), ViewAlign::invalidate_measure);
+        view.align_on_changed(tree, view_align_type().max_size(), ViewAlign::invalidate_measure);
+        view.align_on_changed(tree, view_align_type().w(), ViewAlign::invalidate_measure);
+        view.align_on_changed(tree, view_align_type().h(), ViewAlign::invalidate_measure);
+        view.align_on_changed(tree, view_align_type().h_align(), ViewAlign::invalidate_arrange);
+        view.align_on_changed(tree, view_align_type().v_align(), ViewAlign::invalidate_arrange);
+        view.invalidate_measure(tree);
         result
     }
 
@@ -468,6 +478,73 @@ impl View {
     ) {
         let base = &mut tree.arena[self.0].base;
         event.on_raised(base, on_raised);
+    }
+
+    pub fn align_get<T>(
+        self,
+        tree: &ViewTree,
+        prop: DepProp<ViewAlign, T>,
+    ) -> &T {
+        let align = tree.arena[self.0].align.as_ref().expect("root view does not have align");
+        prop.get(align)
+    }
+
+    pub fn align_set_uncond<T>(
+        self,
+        context: &mut dyn Context,
+        prop: DepProp<ViewAlign, T>,
+        value: T,
+    ) -> T {
+        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let align = tree.arena[self.0].align.as_mut().expect("root view does not have align");
+        let (old, on_changed) = prop.set_uncond(align, value);
+        on_changed.raise(self, context, &old);
+        old
+    }
+
+    pub fn align_set_distinct<T: Eq>(
+        self,
+        context: &mut dyn Context,
+        prop: DepProp<ViewAlign, T>,
+        value: T,
+    ) -> T {
+        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let align = tree.arena[self.0].align.as_mut().expect("root view does not have align");
+        let (old, on_changed) = prop.set_distinct(align, value);
+        on_changed.raise(self, context, &old);
+        old
+    }
+
+    pub fn align_on_changed<T>(
+        self,
+        tree: &mut ViewTree,
+        prop: DepProp<ViewAlign, T>,
+        on_changed: fn(owner: View, context: &mut dyn Context, old: &T),
+    ) {
+        let align = tree.arena[self.0].align.as_mut().expect("root view does not have align");
+        prop.on_changed(align, on_changed);
+    }
+
+    pub fn align_raise<T>(
+        self,
+        context: &mut dyn Context,
+        event: DepEvent<ViewAlign, T>,
+        args: &mut T,
+    ) {
+        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let align = tree.arena[self.0].align.as_mut().expect("root view does not have align");
+        let on_raised = event.raise(align);
+        on_raised.raise(self, context, args);
+    }
+
+    pub fn align_on_raised<T>(
+        self,
+        tree: &mut ViewTree,
+        event: DepEvent<ViewAlign, T>,
+        on_raised: fn(owner: View, context: &mut dyn Context, args: &mut T),
+    ) {
+        let align = tree.arena[self.0].align.as_mut().expect("root view does not have align");
+        event.on_raised(align, on_raised);
     }
 
     pub fn decorator_get<D: Decorator + DepObj<Id=View>, T>(
@@ -823,20 +900,29 @@ impl View {
         }
     }
 
-    pub fn measure(self, tree: &mut ViewTree, size: (Option<i16>, Option<i16>)) {
+    fn min_max(self, tree: &ViewTree) -> Option<(Vector, Vector)> {
+        if self != tree.root {
+            let w = self.align_get(tree, view_align_type().w());
+            let h = self.align_get(tree, view_align_type().h());
+            let min_size = self.align_get(tree, view_align_type().min_size());
+            let min_size = Vector { x: w.unwrap_or(min_size.x), y: h.unwrap_or(min_size.y) };
+            let max_size = self.align_get(tree, view_align_type().max_size());
+            let max_size = Vector { x: w.unwrap_or(max_size.x), y: h.unwrap_or(max_size.y) };
+            Some((min_size, max_size))
+        } else {
+            None
+        }
+    }
+
+    pub fn measure(self, tree: &mut ViewTree, mut size: (Option<i16>, Option<i16>)) {
         let node = &mut tree.arena[self.0];
         if node.measure_size == Some(size) { return; }
         node.measure_size = Some(size);
-        let w = self.base_get(tree, view_base_type().w());
-        let h = self.base_get(tree, view_base_type().h());
-        let min_size = self.base_get(tree, view_base_type().min_size());
-        let min_size = Vector { x: w.unwrap_or(min_size.x), y: h.unwrap_or(min_size.y) };
-        let max_size = self.base_get(tree, view_base_type().max_size());
-        let max_size = Vector { x: w.unwrap_or(max_size.x), y: h.unwrap_or(max_size.y) };
-        let size = (
-            size.0.map(|w| max(min(w as u16, max_size.x as u16), min_size.x as u16) as i16),
-            size.1.map(|h| max(min(h as u16, max_size.y as u16), min_size.y as u16) as i16),
-        );
+        let min_max = self.min_max(tree);
+        if let Some((min_size, max_size)) = min_max {
+            size.0.as_mut().map(|w| *w = max(min(*w as u16, max_size.x as u16), min_size.x as u16) as i16);
+            size.1.as_mut().map(|h| *h = max(min(*h as u16, max_size.y as u16), min_size.y as u16) as i16);
+        }
         let node = &mut tree.arena[self.0];
         let panel = node.panel.as_ref().map(|x| x.behavior());
         let decorator = node.decorator.as_ref().map(|x| x.behavior());
@@ -860,16 +946,18 @@ impl View {
                 Vector::null()
             }
         };
-        let desired_size = decorator.as_ref().map_or(
+        let mut desired_size = decorator.as_ref().map_or(
             children_desired_size,
             |d| d.desired_size(self, tree, children_desired_size)
         );
         let node = &mut tree.arena[self.0];
-        let desired_size = min_size.max(max_size.min(desired_size));
+        if let Some((min_size, max_size)) = min_max {
+            desired_size = min_size.max(max_size.min(desired_size));
+        }
         node.desired_size = desired_size;
     }
 
-    pub fn arrange(self, tree: &mut ViewTree, rect: Rect) {
+    pub fn arrange(self, tree: &mut ViewTree, mut rect: Rect) {
         let node = &mut tree.arena[self.0];
         if let Some(arrange_bounds) = node.arrange_bounds.as_mut() {
             if arrange_bounds.size == rect.size {
@@ -885,20 +973,15 @@ impl View {
             }
         }
         node.arrange_bounds = Some(rect);
-        let w = self.base_get(tree, view_base_type().w());
-        let h = self.base_get(tree, view_base_type().h());
-        let min_size = self.base_get(tree, view_base_type().min_size());
-        let min_size = Vector { x: w.unwrap_or(min_size.x), y: h.unwrap_or(min_size.y) };
-        let max_size = self.base_get(tree, view_base_type().max_size());
-        let max_size = Vector { x: w.unwrap_or(max_size.x), y: h.unwrap_or(max_size.y) };
-        let size = min_size.max(max_size.min(rect.size));
-        let &h_align = self.base_get(tree, view_base_type().h_align());
-        let &v_align = self.base_get(tree, view_base_type().v_align());
-        let padding = Thickness::align(size, rect.size, h_align, v_align);
-        let rect = Rect {
-            tl: rect.tl.offset(Vector { x: padding.l, y: padding.t }),
-            size
-        };
+        let min_max = self.min_max(tree);
+        if let Some((min_size, max_size)) = min_max {
+            let size = min_size.max(max_size.min(rect.size));
+            let &h_align = self.align_get(tree, view_align_type().h_align());
+            let &v_align = self.align_get(tree, view_align_type().v_align());
+            let padding = Thickness::align(size, rect.size, h_align, v_align);
+            rect.tl = rect.tl.offset(Vector { x: padding.l, y: padding.t });
+            rect.size = size;
+        }
         let node = &mut tree.arena[self.0];
         let panel = node.panel.as_ref().map(|x| x.behavior());
         let decorator = node.decorator.as_ref().map(|x| x.behavior());
@@ -925,18 +1008,20 @@ impl View {
                 children_arrange_bounds
             }
         };
-        let render_bounds = decorator.as_ref().map_or(
+        let mut render_bounds = decorator.as_ref().map_or(
             children_render_bounds,
             |d| d.render_bounds(self, tree, children_render_bounds)
         );
-        let size = min_size.max(max_size.min(render_bounds.size));
-        let padding = Thickness::align(size, render_bounds.size, h_align, v_align);
-        let render_bounds = Rect {
-            tl: rect.tl.offset(
-                render_bounds.tl.offset(Vector { x: padding.l, y: padding.t }).offset_from(Point { x: 0, y: 0 })
-            ),
-            size
-        }.intersect(rect);
+        if let Some((min_size, max_size)) = min_max {
+            let size = min_size.max(max_size.min(render_bounds.size));
+            let &h_align = self.align_get(tree, view_align_type().h_align());
+            let &v_align = self.align_get(tree, view_align_type().v_align());
+            let padding = Thickness::align(size, render_bounds.size, h_align, v_align);
+            render_bounds.tl = render_bounds.tl.offset(Vector { x: padding.l, y: padding.t });
+            render_bounds.size = size;
+        }
+        render_bounds.tl = rect.tl.offset(render_bounds.tl.offset_from(Point { x: 0, y: 0 }));
+        render_bounds = render_bounds.intersect(rect);
         let window = tree.arena[self.0].window;
         window.map(|w| w.move_(tree.window_tree(), render_bounds));
         tree.arena[self.0].render_bounds = render_bounds;
@@ -959,7 +1044,7 @@ pub fn root_decorator_type() -> &'static RootDecoratorType { ROOT_DECORATOR_TOKE
 impl RootDecorator {
     const BEHAVIOR: RootDecoratorBehavior = RootDecoratorBehavior;
 
-    fn invalidate_bg(_view: View, context: &mut dyn Context, _old: &Text) {
+    fn invalidate_screen(_view: View, context: &mut dyn Context, _old: &Text) {
         let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
         tree.window_tree().invalidate_screen();
     }
@@ -1015,12 +1100,6 @@ impl ViewInput {
 dep_obj! {
     #[derive(Debug)]
     pub struct ViewBase as View: ViewBaseType {
-        h_align: HAlign = HAlign::Center,
-        v_align: VAlign = VAlign::Center,
-        min_size: Vector = Vector::null(),
-        max_size: Vector = Vector { x: -1, y: -1 },
-        w: Option<i16> = None,
-        h: Option<i16> = None,
         focused: bool = false,
         input yield ViewInput,
     }
@@ -1031,3 +1110,33 @@ static VIEW_BASE_TOKEN: sync::Lazy<DepTypeToken<ViewBaseType>> = sync::Lazy::new
 );
 
 pub fn view_base_type() -> &'static ViewBaseType { VIEW_BASE_TOKEN.ty() }
+
+dep_obj! {
+    #[derive(Debug)]
+    pub struct ViewAlign as View: ViewAlignType {
+        h_align: HAlign = HAlign::Center,
+        v_align: VAlign = VAlign::Center,
+        min_size: Vector = Vector::null(),
+        max_size: Vector = Vector { x: -1, y: -1 },
+        w: Option<i16> = None,
+        h: Option<i16> = None,
+    }
+}
+
+static VIEW_ALIGN_TOKEN: sync::Lazy<DepTypeToken<ViewAlignType>> = sync::Lazy::new(||
+    ViewAlignType::new_raw().expect("ViewAlignType builder locked")
+);
+
+pub fn view_align_type() -> &'static ViewAlignType { VIEW_ALIGN_TOKEN.ty() }
+
+impl ViewAlign {
+    fn invalidate_measure<T>(view: View, context: &mut dyn Context, _old: &T) {
+        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        view.invalidate_measure(tree);
+    }
+
+    fn invalidate_arrange<T>(view: View, context: &mut dyn Context, _old: &T) {
+        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        view.invalidate_arrange(tree);
+    }
+}

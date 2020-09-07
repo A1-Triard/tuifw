@@ -1,6 +1,7 @@
+#![deny(warnings)]
 use boow::Bow;
 use tuifw_screen::{Attr, Color};
-use tuifw_widget::view::{Text, ViewTree, View, view_base_type};
+use tuifw_widget::view::{Text, ViewTree, View, view_align_type};
 use tuifw_widget::view::panels::{CanvasPanel, CanvasLayout};
 use tuifw_widget::view::decorators::{BorderDecorator, border_decorator_type};
 
@@ -39,7 +40,9 @@ fn main() {
     CanvasLayout::new(tree, view);
     BorderDecorator::new(tree, view);
     double_border(tree, view);
-    view.base_set_distinct(tree, view_base_type().w(), Some(8));
-    view.base_set_distinct(tree, view_base_type().h(), Some(8));
-    ViewTree::update(tree, true);
+    view.align_set_distinct(tree, view_align_type().w(), Some(8));
+    view.align_set_distinct(tree, view_align_type().h(), Some(8));
+    loop {
+        ViewTree::update(tree, true).unwrap();
+    }
 }
