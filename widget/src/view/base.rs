@@ -257,6 +257,10 @@ impl View {
             }, (view, result))
         });
         let view = View(view);
+        if let Some(prev) = tree.arena[parent.0].last_child.replace(view) {
+            let next = replace(&mut tree.arena[prev.0].next, view);
+            tree.arena[view.0].next = next;
+        }
         view.align_on_changed(tree, view_align_type().min_size(), ViewAlign::invalidate_measure);
         view.align_on_changed(tree, view_align_type().max_size(), ViewAlign::invalidate_measure);
         view.align_on_changed(tree, view_align_type().w(), ViewAlign::invalidate_measure);
