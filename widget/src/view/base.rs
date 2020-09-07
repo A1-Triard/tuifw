@@ -1,4 +1,5 @@
 use std::any::{Any};
+use std::cmp::{min, max};
 use std::fmt::Debug;
 use std::iter::{self};
 use std::mem::{replace};
@@ -9,7 +10,7 @@ use dep_obj::{dep_obj, DepEvent, DepProp, DepObj, DepTypeToken};
 use dyn_context::{TrivialContext, Context, ContextExt};
 use downcast_rs::{Downcast, impl_downcast};
 use once_cell::sync::{self};
-use tuifw_screen_base::{Key, Event, Screen, Vector, Point, Rect, Attr, Color};
+use tuifw_screen_base::{Key, Event, Screen, Vector, Point, Rect, Attr, Color, HAlign, VAlign, Thickness};
 use tuifw_window::{RenderPort, WindowTree, Window};
 use macro_attr_2018::macro_attr;
 use enum_derive_2018::{EnumDisplay, EnumFromStr};
@@ -826,6 +827,17 @@ impl View {
         let node = &mut tree.arena[self.0];
         if node.measure_size == Some(size) { return; }
         node.measure_size = Some(size);
+        let w = self.base_get(tree, view_base_type().w());
+        let h = self.base_get(tree, view_base_type().h());
+        let min_size = self.base_get(tree, view_base_type().min_size());
+        let min_size = Vector { x: w.unwrap_or(min_size.x), y: h.unwrap_or(min_size.y) };
+        let max_size = self.base_get(tree, view_base_type().max_size());
+        let max_size = Vector { x: w.unwrap_or(max_size.x), y: h.unwrap_or(max_size.y) };
+        let size = (
+            size.0.map(|w| max(min(w as u16, max_size.x as u16), min_size.x as u16) as i16),
+            size.1.map(|h| max(min(h as u16, max_size.y as u16), min_size.y as u16) as i16),
+        );
+        let node = &mut tree.arena[self.0];
         let panel = node.panel.as_ref().map(|x| x.behavior());
         let decorator = node.decorator.as_ref().map(|x| x.behavior());
         let children_measure_size = decorator.as_ref().map_or(
@@ -853,6 +865,7 @@ impl View {
             |d| d.desired_size(self, tree, children_desired_size)
         );
         let node = &mut tree.arena[self.0];
+        let desired_size = min_size.max(max_size.min(desired_size));
         node.desired_size = desired_size;
     }
 
@@ -872,6 +885,21 @@ impl View {
             }
         }
         node.arrange_bounds = Some(rect);
+        let w = self.base_get(tree, view_base_type().w());
+        let h = self.base_get(tree, view_base_type().h());
+        let min_size = self.base_get(tree, view_base_type().min_size());
+        let min_size = Vector { x: w.unwrap_or(min_size.x), y: h.unwrap_or(min_size.y) };
+        let max_size = self.base_get(tree, view_base_type().max_size());
+        let max_size = Vector { x: w.unwrap_or(max_size.x), y: h.unwrap_or(max_size.y) };
+        let size = min_size.max(max_size.min(rect.size));
+        let &h_align = self.base_get(tree, view_base_type().h_align());
+        let &v_align = self.base_get(tree, view_base_type().v_align());
+        let padding = Thickness::align(size, rect.size, h_align, v_align);
+        let rect = Rect {
+            tl: rect.tl.offset(Vector { x: padding.l, y: padding.t }),
+            size
+        };
+        let node = &mut tree.arena[self.0];
         let panel = node.panel.as_ref().map(|x| x.behavior());
         let decorator = node.decorator.as_ref().map(|x| x.behavior());
         let children_arrange_bounds = decorator.as_ref().map_or_else(
@@ -901,9 +929,13 @@ impl View {
             children_render_bounds,
             |d| d.render_bounds(self, tree, children_render_bounds)
         );
+        let size = min_size.max(max_size.min(render_bounds.size));
+        let padding = Thickness::align(size, render_bounds.size, h_align, v_align);
         let render_bounds = Rect {
-            tl: rect.tl.offset(render_bounds.tl.offset_from(Point { x: 0, y: 0 })),
-            size: render_bounds.size
+            tl: rect.tl.offset(
+                render_bounds.tl.offset(Vector { x: padding.l, y: padding.t }).offset_from(Point { x: 0, y: 0 })
+            ),
+            size
         }.intersect(rect);
         let window = tree.arena[self.0].window;
         window.map(|w| w.move_(tree.window_tree(), render_bounds));
@@ -983,6 +1015,8 @@ impl ViewInput {
 dep_obj! {
     #[derive(Debug)]
     pub struct ViewBase as View: ViewBaseType {
+        h_align: HAlign = HAlign::Center,
+        v_align: VAlign = VAlign::Center,
         min_size: Vector = Vector::null(),
         max_size: Vector = Vector { x: -1, y: -1 },
         w: Option<i16> = None,

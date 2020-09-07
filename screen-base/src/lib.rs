@@ -242,9 +242,43 @@ pub struct Thickness {
 }
 
 impl Thickness {
+    pub fn align(inner: Vector, outer: Vector, h_align: HAlign, v_align: VAlign) -> Thickness {
+        let w = outer.x.overflowing_sub(inner.x).0;
+        let (l, r) = match h_align {
+            HAlign::Left => (0, w),
+            HAlign::Right => (w, 0),
+            HAlign::Center => {
+                let l = w / 2;
+                (l, w.overflowing_sub(l).0)
+            }
+        };
+        let h = outer.y.overflowing_sub(inner.y).0;
+        let (t, b) = match v_align {
+            VAlign::Top => (0, h),
+            VAlign::Bottom => (h, 0),
+            VAlign::Center => {
+                let t = h / 2;
+                (t, h.overflowing_sub(t).0)
+            }
+        };
+        Thickness { l, t, r, b }
+    }
+
     pub fn all(a: i16) -> Thickness {
         Thickness { l: a, t: a, r: a, b: a }
     }
+}
+
+macro_attr! {
+    #[derive(Eq, PartialEq, Debug, Hash, Clone, Copy, Ord, PartialOrd)]
+    #[derive(EnumDisplay!, EnumFromStr!)]
+    pub enum HAlign { Left, Center, Right }
+}
+
+macro_attr! {
+    #[derive(Eq, PartialEq, Debug, Hash, Clone, Copy, Ord, PartialOrd)]
+    #[derive(EnumDisplay!, EnumFromStr!)]
+    pub enum VAlign { Top, Center, Bottom }
 }
 
 #[derive(Eq, PartialEq, Debug, Hash, Clone, Copy)]
