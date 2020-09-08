@@ -2,7 +2,7 @@
 #![deny(warnings)]
 
 use dyn_context::Context;
-use tuifw_screen_base::{Point, Color, Attr, Vector, Event, Key, Rect};
+use tuifw_screen::{Point, Color, Attr, Vector, Event, Key, Rect, HAlign, VAlign, Thickness};
 use tuifw_window::{WindowTree, Window, RenderPort};
 
 fn draw(
@@ -27,22 +27,21 @@ fn draw(
 fn main() {
     let screen = unsafe { tuifw_screen::init() }.unwrap();
     let tree = &mut WindowTree::new(screen, draw);
-    let mut bounds = Rect {
-        tl: Point { x: (tree.screen_size().x - 13) / 2, y: (tree.screen_size().y - 7) / 2 },
-        size: Vector { x: 13, y: 7 }
-    };
+    let size = Vector { x: 13, y: 7 };
+    let padding = Thickness::align(size, tree.screen_size(), HAlign::Center, VAlign::Center);
+    let mut bounds = Rect { tl: Point { x: padding.l, y: padding.t }, size };
     let window = Window::new(tree, None, bounds, |window| ((), window));
     loop {
         if let Some(e) = tree.update(true, &mut ()).unwrap() {
             let d = match e {
-                Event::Key(n, Key::Left) => -Vector { x: n.get() as i16, y: 0 },
-                Event::Key(n, Key::Right) => Vector { x: n.get() as i16, y: 0 },
-                Event::Key(n, Key::Up) => -Vector { x: 0, y: n.get() as i16 },
-                Event::Key(n, Key::Down) => Vector { x: 0, y: n.get() as i16 },
-                Event::Key(n, Key::Char('h')) => -Vector { x: n.get() as i16, y: 0 },
-                Event::Key(n, Key::Char('l')) => Vector { x: n.get() as i16, y: 0 },
-                Event::Key(n, Key::Char('k')) => -Vector { x: 0, y: n.get() as i16 },
-                Event::Key(n, Key::Char('j')) => Vector { x: 0, y: n.get() as i16 },
+                Event::Key(n, Key::Left) | Event::Key(n, Key::Char('h')) =>
+                    -Vector { x: (n.get() as i16).overflowing_mul(2).0, y: 0 },
+                Event::Key(n, Key::Right) | Event::Key(n, Key::Char('l')) =>
+                    Vector { x: (n.get() as i16).overflowing_mul(2).0, y: 0 },
+                Event::Key(n, Key::Up) | Event::Key(n, Key::Char('k')) =>
+                    -Vector { x: 0, y: n.get() as i16 },
+                Event::Key(n, Key::Down) | Event::Key(n, Key::Char('j')) =>
+                    Vector { x: 0, y: n.get() as i16 },
                 Event::Key(_, Key::Escape) => break,
                 _ => Vector::null(),
             };
