@@ -6,7 +6,7 @@ use std::mem::{replace};
 use std::num::{NonZeroU16};
 use boow::Bow;
 use components_arena::{RawId, Component, Id, Arena, ComponentClassMutex, ComponentId};
-use dep_obj::{dep_obj, DepEvent, DepProp, DepObj, DepTypeToken};
+use dep_obj::{dep_obj, dep_system, DepTypeToken};
 use dyn_context::{TrivialContext, Context, ContextExt};
 use downcast_rs::{Downcast, impl_downcast};
 use once_cell::sync::{self};
@@ -417,447 +417,50 @@ impl View {
 
     pub fn render_bounds(self, tree: &ViewTree) -> Rect { tree.arena[self.0].render_bounds }
 
-    pub fn base_get<T>(
-        self,
-        tree: &ViewTree,
-        prop: DepProp<ViewBase, T>,
-    ) -> &T {
-        let base = &tree.arena[self.0].base;
-        prop.get(base)
+    dep_system! {
+        pub fn base(self as this, tree: ViewTree) -> ViewBase {
+            if mut { &mut tree.arena[this.0].base } else { &tree.arena[this.0].base }
+        }
     }
 
-    pub fn base_set_uncond<T>(
-        self,
-        context: &mut dyn Context,
-        prop: DepProp<ViewBase, T>,
-        value: T,
-    ) -> T {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
-        let base = &mut tree.arena[self.0].base;
-        let (old, on_changed) = prop.set_uncond(base, value);
-        on_changed.raise(self, context, &old);
-        old
+    dep_system! {
+        pub fn align(self as this, tree: ViewTree) -> ViewAlign {
+            if mut {
+                tree.arena[this.0].align.as_mut().expect("root view does not have align")
+            } else {
+                tree.arena[this.0].align.as_ref().expect("root view does not have align")
+            }
+        }
     }
 
-    pub fn base_set_distinct<T: Eq>(
-        self,
-        context: &mut dyn Context,
-        prop: DepProp<ViewBase, T>,
-        value: T,
-    ) -> T {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
-        let base = &mut tree.arena[self.0].base;
-        let (old, on_changed) = prop.set_distinct(base, value);
-        on_changed.raise(self, context, &old);
-        old
+    dep_system! {
+        pub dyn fn decorator(self as this, tree: ViewTree) -> Decorator {
+            if mut {
+                tree.arena[this.0].decorator.as_mut().expect("Decorator missing")
+            } else {
+                tree.arena[this.0].decorator.as_ref().expect("Decorator missing")
+            }
+        }
     }
 
-    pub fn base_on_changed<T>(
-        self,
-        tree: &mut ViewTree,
-        prop: DepProp<ViewBase, T>,
-        on_changed: fn(owner: View, context: &mut dyn Context, old: &T),
-    ) {
-        let base = &mut tree.arena[self.0].base;
-        prop.on_changed(base, on_changed);
+    dep_system! {
+        pub dyn fn layout(self as this, tree: ViewTree) -> Layout {
+            if mut {
+                tree.arena[this.0].layout.as_mut().expect("Layout missing")
+            } else {
+                tree.arena[this.0].layout.as_ref().expect("Layout missing")
+            }
+        }
     }
 
-    pub fn base_raise<T>(
-        self,
-        context: &mut dyn Context,
-        event: DepEvent<ViewBase, T>,
-        args: &mut T,
-    ) {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
-        let base = &mut tree.arena[self.0].base;
-        let on_raised = event.raise(base);
-        on_raised.raise(self, context, args);
-    }
-
-    pub fn base_on_raised<T>(
-        self,
-        tree: &mut ViewTree,
-        event: DepEvent<ViewBase, T>,
-        on_raised: fn(owner: View, context: &mut dyn Context, args: &mut T),
-    ) {
-        let base = &mut tree.arena[self.0].base;
-        event.on_raised(base, on_raised);
-    }
-
-    pub fn align_get<T>(
-        self,
-        tree: &ViewTree,
-        prop: DepProp<ViewAlign, T>,
-    ) -> &T {
-        let align = tree.arena[self.0].align.as_ref().expect("root view does not have align");
-        prop.get(align)
-    }
-
-    pub fn align_set_uncond<T>(
-        self,
-        context: &mut dyn Context,
-        prop: DepProp<ViewAlign, T>,
-        value: T,
-    ) -> T {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
-        let align = tree.arena[self.0].align.as_mut().expect("root view does not have align");
-        let (old, on_changed) = prop.set_uncond(align, value);
-        on_changed.raise(self, context, &old);
-        old
-    }
-
-    pub fn align_set_distinct<T: Eq>(
-        self,
-        context: &mut dyn Context,
-        prop: DepProp<ViewAlign, T>,
-        value: T,
-    ) -> T {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
-        let align = tree.arena[self.0].align.as_mut().expect("root view does not have align");
-        let (old, on_changed) = prop.set_distinct(align, value);
-        on_changed.raise(self, context, &old);
-        old
-    }
-
-    pub fn align_on_changed<T>(
-        self,
-        tree: &mut ViewTree,
-        prop: DepProp<ViewAlign, T>,
-        on_changed: fn(owner: View, context: &mut dyn Context, old: &T),
-    ) {
-        let align = tree.arena[self.0].align.as_mut().expect("root view does not have align");
-        prop.on_changed(align, on_changed);
-    }
-
-    pub fn align_raise<T>(
-        self,
-        context: &mut dyn Context,
-        event: DepEvent<ViewAlign, T>,
-        args: &mut T,
-    ) {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
-        let align = tree.arena[self.0].align.as_mut().expect("root view does not have align");
-        let on_raised = event.raise(align);
-        on_raised.raise(self, context, args);
-    }
-
-    pub fn align_on_raised<T>(
-        self,
-        tree: &mut ViewTree,
-        event: DepEvent<ViewAlign, T>,
-        on_raised: fn(owner: View, context: &mut dyn Context, args: &mut T),
-    ) {
-        let align = tree.arena[self.0].align.as_mut().expect("root view does not have align");
-        event.on_raised(align, on_raised);
-    }
-
-    pub fn decorator_get<D: Decorator + DepObj<Id=View>, T>(
-        self,
-        tree: &ViewTree,
-        prop: DepProp<D, T>,
-    ) -> &T {
-        let decorator = tree.arena[self.0]
-            .decorator
-            .as_ref()
-            .expect("Decorator missed")
-            .downcast_ref::<D>()
-            .expect("invalid cast")
-        ;
-        prop.get(decorator)
-    }
-
-    pub fn decorator_set_uncond<D: Decorator + DepObj<Id=View>, T>(
-        self,
-        context: &mut dyn Context,
-        prop: DepProp<D, T>,
-        value: T,
-    ) -> T {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
-        let decorator = tree.arena[self.0]
-            .decorator
-            .as_mut()
-            .expect("Decorator missed")
-            .downcast_mut::<D>()
-            .expect("invalid cast")
-        ;
-        let (old, on_changed) = prop.set_uncond(decorator, value);
-        on_changed.raise(self, context, &old);
-        old
-    }
-
-    pub fn decorator_set_distinct<D: Decorator + DepObj<Id=View>, T: Eq>(
-        self,
-        context: &mut dyn Context,
-        prop: DepProp<D, T>,
-        value: T,
-    ) -> T {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
-        let decorator = tree.arena[self.0]
-            .decorator
-            .as_mut()
-            .expect("Decorator missed")
-            .downcast_mut::<D>()
-            .expect("invalid cast")
-        ;
-        let (old, on_changed) = prop.set_distinct(decorator, value);
-        on_changed.raise(self, context, &old);
-        old
-    }
-
-    pub fn decorator_on_changed<D: Decorator + DepObj<Id=View>, T>(
-        self,
-        tree: &mut ViewTree,
-        prop: DepProp<D, T>,
-        on_changed: fn(owner: View, context: &mut dyn Context, old: &T),
-    ) {
-        let decorator = tree.arena[self.0]
-            .decorator
-            .as_mut()
-            .expect("Decorator missed")
-            .downcast_mut::<D>()
-            .expect("invalid cast")
-        ;
-        prop.on_changed(decorator, on_changed);
-    }
-
-    pub fn decorator_raise<D: Decorator + DepObj<Id=View>, T>(
-        self,
-        context: &mut dyn Context,
-        event: DepEvent<D, T>,
-        args: &mut T,
-    ) {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
-        let decorator = tree.arena[self.0]
-            .decorator
-            .as_mut()
-            .expect("Decorator missed")
-            .downcast_mut::<D>()
-            .expect("invalid cast")
-        ;
-        let on_raised = event.raise(decorator);
-        on_raised.raise(self, context, args);
-    }
-
-    pub fn decorator_on_raised<D: Decorator + DepObj<Id=View>, T>(
-        self,
-        tree: &mut ViewTree,
-        event: DepEvent<D, T>,
-        on_raised: fn(owner: View, context: &mut dyn Context, args: &mut T),
-    ) {
-        let decorator = tree.arena[self.0]
-            .decorator
-            .as_mut()
-            .expect("Decorator missed")
-            .downcast_mut::<D>()
-            .expect("invalid cast")
-        ;
-        event.on_raised(decorator, on_raised);
-    }
-
-    pub fn layout_get<L: Layout + DepObj<Id=View>, T>(
-        self,
-        tree: &ViewTree,
-        prop: DepProp<L, T>,
-    ) -> &T {
-        let layout = tree.arena[self.0]
-            .layout
-            .as_ref()
-            .expect("Layout missed")
-            .downcast_ref::<L>()
-            .expect("invalid cast")
-        ;
-        prop.get(layout)
-    }
-
-    pub fn layout_set_uncond<L: Layout + DepObj<Id=View>, T>(
-        self,
-        context: &mut dyn Context,
-        prop: DepProp<L, T>,
-        value: T,
-    ) -> T {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
-        let layout = tree.arena[self.0]
-            .layout
-            .as_mut()
-            .expect("Layout missed")
-            .downcast_mut::<L>()
-            .expect("invalid cast")
-        ;
-        let (old, on_changed) = prop.set_uncond(layout, value);
-        on_changed.raise(self, context, &old);
-        old
-    }
-
-    pub fn layout_set_distinct<L: Layout + DepObj<Id=View>, T: Eq>(
-        self,
-        context: &mut dyn Context,
-        prop: DepProp<L, T>,
-        value: T,
-    ) -> T {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
-        let layout = tree.arena[self.0]
-            .layout
-            .as_mut()
-            .expect("Layout missed")
-            .downcast_mut::<L>()
-            .expect("invalid cast")
-        ;
-        let (old, on_changed) = prop.set_distinct(layout, value);
-        on_changed.raise(self, context, &old);
-        old
-    }
-
-    pub fn layout_on_changed<L: Layout + DepObj<Id=View>, T>(
-        self,
-        tree: &mut ViewTree,
-        prop: DepProp<L, T>,
-        on_changed: fn(owner: View, context: &mut dyn Context, old: &T),
-    ) {
-        let layout = tree.arena[self.0]
-            .layout
-            .as_mut()
-            .expect("Layout missed")
-            .downcast_mut::<L>()
-            .expect("invalid cast")
-        ;
-        prop.on_changed(layout, on_changed);
-    }
-
-    pub fn layout_raise<L: Layout + DepObj<Id=View>, T>(
-        self,
-        context: &mut dyn Context,
-        event: DepEvent<L, T>,
-        args: &mut T,
-    ) {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
-        let layout = tree.arena[self.0]
-            .layout
-            .as_mut()
-            .expect("Layout missed")
-            .downcast_mut::<L>()
-            .expect("invalid cast")
-        ;
-        let on_raised = event.raise(layout);
-        on_raised.raise(self, context, args);
-    }
-
-    pub fn layout_on_raised<L: Layout + DepObj<Id=View>, T>(
-        self,
-        tree: &mut ViewTree,
-        event: DepEvent<L, T>,
-        on_raised: fn(owner: View, context: &mut dyn Context, args: &mut T),
-    ) {
-        let layout = tree.arena[self.0]
-            .layout
-            .as_mut()
-            .expect("Layout missed")
-            .downcast_mut::<L>()
-            .expect("invalid cast")
-        ;
-        event.on_raised(layout, on_raised);
-    }
-
-    pub fn panel_get<P: Panel + DepObj<Id=View>, T>(
-        self,
-        tree: &ViewTree,
-        prop: DepProp<P, T>,
-    ) -> &T {
-        let panel = tree.arena[self.0]
-            .panel
-            .as_ref()
-            .expect("Panel missed")
-            .downcast_ref::<P>()
-            .expect("invalid cast")
-        ;
-        prop.get(panel)
-    }
-
-    pub fn panel_set_uncond<P: Panel + DepObj<Id=View>, T>(
-        self,
-        context: &mut dyn Context,
-        prop: DepProp<P, T>,
-        value: T,
-    ) -> T {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
-        let panel = tree.arena[self.0]
-            .panel
-            .as_mut()
-            .expect("Panel missed")
-            .downcast_mut::<P>()
-            .expect("invalid cast")
-        ;
-        let (old, on_changed) = prop.set_uncond(panel, value);
-        on_changed.raise(self, context, &old);
-        old
-    }
-
-    pub fn panel_set_distinct<P: Panel + DepObj<Id=View>, T: Eq>(
-        self,
-        context: &mut dyn Context,
-        prop: DepProp<P, T>,
-        value: T,
-    ) -> T {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
-        let panel = tree.arena[self.0]
-            .panel
-            .as_mut()
-            .expect("Panel missed")
-            .downcast_mut::<P>()
-            .expect("invalid cast")
-        ;
-        let (old, on_changed) = prop.set_distinct(panel, value);
-        on_changed.raise(self, context, &old);
-        old
-    }
-
-    pub fn panel_on_changed<P: Panel + DepObj<Id=View>, T>(
-        self,
-        tree: &mut ViewTree,
-        prop: DepProp<P, T>,
-        on_changed: fn(owner: View, context: &mut dyn Context, old: &T),
-    ) {
-        let panel = tree.arena[self.0]
-            .panel
-            .as_mut()
-            .expect("Panel missed")
-            .downcast_mut::<P>()
-            .expect("invalid cast")
-        ;
-        prop.on_changed(panel, on_changed);
-    }
-
-    pub fn panel_raise<P: Panel + DepObj<Id=View>, T>(
-        self,
-        context: &mut dyn Context,
-        event: DepEvent<P, T>,
-        args: &mut T,
-    ) {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
-        let panel = tree.arena[self.0]
-            .panel
-            .as_mut()
-            .expect("Panel missed")
-            .downcast_mut::<P>()
-            .expect("invalid cast")
-        ;
-        let on_raised = event.raise(panel);
-        on_raised.raise(self, context, args);
-    }
-
-    pub fn panel_on_raised<P: Panel + DepObj<Id=View>, T>(
-        self,
-        tree: &mut ViewTree,
-        event: DepEvent<P, T>,
-        on_raised: fn(owner: View, context: &mut dyn Context, args: &mut T),
-    ) {
-        let panel = tree.arena[self.0]
-            .panel
-            .as_mut()
-            .expect("Panel missed")
-            .downcast_mut::<P>()
-            .expect("invalid cast")
-        ;
-        event.on_raised(panel, on_raised);
+    dep_system! {
+        pub dyn fn panel(self as this, tree: ViewTree) -> Panel {
+            if mut {
+                tree.arena[this.0].panel.as_mut().expect("Panel missing")
+            } else {
+                tree.arena[this.0].panel.as_ref().expect("Panel missing")
+            }
+        }
     }
 
     #[must_use]

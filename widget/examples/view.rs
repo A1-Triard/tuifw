@@ -46,7 +46,7 @@ fn main() {
     view.align_set_distinct(tree, view_align_type().w(), Some(size.x));
     view.align_set_distinct(tree, view_align_type().h(), Some(size.y));
     view.layout_set_distinct(tree, canvas_layout_type().tl(), Point { x: padding.l, y: padding.t });
-    view.base_on_raised(tree, view_base_type().input(), |view, context, input| {
+    view.base_on(tree, view_base_type().input(), |view, context, input| {
         let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
         let d = match input.key() {
             (n, Key::Left) | (n, Key::Char('h')) =>
