@@ -544,13 +544,13 @@ macro_rules! dep_system {
             $vis fn [< $name _set_uncond >]<DepSystemValueType>(
                 self,
                 context: &mut dyn $crate::dyn_context_Context,
-                prop: $crate::DepProp<DepSystemType, DepSystemValueType>,
+                prop: $crate::DepProp<$System, DepSystemValueType>,
                 value: DepSystemValueType,
             ) -> DepSystemValueType {
                 let $this = self;
                 let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context)
                     .expect(concat!(stringify!($Arena), " required"));
-                let system = $system_mut;
+                let system = $field_mut;
                 let (old, on_changed) = prop.set_uncond(system, value);
                 on_changed.raise(self, context, &old);
                 old
@@ -559,13 +559,13 @@ macro_rules! dep_system {
             $vis fn [< $name _set_distinct >]<DepSystemValueType: Eq>(
                 self,
                 context: &mut dyn $crate::dyn_context_Context,
-                prop: $crate::DepProp<DepSystemType, DepSystemValueType>,
+                prop: $crate::DepProp<$System, DepSystemValueType>,
                 value: DepSystemValueType,
             ) -> DepSystemValueType {
                 let $this = self;
                 let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context)
                     .expect(concat!(stringify!($Arena), " required"));
-                let system = $system_mut;
+                let system = $field_mut;
                 let (old, on_changed) = prop.set_distinct(system, value);
                 on_changed.raise(self, context, &old);
                 old
@@ -578,7 +578,7 @@ macro_rules! dep_system {
                 on_changed: fn(owner: Self, context: &mut dyn $crate::dyn_context_Context, old: &DepSystemValueType),
             ) {
                 let $this = self;
-                let system = $field;
+                let system = $field_mut;
                 prop.on_changed(system, on_changed);
             }
 
@@ -591,7 +591,7 @@ macro_rules! dep_system {
                 let $this = self;
                 let $arena = $crate::dyn_context_ContextExt::get::<$Arena>(context)
                     .expect(concat!(stringify!($Arena), " required"));
-                let system = $system;
+                let system = $field;
                 let on_raised = event.raise(system);
                 on_raised.raise(self, context, args);
             }
