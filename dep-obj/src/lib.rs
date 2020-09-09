@@ -19,6 +19,13 @@ use components_arena::ComponentId;
 use educe::Educe;
 use dyn_context::Context;
 
+#[doc(hidden)]
+pub use paste::paste as paste_paste;
+#[doc(hidden)]
+pub use dyn_context::Context as dyn_context_Context;
+#[doc(hidden)]
+pub use dyn_context::ContextExt as dyn_context_ContextExt;
+
 pub struct DepTypeLock(AtomicBool);
 
 impl DepTypeLock {
@@ -195,9 +202,9 @@ impl<Owner: DepObj, ArgsType> DepEvent<Owner, ArgsType> {
 
     pub fn raise(
         self,
-        obj: &mut Owner,
+        obj: &Owner,
     ) -> OnRaised<Owner::Id, ArgsType> {
-        let on_raised = unsafe { obj.core_mut().events.get_unchecked(self.0.index) };
+        let on_raised = unsafe { obj.core().events.get_unchecked(self.0.index) };
         OnRaised(on_raised.clone(), (PhantomData, PhantomData))
     }
 }
@@ -511,6 +518,176 @@ macro_rules! dep_obj {
         impl $(< $($g)+ >)? $name $(< $($r)+ >)? {
             fn new_raw(token: &$crate::DepTypeToken<$ty>) -> Self {
                 Self { core: $crate::DepObjCore::new(token) }
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! dep_system {
+    (
+        $vis:vis fn $name:ident (self as $this:ident, $arena:ident : $Arena:ty) -> $System:ty {
+            if mut { $field_mut:expr } else { $field:expr }
+        }
+    ) => {
+        $crate::paste_paste! {
+            $vis fn [< $name _get >]<DepSystemValueType>(
+                self,
+                $arena: &$Arena,
+                prop: $crate::DepProp<$System, DepSystemValueType>
+            ) -> &DepSystemValueType {
+                let $this = self;
+                let system = $field;
+                prop.get(system)
+            }
+
+            $vis fn [< $name _set_uncond >]<DepSystemValueType>(
+                self,
+                context: &mut dyn $crate::dyn_context_Context,
+                prop: $crate::DepProp<DepSystemType, DepSystemValueType>,
+                value: DepSystemValueType,
+            ) -> DepSystemValueType {
+                let $this = self;
+                let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context)
+                    .expect(concat!(stringify!($Arena), " required"));
+                let system = $system_mut;
+                let (old, on_changed) = prop.set_uncond(system, value);
+                on_changed.raise(self, context, &old);
+                old
+            }
+
+            $vis fn [< $name _set_distinct >]<DepSystemValueType: Eq>(
+                self,
+                context: &mut dyn $crate::dyn_context_Context,
+                prop: $crate::DepProp<DepSystemType, DepSystemValueType>,
+                value: DepSystemValueType,
+            ) -> DepSystemValueType {
+                let $this = self;
+                let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context)
+                    .expect(concat!(stringify!($Arena), " required"));
+                let system = $system_mut;
+                let (old, on_changed) = prop.set_distinct(system, value);
+                on_changed.raise(self, context, &old);
+                old
+            }
+
+            $vis fn [< $name _on_changed >]<DepSystemValueType>(
+                self,
+                $arena: &mut $Arena,
+                prop: $crate::DepProp<$System, DepSystemValueType>,
+                on_changed: fn(owner: Self, context: &mut dyn $crate::dyn_context_Context, old: &DepSystemValueType),
+            ) {
+                let $this = self;
+                let system = $field;
+                prop.on_changed(system, on_changed);
+            }
+
+            $vis fn [< $name _raise >]<DepSystemArgsType>(
+                self,
+                context: &mut dyn $crate::dyn_context_Context,
+                event: $crate::DepEvent<$System, DepSystemArgsType>,
+                args: &mut DepSystemArgsType,
+            ) {
+                let $this = self;
+                let $arena = $crate::dyn_context_ContextExt::get::<$Arena>(context)
+                    .expect(concat!(stringify!($Arena), " required"));
+                let system = $system;
+                let on_raised = event.raise(system);
+                on_raised.raise(self, context, args);
+            }
+
+            $vis fn [< $name _on >]<DepSystemArgsType>(
+                self,
+                $arena: &mut $Arena,
+                event: $crate::DepEvent<$System, DepSystemArgsType>,
+                on_raised: fn(owner: Self, context: &mut dyn $crate::dyn_context_Context, args: &mut DepSystemArgsType),
+            ) {
+                let $this = self;
+                let system = $field_mut;
+                event.on_raised(system, on_raised);
+            }
+        }
+    };
+    (
+        $vis:vis dyn fn $name:ident (self as $this:ident, $arena:ident : $Arena:ty) -> $System:tt {
+            if mut { $field_mut:expr } else { $field:expr }
+        }
+    ) => {
+        $crate::paste_paste! {
+            $vis fn [< $name _get >]<DepSystemType: $System + $crate::DepObj<Id=Self>, DepSystemValueType>(
+                self,
+                $arena: &$Arena,
+                prop: $crate::DepProp<DepSystemType, DepSystemValueType>
+            ) -> &DepSystemValueType {
+                let $this = self;
+                let system = $field.downcast_ref::<DepSystemType>().expect("invalid cast");
+                prop.get(system)
+            }
+
+            $vis fn [< $name _set_uncond >]<DepSystemType: $System + $crate::DepObj<Id=Self>, DepSystemValueType>(
+                self,
+                context: &mut dyn $crate::dyn_context_Context,
+                prop: $crate::DepProp<DepSystemType, DepSystemValueType>,
+                value: DepSystemValueType,
+            ) -> DepSystemValueType {
+                let $this = self;
+                let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context)
+                    .expect(concat!(stringify!($Arena), " required"));
+                let system = $field_mut.downcast_mut::<DepSystemType>().expect("invalid cast");
+                let (old, on_changed) = prop.set_uncond(system, value);
+                on_changed.raise(self, context, &old);
+                old
+            }
+
+            $vis fn [< $name _set_distinct >]<DepSystemType: $System + $crate::DepObj<Id=Self>, DepSystemValueType: Eq>(
+                self,
+                context: &mut dyn $crate::dyn_context_Context,
+                prop: $crate::DepProp<DepSystemType, DepSystemValueType>,
+                value: DepSystemValueType,
+            ) -> DepSystemValueType {
+                let $this = self;
+                let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context)
+                    .expect(concat!(stringify!($Arena), " required"));
+                let system = $field_mut.downcast_mut::<DepSystemType>().expect("invalid cast");
+                let (old, on_changed) = prop.set_distinct(system, value);
+                on_changed.raise(self, context, &old);
+                old
+            }
+
+            $vis fn [< $name _on_changed >]<DepSystemType: $System + $crate::DepObj<Id=Self>, DepSystemValueType>(
+                self,
+                $arena: &mut $Arena,
+                prop: $crate::DepProp<DepSystemType, DepSystemValueType>,
+                on_changed: fn(owner: Self, context: &mut dyn $crate::dyn_context_Context, old: &DepSystemValueType),
+            ) {
+                let $this = self;
+                let system = $field_mut.downcast_mut::<DepSystemType>().expect("invalid cast");
+                prop.on_changed(system, on_changed);
+            }
+
+            $vis fn [< $name _raise >]<DepSystemType: $System + $crate::DepObj<Id=Self>, DepSystemArgsType>(
+                self,
+                context: &mut dyn $crate::dyn_context_Context,
+                event: $crate::DepEvent<DepSystemType, DepSystemArgsType>,
+                args: &mut DepSystemArgsType,
+            ) {
+                let $this = self;
+                let $arena = $crate::dyn_context_ContextExt::get::<$Arena>(context)
+                    .expect(concat!(stringify!($Arena), " required"));
+                let system = $field.downcast_ref::<DepSystemType>().expect("invalid cast");
+                let on_raised = event.raise(system);
+                on_raised.raise(self, context, args);
+            }
+
+            $vis fn [< $name _on >]<DepSystemType: $System + $crate::DepObj<Id=Self>, DepSystemArgsType>(
+                self,
+                $arena: &mut $Arena,
+                event: $crate::DepEvent<DepSystemType, DepSystemArgsType>,
+                on_raised: fn(owner: Self, context: &mut dyn $crate::dyn_context_Context, args: &mut DepSystemArgsType),
+            ) {
+                let $this = self;
+                let system = $field_mut.downcast_mut::<DepSystemType>().expect("invalid cast");
+                event.on_raised(system, on_raised);
             }
         }
     };
