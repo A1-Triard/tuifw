@@ -255,51 +255,224 @@ impl HBand {
 
 #[derive(Eq, PartialEq, Debug, Hash, Clone, Copy)]
 pub struct Thickness {
-    pub l: i16,
-    pub t: i16,
-    pub r: i16,
-    pub b: i16
+    l: i32,
+    r: i32,
+    t: i32,
+    b: i32,
 }
 
 impl Thickness {
+    pub fn new(l: i32, t: i32, r: i32, b: i32) -> Self {
+        assert!(l >= -(u16::MAX as u32 as i32) && l <= u16::MAX as u32 as i32);
+        assert!(t >= -(u16::MAX as u32 as i32) && t <= u16::MAX as u32 as i32);
+        assert!(r >= -(u16::MAX as u32 as i32) && r <= u16::MAX as u32 as i32);
+        assert!(b >= -(u16::MAX as u32 as i32) && b <= u16::MAX as u32 as i32);
+        Thickness { l, t, r, b }
+    }
+
+    pub unsafe fn new_unchecked(l: i32, t: i32, r: i32, b: i32) -> Self {
+        Thickness { l, t, r, b }
+    }
+
+    pub fn all(a: i32) -> Thickness {
+        assert!(a >= -(u16::MAX as u32 as i32) && a <= u16::MAX as u32 as i32);
+        Thickness { l: a, t: a, r: a, b: a }
+    }
+
+    pub fn l(self) -> i32 { self.l }
+
+    pub fn t(self) -> i32 { self.t }
+
+    pub fn r(self) -> i32 { self.r }
+
+    pub fn b(self) -> i32 { self.b }
+
     pub fn align(inner: Vector, outer: Vector, h_align: HAlign, v_align: VAlign) -> Thickness {
-        let w = outer.x.wrapping_sub(inner.x);
+        let h_neg = inner.x as u16 > outer.x as u16;
+        let (outer_x, inner_x) = if h_neg { (inner.x, outer.x) } else { (outer.x, inner.x) };
+        let w = (outer_x as u16) - (inner_x as u16);
         let (l, r) = match h_align {
             HAlign::Left => (0, w),
             HAlign::Right => (w, 0),
             HAlign::Center => {
                 let l = w / 2;
-                (l, w.wrapping_sub(l))
+                let r = w - l;
+                (l, r)
             }
         };
-        let h = outer.y.wrapping_sub(inner.y);
+        let v_neg = inner.y as u16 > outer.y as u16;
+        let (outer_y, inner_y) = if v_neg { (inner.y, outer.y) } else { (outer.y, inner.y) };
+        let h = (outer_y as u16) - (inner_y as u16);
         let (t, b) = match v_align {
             VAlign::Top => (0, h),
             VAlign::Bottom => (h, 0),
             VAlign::Center => {
                 let t = h / 2;
-                (t, h.wrapping_sub(t))
+                let b = h - t;
+                (t, b)
             }
         };
+        let l = l as u32 as i32;
+        let t = t as u32 as i32;
+        let r = r as u32 as i32;
+        let b = b as u32 as i32;
+        Thickness {
+            l: if h_neg { -l } else { l },
+            t: if v_neg { -t } else { t },
+            r: if h_neg { -r } else { r },
+            b: if v_neg { -b } else { b }
+        }
+    }
+
+    fn shrink_near(thickness: u16, rect: (i16, i16)) -> (i16, i16) {
+        let thickness = min(thickness, rect.1 as u16);
+        (rect.0.wrapping_add(thickness as i16), rect.1.wrapping_sub(thickness as i16))
+    }
+
+    fn shrink_far(thickness: u16, rect: (i16, i16)) -> (i16, i16) {
+        let thickness = min(thickness, rect.1 as u16);
+        (rect.0, rect.1.wrapping_sub(thickness as i16))
+    }
+
+    fn expand_near(thickness: u16, rect: (i16, i16)) -> (i16, i16) {
+        let thickness = min(thickness, u16::MAX - (rect.1 as u16));
+        (rect.0.wrapping_sub(thickness as i16), rect.1.wrapping_add(thickness as i16))
+    }
+
+    fn expand_far(thickness: u16, rect: (i16, i16)) -> (i16, i16) {
+        let thickness = min(thickness, u16::MAX - (rect.1 as u16));
+        (rect.0, rect.1.wrapping_add(thickness as i16))
+    }
+
+    pub fn shrink_rect(self, rect: Rect) -> Rect {
+        let (l, w) = if self.l < 0 {
+            Self::expand_near((-self.l) as u32 as u16, (rect.l(), rect.w()))
+        } else {
+            Self::shrink_near(self.l as u32 as u16, (rect.l(), rect.w()))
+        };
+        let (t, h) = if self.t < 0 {
+            Self::expand_near((-self.t) as u32 as u16, (rect.t(), rect.h()))
+        } else {
+            Self::shrink_near(self.t as u32 as u16, (rect.t(), rect.h()))
+        };
+        let (l, w) = if self.r < 0 {
+            Self::expand_far((-self.r) as u32 as u16, (l, w))
+        } else {
+            Self::shrink_far(self.r as u32 as u16, (l, w))
+        };
+        let (t, h) = if self.b < 0 {
+            Self::expand_far((-self.b) as u32 as u16, (t, h))
+        } else {
+            Self::shrink_far(self.b as u32 as u16, (t, h))
+        };
+        Rect { tl: Point { x: l, y: t }, size: Vector { x: w, y: h } }
+    }
+
+    pub fn expand_rect(self, rect: Rect) -> Rect {
+        (-self).shrink_rect(rect)
+    }
+
+    pub fn shrink_rect_size(self, rect_size: Vector) -> Vector {
+        self.shrink_rect(Rect { tl: Point { x: 0, y: 0 }, size: rect_size }).size
+    }
+
+    pub fn expand_rect_size(self, rect_size: Vector) -> Vector {
+        self.expand_rect(Rect { tl: Point { x: 0, y: 0 }, size: rect_size }).size
+    }
+
+    pub fn shrink_band_h(self, band_h: i16) -> i16 {
+        let (_, h) = if self.t < 0 {
+            Self::expand_near((-self.t) as u32 as u16, (0, band_h))
+        } else {
+            Self::shrink_near(self.t as u32 as u16, (0, band_h))
+        };
+        h
+    }
+
+    pub fn expand_band_h(self, band_h: i16) -> i16 {
+        (-self).shrink_band_h(band_h)
+    }
+
+    pub fn shrink_band_w(self, band_w: i16) -> i16 {
+        let (_, w) = if self.l < 0 {
+            Self::expand_near((-self.t) as u32 as u16, (0, band_w))
+        } else {
+            Self::shrink_near(self.t as u32 as u16, (0, band_w))
+        };
+        w
+    }
+
+    pub fn expand_band_w(self, band_w: i16) -> i16 {
+        (-self).shrink_band_w(band_w)
+    }
+
+    fn add_side(this: i32, other: i32) -> i32 {
+        if this < 0 {
+            if other < 0 {
+                -(((-this) as u32 as u16).saturating_add((-other) as u32 as u16) as u32 as i32)
+            } else {
+                other + this
+            }
+        } else {
+            if other > 0 {
+                (this as u32 as u16).saturating_add(other as u32 as u16) as u32 as i32
+            } else {
+                other + this
+            }
+        }
+    }
+}
+
+impl Default for Thickness {
+    fn default() -> Self {
+        Thickness { l: 0, t: 0, r: 0, b: 0 }
+    }
+}
+
+impl Add for Thickness {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        let l = Self::add_side(self.l, other.l);
+        let t = Self::add_side(self.t, other.t);
+        let r = Self::add_side(self.r, other.r);
+        let b = Self::add_side(self.b, other.b);
         Thickness { l, t, r, b }
     }
+}
 
-    pub fn shrink(self, rect: Rect) -> Rect {
-        Rect::with_tl_br(
-            rect.tl.offset(Vector { x: self.l, y: self.t }),
-            rect.br().offset(-Vector { x: self.r, y: self.b })
-        )
+impl AddAssign for Thickness {
+    fn add_assign(&mut self, other: Self) {
+        *self = *self + other;
     }
+}
 
-    pub fn all(a: i16) -> Thickness {
-        Thickness { l: a, t: a, r: a, b: a }
+impl Sub for Thickness {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        self + (-other)
+    }
+}
+
+impl SubAssign for Thickness {
+    fn sub_assign(&mut self, other: Self) {
+        *self = *self - other;
+    }
+}
+
+impl Neg for Thickness {
+    type Output = Self;
+
+    fn neg(self) -> Self {
+        Thickness { l: -self.l, t: -self.t, r: -self.r, b: -self.b }
     }
 }
 
 impl Index<Side> for Thickness {
-    type Output = i16;
+    type Output = i32;
 
-    fn index(&self, index: Side) -> &i16 {
+    fn index(&self, index: Side) -> &i32 {
         match index {
             Side::Left => &self.l,
             Side::Top => &self.t,
@@ -310,7 +483,7 @@ impl Index<Side> for Thickness {
 }
 
 impl IndexMut<Side> for Thickness {
-    fn index_mut(&mut self, index: Side) -> &mut i16 {
+    fn index_mut(&mut self, index: Side) -> &mut i32 {
         match index {
             Side::Left => &mut self.l,
             Side::Top => &mut self.t,
@@ -339,7 +512,7 @@ pub struct Rect {
 }
 
 impl Rect {
-    pub fn with_tl_br(tl: Point, br: Point) -> Rect {
+    pub fn from_tl_br(tl: Point, br: Point) -> Rect {
         Rect { tl, size: br.offset_from(tl) }
     }
 
@@ -482,7 +655,7 @@ impl Rect {
 impl Arbitrary for Rect {
     fn arbitrary<G: Gen>(g: &mut G) -> Self {
         let a = <(Point, Point)>::arbitrary(g);
-        Rect::with_tl_br(a.0, a.1)
+        Rect::from_tl_br(a.0, a.1)
     }
 }
 

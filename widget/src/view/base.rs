@@ -517,6 +517,13 @@ impl View {
         let node = &mut tree.arena[self.0];
         if node.measure_size == Some(size) { return; }
         node.measure_size = Some(size);
+        let margin = if self == tree.root {
+            Thickness::default()
+        } else {
+            *self.align_get(tree, view_align_type().margin())
+        };
+        size.0.as_mut().map(|w| *w = margin.shrink_band_w(*w));
+        size.1.as_mut().map(|h| *h = margin.shrink_band_h(*h));
         let min_max = self.min_max(tree);
         if let Some((min_size, (max_w, max_h))) = min_max {
             size.0 = size.0.map_or(max_w, |w| {
@@ -555,7 +562,6 @@ impl View {
             children_desired_size,
             |d| d.desired_size(self, tree, children_desired_size)
         );
-        let node = &mut tree.arena[self.0];
         if let Some((min_size, (max_w, max_h))) = min_max {
             desired_size = min_size.max(desired_size);
             if let Some(max_w) = max_w {
@@ -565,7 +571,8 @@ impl View {
                 desired_size.y = min(desired_size.y as u16, max_h as u16) as i16;
             }
         }
-        node.desired_size = desired_size;
+        let node = &mut tree.arena[self.0];
+        node.desired_size = margin.expand_rect_size(desired_size);
     }
 
     pub fn arrange(self, tree: &mut ViewTree, mut rect: Rect) {
@@ -584,6 +591,12 @@ impl View {
             }
         }
         node.arrange_bounds = Some(rect);
+        let margin = if self == tree.root {
+            Thickness::default()
+        } else {
+            *self.align_get(tree, view_align_type().margin())
+        };
+        rect = margin.shrink_rect(rect);
         let (h_align, v_align) = if self == tree.root {
             (HAlign::Left, VAlign::Top)
         } else {
@@ -602,8 +615,7 @@ impl View {
                 size.y = min(size.y as u16, max_h as u16) as i16;
             }
             let padding = Thickness::align(size, rect.size, h_align, v_align);
-            rect.tl = rect.tl.offset(Vector { x: padding.l, y: padding.t });
-            rect.size = size;
+            rect = padding.shrink_rect(rect);
         }
         let node = &mut tree.arena[self.0];
         let panel = node.panel.as_ref().map(|x| x.behavior());
@@ -635,10 +647,8 @@ impl View {
             children_render_bounds,
             |d| d.render_bounds(self, tree, children_render_bounds)
         );
-        let padding = Thickness::align(render_bounds.size, rect.size, h_align, v_align);
-        render_bounds.tl = render_bounds.tl.offset(Vector { x: padding.l, y: padding.t });
-        render_bounds.size = rect.size;
         render_bounds.tl = rect.tl.offset(render_bounds.tl.offset_from(Point { x: 0, y: 0 }));
+        render_bounds = margin.expand_rect(render_bounds);
         let window = tree.arena[self.0].window;
         window.map(|w| w.move_(tree.window_tree(), render_bounds));
         tree.arena[self.0].render_bounds = render_bounds;
@@ -778,6 +788,7 @@ dep_obj! {
         max_h: Option<i16> = None,
         w: Option<i16> = None,
         h: Option<i16> = None,
+        margin: Thickness = Thickness::all(0),
     }
 }
 

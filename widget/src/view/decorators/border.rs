@@ -192,7 +192,7 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
             x: if r { -1 } else { 0 },
             y: if b { -1 } else { 0 },
         };
-        Rect::with_tl_br(tl_offset, Point { x: 0, y: 0}.offset(arrange_size + br_offset))
+        Rect::from_tl_br(tl_offset, Point { x: 0, y: 0}.offset(arrange_size + br_offset))
             .intersect(Rect { tl: Point { x: 0, y: 0 }, size: arrange_size })
     }
 
@@ -213,7 +213,7 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
             x: if r { 1 } else { 0 },
             y: if b { 1 } else { 0 },
         };
-        let render_bounds = Rect::with_tl_br(
+        let render_bounds = Rect::from_tl_br(
             children_render_bounds.tl.offset(tl_offset),
             children_render_bounds.br().offset(br_offset)
         ).union(children_render_bounds);

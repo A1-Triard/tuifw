@@ -1,7 +1,7 @@
 #![deny(warnings)]
 use std::borrow::Cow;
 use dyn_context::ContextExt;
-use tuifw_screen::{Key, Vector, Thickness, HAlign, VAlign, Point, Side};
+use tuifw_screen::{Key, Vector, Thickness, HAlign, VAlign, Point, Side, Rect};
 use tuifw_widget::view::{ViewTree, View, view_align_type, view_base_type};
 use tuifw_widget::view::panels::{CanvasPanel, CanvasLayout, canvas_layout_type};
 use tuifw_widget::view::panels::{DockPanel, DockLayout, dock_layout_type};
@@ -21,17 +21,17 @@ fn double_border(tree: &mut ViewTree, view: View) {
 
 fn main() {
     let screen = unsafe { tuifw_screen::init() }.unwrap();
-    let size = Vector { x: 13, y: 7 };
-    let padding = Thickness::align(size, screen.size(), HAlign::Center, VAlign::Center);
+    let padding = Thickness::align(Vector { x: 13, y: 7 }, screen.size(), HAlign::Center, VAlign::Center);
+    let bounds = padding.shrink_rect(Rect { tl: Point { x: 0, y: 0 }, size: screen.size() });
     let tree = &mut ViewTree::new(screen, |_| ((), |tree| tree));
     CanvasPanel::new(tree, tree.root());
     let border = View::new(tree, tree.root(), |view| ((), view));
     CanvasLayout::new(tree, border);
     BorderDecorator::new(tree, border);
     double_border(tree, border);
-    border.align_set_distinct(tree, view_align_type().w(), Some(size.x));
-    border.align_set_distinct(tree, view_align_type().h(), Some(size.y));
-    border.layout_set_distinct(tree, canvas_layout_type().tl(), Point { x: padding.l, y: padding.t });
+    border.align_set_distinct(tree, view_align_type().w(), Some(bounds.w()));
+    border.align_set_distinct(tree, view_align_type().h(), Some(bounds.h()));
+    border.layout_set_distinct(tree, canvas_layout_type().tl(), bounds.tl);
     DockPanel::new(tree, border);
     let l_arrow = View::new(tree, border, |view| ((), view));
     DockLayout::new(tree, l_arrow);

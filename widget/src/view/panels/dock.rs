@@ -129,28 +129,24 @@ impl PanelBehavior for DockPanelBehavior {
                     Side::Right => bounds.tr().offset(-Vector { x: child_size.x, y: 0 }),
                     Side::Bottom => bounds.bl().offset(-Vector { y: child_size.y, x: 0 }),
                 };
-                child.arrange(tree, Rect { tl: child_tl, size: child_size });
-                let child_rect = child.render_bounds(tree);
+                let child_rect = Rect { tl: child_tl, size: child_size };
+                child.arrange(tree, child_rect);
                 children_rect = children_rect.union_intersect(child_rect, children_arrange_bounds);
                 let d = match base {
-                    Side::Left => Thickness {
-                        l: min(child_rect.w() as u16, bounds.w() as u16) as i16,
-                        t: 0, r: 0, b: 0
-                    },
-                    Side::Right => Thickness {
-                        r: min(child_rect.w() as u16, bounds.w() as u16) as i16,
-                        t: 0, l: 0, b: 0
-                    },
-                    Side::Top => Thickness {
-                        t: min(child_rect.h() as u16, bounds.h() as u16) as i16,
-                        r: 0, l: 0, b: 0
-                    },
-                    Side::Bottom => Thickness {
-                        b: min(child_rect.h() as u16, bounds.h() as u16) as i16,
-                        r: 0, l: 0, t: 0
-                    },
+                    Side::Left => unsafe { Thickness::new_unchecked(
+                        min(child_rect.w() as u16, bounds.w() as u16) as u32 as i32, 0, 0, 0
+                    ) },
+                    Side::Right => unsafe { Thickness::new_unchecked(
+                        0, 0, min(child_rect.w() as u16, bounds.w() as u16) as u32 as i32, 0
+                    ) },
+                    Side::Top => unsafe { Thickness::new_unchecked(
+                        0, min(child_rect.h() as u16, bounds.h() as u16) as u32 as i32, 0, 0
+                    ) },
+                    Side::Bottom => unsafe { Thickness::new_unchecked(
+                        0, 0, 0, min(child_rect.h() as u16, bounds.h() as u16) as u32 as i32
+                    ) },
                 };
-                bounds = d.shrink(bounds);
+                bounds = d.shrink_rect(bounds);
                 if child == last_child { break; }
             }
         }

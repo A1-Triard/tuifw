@@ -29,7 +29,7 @@ fn main() {
     let tree = &mut WindowTree::new(screen, draw);
     let size = Vector { x: 13, y: 7 };
     let padding = Thickness::align(size, tree.screen_size(), HAlign::Center, VAlign::Center);
-    let mut bounds = Rect { tl: Point { x: padding.l, y: padding.t }, size };
+    let mut bounds = padding.shrink_rect(Rect { tl: Point { x: 0, y: 0 }, size: tree.screen_size() });
     let window = Window::new(tree, None, bounds, |window| ((), window));
     loop {
         if let Some(e) = tree.update(true, &mut ()).unwrap() {

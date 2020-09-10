@@ -82,7 +82,7 @@ impl base_Screen for Screen {
             x += 1;
         }
         self.invalidated = self.invalidated
-            .union(Rect::with_tl_br(Point { x: x0, y: p.y }, Point { x, y: p.y + 1 }))
+            .union(Rect::from_tl_br(Point { x: x0, y: p.y }, Point { x, y: p.y + 1 }))
             .unwrap().right().unwrap()
         ;
         x0 .. x
