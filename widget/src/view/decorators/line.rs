@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::fmt::Debug;
 use tuifw_screen_base::{Vector, Point, Rect, Orient};
 use tuifw_window::{RenderPort};
@@ -11,9 +12,9 @@ dep_obj! {
     pub struct LineDecorator as View: LineDecoratorType {
         orient: Orient = Orient::Hor,
         length: i16 = 3,
-        near: Option<Text> = None,
-        stroke: Option<Text> = None,
-        far: Option<Text> = None,
+        near: Cow<'static, str> = Cow::Borrowed(""),
+        stroke: Cow<'static, str> = Cow::Borrowed(""),
+        far: Cow<'static, str> = Cow::Borrowed(""),
     }
 }
 
@@ -44,18 +45,18 @@ impl LineDecorator {
         view.invalidate_measure(tree);
     }
 
-    fn invalidate_near(view: View, context: &mut dyn Context, _old: &Option<Text>) {
+    fn invalidate_near(view: View, context: &mut dyn Context, _old: &Cow<'static, str>) {
         let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
         let invalidated = Rect { tl: Point { x: 0, y: 0 }, size: Vector { x: 1, y: 1 } };
         view.invalidate_rect(tree, invalidated).unwrap();
     }
 
-    fn invalidate_stroke(view: View, context: &mut dyn Context, _old: &Option<Text>) {
+    fn invalidate_stroke(view: View, context: &mut dyn Context, _old: &Cow<'static, str>) {
         let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
         view.invalidate_render(tree).unwrap();
     }
 
-    fn invalidate_far(view: View, context: &mut dyn Context, _old: &Option<Text>) {
+    fn invalidate_far(view: View, context: &mut dyn Context, _old: &Cow<'static, str>) {
         let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
         let &orient = view.decorator_get(tree, line_decorator_type().orient());
         let size = view.render_bounds(tree).size;
@@ -114,23 +115,26 @@ impl DecoratorBehavior for LineDecoratorBehavior {
         let near = view.decorator_get(tree, line_decorator_type().near());
         let stroke = view.decorator_get(tree, line_decorator_type().stroke());
         let far = view.decorator_get(tree, line_decorator_type().far());
-        if let Some(stroke) = stroke {
+        let fg = view.actual_fg(tree);
+        let bg = view.actual_bg(tree);
+        let attr = view.actual_attr(tree);
+        if !stroke.is_empty() {
             for i in 0 .. length as u16 {
                 if orient == Orient::Vert {
-                    port.out(Point { x: 0, y: i as i16 }, stroke.fg, stroke.bg, stroke.attr, &stroke.value);
+                    port.out(Point { x: 0, y: i as i16 }, fg, bg, attr, stroke);
                 } else {
-                    port.out(Point { y: 0, x: i as i16 }, stroke.fg, stroke.bg, stroke.attr, &stroke.value);
+                    port.out(Point { y: 0, x: i as i16 }, fg, bg, attr, stroke);
                 }
             }
         }
-        if let Some(near) = near.as_ref() {
-            port.out(Point { x: 0, y: 0 }, near.fg, near.bg, near.attr, &near.value);
+        if !near.is_empty() {
+            port.out(Point { x: 0, y: 0 }, fg, bg, attr, near);
         }
-        if let Some(far) = far.as_ref() {
+        if !far.is_empty() {
             if orient == Orient::Vert {
-                port.out(Point { y: length.overflowing_sub(1).0, x: 0 }, far.fg, far.bg, far.attr, &far.value);
+                port.out(Point { y: length.overflowing_sub(1).0, x: 0 }, fg, bg, attr, far);
             } else {
-                port.out(Point { x: length.overflowing_sub(1).0, y: 0 }, far.fg, far.bg, far.attr, &far.value);
+                port.out(Point { x: length.overflowing_sub(1).0, y: 0 }, fg, bg, attr, far);
             }
         }
     }

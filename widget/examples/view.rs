@@ -1,36 +1,20 @@
 #![deny(warnings)]
-use boow::Bow;
+use std::borrow::Cow;
 use dyn_context::ContextExt;
-use tuifw_screen::{Attr, Color, Key, Vector, Thickness, HAlign, VAlign, Point};
-use tuifw_widget::view::{Text, ViewTree, View, view_align_type, view_base_type};
+use tuifw_screen::{Key, Vector, Thickness, HAlign, VAlign, Point};
+use tuifw_widget::view::{ViewTree, View, view_align_type, view_base_type};
 use tuifw_widget::view::panels::{CanvasPanel, CanvasLayout, canvas_layout_type};
 use tuifw_widget::view::decorators::{BorderDecorator, border_decorator_type};
 
 fn double_border(tree: &mut ViewTree, view: View) {
-    view.decorator_set_uncond(tree, border_decorator_type().tl(), Some(Text {
-        value: Bow::Borrowed(&"╔"), fg: Color::Green, bg: None, attr: Attr::empty()
-    }));
-    view.decorator_set_uncond(tree, border_decorator_type().tr(), Some(Text {
-        value: Bow::Borrowed(&"╗"), fg: Color::Green, bg: None, attr: Attr::empty()
-    }));
-    view.decorator_set_uncond(tree, border_decorator_type().bl(), Some(Text {
-        value: Bow::Borrowed(&"╚"), fg: Color::Green, bg: None, attr: Attr::empty()
-    }));
-    view.decorator_set_uncond(tree, border_decorator_type().br(), Some(Text {
-        value: Bow::Borrowed(&"╝"), fg: Color::Green, bg: None, attr: Attr::empty()
-    }));
-    view.decorator_set_uncond(tree, border_decorator_type().l(), Some(Text {
-        value: Bow::Borrowed(&"║"), fg: Color::Green, bg: None, attr: Attr::empty()
-    }));
-    view.decorator_set_uncond(tree, border_decorator_type().t(), Some(Text {
-        value: Bow::Borrowed(&"═"), fg: Color::Green, bg: None, attr: Attr::empty()
-    }));
-    view.decorator_set_uncond(tree, border_decorator_type().r(), Some(Text {
-        value: Bow::Borrowed(&"║"), fg: Color::Green, bg: None, attr: Attr::empty()
-    }));
-    view.decorator_set_uncond(tree, border_decorator_type().b(), Some(Text {
-        value: Bow::Borrowed(&"═"), fg: Color::Green, bg: None, attr: Attr::empty()
-    }));
+    view.decorator_set_uncond(tree, border_decorator_type().tl(), Cow::Borrowed(&"╔"));
+    view.decorator_set_uncond(tree, border_decorator_type().tr(), Cow::Borrowed(&"╗"));
+    view.decorator_set_uncond(tree, border_decorator_type().bl(), Cow::Borrowed(&"╚"));
+    view.decorator_set_uncond(tree, border_decorator_type().br(), Cow::Borrowed(&"╝"));
+    view.decorator_set_uncond(tree, border_decorator_type().l(), Cow::Borrowed(&"║"));
+    view.decorator_set_uncond(tree, border_decorator_type().t(), Cow::Borrowed(&"═"));
+    view.decorator_set_uncond(tree, border_decorator_type().r(), Cow::Borrowed(&"║"));
+    view.decorator_set_uncond(tree, border_decorator_type().b(), Cow::Borrowed(&"═"));
 }
 
 fn main() {

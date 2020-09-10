@@ -5,36 +5,14 @@ use std::fmt::Debug;
 use std::iter::{self};
 use std::mem::{replace};
 use std::num::{NonZeroU16};
-use boow::Bow;
 use components_arena::{RawId, Component, Id, Arena, ComponentClassMutex, ComponentId};
-use dep_obj::{dep_obj, dep_system, DepTypeToken};
+use dep_obj::{dep_obj, dep_system, DepTypeToken, DepProp};
 use dyn_context::{TrivialContext, Context, ContextExt};
 use downcast_rs::{Downcast, impl_downcast};
 use once_cell::sync::{self};
 use tuifw_screen_base::{Key, Event, Screen, Vector, Point, Rect, Attr, Color, HAlign, VAlign, Thickness};
 use tuifw_window::{RenderPort, WindowTree, Window};
 use macro_attr_2018::macro_attr;
-
-#[derive(Debug, Clone)]
-pub struct Text {
-    pub fg: Color,
-    pub bg: Option<Color>,
-    pub attr: Attr,
-    pub value: Bow<'static, &'static str>,
-}
-
-impl Text {
-    pub const SPACE: Text = Text {
-        fg: Color::Black,
-        bg: None,
-        attr: Attr::empty(),
-        value: Bow::Borrowed(&" ")
-    };
-}
-
-impl Default for Text {
-    fn default() -> Text { Text::SPACE.clone() }
-}
 
 pub trait Layout: Downcast + Debug + Send + Sync { }
 
@@ -157,7 +135,7 @@ impl ViewTree {
             focused: root,
             quit: false,
         };
-        root.decorator_on_changed(&mut tree, root_decorator_type().bg(), RootDecorator::invalidate_screen);
+        root.decorator_on_changed(&mut tree, root_decorator_type().fill(), RootDecorator::invalidate_screen);
         root.base_set_distinct(&mut tree, view_base_type().focused(), true);
         result(tree)
     }
@@ -252,6 +230,9 @@ impl View {
             let next = replace(&mut tree.arena[prev.0].next, view);
             tree.arena[view.0].next = next;
         }
+        view.base_on_changed(tree, view_base_type().bg(), ViewBase::on_bg_changed);
+        view.base_on_changed(tree, view_base_type().fg(), ViewBase::on_fg_changed);
+        view.base_on_changed(tree, view_base_type().attr(), ViewBase::on_attr_changed);
         view.align_on_changed(tree, view_align_type().min_size(), ViewAlign::invalidate_measure);
         view.align_on_changed(tree, view_align_type().max_size(), ViewAlign::invalidate_measure);
         view.align_on_changed(tree, view_align_type().w(), ViewAlign::invalidate_measure);
@@ -407,6 +388,24 @@ impl View {
     pub fn desired_size(self, tree: &ViewTree) -> Vector { tree.arena[self.0].desired_size }
 
     pub fn render_bounds(self, tree: &ViewTree) -> Rect { tree.arena[self.0].render_bounds }
+
+    pub fn actual_fg(self, tree: &ViewTree) -> Color {
+        self.self_and_parents(tree)
+            .find_map(|view| *view.base_get(tree, view_base_type().fg()))
+            .unwrap_or(Color::Green)
+    }
+
+    pub fn actual_bg(self, tree: &ViewTree) -> Option<Color> {
+        self.self_and_parents(tree)
+            .find_map(|view| *view.base_get(tree, view_base_type().bg()))
+            .unwrap_or(None)
+    }
+
+    pub fn actual_attr(self, tree: &ViewTree) -> Attr {
+        self.self_and_parents(tree)
+            .find_map(|view| *view.base_get(tree, view_base_type().attr()))
+            .unwrap_or(Attr::empty())
+    }
 
     dep_system! {
         pub fn base(self as this, tree: ViewTree) -> ViewBase {
@@ -642,7 +641,7 @@ pub fn root_decorator_type() -> &'static RootDecoratorType { ROOT_DECORATOR_TOKE
 impl RootDecorator {
     const BEHAVIOR: RootDecoratorBehavior = RootDecoratorBehavior;
 
-    fn invalidate_screen(_view: View, context: &mut dyn Context, _old: &Text) {
+    fn invalidate_screen<T>(_view: View, context: &mut dyn Context, _old: &T) {
         let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
         tree.window_tree().invalidate_screen();
     }
@@ -677,8 +676,11 @@ impl DecoratorBehavior for RootDecoratorBehavior {
     }
 
     fn render(&self, view: View, tree: &ViewTree, port: &mut RenderPort) {
-        let bg = view.decorator_get(tree, root_decorator_type().bg());
-        port.fill(|port, p| port.out(p, bg.fg, bg.bg, bg.attr, &bg.value));
+        let fill = view.decorator_get(tree, root_decorator_type().fill());
+        let fg = view.actual_fg(tree);
+        let bg = view.actual_bg(tree);
+        let attr = view.actual_attr(tree);
+        port.fill(|port, p| port.out(p, fg, bg, attr, fill));
     }
 }
 
@@ -698,6 +700,9 @@ impl ViewInput {
 dep_obj! {
     #[derive(Debug)]
     pub struct ViewBase as View: ViewBaseType {
+        fg: Option<Color> = None,
+        bg: Option<Option<Color>> = None,
+        attr: Option<Attr> = None,
         focused: bool = false,
         input yield ViewInput,
     }
@@ -708,6 +713,40 @@ static VIEW_BASE_TOKEN: sync::Lazy<DepTypeToken<ViewBaseType>> = sync::Lazy::new
 );
 
 pub fn view_base_type() -> &'static ViewBaseType { VIEW_BASE_TOKEN.ty() }
+
+impl ViewBase {
+    fn on_inheritable_render_changed<T>(
+        view: View,
+        context: &mut dyn Context,
+        prop: DepProp<Self, Option<T>>,
+    ) {
+        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let _ = view.invalidate_render(tree);
+        if let Some(last_child) = view.last_child(tree) {
+            let mut child = last_child;
+            loop {
+                let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+                child = child.next(tree);
+                if child.base_get(tree, prop).is_none() {
+                    child.base_set_uncond(context, prop, None);
+                }
+                if child == last_child { break; }
+            }
+        }
+    }
+
+    fn on_fg_changed(view: View, context: &mut dyn Context, _old: &Option<Color>) {
+        Self::on_inheritable_render_changed(view, context, view_base_type().fg());
+    }
+
+    fn on_bg_changed(view: View, context: &mut dyn Context, _old: &Option<Option<Color>>) {
+        Self::on_inheritable_render_changed(view, context, view_base_type().bg());
+    }
+
+    fn on_attr_changed(view: View, context: &mut dyn Context, _old: &Option<Attr>) {
+        Self::on_inheritable_render_changed(view, context, view_base_type().attr());
+    }
+}
 
 dep_obj! {
     #[derive(Debug)]
