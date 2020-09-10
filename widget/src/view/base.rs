@@ -13,16 +13,6 @@ use once_cell::sync::{self};
 use tuifw_screen_base::{Key, Event, Screen, Vector, Point, Rect, Attr, Color, HAlign, VAlign, Thickness};
 use tuifw_window::{RenderPort, WindowTree, Window};
 use macro_attr_2018::macro_attr;
-use enum_derive_2018::{EnumDisplay, EnumFromStr};
-
-macro_attr! {
-    #[derive(Eq, PartialEq, Debug, Hash, Clone, Copy, Ord, PartialOrd)]
-    #[derive(EnumDisplay!, EnumFromStr!)]
-    pub enum Orient {
-        Hor,
-        Vert
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct Text {

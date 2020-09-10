@@ -14,7 +14,7 @@ use alloc::boxed::Box;
 use core::any::Any;
 use core::cmp::{min, max};
 use core::num::{NonZeroU16, NonZeroI16};
-use core::ops::{Add, AddAssign, Sub, SubAssign, Neg, Range};
+use core::ops::{Add, AddAssign, Sub, SubAssign, Neg, Range, Index, IndexMut};
 use core::option::{Option};
 use num_traits::Zero;
 use either::{Either, Left, Right};
@@ -25,6 +25,26 @@ use quickcheck::{Arbitrary, Gen};
 
 mod std {
     pub use core::*;
+}
+
+macro_attr! {
+    #[derive(Eq, PartialEq, Debug, Hash, Clone, Copy, Ord, PartialOrd)]
+    #[derive(EnumDisplay!, EnumFromStr!)]
+    pub enum Side {
+        Left,
+        Top,
+        Right,
+        Bottom
+    }
+}
+
+macro_attr! {
+    #[derive(Eq, PartialEq, Debug, Hash, Clone, Copy, Ord, PartialOrd)]
+    #[derive(EnumDisplay!, EnumFromStr!)]
+    pub enum Orient {
+        Hor,
+        Vert
+    }
 }
 
 macro_attr! {
@@ -264,8 +284,39 @@ impl Thickness {
         Thickness { l, t, r, b }
     }
 
+    pub fn shrink(self, rect: Rect) -> Rect {
+        Rect::with_tl_br(
+            rect.tl.offset(Vector { x: self.l, y: self.t }),
+            rect.br().offset(-Vector { x: self.r, y: self.b })
+        )
+    }
+
     pub fn all(a: i16) -> Thickness {
         Thickness { l: a, t: a, r: a, b: a }
+    }
+}
+
+impl Index<Side> for Thickness {
+    type Output = i16;
+
+    fn index(&self, index: Side) -> &i16 {
+        match index {
+            Side::Left => &self.l,
+            Side::Top => &self.t,
+            Side::Right => &self.r,
+            Side::Bottom => &self.b
+        }
+    }
+}
+
+impl IndexMut<Side> for Thickness {
+    fn index_mut(&mut self, index: Side) -> &mut i16 {
+        match index {
+            Side::Left => &mut self.l,
+            Side::Top => &mut self.t,
+            Side::Right => &mut self.r,
+            Side::Bottom => &mut self.b
+        }
     }
 }
 
