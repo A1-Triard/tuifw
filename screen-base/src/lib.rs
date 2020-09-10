@@ -125,11 +125,11 @@ pub struct Point {
 
 impl Point {
     pub fn offset(self, d: Vector) -> Point {
-        Point { x: self.x.overflowing_add(d.x).0, y: self.y.overflowing_add(d.y).0 }
+        Point { x: self.x.wrapping_add(d.x), y: self.y.wrapping_add(d.y) }
     }
 
     pub fn offset_from(self, other: Point) -> Vector {
-        Vector { x: self.x.overflowing_sub(other.x).0, y: self.y.overflowing_sub(other.y).0 }
+        Vector { x: self.x.wrapping_sub(other.x), y: self.y.wrapping_sub(other.y) }
     }
 }
 
@@ -185,7 +185,7 @@ impl Add for Vector {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
-        Vector { x: self.x.overflowing_add(other.x).0, y: self.y.overflowing_add(other.y).0 }
+        Vector { x: self.x.wrapping_add(other.x), y: self.y.wrapping_add(other.y) }
     }
 }
 
@@ -199,7 +199,7 @@ impl Sub for Vector {
     type Output = Self;
 
     fn sub(self, other: Self) -> Self {
-        Vector { x: self.x.overflowing_sub(other.x).0, y: self.y.overflowing_sub(other.y).0 }
+        Vector { x: self.x.wrapping_sub(other.x), y: self.y.wrapping_sub(other.y) }
     }
 }
 
@@ -233,10 +233,10 @@ pub struct VBand {
 
 impl VBand {
     pub fn with_l_r(l: i16, r: i16) -> Option<VBand> {
-        NonZeroI16::new(r.overflowing_sub(l).0).map(|w| VBand { l, w })
+        NonZeroI16::new(r.wrapping_sub(l)).map(|w| VBand { l, w })
     }
 
-    pub fn r(self) -> i16 { self.l.overflowing_add(self.w.get()).0 }
+    pub fn r(self) -> i16 { self.l.wrapping_add(self.w.get()) }
 }
 
 #[derive(Eq, PartialEq, Debug, Hash, Clone, Copy)]
@@ -247,10 +247,10 @@ pub struct HBand {
 
 impl HBand {
     pub fn with_t_b(t: i16, b: i16) -> Option<HBand> {
-        NonZeroI16::new(b.overflowing_sub(t).0).map(|h| HBand { t, h })
+        NonZeroI16::new(b.wrapping_sub(t)).map(|h| HBand { t, h })
     }
 
-    pub fn b(self) -> i16 { self.t.overflowing_add(self.h.get()).0 }
+    pub fn b(self) -> i16 { self.t.wrapping_add(self.h.get()) }
 }
 
 #[derive(Eq, PartialEq, Debug, Hash, Clone, Copy)]
@@ -263,22 +263,22 @@ pub struct Thickness {
 
 impl Thickness {
     pub fn align(inner: Vector, outer: Vector, h_align: HAlign, v_align: VAlign) -> Thickness {
-        let w = outer.x.overflowing_sub(inner.x).0;
+        let w = outer.x.wrapping_sub(inner.x);
         let (l, r) = match h_align {
             HAlign::Left => (0, w),
             HAlign::Right => (w, 0),
             HAlign::Center => {
                 let l = w / 2;
-                (l, w.overflowing_sub(l).0)
+                (l, w.wrapping_sub(l))
             }
         };
-        let h = outer.y.overflowing_sub(inner.y).0;
+        let h = outer.y.wrapping_sub(inner.y);
         let (t, b) = match v_align {
             VAlign::Top => (0, h),
             VAlign::Bottom => (h, 0),
             VAlign::Center => {
                 let t = h / 2;
-                (t, h.overflowing_sub(t).0)
+                (t, h.wrapping_sub(t))
             }
         };
         Thickness { l, t, r, b }
@@ -353,9 +353,9 @@ impl Rect {
 
     pub fn t(self) -> i16 { self.tl.y }
 
-    pub fn r(self) -> i16 { self.tl.x.overflowing_add(self.size.x).0 }
+    pub fn r(self) -> i16 { self.tl.x.wrapping_add(self.size.x) }
 
-    pub fn b(self) -> i16 { self.tl.y.overflowing_add(self.size.y).0 }
+    pub fn b(self) -> i16 { self.tl.y.wrapping_add(self.size.y) }
 
     pub fn tr(self) -> Point { Point { x: self.r(), y: self.t() } }
 
@@ -366,7 +366,7 @@ impl Rect {
     pub fn area(self) -> u32 { self.size.rect_area() }
 
     fn contains_1d(r: (i16, i16), p: i16) -> bool {
-        (p.overflowing_sub(r.0).0 as u16) < (r.1 as u16)
+        (p.wrapping_sub(r.0) as u16) < (r.1 as u16)
     }
 
     pub fn contains(self, p: Point) -> bool {
@@ -376,14 +376,14 @@ impl Rect {
     fn intersect_1d(s: (i16, i16), o: (i16, i16)) -> (i16, i16) {
         let (a, b) = if (s.1 as u16) <= (o.1 as u16) { (o, s) } else { (s, o) };
         if Self::contains_1d(a, b.0) {
-            if Self::contains_1d(a, b.0.overflowing_add(b.1).0) {
+            if Self::contains_1d(a, b.0.wrapping_add(b.1)) {
                 b
             } else {
-                (b.0, a.0.overflowing_add(a.1).0.overflowing_sub(b.0).0)
+                (b.0, a.0.wrapping_add(a.1).wrapping_sub(b.0))
             }
         } else {
-            if Self::contains_1d(a, b.0.overflowing_add(b.1).0) {
-                (a.0, b.0.overflowing_add(b.1).0.overflowing_sub(a.0).0)
+            if Self::contains_1d(a, b.0.wrapping_add(b.1)) {
+                (a.0, b.0.wrapping_add(b.1).wrapping_sub(a.0))
             } else {
                 (b.0, 0)
             }
@@ -409,23 +409,23 @@ impl Rect {
     fn union_1d(s: (i16, NonZeroI16), o: (i16, NonZeroI16)) -> Option<(i16, NonZeroI16)> {
         let (a, b) = if (s.1.get() as u16) <= (o.1.get() as u16) { (o, s) } else { (s, o) };
         if Self::contains_1d((a.0, a.1.get()), b.0) {
-            if Self::contains_1d((a.0, a.1.get()), b.0.overflowing_add(b.1.get()).0) {
-                if (b.0.overflowing_add(b.1.get()).0.overflowing_sub(a.0).0 as u16) >= (b.0.overflowing_sub(a.0).0 as u16) {
+            if Self::contains_1d((a.0, a.1.get()), b.0.wrapping_add(b.1.get())) {
+                if (b.0.wrapping_add(b.1.get()).wrapping_sub(a.0) as u16) >= (b.0.wrapping_sub(a.0) as u16) {
                     Some(a)
                 } else {
                     None
                 }
             } else {
-                let w = NonZeroI16::new(b.0.overflowing_add(b.1.get()).0.overflowing_sub(a.0).0);
+                let w = NonZeroI16::new(b.0.wrapping_add(b.1.get()).wrapping_sub(a.0));
                 w.map(|w| (a.0, w))
             }
         } else {
-            if Self::contains_1d((a.0, a.1.get()), b.0.overflowing_add(b.1.get()).0) {
-                let w = NonZeroI16::new(a.0.overflowing_add(a.1.get()).0.overflowing_sub(b.0).0);
+            if Self::contains_1d((a.0, a.1.get()), b.0.wrapping_add(b.1.get())) {
+                let w = NonZeroI16::new(a.0.wrapping_add(a.1.get()).wrapping_sub(b.0));
                 w.map(|w| (b.0, w))
             } else {
-                let u = NonZeroI16::new(o.0.overflowing_add(o.1.get()).0.overflowing_sub(s.0).0);
-                let v = NonZeroI16::new(s.0.overflowing_add(s.1.get()).0.overflowing_sub(o.0).0);
+                let u = NonZeroI16::new(o.0.wrapping_add(o.1.get()).wrapping_sub(s.0));
+                let v = NonZeroI16::new(s.0.wrapping_add(s.1.get()).wrapping_sub(o.0));
                 u.map_or_else(|| v.map(|v| (o.0, v)), |u| Some(v.map_or_else(
                     || (s.0, u),
                     |v| if (u.get() as u16) <= (v.get() as u16) { (s.0, u) } else { (o.0, v) }

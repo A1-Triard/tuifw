@@ -35,9 +35,9 @@ fn main() {
         if let Some(e) = tree.update(true, &mut ()).unwrap() {
             let d = match e {
                 Event::Key(n, Key::Left) | Event::Key(n, Key::Char('h')) =>
-                    -Vector { x: (n.get() as i16).overflowing_mul(2).0, y: 0 },
+                    -Vector { x: (n.get() as i16).wrapping_mul(2), y: 0 },
                 Event::Key(n, Key::Right) | Event::Key(n, Key::Char('l')) =>
-                    Vector { x: (n.get() as i16).overflowing_mul(2).0, y: 0 },
+                    Vector { x: (n.get() as i16).wrapping_mul(2), y: 0 },
                 Event::Key(n, Key::Up) | Event::Key(n, Key::Char('k')) =>
                     -Vector { x: 0, y: n.get() as i16 },
                 Event::Key(n, Key::Down) | Event::Key(n, Key::Char('j')) =>

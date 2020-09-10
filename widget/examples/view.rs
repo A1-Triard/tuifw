@@ -42,9 +42,9 @@ fn main() {
         let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
         let d = match input.key() {
             (n, Key::Left) | (n, Key::Char('h')) =>
-                -Vector { x: (n.get() as i16).overflowing_mul(2).0, y: 0 },
+                -Vector { x: (n.get() as i16).wrapping_mul(2), y: 0 },
             (n, Key::Right) | (n, Key::Char('l')) =>
-                Vector { x: (n.get() as i16).overflowing_mul(2).0, y: 0 },
+                Vector { x: (n.get() as i16).wrapping_mul(2), y: 0 },
             (n, Key::Up) | (n, Key::Char('k')) =>
                 -Vector { x: 0, y: n.get() as i16 },
             (n, Key::Down) | (n, Key::Char('j')) =>

@@ -59,7 +59,7 @@ impl BorderDecorator {
         let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
         let size = view.render_bounds(tree).size;
         view.invalidate_rect(tree, Rect {
-            tl: Point { x: size.x.overflowing_sub(1).0, y: 0 },
+            tl: Point { x: size.x.wrapping_sub(1), y: 0 },
             size: Vector { x: 1, y: 1 }
         }).unwrap();
     }
@@ -68,7 +68,7 @@ impl BorderDecorator {
         let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
         let size = view.render_bounds(tree).size;
         view.invalidate_rect(tree, Rect {
-            tl: Point { x: 0, y: size.y.overflowing_sub(1).0 },
+            tl: Point { x: 0, y: size.y.wrapping_sub(1) },
             size: Vector { x: 1, y: 1 }
         }).unwrap();
     }
@@ -77,7 +77,7 @@ impl BorderDecorator {
         let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
         let size = view.render_bounds(tree).size;
         view.invalidate_rect(tree, Rect {
-            tl: Point { x: size.x.overflowing_sub(1).0, y: size.y.overflowing_sub(1).0 },
+            tl: Point { x: size.x.wrapping_sub(1), y: size.y.wrapping_sub(1) },
             size: Vector { x: 1, y: 1 }
         }).unwrap();
     }
@@ -104,7 +104,7 @@ impl BorderDecorator {
         let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
         let size = view.render_bounds(tree).size;
         view.invalidate_rect(tree, Rect {
-            tl: Point { x: size.x.overflowing_sub(1).0, y: 0 },
+            tl: Point { x: size.x.wrapping_sub(1), y: 0 },
             size: Vector { x: 1, y: size.y }
         }).unwrap();
     }
@@ -113,7 +113,7 @@ impl BorderDecorator {
         let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
         let size = view.render_bounds(tree).size;
         view.invalidate_rect(tree, Rect {
-            tl: Point { x: 0, y: size.y.overflowing_sub(1).0 },
+            tl: Point { x: 0, y: size.y.wrapping_sub(1) },
             size: Vector { x: size.x, y: 1 }
         }).unwrap();
     }
@@ -255,7 +255,7 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
         }
         if !r.is_empty() {
             for y in 0 .. size.y as u16 {
-                port.out(Point { x: size.x.overflowing_sub(1).0, y: y as i16 }, fg, bg, attr, r);
+                port.out(Point { x: size.x.wrapping_sub(1), y: y as i16 }, fg, bg, attr, r);
             }
         }
         if !t.is_empty() {
@@ -265,20 +265,20 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
         }
         if !b.is_empty() {
             for x in 0 .. size.x as u16 {
-                port.out(Point { x: x as i16, y: size.y.overflowing_sub(1).0 }, fg, bg, attr, b);
+                port.out(Point { x: x as i16, y: size.y.wrapping_sub(1) }, fg, bg, attr, b);
             }
         }
         if !tl.is_empty() {
             port.out(Point { x: 0, y: 0 }, fg, bg, attr, tl);
         }
         if !tr.is_empty() {
-            port.out(Point { x: size.x.overflowing_sub(1).0, y: 0 }, fg, bg, attr, tr);
+            port.out(Point { x: size.x.wrapping_sub(1), y: 0 }, fg, bg, attr, tr);
         }
         if !bl.is_empty() {
-            port.out(Point { x: 0, y: size.y.overflowing_sub(1).0 }, fg, bg, attr, bl);
+            port.out(Point { x: 0, y: size.y.wrapping_sub(1) }, fg, bg, attr, bl);
         }
         if !br.is_empty() {
-            let p = Point { x: size.x.overflowing_sub(1).0, y: size.y.overflowing_sub(1).0 };
+            let p = Point { x: size.x.wrapping_sub(1), y: size.y.wrapping_sub(1) };
             port.out(p, fg, bg, attr, br);
         }
     }

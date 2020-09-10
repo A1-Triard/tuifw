@@ -61,9 +61,9 @@ impl LineDecorator {
         let &orient = view.decorator_get(tree, line_decorator_type().orient());
         let size = view.render_bounds(tree).size;
         let invalidated = if orient == Orient::Vert {
-            Rect { tl: Point { x: 0, y: size.y.overflowing_sub(1).0 }, size: Vector { x: 1, y: 1 } }
+            Rect { tl: Point { x: 0, y: size.y.wrapping_sub(1) }, size: Vector { x: 1, y: 1 } }
         } else {
-            Rect { tl: Point { y: 0, x: size.x.overflowing_sub(1).0 }, size: Vector { x: 1, y: 1 } }
+            Rect { tl: Point { y: 0, x: size.x.wrapping_sub(1) }, size: Vector { x: 1, y: 1 } }
         };
         view.invalidate_rect(tree, invalidated).unwrap();
     }
@@ -132,9 +132,9 @@ impl DecoratorBehavior for LineDecoratorBehavior {
         }
         if !far.is_empty() {
             if orient == Orient::Vert {
-                port.out(Point { y: length.overflowing_sub(1).0, x: 0 }, fg, bg, attr, far);
+                port.out(Point { y: length.wrapping_sub(1), x: 0 }, fg, bg, attr, far);
             } else {
-                port.out(Point { x: length.overflowing_sub(1).0, y: 0 }, fg, bg, attr, far);
+                port.out(Point { x: length.wrapping_sub(1), y: 0 }, fg, bg, attr, far);
             }
         }
     }
