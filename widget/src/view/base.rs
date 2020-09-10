@@ -1,4 +1,5 @@
 use std::any::{Any};
+use std::borrow::Cow;
 use std::cmp::{min, max};
 use std::fmt::Debug;
 use std::iter::{self};
@@ -628,7 +629,7 @@ impl View {
 dep_obj! {
     #[derive(Debug)]
     pub struct RootDecorator as View: RootDecoratorType {
-        bg: Text = Text::SPACE.clone()
+        fill: Cow<'static, str> = Cow::Borrowed(" ")
     }
 }
 

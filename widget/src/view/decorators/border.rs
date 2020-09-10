@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::fmt::Debug;
 use tuifw_screen_base::{Vector, Point, Rect};
 use tuifw_window::{RenderPort};
@@ -10,14 +11,14 @@ use crate::view::base::*;
 dep_obj! {
     #[derive(Debug)]
     pub struct BorderDecorator as View: BorderDecoratorType {
-        tl: Option<Text> = None,
-        tr: Option<Text> = None,
-        bl: Option<Text> = None,
-        br: Option<Text> = None,
-        l: Option<Text> = None,
-        t: Option<Text> = None,
-        r: Option<Text> = None,
-        b: Option<Text> = None,
+        tl: Cow<'static, str> = Cow::Borrowed(""),
+        tr: Cow<'static, str> = Cow::Borrowed(""),
+        bl: Cow<'static, str> = Cow::Borrowed(""),
+        br: Cow<'static, str> = Cow::Borrowed(""),
+        l: Cow<'static, str> = Cow::Borrowed(""),
+        t: Cow<'static, str> = Cow::Borrowed(""),
+        r: Cow<'static, str> = Cow::Borrowed(""),
+        b: Cow<'static, str> = Cow::Borrowed(""),
     }
 }
 
