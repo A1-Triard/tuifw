@@ -584,6 +584,14 @@ impl View {
             }
         }
         node.arrange_bounds = Some(rect);
+        let (h_align, v_align) = if self == tree.root {
+            (HAlign::Left, VAlign::Top)
+        } else {
+            (
+                *self.align_get(tree, view_align_type().h_align()),
+                *self.align_get(tree, view_align_type().v_align())
+            )
+        };
         let min_max = self.min_max(tree);
         if let Some((min_size, (max_w, max_h))) = min_max {
             let mut size = min_size.max(rect.size);
@@ -593,8 +601,6 @@ impl View {
             if let Some(max_h) = max_h {
                 size.y = min(size.y as u16, max_h as u16) as i16;
             }
-            let &h_align = self.align_get(tree, view_align_type().h_align());
-            let &v_align = self.align_get(tree, view_align_type().v_align());
             let padding = Thickness::align(size, rect.size, h_align, v_align);
             rect.tl = rect.tl.offset(Vector { x: padding.l, y: padding.t });
             rect.size = size;
@@ -629,22 +635,10 @@ impl View {
             children_render_bounds,
             |d| d.render_bounds(self, tree, children_render_bounds)
         );
-        if let Some((min_size, (max_w, max_h))) = min_max {
-            let mut size = min_size.max(render_bounds.size);
-            if let Some(max_w) = max_w {
-                size.x = min(size.x as u16, max_w as u16) as i16;
-            }
-            if let Some(max_h) = max_h {
-                size.y = min(size.y as u16, max_h as u16) as i16;
-            }
-            let &h_align = self.align_get(tree, view_align_type().h_align());
-            let &v_align = self.align_get(tree, view_align_type().v_align());
-            let padding = Thickness::align(size, render_bounds.size, h_align, v_align);
-            render_bounds.tl = render_bounds.tl.offset(Vector { x: padding.l, y: padding.t });
-            render_bounds.size = size;
-        }
+        let padding = Thickness::align(render_bounds.size, rect.size, h_align, v_align);
+        render_bounds.tl = render_bounds.tl.offset(Vector { x: padding.l, y: padding.t });
+        render_bounds.size = rect.size;
         render_bounds.tl = rect.tl.offset(render_bounds.tl.offset_from(Point { x: 0, y: 0 }));
-        render_bounds = render_bounds.intersect(rect);
         let window = tree.arena[self.0].window;
         window.map(|w| w.move_(tree.window_tree(), render_bounds));
         tree.arena[self.0].render_bounds = render_bounds;
