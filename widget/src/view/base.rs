@@ -234,7 +234,8 @@ impl View {
         view.base_on_changed(tree, view_base_type().fg(), ViewBase::on_fg_changed);
         view.base_on_changed(tree, view_base_type().attr(), ViewBase::on_attr_changed);
         view.align_on_changed(tree, view_align_type().min_size(), ViewAlign::invalidate_measure);
-        view.align_on_changed(tree, view_align_type().max_size(), ViewAlign::invalidate_measure);
+        view.align_on_changed(tree, view_align_type().max_w(), ViewAlign::invalidate_measure);
+        view.align_on_changed(tree, view_align_type().max_h(), ViewAlign::invalidate_measure);
         view.align_on_changed(tree, view_align_type().w(), ViewAlign::invalidate_measure);
         view.align_on_changed(tree, view_align_type().h(), ViewAlign::invalidate_measure);
         view.align_on_changed(tree, view_align_type().h_align(), ViewAlign::invalidate_arrange);
@@ -497,14 +498,15 @@ impl View {
         }
     }
 
-    fn min_max(self, tree: &ViewTree) -> Option<(Vector, Vector)> {
+    fn min_max(self, tree: &ViewTree) -> Option<(Vector, (Option<i16>, Option<i16>))> {
         if self != tree.root {
             let w = self.align_get(tree, view_align_type().w());
             let h = self.align_get(tree, view_align_type().h());
             let min_size = self.align_get(tree, view_align_type().min_size());
             let min_size = Vector { x: w.unwrap_or(min_size.x), y: h.unwrap_or(min_size.y) };
-            let max_size = self.align_get(tree, view_align_type().max_size());
-            let max_size = Vector { x: w.unwrap_or(max_size.x), y: h.unwrap_or(max_size.y) };
+            let &max_w = self.align_get(tree, view_align_type().max_w());
+            let &max_h = self.align_get(tree, view_align_type().max_h());
+            let max_size = (w.or(max_w), h.or(max_h));
             Some((min_size, max_size))
         } else {
             None
@@ -516,9 +518,15 @@ impl View {
         if node.measure_size == Some(size) { return; }
         node.measure_size = Some(size);
         let min_max = self.min_max(tree);
-        if let Some((min_size, max_size)) = min_max {
-            size.0.as_mut().map(|w| *w = max(min(*w as u16, max_size.x as u16), min_size.x as u16) as i16);
-            size.1.as_mut().map(|h| *h = max(min(*h as u16, max_size.y as u16), min_size.y as u16) as i16);
+        if let Some((min_size, (max_w, max_h))) = min_max {
+            size.0 = size.0.map_or(max_w, |w| {
+                let w = max(w as u16, min_size.x as u16);
+                Some(max_w.map_or(w, |max_w| min(w, max_w as u16)) as i16)
+            });
+            size.1 = size.1.map_or(max_h, |h| {
+                let h = max(h as u16, min_size.y as u16);
+                Some(max_h.map_or(h, |max_h| min(h, max_h as u16)) as i16)
+            });
         }
         let node = &mut tree.arena[self.0];
         let panel = node.panel.as_ref().map(|x| x.behavior());
@@ -548,8 +556,14 @@ impl View {
             |d| d.desired_size(self, tree, children_desired_size)
         );
         let node = &mut tree.arena[self.0];
-        if let Some((min_size, max_size)) = min_max {
-            desired_size = min_size.max(max_size.min(desired_size));
+        if let Some((min_size, (max_w, max_h))) = min_max {
+            desired_size = min_size.max(desired_size);
+            if let Some(max_w) = max_w {
+                desired_size.x = min(desired_size.x as u16, max_w as u16) as i16;
+            }
+            if let Some(max_h) = max_h {
+                desired_size.y = min(desired_size.y as u16, max_h as u16) as i16;
+            }
         }
         node.desired_size = desired_size;
     }
@@ -571,8 +585,14 @@ impl View {
         }
         node.arrange_bounds = Some(rect);
         let min_max = self.min_max(tree);
-        if let Some((min_size, max_size)) = min_max {
-            let size = min_size.max(max_size.min(rect.size));
+        if let Some((min_size, (max_w, max_h))) = min_max {
+            let mut size = min_size.max(rect.size);
+            if let Some(max_w) = max_w {
+                size.x = min(size.x as u16, max_w as u16) as i16;
+            }
+            if let Some(max_h) = max_h {
+                size.y = min(size.y as u16, max_h as u16) as i16;
+            }
             let &h_align = self.align_get(tree, view_align_type().h_align());
             let &v_align = self.align_get(tree, view_align_type().v_align());
             let padding = Thickness::align(size, rect.size, h_align, v_align);
@@ -609,8 +629,14 @@ impl View {
             children_render_bounds,
             |d| d.render_bounds(self, tree, children_render_bounds)
         );
-        if let Some((min_size, max_size)) = min_max {
-            let size = min_size.max(max_size.min(render_bounds.size));
+        if let Some((min_size, (max_w, max_h))) = min_max {
+            let mut size = min_size.max(render_bounds.size);
+            if let Some(max_w) = max_w {
+                size.x = min(size.x as u16, max_w as u16) as i16;
+            }
+            if let Some(max_h) = max_h {
+                size.y = min(size.y as u16, max_h as u16) as i16;
+            }
             let &h_align = self.align_get(tree, view_align_type().h_align());
             let &v_align = self.align_get(tree, view_align_type().v_align());
             let padding = Thickness::align(size, render_bounds.size, h_align, v_align);
@@ -754,7 +780,8 @@ dep_obj! {
         h_align: HAlign = HAlign::Center,
         v_align: VAlign = VAlign::Center,
         min_size: Vector = Vector::null(),
-        max_size: Vector = Vector { x: -1, y: -1 },
+        max_w: Option<i16> = None,
+        max_h: Option<i16> = None,
         w: Option<i16> = None,
         h: Option<i16> = None,
     }
