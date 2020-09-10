@@ -308,7 +308,7 @@ impl WindowTree {
         let bounds = self.arena[window].bounds.offset(offset);
         let (invalidated, screen_size) = self.invalidated();
         if !rect_invalidated((invalidated, screen_size), bounds) { return; }
-        let offset = offset + bounds.tl.offset_from(Point { x: 0, y: 0 });
+        let offset = bounds.tl.offset_from(Point { x: 0, y: 0 });
         let (screen, invalidated) = self.screen.take().expect("WindowTree is in invalid state");
         let mut port = RenderPort {
             screen,
