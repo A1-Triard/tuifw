@@ -5,3 +5,6 @@
 #![allow(clippy::option_map_unit_fn)]
 
 pub mod view;
+
+mod base;
+pub use base::*;
