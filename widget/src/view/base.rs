@@ -647,7 +647,9 @@ impl View {
             children_render_bounds,
             |d| d.render_bounds(self, tree, children_render_bounds)
         );
-        render_bounds.tl = rect.tl.offset(render_bounds.tl.offset_from(Point { x: 0, y: 0 }));
+        let padding = Thickness::align(render_bounds.size, rect.size, h_align, v_align);
+        render_bounds = padding.expand_rect(render_bounds);
+        render_bounds.tl = rect.tl.offset(Point { x: 0, y: 0 }.offset_from(render_bounds.tl));
         render_bounds = margin.expand_rect(render_bounds);
         let window = tree.arena[self.0].window;
         window.map(|w| w.move_(tree.window_tree(), render_bounds));
