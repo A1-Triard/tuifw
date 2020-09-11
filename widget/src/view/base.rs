@@ -93,6 +93,7 @@ pub struct ViewTree {
     screen_size: Vector,
     root: View,
     focused: View,
+    actual_focused: View,
     quit: bool,
 }
 
@@ -133,10 +134,10 @@ impl ViewTree {
             screen_size,
             root,
             focused: root,
+            actual_focused: root,
             quit: false,
         };
         root.decorator_on_changed(&mut tree, root_decorator_type().fill(), RootDecorator::invalidate_screen);
-        root.base_set_distinct(&mut tree, view_base_type().focused(), true);
         result(tree)
     }
 
@@ -151,6 +152,7 @@ impl ViewTree {
     pub fn root(&self) -> View { self.root }
 
     pub fn update(context: &mut dyn Context, wait: bool) -> Result<bool, Box<dyn Any>> {
+        Self::update_actual_focused(context);
         let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
         tree.root.measure(tree, (Some(tree.screen_size.x), Some(tree.screen_size.y)));
         tree.root.arrange(tree, Rect { tl: Point { x: 0, y: 0 }, size: tree.screen_size });
@@ -165,11 +167,11 @@ impl ViewTree {
         let event = event?;
         if let Some(Event::Key(n, key)) = event {
             let mut input = ViewInput { key: (n, key), handled: false };
-            let mut view = tree.focused;
+            let mut view = tree.actual_focused;
             loop {
                 view.base_raise(context, view_base_type().input(), &mut input);
                 if input.handled { break; }
-                let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+                let tree = context.get::<ViewTree>().expect("ViewTree required");
                 if let Some(parent) = view.parent(tree) {
                     view = parent;
                 } else {
@@ -179,6 +181,36 @@ impl ViewTree {
         }
         let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
         Ok(!tree.quit)
+    }
+
+    pub fn focused(&self) -> View { self.focused }
+
+    fn update_actual_focused(context: &mut dyn Context) {
+        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let focused = tree.focused;
+        let actual_focused = tree.actual_focused;
+        if focused == actual_focused { return; }
+        tree.actual_focused = focused;
+        let mut view = actual_focused;
+        loop {
+            view.base_raise(context, view_base_type().lost_focus(), &mut ());
+            let tree = context.get::<ViewTree>().expect("ViewTree required");
+            if let Some(parent) = view.parent(tree) {
+                view = parent;
+            } else {
+                break;
+            }
+        }
+        let mut view = focused;
+        loop {
+            view.base_raise(context, view_base_type().got_focus(), &mut ());
+            let tree = context.get::<ViewTree>().expect("ViewTree required");
+            if let Some(parent) = view.parent(tree) {
+                view = parent;
+            } else {
+                break;
+            }
+        }
     }
 }
 
@@ -240,6 +272,7 @@ impl View {
         view.align_on_changed(tree, view_align_type().h(), ViewAlign::invalidate_measure);
         view.align_on_changed(tree, view_align_type().h_align(), ViewAlign::invalidate_arrange);
         view.align_on_changed(tree, view_align_type().v_align(), ViewAlign::invalidate_arrange);
+        view.align_on_changed(tree, view_align_type().margin(), ViewAlign::invalidate_measure);
         view.invalidate_measure(tree);
         result
     }
@@ -252,17 +285,8 @@ impl View {
         Tag::from_raw(replace(&mut tree.arena[self.0].tag, tag.into_raw()))
     }
 
-    pub fn focus(self, context: &mut dyn Context) -> View {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
-        let old = replace(&mut tree.focused, self);
-        if old != self {
-            old.base_set_distinct(context, view_base_type().focused(), false);
-            let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
-            if tree.focused == self {
-                self.base_set_distinct(context, view_base_type().focused(), true);
-            }
-        }
-        old
+    pub fn focus(self, tree: &mut ViewTree) -> View {
+        replace(&mut tree.focused, self)
     }
 
     fn renew_window(self, tree: &mut ViewTree, parent_window: Option<Window>) {
@@ -734,7 +758,8 @@ dep_obj! {
         fg: Option<Color> = None,
         bg: Option<Option<Color>> = None,
         attr: Option<Attr> = None,
-        focused: bool = false,
+        got_focus yield (),
+        lost_focus yield (),
         input yield ViewInput,
     }
 }
