@@ -397,14 +397,14 @@ macro_rules! dep_obj {
     (
         $(#[$attr:meta])* $vis:vis struct $name:ident
         $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ $(,)?>)?
-        as $id:ty {
+        for $id:ty {
             $($(
                $field:ident $delim:tt $field_ty:ty $(= $field_val:expr)?
             ),+ $(,)?)?
         }
     ) => {
         dep_obj! {
-            @impl builder [$(#[$attr])*] ($vis) $name as $id ;
+            @impl builder [$(#[$attr])*] ($vis) $name for $id ;
             [] [] [] [] [] [] [$($($field $delim $field_ty $(= $field_val)?),+)?];
             $(
                 [ $( $lt ),+ ],
@@ -413,7 +413,7 @@ macro_rules! dep_obj {
         }
     };
     (
-        @impl $builder:ident [$(#[$attr:meta])*] ($vis:vis) $name:ident as $id:ty ;
+        @impl $builder:ident [$(#[$attr:meta])*] ($vis:vis) $name:ident for $id:ty ;
         [$($f:tt)*]
         [$($b:tt)*]
         [$($s:tt)*]
@@ -424,7 +424,7 @@ macro_rules! dep_obj {
         $([ $($g:tt)+ ], [ $($r:tt)+ ])?
     ) => {
         dep_obj! {
-            @impl $builder [$(#[$attr])*] ($vis) $name as $id ;
+            @impl $builder [$(#[$attr])*] ($vis) $name for $id ;
             [
                 $($f)*
                 $field : $field_ty,
@@ -456,7 +456,7 @@ macro_rules! dep_obj {
         }
     };
     (
-        @impl $builder:ident [$(#[$attr:meta])*] ($vis:vis) $name:ident as $id:ty ;
+        @impl $builder:ident [$(#[$attr:meta])*] ($vis:vis) $name:ident for $id:ty ;
         [$($f:tt)*]
         [$($b:tt)*]
         [$($s:tt)*]
@@ -467,7 +467,7 @@ macro_rules! dep_obj {
         $([ $($g:tt)+ ], [ $($r:tt)+ ])?
     ) => {
         dep_obj! {
-            @impl $builder [$(#[$attr])*] ($vis) $name as $id ;
+            @impl $builder [$(#[$attr])*] ($vis) $name for $id ;
             [
                 $($f)*
                 $field : $field_ty,
@@ -499,7 +499,7 @@ macro_rules! dep_obj {
         }
     };
     (
-        @impl $builder:ident [$(#[$attr:meta])*] ($vis:vis) $name:ident as $id:ty ;
+        @impl $builder:ident [$(#[$attr:meta])*] ($vis:vis) $name:ident for $id:ty ;
         [$($f:tt)*] [$($b:tt)*] [$($s:tt)*] [$($p:tt)*] [$($c:tt)*] [$($l:tt)*] [];
         $([ $($g:tt)+ ], [ $($r:tt)+ ])?
     ) => {
