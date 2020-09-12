@@ -176,45 +176,22 @@ mod not_chip {
     impl ChipLegs for NotLegs { }
 }
 
-use std::any::{Any, TypeId};
 use std::num::NonZeroUsize;
 use dep_obj::{DepTypeToken};
-use dyn_context::{Context, ContextExt, context};
+use dyn_context::{ContextExt, context};
 use circuit::*;
 use or_chip::*;
 use not_chip::*;
 
 context! {
     mod trigger_context {
-        circuit: mut Circuit,
-        or_legs_token: ref DepTypeToken<OrLegsType>,
-        not_legs_token: ref DepTypeToken<NotLegsType>,
+        dyn circuit: mut Circuit,
+        dyn or_legs_token: ref DepTypeToken<OrLegsType>,
+        dyn not_legs_token: ref DepTypeToken<NotLegsType>,
     }
 }
 
 use trigger_context::Context as TriggerContext;
-
-impl Context for TriggerContext {
-    fn get_raw(&self, ty: TypeId) -> Option<&dyn Any> {
-        if ty == TypeId::of::<Circuit>() {
-            Some(self.circuit())
-        } else if ty == TypeId::of::<DepTypeToken<OrLegsType>>() {
-            Some(self.or_legs_token())
-        } else if ty == TypeId::of::<DepTypeToken<NotLegsType>>() {
-            Some(self.not_legs_token())
-        } else {
-            None
-        }
-    }
-
-    fn get_mut_raw(&mut self, ty: TypeId) -> Option<&mut dyn Any> {
-        if ty == TypeId::of::<Circuit>() {
-            Some(self.circuit_mut())
-        } else {
-            None
-        }
-    }
-}
 
 fn main() {
     let mut circuit_token = CircuitToken::new().unwrap();
