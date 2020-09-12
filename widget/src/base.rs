@@ -26,7 +26,7 @@ macro_attr! {
         last_child: Option<Widget>,
         next: Widget,
         #[educe(Debug(ignore))]
-        template: Option<fn(tree: &mut WidgetTree, widget: Widget, parent_view: View) -> View>,
+        load: Option<fn(tree: &mut WidgetTree, widget: Widget, parent_view: View) -> View>,
     }
 }
 
@@ -57,7 +57,7 @@ impl WidgetTree {
                 parent: None,
                 last_child: None,
                 next: Widget(root),
-                template: None,
+                load: None,
             }, root));
             (root, move |view_tree| (view_tree, Widget(root)))
         });
@@ -73,14 +73,14 @@ impl WidgetTree {
 impl Widget {
     pub fn new(
         tree: &mut WidgetTree, 
-        template: fn(tree: &mut WidgetTree, widget: Widget, parent_view: View) -> View,
+        load: fn(tree: &mut WidgetTree, widget: Widget, parent_view: View) -> View,
     ) -> Widget {
         tree.widget_arena.insert(|widget| (WidgetNode {
             view: None,
             parent: None,
             last_child: None,
             next: Widget(widget),
-            template: Some(template),
+            load: Some(load),
         }, Widget(widget)))
     }
 
@@ -107,8 +107,8 @@ impl Widget {
         }
         let node = &mut tree.widget_arena[self.0];
         if node.view.is_some() { panic!("widget already loaded"); }
-        let template = node.template.unwrap();
-        let view = template(tree, self, parent_view);
+        let load = node.load.unwrap();
+        let view = load(tree, self, parent_view);
         if view.tag::<Widget>(&tree.view_tree) != self {
             panic!("widget/view tag mismatch");
         }
