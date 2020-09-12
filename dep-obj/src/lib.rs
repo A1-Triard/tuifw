@@ -397,15 +397,15 @@ macro_rules! dep_obj {
     (
         $(#[$attr:meta])* $vis:vis struct $name:ident
         $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ $(,)?>)?
-        for $id:ty {
+        become $set:ident in $id:ty {
             $($(
                $field:ident $delim:tt $field_ty:ty $(= $field_val:expr)?
             ),+ $(,)?)?
         }
     ) => {
         dep_obj! {
-            @impl builder [$(#[$attr])*] ($vis) $name for $id ;
-            [] [] [] [] [] [] [$($($field $delim $field_ty $(= $field_val)?),+)?];
+            @impl builder id ty this context [$(#[$attr])*] ($vis) $name become $set in $id ;
+            [] [] [] [] [] [] [] [$($($field $delim $field_ty $(= $field_val)?),+)?];
             $(
                 [ $( $lt ),+ ],
                 [ $( $lt $( : $clt $(+ $dlt )* )? ),+ ]
@@ -413,7 +413,9 @@ macro_rules! dep_obj {
         }
     };
     (
-        @impl $builder:ident [$(#[$attr:meta])*] ($vis:vis) $name:ident for $id:ty ;
+        @impl $builder:ident $id_builder:ident $ty:ident $this:ident $context:ident
+        [$(#[$attr:meta])*] ($vis:vis) $name:ident become $set:ident in $id:ty ;
+        [$($x:tt)*]
         [$($f:tt)*]
         [$($b:tt)*]
         [$($s:tt)*]
@@ -424,14 +426,21 @@ macro_rules! dep_obj {
         $([ $($g:tt)+ ], [ $($r:tt)+ ])?
     ) => {
         dep_obj! {
-            @impl $builder [$(#[$attr])*] ($vis) $name for $id ;
+            @impl $builder $id_builder $ty $this $context
+            [$(#[$attr])*] ($vis) $name become $set in $id ;
+            [
+                $($x)*
+                $id_builder . [< $set _set_uncond >] ($context, $ty.$field(), $this.$field);
+            ]
             [
                 $($f)*
                 $field : $field_ty,
             ]
             [
                 $($b)*
-                $vis fn $field(&mut self, val : $field_ty) { }
+                $vis fn $field(&mut self, val : $field_ty) {
+                    self.$field = val;
+                }
             ]
             [
                 $($s)*
@@ -456,7 +465,9 @@ macro_rules! dep_obj {
         }
     };
     (
-        @impl $builder:ident [$(#[$attr:meta])*] ($vis:vis) $name:ident for $id:ty ;
+        @impl $builder:ident $id_builder:ident $ty:ident $this:ident $context:ident
+        [$(#[$attr:meta])*] ($vis:vis) $name:ident become $set:ident in $id:ty ;
+        [$($x:tt)*]
         [$($f:tt)*]
         [$($b:tt)*]
         [$($s:tt)*]
@@ -467,7 +478,11 @@ macro_rules! dep_obj {
         $([ $($g:tt)+ ], [ $($r:tt)+ ])?
     ) => {
         dep_obj! {
-            @impl $builder [$(#[$attr])*] ($vis) $name for $id ;
+            @impl $builder $id_builder $ty $this $context
+            [$(#[$attr])*] ($vis) $name become $set in $id ;
+            [
+                $($x)*
+            ]
             [
                 $($f)*
                 $field : $field_ty,
@@ -499,14 +514,27 @@ macro_rules! dep_obj {
         }
     };
     (
-        @impl $builder:ident [$(#[$attr:meta])*] ($vis:vis) $name:ident for $id:ty ;
-        [$($f:tt)*] [$($b:tt)*] [$($s:tt)*] [$($p:tt)*] [$($c:tt)*] [$($l:tt)*] [];
+        @impl $builder:ident $id_builder:ident $ty:ident $this:ident $context:ident
+        [$(#[$attr:meta])*] ($vis:vis) $name:ident become $set:ident in $id:ty ;
+        [$($x:tt)*] [$($f:tt)*] [$($b:tt)*] [$($s:tt)*] [$($p:tt)*] [$($c:tt)*] [$($l:tt)*] [];
         $([ $($g:tt)+ ], [ $($r:tt)+ ])?
     ) => {
         $crate::paste_paste! {
             $vis struct [< $name Builder >] { $($f)* }
 
-            impl [< $name Builder >] { $($b)* }
+            impl [< $name Builder >] {
+                $($b)*
+
+                $vis fn build(
+                    self,
+                    $context: &mut dyn $crate::dyn_context_Context,
+                    $id_builder: $id,
+                    $ty: & [< $name Type >]
+                ) {
+                    let $this = self;
+                    $($x)*
+                }
+            }
 
             $vis struct [< $name Type >] { $($s)* }
 

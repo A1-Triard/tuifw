@@ -91,7 +91,7 @@ mod or_chip {
 
     dep_obj! {
         #[derive(Debug)]
-        pub struct OrLegs for Chip {
+        pub struct OrLegs become legs in Chip {
             in_1: bool = false,
             in_2: bool = false,
             out: bool = false,
@@ -139,7 +139,7 @@ mod not_chip {
 
     dep_obj! {
         #[derive(Debug)]
-        pub struct NotLegs for Chip {
+        pub struct NotLegs become legs in Chip {
             in_: bool = false,
             out: bool = true,
         }
