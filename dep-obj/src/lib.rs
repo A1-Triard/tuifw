@@ -397,15 +397,15 @@ macro_rules! dep_obj {
     (
         $(#[$attr:meta])* $vis:vis struct $name:ident
         $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ $(,)?>)?
-        as $id:ty : $ty:ident {
+        as $id:ty {
             $($(
                $field:ident $delim:tt $field_ty:ty $(= $field_val:expr)?
             ),+ $(,)?)?
         }
     ) => {
         dep_obj! {
-            @impl builder [$(#[$attr])*] ($vis) $name as $id : $ty ;
-            [] [] [] [] [$($($field $delim $field_ty $(= $field_val)?),+)?];
+            @impl builder [$(#[$attr])*] ($vis) $name as $id ;
+            [] [] [] [] [] [] [$($($field $delim $field_ty $(= $field_val)?),+)?];
             $(
                 [ $( $lt ),+ ],
                 [ $( $lt $( : $clt $(+ $dlt )* )? ),+ ]
@@ -413,7 +413,9 @@ macro_rules! dep_obj {
         }
     };
     (
-        @impl $builder:ident [$(#[$attr:meta])*] ($vis:vis) $name:ident as $id:ty : $ty:ident ;
+        @impl $builder:ident [$(#[$attr:meta])*] ($vis:vis) $name:ident as $id:ty ;
+        [$($f:tt)*]
+        [$($b:tt)*]
         [$($s:tt)*]
         [$($p:tt)*]
         [$($c:tt)*]
@@ -422,14 +424,22 @@ macro_rules! dep_obj {
         $([ $($g:tt)+ ], [ $($r:tt)+ ])?
     ) => {
         dep_obj! {
-            @impl $builder [$(#[$attr])*] ($vis) $name as $id : $ty ;
+            @impl $builder [$(#[$attr])*] ($vis) $name as $id ;
+            [
+                $($f)*
+                $field : $field_ty,
+            ]
+            [
+                $($b)*
+                $vis fn $field(&mut self, val : $field_ty) { }
+            ]
             [
                 $($s)*
-                $field : $crate::DepPropRaw<$ty, $field_ty>,
+                $field : $crate::DepPropRaw< [< $name Type >] , $field_ty>,
             ]
             [
                 $($p)*
-                pub fn $field $(< $($g)+ >)? (&self) -> $crate::DepProp<$name $(< $($r)+ >)?, $field_ty> {
+                $vis fn $field $(< $($g)+ >)? (&self) -> $crate::DepProp<$name $(< $($r)+ >)?, $field_ty> {
                     self.$field.owned_by() 
                 }
             ]
@@ -446,7 +456,9 @@ macro_rules! dep_obj {
         }
     };
     (
-        @impl $builder:ident [$(#[$attr:meta])*] ($vis:vis) $name:ident as $id:ty : $ty:ident ;
+        @impl $builder:ident [$(#[$attr:meta])*] ($vis:vis) $name:ident as $id:ty ;
+        [$($f:tt)*]
+        [$($b:tt)*]
         [$($s:tt)*]
         [$($p:tt)*]
         [$($c:tt)*]
@@ -455,14 +467,22 @@ macro_rules! dep_obj {
         $([ $($g:tt)+ ], [ $($r:tt)+ ])?
     ) => {
         dep_obj! {
-            @impl $builder [$(#[$attr])*] ($vis) $name as $id : $ty ;
+            @impl $builder [$(#[$attr])*] ($vis) $name as $id ;
+            [
+                $($f)*
+                $field : $field_ty,
+            ]
+            [
+                $($b)*
+                $vis fn [< on_ $field _changed >] (&mut self, val : $field_ty) { }
+            ]
             [
                 $($s)*
-                $field : $crate::DepEventRaw<$ty, $field_ty>,
+                $field : $crate::DepEventRaw< [< $name Type >] , $field_ty>,
             ]
             [
                 $($p)*
-                pub fn $field $(< $($g)+ >)? (&self) -> $crate::DepEvent<$name $(< $($r)+ >)?, $field_ty> {
+                $vis fn $field $(< $($g)+ >)? (&self) -> $crate::DepEvent<$name $(< $($r)+ >)?, $field_ty> {
                     self.$field.owned_by()
                 }
             ]
@@ -479,45 +499,51 @@ macro_rules! dep_obj {
         }
     };
     (
-        @impl $builder:ident [$(#[$attr:meta])*] ($vis:vis) $name:ident as $id:ty : $ty:ident ;
-        [$($s:tt)*] [$($p:tt)*] [$($c:tt)*] [$($l:tt)*] [];
+        @impl $builder:ident [$(#[$attr:meta])*] ($vis:vis) $name:ident as $id:ty ;
+        [$($f:tt)*] [$($b:tt)*] [$($s:tt)*] [$($p:tt)*] [$($c:tt)*] [$($l:tt)*] [];
         $([ $($g:tt)+ ], [ $($r:tt)+ ])?
     ) => {
-        $vis struct $ty { $($s)* }
+        $crate::paste_paste! {
+            $vis struct [< $name Builder >] { $($f)* }
 
-        unsafe impl $crate::DepType for $ty {
-            fn lock() -> &'static $crate::DepTypeLock {
-                static LOCK: $crate::DepTypeLock = $crate::DepTypeLock::new();
-                &LOCK
+            impl [< $name Builder >] { $($b)* }
+
+            $vis struct [< $name Type >] { $($s)* }
+
+            unsafe impl $crate::DepType for [< $name Type >] {
+                fn lock() -> &'static $crate::DepTypeLock {
+                    static LOCK: $crate::DepTypeLock = $crate::DepTypeLock::new();
+                    &LOCK
+                }
             }
-        }
 
-        impl $ty {
-            $($p)*
+            impl [< $name Type >] {
+                $($p)*
 
-            fn new_raw() -> Option<$crate::DepTypeToken<Self>> {
-                $crate::DepTypeBuilder::new().map(|mut $builder| {
-                    $($c)*
-                    $builder.build(Self { $($l)* })
-                })
+                fn new_raw() -> Option<$crate::DepTypeToken<Self>> {
+                    $crate::DepTypeBuilder::new().map(|mut $builder| {
+                        $($c)*
+                        $builder.build(Self { $($l)* })
+                    })
+                }
             }
-        }
 
-        $(#[$attr])*
-        $vis struct $name $(< $($g)+ >)? {
-            core: $crate::DepObjCore<$ty, $id>,
-        }
+            $(#[$attr])*
+            $vis struct $name $(< $($g)+ >)? {
+                core: $crate::DepObjCore< [< $name Type  >] , $id>,
+            }
 
-        impl $(< $($g)+ >)? $crate::DepObj for $name $(< $($r)+ >)? {
-            type Type = $ty;
-            type Id = $id;
-            fn core(&self) -> &$crate::DepObjCore<Self::Type, Self::Id> { &self.core }
-            fn core_mut(&mut self) -> &mut $crate::DepObjCore<Self::Type, Self::Id> { &mut self.core }
-        }
+            impl $(< $($g)+ >)? $crate::DepObj for $name $(< $($r)+ >)? {
+                type Type = [< $name Type >] ;
+                type Id = $id;
+                fn core(&self) -> &$crate::DepObjCore<Self::Type, Self::Id> { &self.core }
+                fn core_mut(&mut self) -> &mut $crate::DepObjCore<Self::Type, Self::Id> { &mut self.core }
+            }
 
-        impl $(< $($g)+ >)? $name $(< $($r)+ >)? {
-            fn new_raw(token: &$crate::DepTypeToken<$ty>) -> Self {
-                Self { core: $crate::DepObjCore::new(token) }
+            impl $(< $($g)+ >)? $name $(< $($r)+ >)? {
+                fn new_raw(token: &$crate::DepTypeToken< [< $name Type >] >) -> Self {
+                    Self { core: $crate::DepObjCore::new(token) }
+                }
             }
         }
     };
