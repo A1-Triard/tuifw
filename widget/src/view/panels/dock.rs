@@ -31,6 +31,7 @@ impl<'a> ViewBuilderDockPanelExt for ViewBuilder<'a> {
 impl<'a, 'b> DockPanelBuilder<'a, 'b> {
     pub fn child<Tag: ComponentId>(
         &mut self,
+        storage: Option<&mut Option<View>>,
         tag: Tag,
         layout: impl FnOnce(&mut DockLayoutBuilder) -> &mut DockLayoutBuilder,
         f: impl for<'c, 'd> FnOnce(&'c mut ViewBuilder<'d>) -> &'c mut ViewBuilder<'d>
@@ -38,6 +39,7 @@ impl<'a, 'b> DockPanelBuilder<'a, 'b> {
         let view = self.core_priv().view();
         let tree: &mut ViewTree = self.core_priv_mut().context().get_mut();
         let child = View::new(tree, view, |child| (tag, child));
+        storage.map(|x| x.replace(child));
         DockLayout::new(tree, child);
         let mut builder = DockLayoutBuilder::new_priv();
         layout(&mut builder);
