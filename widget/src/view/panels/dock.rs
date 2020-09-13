@@ -1,10 +1,48 @@
 use std::cmp::{min};
 use std::fmt::Debug;
 use tuifw_screen_base::{Vector, Rect, Side, Orient, Thickness};
+use components_arena::ComponentId;
 use dep_obj::{dep_obj, DepTypeToken};
 use dyn_context::{Context, ContextExt};
 use once_cell::sync::{self};
 use crate::view::base::*;
+
+pub trait ViewBuilderDockPanelExt {
+    fn dock_panel(
+        &mut self,
+        f: impl for<'a, 'b, 'c> FnOnce(&'a mut DockPanelBuilder<'b, 'c>) -> &'a mut DockPanelBuilder<'b, 'c>
+    ) -> &mut Self;
+}
+
+impl<'a> ViewBuilderDockPanelExt for ViewBuilder<'a> {
+    fn dock_panel(
+        &mut self,
+        f: impl for<'b, 'c, 'd> FnOnce(&'b mut DockPanelBuilder<'c, 'd>) -> &'b mut DockPanelBuilder<'c, 'd>
+    ) -> &mut Self {
+        let mut builder = DockPanelBuilder::new_priv(self);
+        f(&mut builder);
+        self
+    }
+}
+
+impl<'a, 'b> DockPanelBuilder<'a, 'b> {
+    pub fn child<Tag: ComponentId>(
+        &mut self,
+        tag: Tag,
+        layout: impl FnOnce(&mut DockLayoutBuilder) -> &mut DockLayoutBuilder,
+        f: impl for<'c, 'd> FnOnce(&'c mut ViewBuilder<'d>) -> &'c mut ViewBuilder<'d>
+    ) -> &mut Self {
+        let view = self.core_priv().view();
+        let tree: &mut ViewTree = self.core_priv_mut().context().get_mut();
+        let child = View::new(tree, view, |child| (tag, child));
+        DockLayout::new(tree, child);
+        let mut builder = DockLayoutBuilder::new_priv();
+        layout(&mut builder);
+        builder.build_priv(self.core_priv_mut().context(), child, dock_layout_type());
+        child.build(self.core_priv_mut().context(), f);
+        self
+    }
+}
 
 dep_obj! {
     #[derive(Debug)]
@@ -39,7 +77,7 @@ impl Layout for DockLayout { }
 
 dep_obj! {
     #[derive(Debug)]
-    pub struct DockPanel become panel in View {
+    pub struct DockPanel become panel in View where BuilderCore<'a, 'b> = &'a mut ViewBuilder<'b>{
         base: Side = Side::Top,
     }
 }
