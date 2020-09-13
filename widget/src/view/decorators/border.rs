@@ -20,10 +20,10 @@ impl<'a> ViewBuilderBorderDecoratorExt for ViewBuilder<'a> {
         &mut self,
         f: impl FnOnce(&mut BorderDecoratorBuilder) -> &mut BorderDecoratorBuilder
     ) -> &mut Self {
-        let mut builder = BorderDecoratorBuilder::new();
+        let mut builder = BorderDecoratorBuilder::new_priv();
         f(&mut builder);
         let view = self.view();
-        builder.build(self.context(), view, border_decorator_type());
+        builder.build_priv(self.context(), view, border_decorator_type());
         self
     }
 }
@@ -43,7 +43,7 @@ dep_obj! {
 }
 
 static BORDER_DECORATOR_TOKEN: sync::Lazy<DepTypeToken<BorderDecoratorType>> = sync::Lazy::new(||
-    BorderDecoratorType::new_raw().expect("BorderDecoratorType builder locked")
+    BorderDecoratorType::new_priv().expect("BorderDecoratorType builder locked")
 );
 
 pub fn border_decorator_type() -> &'static BorderDecoratorType { BORDER_DECORATOR_TOKEN.ty() }
@@ -56,7 +56,7 @@ impl BorderDecorator {
         tree: &mut ViewTree,
         view: View,
     ) {
-        view.set_decorator(tree, BorderDecorator::new_raw(&BORDER_DECORATOR_TOKEN));
+        view.set_decorator(tree, BorderDecorator::new_priv(&BORDER_DECORATOR_TOKEN));
         view.decorator_on_changed(tree, border_decorator_type().tl(), Self::invalidate_tl);
         view.decorator_on_changed(tree, border_decorator_type().tr(), Self::invalidate_tr);
         view.decorator_on_changed(tree, border_decorator_type().bl(), Self::invalidate_bl);

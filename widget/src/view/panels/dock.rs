@@ -14,7 +14,7 @@ dep_obj! {
 }
 
 static DOCK_LAYOUT_TOKEN: sync::Lazy<DepTypeToken<DockLayoutType>> = sync::Lazy::new(||
-    DockLayoutType::new_raw().expect("DockLayoutType builder locked")
+    DockLayoutType::new_priv().expect("DockLayoutType builder locked")
 );
 
 pub fn dock_layout_type() -> &'static DockLayoutType { DOCK_LAYOUT_TOKEN.ty() }
@@ -25,7 +25,7 @@ impl DockLayout {
         tree: &mut ViewTree,
         view: View,
     ) {
-        view.set_layout(tree, DockLayout::new_raw(&DOCK_LAYOUT_TOKEN));
+        view.set_layout(tree, DockLayout::new_priv(&DOCK_LAYOUT_TOKEN));
         view.layout_on_changed(tree, dock_layout_type().dock(), Self::invalidate_parent_measure);
     }
 
@@ -45,7 +45,7 @@ dep_obj! {
 }
 
 static DOCK_PANEL_TOKEN: sync::Lazy<DepTypeToken<DockPanelType>> = sync::Lazy::new(||
-    DockPanelType::new_raw().expect("DockPanelType builder locked")
+    DockPanelType::new_priv().expect("DockPanelType builder locked")
 );
 
 pub fn dock_panel_type() -> &'static DockPanelType { DOCK_PANEL_TOKEN.ty() }
@@ -58,7 +58,7 @@ impl DockPanel {
         tree: &mut ViewTree,
         view: View,
     ) {
-        view.set_panel(tree, DockPanel::new_raw(&DOCK_PANEL_TOKEN));
+        view.set_panel(tree, DockPanel::new_priv(&DOCK_PANEL_TOKEN));
     }
 }
 

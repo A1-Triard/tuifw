@@ -10,6 +10,26 @@ use crate::view::base::*;
 use unicode_width::UnicodeWidthChar;
 use unicode_segmentation::UnicodeSegmentation;
 
+pub trait ViewBuilderLabelDecoratorExt {
+    fn label_decorator(
+        &mut self,
+        f: impl FnOnce(&mut LabelDecoratorBuilder) -> &mut LabelDecoratorBuilder
+    ) -> &mut Self;
+}
+
+impl<'a> ViewBuilderLabelDecoratorExt for ViewBuilder<'a> {
+    fn label_decorator(
+        &mut self,
+        f: impl FnOnce(&mut LabelDecoratorBuilder) -> &mut LabelDecoratorBuilder
+    ) -> &mut Self {
+        let mut builder = LabelDecoratorBuilder::new_priv();
+        f(&mut builder);
+        let view = self.view();
+        builder.build_priv(self.context(), view, label_decorator_type());
+        self
+    }
+}
+
 dep_obj! {
     #[derive(Debug)]
     pub struct LabelDecorator become decorator in View {
@@ -18,7 +38,7 @@ dep_obj! {
 }
 
 static LABEL_DECORATOR_TOKEN: sync::Lazy<DepTypeToken<LabelDecoratorType>> = sync::Lazy::new(||
-    LabelDecoratorType::new_raw().expect("LabelDecoratorType builder locked")
+    LabelDecoratorType::new_priv().expect("LabelDecoratorType builder locked")
 );
 
 pub fn label_decorator_type() -> &'static LabelDecoratorType { LABEL_DECORATOR_TOKEN.ty() }
@@ -31,7 +51,7 @@ impl LabelDecorator {
         tree: &mut ViewTree,
         view: View,
     ) {
-        view.set_decorator(tree, LabelDecorator::new_raw(&LABEL_DECORATOR_TOKEN));
+        view.set_decorator(tree, LabelDecorator::new_priv(&LABEL_DECORATOR_TOKEN));
         view.decorator_on_changed(tree, label_decorator_type().text(), Self::invalidate_measure);
     }
 

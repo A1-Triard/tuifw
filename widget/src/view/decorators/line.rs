@@ -7,6 +7,26 @@ use dyn_context::{Context, ContextExt};
 use once_cell::sync::{self};
 use crate::view::base::*;
 
+pub trait ViewBuilderLineDecoratorExt {
+    fn line_decorator(
+        &mut self,
+        f: impl FnOnce(&mut LineDecoratorBuilder) -> &mut LineDecoratorBuilder
+    ) -> &mut Self;
+}
+
+impl<'a> ViewBuilderLineDecoratorExt for ViewBuilder<'a> {
+    fn line_decorator(
+        &mut self,
+        f: impl FnOnce(&mut LineDecoratorBuilder) -> &mut LineDecoratorBuilder
+    ) -> &mut Self {
+        let mut builder = LineDecoratorBuilder::new_priv();
+        f(&mut builder);
+        let view = self.view();
+        builder.build_priv(self.context(), view, line_decorator_type());
+        self
+    }
+}
+
 dep_obj! {
     #[derive(Debug)]
     pub struct LineDecorator become decorator in View {
@@ -19,7 +39,7 @@ dep_obj! {
 }
 
 static LINE_DECORATOR_TOKEN: sync::Lazy<DepTypeToken<LineDecoratorType>> = sync::Lazy::new(||
-    LineDecoratorType::new_raw().expect("LineDecoratorType builder locked")
+    LineDecoratorType::new_priv().expect("LineDecoratorType builder locked")
 );
 
 pub fn line_decorator_type() -> &'static LineDecoratorType { LINE_DECORATOR_TOKEN.ty() }
@@ -32,7 +52,7 @@ impl LineDecorator {
         tree: &mut ViewTree,
         view: View,
     ) {
-        view.set_decorator(tree, LineDecorator::new_raw(&LINE_DECORATOR_TOKEN));
+        view.set_decorator(tree, LineDecorator::new_priv(&LINE_DECORATOR_TOKEN));
         view.decorator_on_changed(tree, line_decorator_type().orient(), Self::invalidate_measure);
         view.decorator_on_changed(tree, line_decorator_type().length(), Self::invalidate_measure);
         view.decorator_on_changed(tree, line_decorator_type().near(), Self::invalidate_near);

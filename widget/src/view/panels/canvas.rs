@@ -1,9 +1,49 @@
 use std::fmt::Debug;
 use tuifw_screen_base::{Vector, Point, Rect};
+use components_arena::ComponentId;
 use dep_obj::{dep_obj, DepTypeToken};
 use dyn_context::{Context, ContextExt};
 use once_cell::sync::{self};
 use crate::view::base::*;
+
+pub trait ViewBuilderCanvasPanelExt {
+    fn canvas_panel(
+        &mut self,
+        f: impl for<'a, 'b, 'c> FnOnce(&'a mut CanvasPanelBuilder<'b, 'c>) -> &'a mut CanvasPanelBuilder<'b, 'c>
+    ) -> &mut Self;
+}
+
+impl<'a> ViewBuilderCanvasPanelExt for ViewBuilder<'a> {
+    fn canvas_panel(
+        &mut self,
+        f: impl for<'b, 'c, 'd> FnOnce(&'b mut CanvasPanelBuilder<'c, 'd>) -> &'b mut CanvasPanelBuilder<'c, 'd>
+    ) -> &mut Self {
+        let mut builder = CanvasPanelBuilder(self);
+        f(&mut builder);
+        self
+    }
+}
+
+pub struct CanvasPanelBuilder<'a, 'b>(&'a mut ViewBuilder<'b>);
+
+impl<'a, 'b> CanvasPanelBuilder<'a, 'b> {
+    pub fn child<Tag: ComponentId>(
+        &mut self,
+        tag: Tag,
+        layout: impl FnOnce(&mut CanvasLayoutBuilder) -> &mut CanvasLayoutBuilder,
+        f: impl for<'c, 'd> FnOnce(&'c mut ViewBuilder<'d>) -> &'c mut ViewBuilder<'d>
+    ) -> &mut Self {
+        let view = self.0.view();
+        let tree: &mut ViewTree = self.0.context().get_mut();
+        let child = View::new(tree, view, |child| (tag, child));
+        CanvasLayout::new(tree, child);
+        let mut builder = CanvasLayoutBuilder::new_priv();
+        layout(&mut builder);
+        builder.build_priv(self.0.context(), child, canvas_layout_type());
+        child.build(self.0.context(), f);
+        self
+    }
+}
 
 dep_obj! {
     #[derive(Debug)]
@@ -13,7 +53,7 @@ dep_obj! {
 }
 
 static CANVAS_LAYOUT_TOKEN: sync::Lazy<DepTypeToken<CanvasLayoutType>> = sync::Lazy::new(||
-    CanvasLayoutType::new_raw().expect("CanvasLayoutType builder locked")
+    CanvasLayoutType::new_priv().expect("CanvasLayoutType builder locked")
 );
 
 pub fn canvas_layout_type() -> &'static CanvasLayoutType { CANVAS_LAYOUT_TOKEN.ty() }
@@ -24,7 +64,7 @@ impl CanvasLayout {
         tree: &mut ViewTree,
         view: View,
     ) {
-        view.set_layout(tree, CanvasLayout::new_raw(&CANVAS_LAYOUT_TOKEN));
+        view.set_layout(tree, CanvasLayout::new_priv(&CANVAS_LAYOUT_TOKEN));
         view.layout_on_changed(tree, canvas_layout_type().tl(), Self::invalidate_parent_arrange);
     }
 

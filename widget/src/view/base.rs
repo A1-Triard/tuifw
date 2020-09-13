@@ -108,11 +108,11 @@ impl ViewTree {
         let (result, window_tree, root) = arena.insert(|view| {
             let window_tree = WindowTree::new(screen, render_view);
             let screen_size = window_tree.screen_size();
-            let decorator = RootDecorator::new_raw(&ROOT_DECORATOR_TOKEN);
+            let decorator = RootDecorator::new_priv(&ROOT_DECORATOR_TOKEN);
             let (tag, result) = root_tag(View(view));
             (ViewNode {
                 tag: tag.into_raw(),
-                base: ViewBase::new_raw(&VIEW_BASE_TOKEN),
+                base: ViewBase::new_priv(&VIEW_BASE_TOKEN),
                 align: None,
                 decorator: Some(Box::new(decorator) as _),
                 window: None,
@@ -252,8 +252,8 @@ impl View {
             let (tag, result) = tag(View(view));
             (ViewNode {
                 tag: tag.into_raw(),
-                base: ViewBase::new_raw(&VIEW_BASE_TOKEN),
-                align: Some(ViewAlign::new_raw(&VIEW_ALIGN_TOKEN)),
+                base: ViewBase::new_priv(&VIEW_BASE_TOKEN),
+                align: Some(ViewAlign::new_priv(&VIEW_ALIGN_TOKEN)),
                 decorator: None,
                 window: None,
                 layout: None,
@@ -703,7 +703,7 @@ dep_obj! {
 }
 
 static ROOT_DECORATOR_TOKEN: sync::Lazy<DepTypeToken<RootDecoratorType>> = sync::Lazy::new(||
-    RootDecoratorType::new_raw().expect("RootDecoratorType builder locked")
+    RootDecoratorType::new_priv().expect("RootDecoratorType builder locked")
 );
 
 pub fn root_decorator_type() -> &'static RootDecoratorType { ROOT_DECORATOR_TOKEN.ty() }
@@ -780,7 +780,7 @@ dep_obj! {
 }
 
 static VIEW_BASE_TOKEN: sync::Lazy<DepTypeToken<ViewBaseType>> = sync::Lazy::new(||
-    ViewBaseType::new_raw().expect("ViewBaseType builder locked")
+    ViewBaseType::new_priv().expect("ViewBaseType builder locked")
 );
 
 pub fn view_base_type() -> &'static ViewBaseType { VIEW_BASE_TOKEN.ty() }
@@ -834,7 +834,7 @@ dep_obj! {
 }
 
 static VIEW_ALIGN_TOKEN: sync::Lazy<DepTypeToken<ViewAlignType>> = sync::Lazy::new(||
-    ViewAlignType::new_raw().expect("ViewAlignType builder locked")
+    ViewAlignType::new_priv().expect("ViewAlignType builder locked")
 );
 
 pub fn view_align_type() -> &'static ViewAlignType { VIEW_ALIGN_TOKEN.ty() }
