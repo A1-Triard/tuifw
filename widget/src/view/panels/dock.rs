@@ -19,6 +19,9 @@ impl<'a> ViewBuilderDockPanelExt for ViewBuilder<'a> {
         &mut self,
         f: impl for<'b, 'c, 'd> FnOnce(&'b mut DockPanelBuilder<'c, 'd>) -> &'b mut DockPanelBuilder<'c, 'd>
     ) -> &mut Self {
+        let view = self.view();
+        let tree: &mut ViewTree = self.context().get_mut();
+        DockPanel::new(tree, view);
         let mut builder = DockPanelBuilder::new_priv(self);
         f(&mut builder);
         self

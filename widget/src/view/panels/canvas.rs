@@ -18,6 +18,9 @@ impl<'a> ViewBuilderCanvasPanelExt for ViewBuilder<'a> {
         &mut self,
         f: impl for<'b, 'c, 'd> FnOnce(&'b mut CanvasPanelBuilder<'c, 'd>) -> &'b mut CanvasPanelBuilder<'c, 'd>
     ) -> &mut Self {
+        let view = self.view();
+        let tree: &mut ViewTree = self.context().get_mut();
+        CanvasPanel::new(tree, view);
         let mut builder = CanvasPanelBuilder(self);
         f(&mut builder);
         self
@@ -29,6 +32,7 @@ pub struct CanvasPanelBuilder<'a, 'b>(&'a mut ViewBuilder<'b>);
 impl<'a, 'b> CanvasPanelBuilder<'a, 'b> {
     pub fn child<Tag: ComponentId>(
         &mut self,
+        storage: Option<&mut Option<View>>,
         tag: Tag,
         layout: impl FnOnce(&mut CanvasLayoutBuilder) -> &mut CanvasLayoutBuilder,
         f: impl for<'c, 'd> FnOnce(&'c mut ViewBuilder<'d>) -> &'c mut ViewBuilder<'d>
@@ -36,6 +40,7 @@ impl<'a, 'b> CanvasPanelBuilder<'a, 'b> {
         let view = self.0.view();
         let tree: &mut ViewTree = self.0.context().get_mut();
         let child = View::new(tree, view, |child| (tag, child));
+        storage.map(|x| x.replace(child));
         CanvasLayout::new(tree, child);
         let mut builder = CanvasLayoutBuilder::new_priv();
         layout(&mut builder);

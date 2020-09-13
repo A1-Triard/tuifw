@@ -22,6 +22,8 @@ impl<'a> ViewBuilderLineDecoratorExt for ViewBuilder<'a> {
         let mut builder = LineDecoratorBuilder::new_priv();
         f(&mut builder);
         let view = self.view();
+        let tree: &mut ViewTree = self.context().get_mut();
+        LineDecorator::new(tree, view);
         builder.build_priv(self.context(), view, line_decorator_type());
         self
     }

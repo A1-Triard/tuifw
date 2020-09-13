@@ -23,6 +23,8 @@ impl<'a> ViewBuilderBorderDecoratorExt for ViewBuilder<'a> {
         let mut builder = BorderDecoratorBuilder::new_priv();
         f(&mut builder);
         let view = self.view();
+        let tree: &mut ViewTree = self.context().get_mut();
+        BorderDecorator::new(tree, view);
         builder.build_priv(self.context(), view, border_decorator_type());
         self
     }

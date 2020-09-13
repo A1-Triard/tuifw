@@ -25,6 +25,8 @@ impl<'a> ViewBuilderLabelDecoratorExt for ViewBuilder<'a> {
         let mut builder = LabelDecoratorBuilder::new_priv();
         f(&mut builder);
         let view = self.view();
+        let tree: &mut ViewTree = self.context().get_mut();
+        LabelDecorator::new(tree, view);
         builder.build_priv(self.context(), view, label_decorator_type());
         self
     }

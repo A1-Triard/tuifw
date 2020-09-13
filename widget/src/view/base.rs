@@ -787,6 +787,26 @@ impl ViewInput {
     }
 }
 
+pub trait ViewBuilderViewBaseExt {
+    fn base(
+        &mut self,
+        f: impl FnOnce(&mut ViewBaseBuilder) -> &mut ViewBaseBuilder
+    ) -> &mut Self;
+}
+
+impl<'a> ViewBuilderViewBaseExt for ViewBuilder<'a> {
+    fn base(
+        &mut self,
+        f: impl FnOnce(&mut ViewBaseBuilder) -> &mut ViewBaseBuilder
+    ) -> &mut Self {
+        let mut builder = ViewBaseBuilder::new_priv();
+        f(&mut builder);
+        let view = self.view();
+        builder.build_priv(self.context(), view, view_base_type());
+        self
+    }
+}
+
 dep_obj! {
     #[derive(Debug)]
     pub struct ViewBase become base in View {
@@ -836,6 +856,26 @@ impl ViewBase {
 
     fn on_attr_changed(context: &mut dyn Context, view: View, _old: &Option<Attr>) {
         Self::on_inheritable_render_changed(context, view, view_base_type().attr());
+    }
+}
+
+pub trait ViewBuilderViewAlignExt {
+    fn align(
+        &mut self,
+        f: impl FnOnce(&mut ViewAlignBuilder) -> &mut ViewAlignBuilder
+    ) -> &mut Self;
+}
+
+impl<'a> ViewBuilderViewAlignExt for ViewBuilder<'a> {
+    fn align(
+        &mut self,
+        f: impl FnOnce(&mut ViewAlignBuilder) -> &mut ViewAlignBuilder
+    ) -> &mut Self {
+        let mut builder = ViewAlignBuilder::new_priv();
+        f(&mut builder);
+        let view = self.view();
+        builder.build_priv(self.context(), view, view_align_type());
+        self
     }
 }
 

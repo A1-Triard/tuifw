@@ -2,69 +2,63 @@
 use std::borrow::Cow;
 use dyn_context::ContextExt;
 use tuifw_screen::{Key, Vector, Thickness, HAlign, VAlign, Point, Side, Rect};
-use tuifw_widget::view::{ViewTree, View, view_align_type, view_base_type};
-use tuifw_widget::view::panels::{CanvasPanel, CanvasLayout, canvas_layout_type};
-use tuifw_widget::view::panels::{DockPanel, DockLayout, dock_layout_type};
-use tuifw_widget::view::decorators::{BorderDecorator, ViewBuilderBorderDecoratorExt};
-use tuifw_widget::view::decorators::{LabelDecorator, label_decorator_type};
+use tuifw_widget::view::{View, ViewTree, view_base_type, ViewBuilderViewAlignExt};
+use tuifw_widget::view::panels::{ViewBuilderCanvasPanelExt, canvas_layout_type};
+use tuifw_widget::view::panels::{ViewBuilderDockPanelExt};
+use tuifw_widget::view::decorators::{ViewBuilderBorderDecoratorExt};
+use tuifw_widget::view::decorators::{ViewBuilderLabelDecoratorExt};
 
-fn build_box(tree: &mut ViewTree, border: View) {
-    border.build(tree, |view| view
-        .border_decorator(|border| border
-            .tl(Cow::Borrowed("╔"))
-            .tr(Cow::Borrowed("╗"))
-            .bl(Cow::Borrowed("╚"))
-            .br(Cow::Borrowed("╝"))
-            .l(Cow::Borrowed("║"))
-            .t(Cow::Borrowed("═"))
-            .r(Cow::Borrowed("║"))
-            .b(Cow::Borrowed("═"))
+fn build(tree: &mut ViewTree, bounds: Rect) -> View {
+    let mut border = None;
+    tree.root().build(tree, |view| view
+        .canvas_panel(|panel| panel
+            .child(Some(&mut border), (), |layout| layout.tl(bounds.tl), |view| view
+                .align(|align| align
+                    .w(Some(bounds.w()))
+                    .h(Some(bounds.h()))
+                )
+                .border_decorator(|view| view
+                    .tl(Cow::Borrowed("╔"))
+                    .tr(Cow::Borrowed("╗"))
+                    .bl(Cow::Borrowed("╚"))
+                    .br(Cow::Borrowed("╝"))
+                    .l(Cow::Borrowed("║"))
+                    .t(Cow::Borrowed("═"))
+                    .r(Cow::Borrowed("║"))
+                    .b(Cow::Borrowed("═"))
+                )
+                .dock_panel(|panel| panel
+                    .child((), |layout| layout.dock(Some(Side::Top)), |view| view
+                        .label_decorator(|label| label.text(Cow::Borrowed("↑")))
+                    )
+                    .child((), |layout| layout.dock(Some(Side::Top)), |view| view
+                        .label_decorator(|label| label.text(Cow::Borrowed("k")))
+                    )
+                    .child((), |layout| layout.dock(Some(Side::Bottom)), |view| view
+                        .label_decorator(|label| label.text(Cow::Borrowed("↓")))
+                    )
+                    .child((), |layout| layout.dock(Some(Side::Bottom)), |view| view
+                        .label_decorator(|label| label.text(Cow::Borrowed("j")))
+                    )
+                    .child((), |layout| layout.dock(Some(Side::Left)), |view| view
+                        .align(|align| align.margin(Thickness::new(1, 0, 0, 0)))
+                        .label_decorator(|label| label.text(Cow::Borrowed("←")))
+                    )
+                    .child((), |layout| layout.dock(Some(Side::Left)), |view| view
+                        .label_decorator(|label| label.text(Cow::Borrowed("h")))
+                    )
+                    .child((), |layout| layout.dock(Some(Side::Right)), |view| view
+                        .align(|align| align.margin(Thickness::new(0, 0, 1, 0)))
+                        .label_decorator(|label| label.text(Cow::Borrowed("→")))
+                    )
+                    .child((), |layout| layout.dock(Some(Side::Right)), |view| view
+                        .label_decorator(|label| label.text(Cow::Borrowed("l")))
+                    )
+                )
+            )
         )
     );
-
-    DockPanel::new(tree, border);
-    let t_arrow = View::new(tree, border, |view| ((), view));
-    DockLayout::new(tree, t_arrow);
-    LabelDecorator::new(tree, t_arrow);
-    t_arrow.decorator_set_distinct(tree, label_decorator_type().text(), Cow::Borrowed("↑"));
-    t_arrow.layout_set_distinct(tree, dock_layout_type().dock(), Some(Side::Top));
-    let t_text = View::new(tree, border, |view| ((), view));
-    DockLayout::new(tree, t_text);
-    LabelDecorator::new(tree, t_text);
-    t_text.decorator_set_distinct(tree, label_decorator_type().text(), Cow::Borrowed("k"));
-    t_text.layout_set_distinct(tree, dock_layout_type().dock(), Some(Side::Top));
-    let b_arrow = View::new(tree, border, |view| ((), view));
-    DockLayout::new(tree, b_arrow);
-    LabelDecorator::new(tree, b_arrow);
-    b_arrow.decorator_set_distinct(tree, label_decorator_type().text(), Cow::Borrowed("↓"));
-    b_arrow.layout_set_distinct(tree, dock_layout_type().dock(), Some(Side::Bottom));
-    let b_text = View::new(tree, border, |view| ((), view));
-    DockLayout::new(tree, b_text);
-    LabelDecorator::new(tree, b_text);
-    b_text.decorator_set_distinct(tree, label_decorator_type().text(), Cow::Borrowed("j"));
-    b_text.layout_set_distinct(tree, dock_layout_type().dock(), Some(Side::Bottom));
-    let l_arrow = View::new(tree, border, |view| ((), view));
-    DockLayout::new(tree, l_arrow);
-    LabelDecorator::new(tree, l_arrow);
-    l_arrow.decorator_set_distinct(tree, label_decorator_type().text(), Cow::Borrowed("←"));
-    l_arrow.layout_set_distinct(tree, dock_layout_type().dock(), Some(Side::Left));
-    l_arrow.align_set_distinct(tree, view_align_type().margin(), Thickness::new(1, 0, 0, 0));
-    let l_text = View::new(tree, border, |view| ((), view));
-    DockLayout::new(tree, l_text);
-    LabelDecorator::new(tree, l_text);
-    l_text.decorator_set_distinct(tree, label_decorator_type().text(), Cow::Borrowed("h"));
-    l_text.layout_set_distinct(tree, dock_layout_type().dock(), Some(Side::Left));
-    let r_arrow = View::new(tree, border, |view| ((), view));
-    DockLayout::new(tree, r_arrow);
-    LabelDecorator::new(tree, r_arrow);
-    r_arrow.decorator_set_distinct(tree, label_decorator_type().text(), Cow::Borrowed("→"));
-    r_arrow.layout_set_distinct(tree, dock_layout_type().dock(), Some(Side::Right));
-    r_arrow.align_set_distinct(tree, view_align_type().margin(), Thickness::new(0, 0, 1, 0));
-    let r_text = View::new(tree, border, |view| ((), view));
-    DockLayout::new(tree, r_text);
-    LabelDecorator::new(tree, r_text);
-    r_text.decorator_set_distinct(tree, label_decorator_type().text(), Cow::Borrowed("l"));
-    r_text.layout_set_distinct(tree, dock_layout_type().dock(), Some(Side::Right));
+    border.unwrap()
 }
 
 fn main() {
@@ -72,14 +66,7 @@ fn main() {
     let padding = Thickness::align(Vector { x: 13, y: 7 }, screen.size(), HAlign::Center, VAlign::Center);
     let bounds = padding.shrink_rect(Rect { tl: Point { x: 0, y: 0 }, size: screen.size() });
     let tree = &mut ViewTree::new(screen, |_| ((), |tree| tree));
-    CanvasPanel::new(tree, tree.root());
-    let border = View::new(tree, tree.root(), |view| ((), view));
-    CanvasLayout::new(tree, border);
-    BorderDecorator::new(tree, border);
-    build_box(tree, border);
-    border.align_set_distinct(tree, view_align_type().w(), Some(bounds.w()));
-    border.align_set_distinct(tree, view_align_type().h(), Some(bounds.h()));
-    border.layout_set_distinct(tree, canvas_layout_type().tl(), bounds.tl);
+    let border = build(tree, bounds);
     border.base_on(tree, view_base_type().input(), |context, border, input| {
         let tree: &mut ViewTree = context.get_mut();
         let d = match input.key() {
