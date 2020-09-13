@@ -552,13 +552,13 @@ macro_rules! dep_obj {
             impl [< $name Builder >] {
                 $($b)*
 
-                $vis fn new() -> Self {
+                fn new_priv() -> Self {
                     Self {
                         $($y)*
                     }
                 }
 
-                $vis fn build(
+                fn build_priv(
                     self,
                     $context: &mut dyn $crate::dyn_context_Context,
                     $id_builder: $id,
@@ -581,7 +581,7 @@ macro_rules! dep_obj {
             impl [< $name Type >] {
                 $($p)*
 
-                fn new_raw() -> Option<$crate::DepTypeToken<Self>> {
+                fn new_priv() -> Option<$crate::DepTypeToken<Self>> {
                     $crate::DepTypeBuilder::new().map(|mut $builder| {
                         $($c)*
                         $builder.build(Self { $($l)* })
@@ -602,7 +602,7 @@ macro_rules! dep_obj {
             }
 
             impl $(< $($g)+ >)? $name $(< $($r)+ >)? {
-                fn new_raw(token: &$crate::DepTypeToken< [< $name Type >] >) -> Self {
+                fn new_priv(token: &$crate::DepTypeToken< [< $name Type >] >) -> Self {
                     Self { core: $crate::DepObjCore::new(token) }
                 }
             }

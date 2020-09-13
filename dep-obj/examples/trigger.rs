@@ -94,7 +94,7 @@ mod or_chip {
     }
 
     impl OrLegsType {
-        pub fn new() -> Option<DepTypeToken<Self>> { Self::new_raw() }
+        pub fn new() -> Option<DepTypeToken<Self>> { Self::new_priv() }
     }
 
     impl OrLegs {
@@ -103,7 +103,7 @@ mod or_chip {
             token: &DepTypeToken<OrLegsType>,
             tag: impl FnOnce(Chip) -> (Tag, T)
         ) -> T {
-            let legs = Self::new_raw(token);
+            let legs = Self::new_priv(token);
             let (chip, result) = Chip::new(circuit, |chip| {
                 let (tag, result) = tag(chip);
                 (Box::new(legs) as _, tag, (chip, result))
@@ -141,7 +141,7 @@ mod not_chip {
     }
 
     impl NotLegsType {
-        pub fn new() -> Option<DepTypeToken<Self>> { Self::new_raw() }
+        pub fn new() -> Option<DepTypeToken<Self>> { Self::new_priv() }
     }
 
     impl NotLegs {
@@ -150,7 +150,7 @@ mod not_chip {
             token: &DepTypeToken<NotLegsType>,
             tag: impl FnOnce(Chip) -> (Tag, T)
         ) -> T {
-            let legs = Self::new_raw(token);
+            let legs = Self::new_priv(token);
             let (chip, result) = Chip::new(circuit, |chip| {
                 let (tag, result) = tag(chip);
                 (Box::new(legs) as _, tag, (chip, result))
