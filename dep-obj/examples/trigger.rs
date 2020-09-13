@@ -191,8 +191,8 @@ use trigger_chips::Context as TriggerChips;
 context! {
     mod trigger_context {
         dyn circuit: mut Circuit,
-        dyn or_legs_token: ref DepTypeToken<OrLegsType>,
-        dyn not_legs_token: ref DepTypeToken<NotLegsType>,
+        dyn or_legs: ref DepTypeToken<OrLegsType>,
+        dyn not_legs: ref DepTypeToken<NotLegsType>,
         dyn chips: ref TriggerChips,
     }
 }
@@ -202,52 +202,52 @@ use trigger_context::Context as TriggerContext;
 fn main() {
     let mut circuit_token = CircuitToken::new().unwrap();
     let circuit = &mut Circuit::new(&mut circuit_token);
-    let or_legs_token: DepTypeToken<OrLegsType> =  OrLegsType::new().unwrap();
-    let not_legs_token: DepTypeToken<NotLegsType> = NotLegsType::new().unwrap();
-    let not_1 = NotLegs::new(circuit, &not_legs_token, |chip| (1usize, chip));
-    let not_2 = NotLegs::new(circuit, &not_legs_token, |chip| (2usize, chip));
-    let or_1 = OrLegs::new(circuit, &or_legs_token, |chip| (1usize, chip));
-    let or_2 = OrLegs::new(circuit, &or_legs_token, |chip| (2usize, chip));
+    let or_legs: DepTypeToken<OrLegsType> =  OrLegsType::new().unwrap();
+    let not_legs: DepTypeToken<NotLegsType> = NotLegsType::new().unwrap();
+    let not_1 = NotLegs::new(circuit, &not_legs, |chip| (1usize, chip));
+    let not_2 = NotLegs::new(circuit, &not_legs, |chip| (2usize, chip));
+    let or_1 = OrLegs::new(circuit, &or_legs, |chip| (1usize, chip));
+    let or_2 = OrLegs::new(circuit, &or_legs, |chip| (2usize, chip));
     let on_not_out_changed = |not: Chip, context: &mut dyn Context, _old: &_| {
-        let not_legs_token: &DepTypeToken<NotLegsType> = context.get();
-        let or_legs_token: &DepTypeToken<OrLegsType> = context.get();
+        let not_legs: &DepTypeToken<NotLegsType> = context.get();
+        let or_legs: &DepTypeToken<OrLegsType> = context.get();
         let circuit: &Circuit = context.get();
         let chips: &TriggerChips = context.get();
         let or = if not.tag::<usize>(circuit) == 1 { chips.or_2() } else { chips.or_1() };
-        let &out = not.legs_get(circuit, not_legs_token.ty().out());
-        let in_2 = or_legs_token.ty().in_2();
+        let &out = not.legs_get(circuit, not_legs.ty().out());
+        let in_2 = or_legs.ty().in_2();
         or.legs_set_uncond(context, in_2, out);
     };
     let on_or_out_changed = |or: Chip, context: &mut dyn Context, _old: &_| {
-        let not_legs_token: &DepTypeToken<NotLegsType> = context.get();
-        let or_legs_token: &DepTypeToken<OrLegsType> = context.get();
+        let not_legs: &DepTypeToken<NotLegsType> = context.get();
+        let or_legs: &DepTypeToken<OrLegsType> = context.get();
         let circuit: &Circuit = context.get();
         let chips: &TriggerChips = context.get();
         let not = if or.tag::<usize>(circuit) == 1 { chips.not_1() } else { chips.not_2() };
-        let &out = or.legs_get(circuit, or_legs_token.ty().out());
-        let in_ = not_legs_token.ty().in_();
+        let &out = or.legs_get(circuit, or_legs.ty().out());
+        let in_ = not_legs.ty().in_();
         not.legs_set_uncond(context, in_, out);
     };
-    not_1.legs_on_changed(circuit, not_legs_token.ty().out(), on_not_out_changed);
-    not_2.legs_on_changed(circuit, not_legs_token.ty().out(), on_not_out_changed);
-    or_1.legs_on_changed(circuit, or_legs_token.ty().out(), on_or_out_changed);
-    or_2.legs_on_changed(circuit, or_legs_token.ty().out(), on_or_out_changed);
-    not_1.legs_on_changed(circuit, not_legs_token.ty().out(), |not_1, context, _old| {
-        let not_legs_token: &DepTypeToken<NotLegsType> = context.get();
+    not_1.legs_on_changed(circuit, not_legs.ty().out(), on_not_out_changed);
+    not_2.legs_on_changed(circuit, not_legs.ty().out(), on_not_out_changed);
+    or_1.legs_on_changed(circuit, or_legs.ty().out(), on_or_out_changed);
+    or_2.legs_on_changed(circuit, or_legs.ty().out(), on_or_out_changed);
+    not_1.legs_on_changed(circuit, not_legs.ty().out(), |not_1, context, _old| {
+        let not_legs: &DepTypeToken<NotLegsType> = context.get();
         let circuit: &Circuit = context.get();
-        let &out = not_1.legs_get(circuit, not_legs_token.ty().out());
+        let &out = not_1.legs_get(circuit, not_legs.ty().out());
         println!("{}", if out { "0 -> 1" } else { "1 -> 0" });
     });
     TriggerChips::call(or_1, or_2, not_1, not_2, |chips| {
-        TriggerContext::call(circuit, &or_legs_token, &not_legs_token, chips, |context| {
-            or_1.legs_set_distinct(context, or_legs_token.ty().in_1(), true);
-            or_1.legs_set_distinct(context, or_legs_token.ty().in_1(), false);
-            or_2.legs_set_distinct(context, or_legs_token.ty().in_1(), true);
-            or_2.legs_set_distinct(context, or_legs_token.ty().in_1(), false);
-            or_1.legs_set_distinct(context, or_legs_token.ty().in_1(), true);
-            or_1.legs_set_distinct(context, or_legs_token.ty().in_1(), false);
-            or_2.legs_set_distinct(context, or_legs_token.ty().in_1(), true);
-            or_2.legs_set_distinct(context, or_legs_token.ty().in_1(), false);
+        TriggerContext::call(circuit, &or_legs, &not_legs, chips, |context| {
+            or_1.legs_set_distinct(context, or_legs.ty().in_1(), true);
+            or_1.legs_set_distinct(context, or_legs.ty().in_1(), false);
+            or_2.legs_set_distinct(context, or_legs.ty().in_1(), true);
+            or_2.legs_set_distinct(context, or_legs.ty().in_1(), false);
+            or_1.legs_set_distinct(context, or_legs.ty().in_1(), true);
+            or_1.legs_set_distinct(context, or_legs.ty().in_1(), false);
+            or_2.legs_set_distinct(context, or_legs.ty().in_1(), true);
+            or_2.legs_set_distinct(context, or_legs.ty().in_1(), false);
         });
     });
 }
