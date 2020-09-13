@@ -385,7 +385,8 @@ macro_rules! dep_obj {
     (
         $(#[$attr:meta])* $vis:vis struct $name:ident
         $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ $(,)?>)?
-        become $set:ident in $id:ty {
+        become $set:ident in $id:ty
+        $(where BuilderCore $(< $( $blt:tt $( : $bclt:tt $(+ $bdlt:tt )* )? ),+ $(,)?>)? = $bct:ty)? {
             $($(
                $field:ident $delim:tt $field_ty:ty $(= $field_val:expr)?
             ),+ $(,)?)?
@@ -394,10 +395,15 @@ macro_rules! dep_obj {
         dep_obj! {
             @impl builder id ty this context [$(#[$attr])*] ($vis) $name become $set in $id ;
             [] [] [] [] [] [] [] [] [$($($field $delim $field_ty $(= $field_val)?),+)?];
-            $(
+            [$(
                 [ $( $lt ),+ ],
                 [ $( $lt $( : $clt $(+ $dlt )* )? ),+ ]
-            )?
+            )?]
+            $( $bct [$(
+                [ $( $blt ),+ ],
+                [ $( $blt $( : $bclt $(+ $bdlt )* )? ),+ ]
+            )?])?
+
         }
     };
     (
@@ -412,7 +418,8 @@ macro_rules! dep_obj {
         [$($c:tt)*]
         [$($l:tt)*]
         [$field:ident : $field_ty:ty = $field_val:expr $(, $($other_fields:tt)+)?];
-        $([ $($g:tt)+ ], [ $($r:tt)+ ])?
+        [$([ $($g:tt)+ ], [ $($r:tt)+ ])?]
+        $($bct:ty [$([ $($bg:tt)+ ], [ $($br:tt)+ ])?])?
     ) => {
         dep_obj! {
             @impl $builder $id_builder $ty $this $context
@@ -473,7 +480,8 @@ macro_rules! dep_obj {
                 $field,
             ]
             [$($($other_fields)+)?];
-            $([ $($g)+ ], [ $($r)+ ])?
+            [$([ $($g)+ ], [ $($r)+ ])?]
+            $($bct [$([ $($bg)+ ], [ $($br)+ ])?])?
         }
     };
     (
@@ -488,7 +496,8 @@ macro_rules! dep_obj {
         [$($c:tt)*]
         [$($l:tt)*]
         [$field:ident yield $field_ty:ty $(, $($other_fields:tt)+)?];
-        $([ $($g:tt)+ ], [ $($r:tt)+ ])?
+        [$([ $($g:tt)+ ], [ $($r:tt)+ ])?]
+        $($bct:ty [$([ $($bg:tt)+ ], [ $($br:tt)+ ])?])?
     ) => {
         dep_obj! {
             @impl $builder $id_builder $ty $this $context
@@ -537,26 +546,38 @@ macro_rules! dep_obj {
                 $field,
             ]
             [$($($other_fields)+)?];
-            $([ $($g)+ ], [ $($r)+ ])?
+            [$([ $($g)+ ], [ $($r)+ ])?]
+            $($bct [$([ $($bg)+ ], [ $($br)+ ])?])?
         }
     };
     (
         @impl $builder:ident $id_builder:ident $ty:ident $this:ident $context:ident
         [$(#[$attr:meta])*] ($vis:vis) $name:ident become $set:ident in $id:ty ;
         [$($x:tt)*] [$($y:tt)*] [$($f:tt)*] [$($b:tt)*] [$($s:tt)*] [$($p:tt)*] [$($c:tt)*] [$($l:tt)*] [];
-        $([ $($g:tt)+ ], [ $($r:tt)+ ])?
+        [$([ $($g:tt)+ ], [ $($r:tt)+ ])?]
+        $($bct:ty [$([ $($bg:tt)+ ], [ $($br:tt)+ ])?])?
     ) => {
         $crate::paste_paste! {
-            $vis struct [< $name Builder >] { $($f)* }
+            $vis struct [< $name Builder >] $($(< $($bg)+ >)?)? {
+                $(core_priv: $bct,)?
+                $($f)*
+            }
 
-            impl [< $name Builder >] {
+            impl $($(< $($bg)+ >)?)? [< $name Builder >] $($(< $($br)+ >)?)? {
                 $($b)*
 
-                fn new_priv() -> Self {
+                fn new_priv($(core: $bct)?) -> Self {
                     Self {
+                        $(core_priv: { let r: $bct = core; r },)?
                         $($y)*
                     }
                 }
+
+                $(
+                    fn core_priv(&self) -> &$bct { &self.core_priv }
+
+                    fn core_priv_mut(&mut self) -> &mut $bct { &mut self.core_priv }
+                )?
 
                 fn build_priv(
                     self,
