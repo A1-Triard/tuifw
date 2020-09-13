@@ -113,7 +113,7 @@ mod or_chip {
             result
         }
 
-        fn update(chip: Chip, context: &mut dyn Context, _old: &bool) {
+        fn update(context: &mut dyn Context, chip: Chip, _old: &bool) {
             let token: &DepTypeToken<OrLegsType> = context.get();
             let circuit: &Circuit= context.get();
             let in_1 = *chip.legs_get(circuit, token.ty().in_1());
@@ -159,7 +159,7 @@ mod not_chip {
             result
         }
 
-        fn update(chip: Chip, context: &mut dyn Context, _old: &bool) {
+        fn update(context: &mut dyn Context, chip: Chip, _old: &bool) {
             let token: &DepTypeToken<NotLegsType> = context.get();
             let circuit: &Circuit = context.get();
             let in_ = *chip.legs_get(circuit, token.ty().in_());
@@ -208,7 +208,7 @@ fn main() {
     let not_2 = NotLegs::new(circuit, &not_legs, |chip| (2usize, chip));
     let or_1 = OrLegs::new(circuit, &or_legs, |chip| (1usize, chip));
     let or_2 = OrLegs::new(circuit, &or_legs, |chip| (2usize, chip));
-    let on_not_out_changed = |not: Chip, context: &mut dyn Context, _old: &_| {
+    let on_not_out_changed = |context: &mut dyn Context, not: Chip, _old: &_| {
         let not_legs: &DepTypeToken<NotLegsType> = context.get();
         let or_legs: &DepTypeToken<OrLegsType> = context.get();
         let circuit: &Circuit = context.get();
@@ -218,7 +218,7 @@ fn main() {
         let in_2 = or_legs.ty().in_2();
         or.legs_set_uncond(context, in_2, out);
     };
-    let on_or_out_changed = |or: Chip, context: &mut dyn Context, _old: &_| {
+    let on_or_out_changed = |context: &mut dyn Context, or: Chip, _old: &_| {
         let not_legs: &DepTypeToken<NotLegsType> = context.get();
         let or_legs: &DepTypeToken<OrLegsType> = context.get();
         let circuit: &Circuit = context.get();
@@ -232,7 +232,7 @@ fn main() {
     not_2.legs_on_changed(circuit, not_legs.ty().out(), on_not_out_changed);
     or_1.legs_on_changed(circuit, or_legs.ty().out(), on_or_out_changed);
     or_2.legs_on_changed(circuit, or_legs.ty().out(), on_or_out_changed);
-    not_1.legs_on_changed(circuit, not_legs.ty().out(), |not_1, context, _old| {
+    not_1.legs_on_changed(circuit, not_legs.ty().out(), |context, not_1, _old| {
         let not_legs: &DepTypeToken<NotLegsType> = context.get();
         let circuit: &Circuit = context.get();
         let &out = not_1.legs_get(circuit, not_legs.ty().out());

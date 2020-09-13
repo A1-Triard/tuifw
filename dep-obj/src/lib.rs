@@ -62,12 +62,12 @@ pub trait DepObj {
 #[derive(Debug)]
 struct Entry<PropType> {
     value: PropType,
-    on_changed: Option<Vec<usize>>,
+    on_changed: Vec<usize>,
 }
 
 unsafe fn store_default<PropType>(fn_ptr: usize, props: *mut u8) {
     let fn_ptr: fn() -> PropType = transmute(fn_ptr);
-    ptr::write(props as *mut Entry<PropType>, Entry { value: fn_ptr(), on_changed: None });
+    ptr::write(props as *mut Entry<PropType>, Entry { value: fn_ptr(), on_changed: Vec::new() });
 }
 
 unsafe fn drop_entry<PropType>(props: *mut u8) {
@@ -139,18 +139,16 @@ impl<OwnerType: DepType> DepTypeBuilder<OwnerType> {
 }
 
 pub struct OnRaised<OwnerId: ComponentId, ArgsType>(
-    Option<Vec<usize>>,
+    Vec<usize>,
     (PhantomData<OwnerId>, PhantomData<ArgsType>),
 );
 
 impl<OwnerId: ComponentId, ArgsType> OnRaised<OwnerId, ArgsType> {
-    pub fn raise(self, owner_id: OwnerId, context: &mut dyn Context, args: &mut ArgsType) {
-        if let Some(on_raised) = self.0 {
-            for on_raised in on_raised {
-                let on_raised: fn(owner_id: OwnerId, context: &mut dyn Context, args: &mut ArgsType) =
-                    unsafe { transmute(on_raised) };
-                on_raised(owner_id, context, args);
-            }
+    pub fn raise(self, context: &mut dyn Context, owner_id: OwnerId, args: &mut ArgsType) {
+        for on_raised in self.0 {
+            let on_raised: fn(context: &mut dyn Context, owner_id: OwnerId, args: &mut ArgsType) =
+                unsafe { transmute(on_raised) };
+            on_raised(context, owner_id, args);
         }
     }
 }
@@ -189,15 +187,11 @@ impl<Owner: DepObj, ArgsType> DepEvent<Owner, ArgsType> {
     pub fn on_raised(
         self,
         obj: &mut Owner,
-        callback: fn(owner_id: Owner::Id, context: &mut dyn Context, args: &mut ArgsType)
+        callback: fn(context: &mut dyn Context, owner_id: Owner::Id, args: &mut ArgsType)
     ) {
         let callback = unsafe { transmute(callback) };
         let on_raised = unsafe { obj.core_mut().events.get_unchecked_mut(self.0.index) };
-        if let Some(on_raised) = on_raised.as_mut() {
-            on_raised.push(callback);
-        } else {
-            on_raised.replace(vec![callback]);
-        }
+        on_raised.push(callback);
     }
 
     pub fn raise(
@@ -210,18 +204,16 @@ impl<Owner: DepObj, ArgsType> DepEvent<Owner, ArgsType> {
 }
 
 pub struct OnChanged<OwnerId: ComponentId, PropType>(
-    Option<Vec<usize>>,
+    Vec<usize>,
     (PhantomData<OwnerId>, PhantomData<PropType>),
 );
 
 impl<OwnerId: ComponentId, PropType> OnChanged<OwnerId, PropType> {
-    pub fn raise(self, owner_id: OwnerId, context: &mut dyn Context, old: &PropType) {
-        if let Some(on_changed) = self.0 {
-            for on_changed in on_changed {
-                let on_changed: fn(owner_id: OwnerId, context: &mut dyn Context, old: &PropType) =
-                    unsafe { transmute(on_changed) };
-                on_changed(owner_id, context, old);
-            }
+    pub fn raise(self, context: &mut dyn Context, owner_id: OwnerId, old: &PropType) {
+        for on_changed in self.0 {
+            let on_changed: fn(context: &mut dyn Context, owner_id: OwnerId, old: &PropType) =
+                unsafe { transmute(on_changed) };
+            on_changed(context, owner_id, old);
         }
     }
 }
@@ -278,7 +270,7 @@ impl<Owner: DepObj, PropType: Eq> DepProp<Owner, PropType> {
     ) -> (PropType, OnChanged<Owner::Id, PropType>) {
         let entry = self.0.get_entry_mut(obj.core_mut());
         let old = replace(&mut entry.value, value);
-        let on_changed = if old == entry.value { None } else { entry.on_changed.clone() };
+        let on_changed = if old == entry.value { Vec::new() } else { entry.on_changed.clone() };
         (old, OnChanged(on_changed, (PhantomData, PhantomData)))
     }
 }
@@ -304,15 +296,11 @@ impl<Owner: DepObj, PropType> DepProp<Owner, PropType> {
     pub fn on_changed(
         self,
         obj: &mut Owner,
-        callback: fn(owner_id: Owner::Id, context: &mut dyn Context, old: &PropType)
+        callback: fn(context: &mut dyn Context, owner_id: Owner::Id, old: &PropType)
     ) {
         let callback = unsafe { transmute(callback) };
         let entry = self.0.get_entry_mut(obj.core_mut());
-        if let Some(on_changed) = entry.on_changed.as_mut() {
-            on_changed.push(callback);
-        } else {
-            entry.on_changed = Some(vec![callback]);
-        }
+        entry.on_changed.push(callback);
     }
 }
 
@@ -322,7 +310,7 @@ pub struct DepObjCore<OwnerType: DepType, OwnerId: ComponentId> {
     layout: Layout,
     props: *mut u8,
     drop: Vec<(isize, unsafe fn(*mut u8))>,
-    events: Vec<Option<Vec<usize>>>,
+    events: Vec<Vec<usize>>,
     phantom: (PhantomData<OwnerType>, PhantomData<OwnerId>)
 }
 
@@ -331,20 +319,20 @@ unsafe impl<OwnerType: DepType, OwnerId: ComponentId> Sync for DepObjCore<OwnerT
 impl<OwnerType: DepType, OwnerId: ComponentId> Unpin for DepObjCore<OwnerType, OwnerId> { }
 
 impl<OwnerType: DepType, OwnerId: ComponentId> DepObjCore<OwnerType, OwnerId> {
-    pub fn new(tytoken: &DepTypeToken<OwnerType>) -> DepObjCore<OwnerType, OwnerId> {
-        let props = if tytoken.layout.size() == 0 {
+    pub fn new(ty_token: &DepTypeToken<OwnerType>) -> DepObjCore<OwnerType, OwnerId> {
+        let props = if ty_token.layout.size() == 0 {
             null_mut()
         } else {
-            NonNull::new(unsafe { alloc(tytoken.layout) }).expect("out of memory").as_ptr()
+            NonNull::new(unsafe { alloc(ty_token.layout) }).expect("out of memory").as_ptr()
         };
-        for &(offset, store, fn_ptr) in &tytoken.default {
+        for &(offset, store, fn_ptr) in &ty_token.default {
             unsafe { store(fn_ptr, props.offset(offset)) };
         }
         DepObjCore {
-            layout: tytoken.layout,
+            layout: ty_token.layout,
             props,
-            drop: tytoken.drop.clone(),
-            events: vec![None; tytoken.events],
+            drop: ty_token.drop.clone(),
+            events: vec![Vec::new(); ty_token.events],
             phantom: (PhantomData, PhantomData)
         }
     }
@@ -430,16 +418,18 @@ macro_rules! dep_obj {
             [$(#[$attr])*] ($vis) $name become $set in $id ;
             [
                 $($x)*
-                $id_builder . [< $set _set_uncond >] ($context, $ty.$field(), $this.$field);
+                if let Some(field) = $this.$field {
+                    $id_builder . [< $set _set_uncond >] ($context, $ty.$field(), field);
+                }
             ]
             [
                 $($f)*
-                $field : $field_ty,
+                $field : Option<$field_ty>,
             ]
             [
                 $($b)*
                 $vis fn $field(&mut self, val : $field_ty) {
-                    self.$field = val;
+                    self.$field = Some(val);
                 }
             ]
             [
@@ -485,7 +475,7 @@ macro_rules! dep_obj {
             ]
             [
                 $($f)*
-                $field : $field_ty,
+                $field : Vec<fn(context: &mut dyn $crate::dyn_context_Context, owner: $id, args: &mut $field_ty)>>,
             ]
             [
                 $($b)*
@@ -605,7 +595,7 @@ macro_rules! dep_system {
                 let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
                 let system = $field_mut;
                 let (old, on_changed) = prop.set_uncond(system, value);
-                on_changed.raise(self, context, &old);
+                on_changed.raise(context, self, &old);
                 old
             }
 
@@ -619,7 +609,7 @@ macro_rules! dep_system {
                 let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
                 let system = $field_mut;
                 let (old, on_changed) = prop.set_distinct(system, value);
-                on_changed.raise(self, context, &old);
+                on_changed.raise(context, self, &old);
                 old
             }
 
@@ -627,7 +617,7 @@ macro_rules! dep_system {
                 self,
                 $arena: &mut $Arena,
                 prop: $crate::DepProp<$System, DepSystemValueType>,
-                on_changed: fn(owner: Self, context: &mut dyn $crate::dyn_context_Context, old: &DepSystemValueType),
+                on_changed: fn(context: &mut dyn $crate::dyn_context_Context, owner: Self, old: &DepSystemValueType),
             ) {
                 let $this = self;
                 let system = $field_mut;
@@ -644,14 +634,14 @@ macro_rules! dep_system {
                 let $arena = $crate::dyn_context_ContextExt::get::<$Arena>(context);
                 let system = $field;
                 let on_raised = event.raise(system);
-                on_raised.raise(self, context, args);
+                on_raised.raise(context, self, args);
             }
 
             $vis fn [< $name _on >]<DepSystemArgsType>(
                 self,
                 $arena: &mut $Arena,
                 event: $crate::DepEvent<$System, DepSystemArgsType>,
-                on_raised: fn(owner: Self, context: &mut dyn $crate::dyn_context_Context, args: &mut DepSystemArgsType),
+                on_raised: fn(context: &mut dyn $crate::dyn_context_Context, owner: Self, args: &mut DepSystemArgsType),
             ) {
                 let $this = self;
                 let system = $field_mut;
@@ -685,7 +675,7 @@ macro_rules! dep_system {
                 let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
                 let system = $field_mut.downcast_mut::<DepSystemType>().expect("invalid cast");
                 let (old, on_changed) = prop.set_uncond(system, value);
-                on_changed.raise(self, context, &old);
+                on_changed.raise(context, self, &old);
                 old
             }
 
@@ -699,7 +689,7 @@ macro_rules! dep_system {
                 let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
                 let system = $field_mut.downcast_mut::<DepSystemType>().expect("invalid cast");
                 let (old, on_changed) = prop.set_distinct(system, value);
-                on_changed.raise(self, context, &old);
+                on_changed.raise(context, self, &old);
                 old
             }
 
@@ -707,7 +697,7 @@ macro_rules! dep_system {
                 self,
                 $arena: &mut $Arena,
                 prop: $crate::DepProp<DepSystemType, DepSystemValueType>,
-                on_changed: fn(owner: Self, context: &mut dyn $crate::dyn_context_Context, old: &DepSystemValueType),
+                on_changed: fn(context: &mut dyn $crate::dyn_context_Context, owner: Self, old: &DepSystemValueType),
             ) {
                 let $this = self;
                 let system = $field_mut.downcast_mut::<DepSystemType>().expect("invalid cast");
@@ -724,14 +714,14 @@ macro_rules! dep_system {
                 let $arena = $crate::dyn_context_ContextExt::get::<$Arena>(context);
                 let system = $field.downcast_ref::<DepSystemType>().expect("invalid cast");
                 let on_raised = event.raise(system);
-                on_raised.raise(self, context, args);
+                on_raised.raise(context, self, args);
             }
 
             $vis fn [< $name _on >]<DepSystemType: $System + $crate::DepObj<Id=Self>, DepSystemArgsType>(
                 self,
                 $arena: &mut $Arena,
                 event: $crate::DepEvent<DepSystemType, DepSystemArgsType>,
-                on_raised: fn(owner: Self, context: &mut dyn $crate::dyn_context_Context, args: &mut DepSystemArgsType),
+                on_raised: fn(context: &mut dyn $crate::dyn_context_Context, owner: Self, args: &mut DepSystemArgsType),
             ) {
                 let $this = self;
                 let system = $field_mut.downcast_mut::<DepSystemType>().expect("invalid cast");
