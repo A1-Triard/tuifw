@@ -179,13 +179,6 @@ impl Window {
         Tag::from_raw(tree.arena[self.0].tag.unwrap_or_else(|| unsafe { unreachable_unchecked() }))
     }
 
-    pub fn set_tag<Tag: ComponentId>(self, tree: &mut WindowTree, tag: Tag) -> Tag {
-        Tag::from_raw(
-            tree.arena[self.0].tag.replace(tag.into_raw())
-                .unwrap_or_else(|| unsafe { unreachable_unchecked() })
-        )
-    }
-
     pub fn move_(self, tree: &mut WindowTree, bounds: Rect) {
         let parent = tree.arena[self.0].parent.unwrap_or_else(|| unsafe { unreachable_unchecked() });
         let screen_bounds = bounds.offset(offset_from_root(parent, tree));

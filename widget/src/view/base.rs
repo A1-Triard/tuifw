@@ -281,10 +281,6 @@ impl View {
         Tag::from_raw(tree.arena[self.0].tag)
     }
 
-    pub fn set_tag<Tag: ComponentId>(self, tree: &mut ViewTree, tag: Tag) -> Tag {
-        Tag::from_raw(replace(&mut tree.arena[self.0].tag, tag.into_raw()))
-    }
-
     pub fn focus(self, tree: &mut ViewTree) -> View {
         replace(&mut tree.focused, self)
     }
