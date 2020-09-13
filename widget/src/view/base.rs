@@ -695,6 +695,26 @@ impl View {
     }
 }
 
+pub trait ViewBuilderRootDecoratorExt {
+    fn root_decorator(
+        &mut self,
+        f: impl FnOnce(&mut RootDecoratorBuilder) -> &mut RootDecoratorBuilder
+    ) -> &mut Self;
+}
+
+impl<'a> ViewBuilderRootDecoratorExt for ViewBuilder<'a> {
+    fn root_decorator(
+        &mut self,
+        f: impl FnOnce(&mut RootDecoratorBuilder) -> &mut RootDecoratorBuilder
+    ) -> &mut Self {
+        let mut builder = RootDecoratorBuilder::new_priv();
+        f(&mut builder);
+        let view = self.view();
+        builder.build_priv(self.context(), view, root_decorator_type());
+        self
+    }
+}
+
 dep_obj! {
     #[derive(Debug)]
     pub struct RootDecorator become decorator in View {
