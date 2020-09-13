@@ -5,18 +5,23 @@ use tuifw_screen::{Key, Vector, Thickness, HAlign, VAlign, Point, Side, Rect};
 use tuifw_widget::view::{ViewTree, View, view_align_type, view_base_type};
 use tuifw_widget::view::panels::{CanvasPanel, CanvasLayout, canvas_layout_type};
 use tuifw_widget::view::panels::{DockPanel, DockLayout, dock_layout_type};
-use tuifw_widget::view::decorators::{BorderDecorator, border_decorator_type};
+use tuifw_widget::view::decorators::{BorderDecorator, ViewBuilderBorderDecoratorExt};
 use tuifw_widget::view::decorators::{LabelDecorator, label_decorator_type};
 
 fn build_box(tree: &mut ViewTree, border: View) {
-    border.decorator_set_distinct(tree, border_decorator_type().tl(), Cow::Borrowed("╔"));
-    border.decorator_set_uncond(tree, border_decorator_type().tr(), Cow::Borrowed("╗"));
-    border.decorator_set_uncond(tree, border_decorator_type().bl(), Cow::Borrowed("╚"));
-    border.decorator_set_uncond(tree, border_decorator_type().br(), Cow::Borrowed("╝"));
-    border.decorator_set_uncond(tree, border_decorator_type().l(), Cow::Borrowed("║"));
-    border.decorator_set_uncond(tree, border_decorator_type().t(), Cow::Borrowed("═"));
-    border.decorator_set_uncond(tree, border_decorator_type().r(), Cow::Borrowed("║"));
-    border.decorator_set_uncond(tree, border_decorator_type().b(), Cow::Borrowed("═"));
+    border.build(tree, |view| view
+        .border_decorator(|border| border
+            .tl(Cow::Borrowed("╔"))
+            .tr(Cow::Borrowed("╗"))
+            .bl(Cow::Borrowed("╚"))
+            .br(Cow::Borrowed("╝"))
+            .l(Cow::Borrowed("║"))
+            .t(Cow::Borrowed("═"))
+            .r(Cow::Borrowed("║"))
+            .b(Cow::Borrowed("═"))
+        )
+    );
+
     DockPanel::new(tree, border);
     let t_arrow = View::new(tree, border, |view| ((), view));
     DockLayout::new(tree, t_arrow);
@@ -75,7 +80,7 @@ fn main() {
     border.align_set_distinct(tree, view_align_type().w(), Some(bounds.w()));
     border.align_set_distinct(tree, view_align_type().h(), Some(bounds.h()));
     border.layout_set_distinct(tree, canvas_layout_type().tl(), bounds.tl);
-    border.base_on(tree, view_base_type().input(), |border, context, input| {
+    border.base_on(tree, view_base_type().input(), |context, border, input| {
         let tree: &mut ViewTree = context.get_mut();
         let d = match input.key() {
             (n, Key::Left) | (n, Key::Char('h')) =>

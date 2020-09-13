@@ -225,6 +225,16 @@ fn render_view(
     view_tree.arena[view.0].decorator.as_ref().unwrap().behavior().render(view, view_tree, port);
 }
 
+pub struct ViewBuilder<'a> {
+    view: View,
+    context: &'a mut dyn Context,
+}
+
+impl<'a> ViewBuilder<'a> {
+    pub fn view(&self) -> View { self.view }
+    pub fn context(&mut self) -> &mut dyn Context { self.context }
+}
+
 macro_attr! {
     #[derive(ComponentId!)]
     #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
@@ -279,6 +289,15 @@ impl View {
 
     pub fn tag<Tag: ComponentId>(self, tree: &ViewTree) -> Tag {
         Tag::from_raw(tree.arena[self.0].tag)
+    }
+
+    pub fn build<'a>(
+        self,
+        context: &'a mut dyn Context,
+        f: impl for<'b> FnOnce(&'b mut ViewBuilder<'a>) -> &'b mut ViewBuilder<'a>
+    ) {
+        let mut builder = ViewBuilder { view: self, context };
+        f(&mut builder);
     }
 
     pub fn focus(self, tree: &mut ViewTree) -> View {
@@ -692,7 +711,7 @@ pub fn root_decorator_type() -> &'static RootDecoratorType { ROOT_DECORATOR_TOKE
 impl RootDecorator {
     const BEHAVIOR: RootDecoratorBehavior = RootDecoratorBehavior;
 
-    fn invalidate_screen<T>(_view: View, context: &mut dyn Context, _old: &T) {
+    fn invalidate_screen<T>(context: &mut dyn Context, _view: View, _old: &T) {
         let tree: &mut ViewTree = context.get_mut();
         tree.window_tree().invalidate_screen();
     }
@@ -768,8 +787,8 @@ pub fn view_base_type() -> &'static ViewBaseType { VIEW_BASE_TOKEN.ty() }
 
 impl ViewBase {
     fn on_inheritable_render_changed<T>(
-        view: View,
         context: &mut dyn Context,
+        view: View,
         prop: DepProp<Self, Option<T>>,
     ) {
         let tree: &mut ViewTree = context.get_mut();
@@ -787,16 +806,16 @@ impl ViewBase {
         }
     }
 
-    fn on_fg_changed(view: View, context: &mut dyn Context, _old: &Option<Color>) {
-        Self::on_inheritable_render_changed(view, context, view_base_type().fg());
+    fn on_fg_changed(context: &mut dyn Context, view: View, _old: &Option<Color>) {
+        Self::on_inheritable_render_changed(context, view, view_base_type().fg());
     }
 
-    fn on_bg_changed(view: View, context: &mut dyn Context, _old: &Option<Option<Color>>) {
-        Self::on_inheritable_render_changed(view, context, view_base_type().bg());
+    fn on_bg_changed(context: &mut dyn Context, view: View, _old: &Option<Option<Color>>) {
+        Self::on_inheritable_render_changed(context, view, view_base_type().bg());
     }
 
-    fn on_attr_changed(view: View, context: &mut dyn Context, _old: &Option<Attr>) {
-        Self::on_inheritable_render_changed(view, context, view_base_type().attr());
+    fn on_attr_changed(context: &mut dyn Context, view: View, _old: &Option<Attr>) {
+        Self::on_inheritable_render_changed(context, view, view_base_type().attr());
     }
 }
 
@@ -821,12 +840,12 @@ static VIEW_ALIGN_TOKEN: sync::Lazy<DepTypeToken<ViewAlignType>> = sync::Lazy::n
 pub fn view_align_type() -> &'static ViewAlignType { VIEW_ALIGN_TOKEN.ty() }
 
 impl ViewAlign {
-    fn invalidate_measure<T>(view: View, context: &mut dyn Context, _old: &T) {
+    fn invalidate_measure<T>(context: &mut dyn Context, view: View, _old: &T) {
         let tree: &mut ViewTree = context.get_mut();
         view.invalidate_measure(tree);
     }
 
-    fn invalidate_arrange<T>(view: View, context: &mut dyn Context, _old: &T) {
+    fn invalidate_arrange<T>(context: &mut dyn Context, view: View, _old: &T) {
         let tree: &mut ViewTree = context.get_mut();
         view.invalidate_arrange(tree);
     }

@@ -29,7 +29,7 @@ impl DockLayout {
         view.layout_on_changed(tree, dock_layout_type().dock(), Self::invalidate_parent_measure);
     }
 
-    fn invalidate_parent_measure<T>(view: View, context: &mut dyn Context, _old: &T) {
+    fn invalidate_parent_measure<T>(context: &mut dyn Context, view: View, _old: &T) {
         let tree: &mut ViewTree = context.get_mut();
         view.parent(tree).map(|parent| parent.invalidate_measure(tree));
     }

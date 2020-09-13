@@ -35,7 +35,7 @@ impl LabelDecorator {
         view.decorator_on_changed(tree, label_decorator_type().text(), Self::invalidate_measure);
     }
 
-    fn invalidate_measure<T>(view: View, context: &mut dyn Context, _old: &T) {
+    fn invalidate_measure<T>(context: &mut dyn Context, view: View, _old: &T) {
         let tree: &mut ViewTree = context.get_mut();
         view.invalidate_measure(tree);
     }

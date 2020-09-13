@@ -28,7 +28,7 @@ impl CanvasLayout {
         view.layout_on_changed(tree, canvas_layout_type().tl(), Self::invalidate_parent_arrange);
     }
 
-    fn invalidate_parent_arrange(view: View, context: &mut dyn Context, _old: &Point) {
+    fn invalidate_parent_arrange(context: &mut dyn Context, view: View, _old: &Point) {
         let tree: &mut ViewTree = context.get_mut();
         view.parent(tree).map(|parent| parent.invalidate_arrange(tree));
     }
