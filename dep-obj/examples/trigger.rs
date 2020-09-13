@@ -177,27 +177,21 @@ use circuit::*;
 use or_chip::*;
 use not_chip::*;
 
-context! {
-    mod trigger_chips {
-        or_1: const Chip,
-        or_2: const Chip,
-        not_1: const Chip,
-        not_2: const Chip,
-    }
+struct TriggerChips {
+    pub or_1: Chip,
+    pub or_2: Chip,
+    pub not_1: Chip,
+    pub not_2: Chip,
 }
 
-use trigger_chips::Context as TriggerChips;
-
 context! {
-    mod trigger_context {
+    struct TriggerContext {
         dyn circuit: mut Circuit,
         dyn or_legs: ref DepTypeToken<OrLegsType>,
         dyn not_legs: ref DepTypeToken<NotLegsType>,
         dyn chips: ref TriggerChips,
     }
 }
-
-use trigger_context::Context as TriggerContext;
 
 fn main() {
     let mut circuit_token = CircuitToken::new().unwrap();
@@ -213,7 +207,7 @@ fn main() {
         let or_legs: &DepTypeToken<OrLegsType> = context.get();
         let circuit: &Circuit = context.get();
         let chips: &TriggerChips = context.get();
-        let or = if not.tag::<usize>(circuit) == 1 { chips.or_2() } else { chips.or_1() };
+        let or = if not.tag::<usize>(circuit) == 1 { chips.or_2 } else { chips.or_1 };
         let &out = not.legs_get(circuit, not_legs.ty().out());
         let in_2 = or_legs.ty().in_2();
         or.legs_set_uncond(context, in_2, out);
@@ -223,7 +217,7 @@ fn main() {
         let or_legs: &DepTypeToken<OrLegsType> = context.get();
         let circuit: &Circuit = context.get();
         let chips: &TriggerChips = context.get();
-        let not = if or.tag::<usize>(circuit) == 1 { chips.not_1() } else { chips.not_2() };
+        let not = if or.tag::<usize>(circuit) == 1 { chips.not_1 } else { chips.not_2 };
         let &out = or.legs_get(circuit, or_legs.ty().out());
         let in_ = not_legs.ty().in_();
         not.legs_set_uncond(context, in_, out);
@@ -238,16 +232,15 @@ fn main() {
         let &out = not_1.legs_get(circuit, not_legs.ty().out());
         println!("{}", if out { "0 -> 1" } else { "1 -> 0" });
     });
-    TriggerChips::call(or_1, or_2, not_1, not_2, |chips| {
-        TriggerContext::call(circuit, &or_legs, &not_legs, chips, |context| {
-            or_1.legs_set_distinct(context, or_legs.ty().in_1(), true);
-            or_1.legs_set_distinct(context, or_legs.ty().in_1(), false);
-            or_2.legs_set_distinct(context, or_legs.ty().in_1(), true);
-            or_2.legs_set_distinct(context, or_legs.ty().in_1(), false);
-            or_1.legs_set_distinct(context, or_legs.ty().in_1(), true);
-            or_1.legs_set_distinct(context, or_legs.ty().in_1(), false);
-            or_2.legs_set_distinct(context, or_legs.ty().in_1(), true);
-            or_2.legs_set_distinct(context, or_legs.ty().in_1(), false);
-        });
+    let chips = TriggerChips { or_1, or_2, not_1, not_2 };
+    TriggerContext::call(circuit, &or_legs, &not_legs, &chips, |context| {
+        or_1.legs_set_distinct(context, or_legs.ty().in_1(), true);
+        or_1.legs_set_distinct(context, or_legs.ty().in_1(), false);
+        or_2.legs_set_distinct(context, or_legs.ty().in_1(), true);
+        or_2.legs_set_distinct(context, or_legs.ty().in_1(), false);
+        or_1.legs_set_distinct(context, or_legs.ty().in_1(), true);
+        or_1.legs_set_distinct(context, or_legs.ty().in_1(), false);
+        or_2.legs_set_distinct(context, or_legs.ty().in_1(), true);
+        or_2.legs_set_distinct(context, or_legs.ty().in_1(), false);
     });
 }
