@@ -393,7 +393,7 @@ macro_rules! dep_obj {
     ) => {
         dep_obj! {
             @impl builder id ty this context [$(#[$attr])*] ($vis) $name become $set in $id ;
-            [] [] [] [] [] [] [] [$($($field $delim $field_ty $(= $field_val)?),+)?];
+            [] [] [] [] [] [] [] [] [$($($field $delim $field_ty $(= $field_val)?),+)?];
             $(
                 [ $( $lt ),+ ],
                 [ $( $lt $( : $clt $(+ $dlt )* )? ),+ ]
@@ -404,6 +404,7 @@ macro_rules! dep_obj {
         @impl $builder:ident $id_builder:ident $ty:ident $this:ident $context:ident
         [$(#[$attr:meta])*] ($vis:vis) $name:ident become $set:ident in $id:ty ;
         [$($x:tt)*]
+        [$($y:tt)*]
         [$($f:tt)*]
         [$($b:tt)*]
         [$($s:tt)*]
@@ -418,18 +419,39 @@ macro_rules! dep_obj {
             [$(#[$attr])*] ($vis) $name become $set in $id ;
             [
                 $($x)*
-                if let Some(field) = $this.$field {
+                if let Some(field) = $this.$field.0 {
                     $id_builder . [< $set _set_uncond >] ($context, $ty.$field(), field);
+                }
+                for on_changed in $this.$field.1 {
+                    let arena = $crate::dyn_context_ContextExt::get_mut($context);
+                    $id_builder . [< $set _on_changed >] (arena, $ty.$field(), on_changed);
                 }
             ]
             [
+                $($y)*
+                $field : (None, Vec::new()),
+            ]
+            [
                 $($f)*
-                $field : Option<$field_ty>,
+                $field : (
+                    Option<$field_ty>,
+                    Vec<fn(context: &mut dyn $crate::dyn_context_Context, owner: $id, old: &$field_ty)>
+                ),
             ]
             [
                 $($b)*
-                $vis fn $field(&mut self, val : $field_ty) {
-                    self.$field = Some(val);
+
+                $vis fn $field(&mut self, val : $field_ty) -> &mut Self {
+                    self.$field.0 = Some(val);
+                    self
+                }
+
+                $vis fn [< on_ $field _changed >] (
+                    &mut self,
+                    callback : fn(context: &mut dyn $crate::dyn_context_Context, owner: $id, old: &$field_ty)
+                ) -> &mut Self {
+                    self.$field.1.push(callback);
+                    self
                 }
             ]
             [
@@ -458,6 +480,7 @@ macro_rules! dep_obj {
         @impl $builder:ident $id_builder:ident $ty:ident $this:ident $context:ident
         [$(#[$attr:meta])*] ($vis:vis) $name:ident become $set:ident in $id:ty ;
         [$($x:tt)*]
+        [$($y:tt)*]
         [$($f:tt)*]
         [$($b:tt)*]
         [$($s:tt)*]
@@ -472,14 +495,28 @@ macro_rules! dep_obj {
             [$(#[$attr])*] ($vis) $name become $set in $id ;
             [
                 $($x)*
+                for on_raised in $this.$field {
+                    let arena = $crate::dyn_context_ContextExt::get_mut($context);
+                    $id_builder . [< $set _on >] (arena, $ty.$field(), on_raised);
+                }
+            ]
+            [
+                $($y)*
+                $field : Vec::new(),
             ]
             [
                 $($f)*
-                $field : Vec<fn(context: &mut dyn $crate::dyn_context_Context, owner: $id, args: &mut $field_ty)>>,
+                $field : Vec<fn(context: &mut dyn $crate::dyn_context_Context, owner: $id, args: &mut $field_ty)>,
             ]
             [
                 $($b)*
-                $vis fn [< on_ $field _changed >] (&mut self, val : $field_ty) { }
+                $vis fn [< on_ $field _changed >] (
+                    &mut self,
+                    callback : fn(context: &mut dyn $crate::dyn_context_Context, owner: $id, args: &mut $field_ty)
+                ) -> &mut Self {
+                    self.$field.push(callback);
+                    self
+                }
             ]
             [
                 $($s)*
@@ -506,7 +543,7 @@ macro_rules! dep_obj {
     (
         @impl $builder:ident $id_builder:ident $ty:ident $this:ident $context:ident
         [$(#[$attr:meta])*] ($vis:vis) $name:ident become $set:ident in $id:ty ;
-        [$($x:tt)*] [$($f:tt)*] [$($b:tt)*] [$($s:tt)*] [$($p:tt)*] [$($c:tt)*] [$($l:tt)*] [];
+        [$($x:tt)*] [$($y:tt)*] [$($f:tt)*] [$($b:tt)*] [$($s:tt)*] [$($p:tt)*] [$($c:tt)*] [$($l:tt)*] [];
         $([ $($g:tt)+ ], [ $($r:tt)+ ])?
     ) => {
         $crate::paste_paste! {
@@ -514,6 +551,12 @@ macro_rules! dep_obj {
 
             impl [< $name Builder >] {
                 $($b)*
+
+                $vis fn new() -> Self {
+                    Self {
+                        $($y)*
+                    }
+                }
 
                 $vis fn build(
                     self,
