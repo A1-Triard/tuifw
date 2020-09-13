@@ -9,7 +9,7 @@ use crate::view::base::*;
 
 dep_obj! {
     #[derive(Debug)]
-    pub struct LineDecorator as View: LineDecoratorType {
+    pub struct LineDecorator become decorator in View {
         orient: Orient = Orient::Hor,
         length: i16 = 3,
         near: Cow<'static, str> = Cow::Borrowed(""),
@@ -41,23 +41,23 @@ impl LineDecorator {
     }
 
     fn invalidate_measure<T>(view: View, context: &mut dyn Context, _old: &T) {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let tree: &mut ViewTree = context.get_mut();
         view.invalidate_measure(tree);
     }
 
     fn invalidate_near(view: View, context: &mut dyn Context, _old: &Cow<'static, str>) {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let tree: &mut ViewTree = context.get_mut();
         let invalidated = Rect { tl: Point { x: 0, y: 0 }, size: Vector { x: 1, y: 1 } };
         view.invalidate_rect(tree, invalidated).unwrap();
     }
 
     fn invalidate_stroke(view: View, context: &mut dyn Context, _old: &Cow<'static, str>) {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let tree: &mut ViewTree = context.get_mut();
         view.invalidate_render(tree).unwrap();
     }
 
     fn invalidate_far(view: View, context: &mut dyn Context, _old: &Cow<'static, str>) {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let tree: &mut ViewTree = context.get_mut();
         let &orient = view.decorator_get(tree, line_decorator_type().orient());
         let size = view.render_bounds(tree).size;
         let invalidated = if orient == Orient::Vert {

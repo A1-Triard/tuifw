@@ -7,7 +7,7 @@ use crate::view::base::*;
 
 dep_obj! {
     #[derive(Debug)]
-    pub struct CanvasLayout as View: CanvasLayoutType {
+    pub struct CanvasLayout become layout in View {
         tl: Point = Point { x: 0, y: 0 },
     }
 }
@@ -29,7 +29,7 @@ impl CanvasLayout {
     }
 
     fn invalidate_parent_arrange(view: View, context: &mut dyn Context, _old: &Point) {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let tree: &mut ViewTree = context.get_mut();
         view.parent(tree).map(|parent| parent.invalidate_arrange(tree));
     }
 }

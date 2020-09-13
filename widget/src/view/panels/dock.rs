@@ -8,7 +8,7 @@ use crate::view::base::*;
 
 dep_obj! {
     #[derive(Debug)]
-    pub struct DockLayout as View: DockLayoutType {
+    pub struct DockLayout become layout in View {
         dock: Option<Side> = None,
     }
 }
@@ -30,7 +30,7 @@ impl DockLayout {
     }
 
     fn invalidate_parent_measure<T>(view: View, context: &mut dyn Context, _old: &T) {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let tree: &mut ViewTree = context.get_mut();
         view.parent(tree).map(|parent| parent.invalidate_measure(tree));
     }
 }
@@ -39,7 +39,7 @@ impl Layout for DockLayout { }
 
 dep_obj! {
     #[derive(Debug)]
-    pub struct DockPanel as View: DockPanelType {
+    pub struct DockPanel become panel in View {
         base: Side = Side::Top,
     }
 }

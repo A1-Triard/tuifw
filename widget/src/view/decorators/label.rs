@@ -12,7 +12,7 @@ use unicode_segmentation::UnicodeSegmentation;
 
 dep_obj! {
     #[derive(Debug)]
-    pub struct LabelDecorator as View: LabelDecoratorType {
+    pub struct LabelDecorator become decorator in View {
         text: Cow<'static, str> = Cow::Borrowed(""),
     }
 }
@@ -36,7 +36,7 @@ impl LabelDecorator {
     }
 
     fn invalidate_measure<T>(view: View, context: &mut dyn Context, _old: &T) {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let tree: &mut ViewTree = context.get_mut();
         view.invalidate_measure(tree);
     }
 }

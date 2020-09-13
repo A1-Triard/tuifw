@@ -76,7 +76,7 @@ fn main() {
     border.align_set_distinct(tree, view_align_type().h(), Some(bounds.h()));
     border.layout_set_distinct(tree, canvas_layout_type().tl(), bounds.tl);
     border.base_on(tree, view_base_type().input(), |border, context, input| {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let tree: &mut ViewTree = context.get_mut();
         let d = match input.key() {
             (n, Key::Left) | (n, Key::Char('h')) =>
                 -Vector { x: (n.get() as i16).wrapping_mul(2), y: 0 },

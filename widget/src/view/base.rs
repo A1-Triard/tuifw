@@ -153,7 +153,7 @@ impl ViewTree {
 
     pub fn update(context: &mut dyn Context, wait: bool) -> Result<bool, Box<dyn Any>> {
         Self::update_actual_focused(context);
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let tree: &mut ViewTree = context.get_mut();
         tree.root.measure(tree, (Some(tree.screen_size.x), Some(tree.screen_size.y)));
         tree.root.arrange(tree, Rect { tl: Point { x: 0, y: 0 }, size: tree.screen_size });
         let mut window_tree = tree.window_tree.take().expect("ViewTree is in invalid state");
@@ -171,7 +171,7 @@ impl ViewTree {
             loop {
                 view.base_raise(context, view_base_type().input(), &mut input);
                 if input.handled { break; }
-                let tree = context.get::<ViewTree>().expect("ViewTree required");
+                let tree: &ViewTree = context.get();
                 if let Some(parent) = view.parent(tree) {
                     view = parent;
                 } else {
@@ -179,14 +179,14 @@ impl ViewTree {
                 }
             }
         }
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let tree: &mut ViewTree = context.get_mut();
         Ok(!tree.quit)
     }
 
     pub fn focused(&self) -> View { self.focused }
 
     fn update_actual_focused(context: &mut dyn Context) {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let tree: &mut ViewTree = context.get_mut();
         let focused = tree.focused;
         let actual_focused = tree.actual_focused;
         if focused == actual_focused { return; }
@@ -194,7 +194,7 @@ impl ViewTree {
         let mut view = actual_focused;
         loop {
             view.base_raise(context, view_base_type().lost_focus(), &mut ());
-            let tree = context.get::<ViewTree>().expect("ViewTree required");
+            let tree: &ViewTree = context.get();
             if let Some(parent) = view.parent(tree) {
                 view = parent;
             } else {
@@ -204,7 +204,7 @@ impl ViewTree {
         let mut view = focused;
         loop {
             view.base_raise(context, view_base_type().got_focus(), &mut ());
-            let tree = context.get::<ViewTree>().expect("ViewTree required");
+            let tree: &ViewTree = context.get();
             if let Some(parent) = view.parent(tree) {
                 view = parent;
             } else {
@@ -220,7 +220,7 @@ fn render_view(
     port: &mut RenderPort,
     context: &mut dyn Context,
 ) {
-    let view_tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+    let view_tree: &mut ViewTree = context.get_mut();
     let view: View = window.map(|window| window.tag(tree)).unwrap_or(view_tree.root);
     view_tree.arena[view.0].decorator.as_ref().unwrap().behavior().render(view, view_tree, port);
 }
@@ -682,7 +682,7 @@ impl View {
 
 dep_obj! {
     #[derive(Debug)]
-    pub struct RootDecorator as View: RootDecoratorType {
+    pub struct RootDecorator become decorator in View {
         fill: Cow<'static, str> = Cow::Borrowed(" ")
     }
 }
@@ -697,7 +697,7 @@ impl RootDecorator {
     const BEHAVIOR: RootDecoratorBehavior = RootDecoratorBehavior;
 
     fn invalidate_screen<T>(_view: View, context: &mut dyn Context, _old: &T) {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let tree: &mut ViewTree = context.get_mut();
         tree.window_tree().invalidate_screen();
     }
 }
@@ -754,7 +754,7 @@ impl ViewInput {
 
 dep_obj! {
     #[derive(Debug)]
-    pub struct ViewBase as View: ViewBaseType {
+    pub struct ViewBase become base in View {
         fg: Option<Color> = None,
         bg: Option<Option<Color>> = None,
         attr: Option<Attr> = None,
@@ -776,12 +776,12 @@ impl ViewBase {
         context: &mut dyn Context,
         prop: DepProp<Self, Option<T>>,
     ) {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let tree: &mut ViewTree = context.get_mut();
         let _ = view.invalidate_render(tree);
         if let Some(last_child) = view.last_child(tree) {
             let mut child = last_child;
             loop {
-                let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+                let tree: &ViewTree = context.get();
                 child = child.next(tree);
                 if child.base_get(tree, prop).is_none() {
                     child.base_set_uncond(context, prop, None);
@@ -806,7 +806,7 @@ impl ViewBase {
 
 dep_obj! {
     #[derive(Debug)]
-    pub struct ViewAlign as View: ViewAlignType {
+    pub struct ViewAlign become align in View {
         h_align: HAlign = HAlign::Center,
         v_align: VAlign = VAlign::Center,
         min_size: Vector = Vector::null(),
@@ -826,12 +826,12 @@ pub fn view_align_type() -> &'static ViewAlignType { VIEW_ALIGN_TOKEN.ty() }
 
 impl ViewAlign {
     fn invalidate_measure<T>(view: View, context: &mut dyn Context, _old: &T) {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let tree: &mut ViewTree = context.get_mut();
         view.invalidate_measure(tree);
     }
 
     fn invalidate_arrange<T>(view: View, context: &mut dyn Context, _old: &T) {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let tree: &mut ViewTree = context.get_mut();
         view.invalidate_arrange(tree);
     }
 }

@@ -10,7 +10,7 @@ use crate::view::base::*;
 
 dep_obj! {
     #[derive(Debug)]
-    pub struct BorderDecorator as View: BorderDecoratorType {
+    pub struct BorderDecorator become decorator in View {
         tl: Cow<'static, str> = Cow::Borrowed(""),
         tr: Cow<'static, str> = Cow::Borrowed(""),
         bl: Cow<'static, str> = Cow::Borrowed(""),
@@ -48,7 +48,7 @@ impl BorderDecorator {
     }
 
     fn invalidate_tl(view: View, context: &mut dyn Context, _old: &Cow<'static, str>) {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let tree: &mut ViewTree = context.get_mut();
         view.invalidate_rect(tree, Rect {
             tl: Point { x: 0, y: 0 },
             size: Vector { x: 1, y: 1 }
@@ -56,7 +56,7 @@ impl BorderDecorator {
     }
 
     fn invalidate_tr(view: View, context: &mut dyn Context, _old: &Cow<'static, str>) {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let tree: &mut ViewTree = context.get_mut();
         let size = view.render_bounds(tree).size;
         view.invalidate_rect(tree, Rect {
             tl: Point { x: size.x.wrapping_sub(1), y: 0 },
@@ -65,7 +65,7 @@ impl BorderDecorator {
     }
 
     fn invalidate_bl(view: View, context: &mut dyn Context, _old: &Cow<'static, str>) {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let tree: &mut ViewTree = context.get_mut();
         let size = view.render_bounds(tree).size;
         view.invalidate_rect(tree, Rect {
             tl: Point { x: 0, y: size.y.wrapping_sub(1) },
@@ -74,7 +74,7 @@ impl BorderDecorator {
     }
 
     fn invalidate_br(view: View, context: &mut dyn Context, _old: &Cow<'static, str>) {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let tree: &mut ViewTree = context.get_mut();
         let size = view.render_bounds(tree).size;
         view.invalidate_rect(tree, Rect {
             tl: Point { x: size.x.wrapping_sub(1), y: size.y.wrapping_sub(1) },
@@ -83,7 +83,7 @@ impl BorderDecorator {
     }
 
     fn invalidate_l(view: View, context: &mut dyn Context, _old: &Cow<'static, str>) {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let tree: &mut ViewTree = context.get_mut();
         let size = view.render_bounds(tree).size;
         view.invalidate_rect(tree, Rect {
             tl: Point { x: 0, y: 0 },
@@ -92,7 +92,7 @@ impl BorderDecorator {
     }
 
     fn invalidate_t(view: View, context: &mut dyn Context, _old: &Cow<'static, str>) {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let tree: &mut ViewTree = context.get_mut();
         let size = view.render_bounds(tree).size;
         view.invalidate_rect(tree, Rect {
             tl: Point { x: 0, y: 0 },
@@ -101,7 +101,7 @@ impl BorderDecorator {
     }
 
     fn invalidate_r(view: View, context: &mut dyn Context, _old: &Cow<'static, str>) {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let tree: &mut ViewTree = context.get_mut();
         let size = view.render_bounds(tree).size;
         view.invalidate_rect(tree, Rect {
             tl: Point { x: size.x.wrapping_sub(1), y: 0 },
@@ -110,7 +110,7 @@ impl BorderDecorator {
     }
 
     fn invalidate_b(view: View, context: &mut dyn Context, _old: &Cow<'static, str>) {
-        let tree = context.get_mut::<ViewTree>().expect("ViewTree required");
+        let tree: &mut ViewTree = context.get_mut();
         let size = view.render_bounds(tree).size;
         view.invalidate_rect(tree, Rect {
             tl: Point { x: 0, y: size.y.wrapping_sub(1) },
