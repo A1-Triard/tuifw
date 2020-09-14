@@ -1,11 +1,13 @@
+use std::any::{Any, TypeId};
 use std::fmt::Debug;
 use std::mem::replace;
 use components_arena::{ComponentId, Id, Component, Arena, ComponentClassMutex};
+use dyn_context::{Context, ContextExt};
 use dep_obj::{dep_system};
 use downcast_rs::{Downcast, impl_downcast};
 use macro_attr_2018::macro_attr;
 use tuifw_screen_base::Screen;
-use crate::view::{View, ViewTree};
+use crate::view::{View, ViewTree, ViewBuilder};
 
 pub trait WidgetBehavior {
     fn load(&self, tree: &mut WidgetTree, widget: Widget, view: View);
@@ -56,6 +58,28 @@ pub struct WidgetTree {
     _model_arena: Arena<ModelNode>,
     view_tree: ViewTree,
     _root: Widget,
+}
+
+impl Context for WidgetTree {
+    fn get_raw(&self, ty: TypeId) -> Option<&dyn Any> {
+        if ty == TypeId::of::<WidgetTree>() {
+            Some(self)
+        } else if ty == TypeId::of::<ViewTree>() {
+            Some(&self.view_tree)
+        } else {
+            None
+        }
+    }
+
+    fn get_mut_raw(&mut self, ty: TypeId) -> Option<&mut dyn Any> {
+        if ty == TypeId::of::<WidgetTree>() {
+            Some(self)
+        } else if ty == TypeId::of::<ViewTree>() {
+            Some(&mut self.view_tree)
+        } else {
+            None
+        }
+    }
 }
 
 impl WidgetTree {
@@ -151,5 +175,18 @@ impl Widget {
                 tree.widget_arena[this.0].obj.as_ref().expect("root widget does not have obj")
             }
         }
+    }
+}
+
+pub trait ViewBuilderWidgetExt {
+    fn widget(&mut self, widget: Widget) -> &mut Self;
+}
+
+impl<'a> ViewBuilderWidgetExt for ViewBuilder<'a> {
+    fn widget(&mut self, widget: Widget) -> &mut Self {
+        let view = self.view();
+        let tree = self.context().get_mut::<WidgetTree>();
+        widget.load(tree, view);
+        self
     }
 }

@@ -1,7 +1,11 @@
+use std::borrow::Cow;
+use tuifw_screen_base::Side;
 use dep_obj::{dep_obj, DepTypeToken};
 use once_cell::sync::{self};
-use crate::base::{Widget, WidgetTree, WidgetObj, WidgetBehavior};
+use crate::base::{Widget, WidgetTree, WidgetObj, WidgetBehavior, ViewBuilderWidgetExt};
 use crate::view::View;
+use crate::view::decorators::{ViewBuilderLabelDecoratorExt};
+use crate::view::panels::{ViewBuilderDockPanelExt};
 
 dep_obj! {
     #[derive(Debug)]
@@ -32,22 +36,23 @@ impl WidgetObj for Button {
 struct ButtonBehavior;
 
 impl WidgetBehavior for ButtonBehavior {
-    fn load(&self, _tree: &mut WidgetTree, _button: Widget, _view: View) {
-        /*
-        let content = 
+    fn load(&self, tree: &mut WidgetTree, button: Widget, view: View) {
+        let &content = button.obj_get(tree, button_type().content());
         view.build(tree, |view| view
-            .dock_panel(|panel| panel
-                .child(button, |layout| layout.dock(Some(Side::Left)), |view| view
-                    .label_decorator(|label| label.text(Cow::Borrowed("[ ")))
-                )
-                .child(button, |layout| layout.dock(Some(Side::Right)), |view| view
-                    .label_decorator(|label| label.text(Cow::Borrowed(" ]")))
-                )
-                .child(button, |layout| layout, |view| {
-
-                    view
-                    .label_decorator(|label| label.text(Cow::Borrowed(" ]")))
-                )
-        */
+            .dock_panel(|panel| {
+                panel
+                    .child(None, button, |layout| layout.dock(Some(Side::Left)), |view| view
+                        .label_decorator(|label| label.text(Cow::Borrowed("[ ")))
+                    )
+                    .child(None, button, |layout| layout.dock(Some(Side::Right)), |view| view
+                        .label_decorator(|label| label.text(Cow::Borrowed(" ]")))
+                    )
+                ;
+                if let Some(content) = content {
+                    panel.child(None, content, |layout| layout, |view| view.widget(content));
+                }
+                panel
+            })
+        );
     }
 }
