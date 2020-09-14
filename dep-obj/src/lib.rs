@@ -573,7 +573,7 @@ macro_rules! dep_obj {
         [$(#[$attr:meta])*] [$vis:vis] [$name:ident] [$system:ident] [$Id:ty] [$($BuilderCore:ty)?]
         [$($g:tt)*] [$($r:tt)*] [$($bc_g:tt)*] [$($bc_r:tt)*]
         [$($builder_build_setters:tt)*]
-        [$($($builder_build_callbacks:tt)+)?]
+        [$($builder_build_callbacks:tt)*]
         [$($builder_init:tt)*]
         [$($builder_fields:tt)*]
         [$($builder_methods:tt)*]
