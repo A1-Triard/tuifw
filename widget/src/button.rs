@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use tuifw_screen_base::Side;
-use dep_obj::{dep_obj, DepTypeToken, DepObjBuilderCore};
+use dep_obj::{dep_obj, DepTypeToken};
 use once_cell::sync::{self};
 use crate::base::{Widget, WidgetTree, WidgetObj, WidgetBehavior, ViewBuilderWidgetExt};
 use crate::view::View;
@@ -9,7 +9,7 @@ use crate::view::panels::{ViewBuilderDockPanelExt};
 
 dep_obj! {
     #[derive(Debug)]
-    pub struct Button become obj in Widget where BuilderCore<'a> = DepObjBuilderCore<'a> {
+    pub struct Button become obj in Widget {
         content: Option<Widget> = None,
     }
 }

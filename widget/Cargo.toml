@@ -16,7 +16,7 @@ tuifw-screen-base = { path = "../screen-base", version = "0.6.0" }
 tuifw-window = { path = "../window", version = "0.6.0" }
 components-arena = "0.8.5"
 dyn-context = "0.0.6"
-dep-obj = "0.0.23"
+dep-obj = "0.0.24"
 macro-attr-2018 = "0.3.3"
 downcast-rs = "1.2.0"
 once_cell = "1.4.0"
