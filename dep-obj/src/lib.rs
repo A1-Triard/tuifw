@@ -33,6 +33,8 @@ pub use core::option::Option::None as std_option_None;
 pub use core::option::Option::Some as std_option_Some;
 #[doc(hidden)]
 pub use alloc::vec::Vec as std_vec_Vec;
+#[doc(hidden)]
+pub use core::cmp::Eq as std_cmp_Eq;
 
 pub struct DepTypeLock(AtomicBool);
 
@@ -671,7 +673,7 @@ macro_rules! dep_system {
         }
     ) => {
         $crate::paste_paste! {
-            $vis fn [< $name _get >]<DepSystemValueType>(
+            $vis fn [< $name _get >] <DepSystemValueType>(
                 self,
                 $arena: &$Arena,
                 prop: $crate::DepProp<$System, DepSystemValueType>
@@ -681,7 +683,7 @@ macro_rules! dep_system {
                 prop.get(system)
             }
 
-            $vis fn [< $name _set_uncond >]<DepSystemValueType>(
+            $vis fn [< $name _set_uncond >] <DepSystemValueType>(
                 self,
                 context: &mut dyn $crate::dyn_context_Context,
                 prop: $crate::DepProp<$System, DepSystemValueType>,
@@ -695,7 +697,7 @@ macro_rules! dep_system {
                 old
             }
 
-            $vis fn [< $name _set_distinct >]<DepSystemValueType: Eq>(
+            $vis fn [< $name _set_distinct >] <DepSystemValueType: $crate::std_cmp_Eq>(
                 self,
                 context: &mut dyn $crate::dyn_context_Context,
                 prop: $crate::DepProp<$System, DepSystemValueType>,
@@ -709,7 +711,7 @@ macro_rules! dep_system {
                 old
             }
 
-            $vis fn [< $name _on_changed >]<DepSystemValueType>(
+            $vis fn [< $name _on_changed >] <DepSystemValueType>(
                 self,
                 $arena: &mut $Arena,
                 prop: $crate::DepProp<$System, DepSystemValueType>,
@@ -720,7 +722,7 @@ macro_rules! dep_system {
                 prop.on_changed(system, on_changed);
             }
 
-            $vis fn [< $name _raise >]<DepSystemArgsType>(
+            $vis fn [< $name _raise >] <DepSystemArgsType>(
                 self,
                 context: &mut dyn $crate::dyn_context_Context,
                 event: $crate::DepEvent<$System, DepSystemArgsType>,
@@ -733,7 +735,7 @@ macro_rules! dep_system {
                 on_raised.raise(context, self, args);
             }
 
-            $vis fn [< $name _on >]<DepSystemArgsType>(
+            $vis fn [< $name _on >] <DepSystemArgsType>(
                 self,
                 $arena: &mut $Arena,
                 event: $crate::DepEvent<$System, DepSystemArgsType>,
@@ -751,7 +753,7 @@ macro_rules! dep_system {
         }
     ) => {
         $crate::paste_paste! {
-            $vis fn [< $name _get >]<DepSystemType: $System + $crate::DepObj<Id=Self>, DepSystemValueType>(
+            $vis fn [< $name _get >] <DepSystemType: $System + $crate::DepObj<Id=Self>, DepSystemValueType>(
                 self,
                 $arena: &$Arena,
                 prop: $crate::DepProp<DepSystemType, DepSystemValueType>
@@ -761,7 +763,7 @@ macro_rules! dep_system {
                 prop.get(system)
             }
 
-            $vis fn [< $name _set_uncond >]<DepSystemType: $System + $crate::DepObj<Id=Self>, DepSystemValueType>(
+            $vis fn [< $name _set_uncond >] <DepSystemType: $System + $crate::DepObj<Id=Self>, DepSystemValueType>(
                 self,
                 context: &mut dyn $crate::dyn_context_Context,
                 prop: $crate::DepProp<DepSystemType, DepSystemValueType>,
@@ -775,7 +777,9 @@ macro_rules! dep_system {
                 old
             }
 
-            $vis fn [< $name _set_distinct >]<DepSystemType: $System + $crate::DepObj<Id=Self>, DepSystemValueType: Eq>(
+            $vis fn [< $name _set_distinct >] <
+                DepSystemType: $System + $crate::DepObj<Id=Self>, DepSystemValueType: $crate::std_cmp_Eq
+            >(
                 self,
                 context: &mut dyn $crate::dyn_context_Context,
                 prop: $crate::DepProp<DepSystemType, DepSystemValueType>,
@@ -789,7 +793,7 @@ macro_rules! dep_system {
                 old
             }
 
-            $vis fn [< $name _on_changed >]<DepSystemType: $System + $crate::DepObj<Id=Self>, DepSystemValueType>(
+            $vis fn [< $name _on_changed >] <DepSystemType: $System + $crate::DepObj<Id=Self>, DepSystemValueType>(
                 self,
                 $arena: &mut $Arena,
                 prop: $crate::DepProp<DepSystemType, DepSystemValueType>,
@@ -800,7 +804,7 @@ macro_rules! dep_system {
                 prop.on_changed(system, on_changed);
             }
 
-            $vis fn [< $name _raise >]<DepSystemType: $System + $crate::DepObj<Id=Self>, DepSystemArgsType>(
+            $vis fn [< $name _raise >] <DepSystemType: $System + $crate::DepObj<Id=Self>, DepSystemArgsType>(
                 self,
                 context: &mut dyn $crate::dyn_context_Context,
                 event: $crate::DepEvent<DepSystemType, DepSystemArgsType>,
@@ -813,7 +817,7 @@ macro_rules! dep_system {
                 on_raised.raise(context, self, args);
             }
 
-            $vis fn [< $name _on >]<DepSystemType: $System + $crate::DepObj<Id=Self>, DepSystemArgsType>(
+            $vis fn [< $name _on >] <DepSystemType: $System + $crate::DepObj<Id=Self>, DepSystemArgsType>(
                 self,
                 $arena: &mut $Arena,
                 event: $crate::DepEvent<DepSystemType, DepSystemArgsType>,
