@@ -81,12 +81,12 @@ mod circuit {
 mod or_chip {
     use crate::circuit::*;
     use components_arena::ComponentId;
-    use dep_obj::{dep_obj, DepTypeToken};
+    use dep_obj::{dep_obj, DepTypeToken, DepObjBuilderCore};
     use dyn_context::{Context, ContextExt};
 
     dep_obj! {
         #[derive(Debug)]
-        pub struct OrLegs become legs in Chip {
+        pub struct OrLegs become legs in Chip where BuilderCore<'a> = DepObjBuilderCore<'a> {
             in_1: bool = false,
             in_2: bool = false,
             out: bool = false,
@@ -129,12 +129,12 @@ mod or_chip {
 mod not_chip {
     use crate::circuit::*;
     use components_arena::ComponentId;
-    use dep_obj::{dep_obj, DepTypeToken};
+    use dep_obj::{dep_obj, DepTypeToken, DepObjBuilderCore};
     use dyn_context::{Context, ContextExt};
 
     dep_obj! {
         #[derive(Debug)]
-        pub struct NotLegs become legs in Chip {
+        pub struct NotLegs become legs in Chip where BuilderCore<'a> = DepObjBuilderCore<'a> {
             in_: bool = false,
             out: bool = true,
         }

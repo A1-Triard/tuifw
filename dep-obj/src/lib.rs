@@ -358,6 +358,14 @@ impl<OwnerType: DepType, OwnerId: ComponentId> Drop for DepObjCore<OwnerType, Ow
     }
 }
 
+pub struct DepObjBuilderCore<'a> {
+    pub context: &'a mut dyn Context
+}
+
+impl<'a> DepObjBuilderCore<'a> {
+    pub fn context(&mut self) -> &mut dyn Context { self.context }
+}
+
 #[macro_export]
 macro_rules! DepType {
     (
@@ -394,7 +402,7 @@ macro_rules! dep_obj {
         $(#[$attr:meta])* $vis:vis struct $name:ident
         $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ $(,)?>)?
         become $system:ident in $Id:ty
-        $(where BuilderCore $(< $( $bc_lt:tt $( : $bc_clt:tt $(+ $bc_dlt:tt )* )? ),+ $(,)?>)? = $BuilderCore:ty)? {
+        where BuilderCore $(< $( $bc_lt:tt $( : $bc_clt:tt $(+ $bc_dlt:tt )* )? ),+ $(,)?>)? = $BuilderCore:ty {
             $($(
                $field:ident $field_delim:tt $field_ty:ty $(= $field_val:expr)?
             ),+ $(,)?)?
@@ -403,11 +411,11 @@ macro_rules! dep_obj {
         $crate::dep_obj! {
             @impl
             [builder]
-            [$(#[$attr])*] [$vis] [$name] [$system] [$Id] [$($BuilderCore)?]
+            [$(#[$attr])*] [$vis] [$name] [$system] [$Id] [$BuilderCore]
             [ $( < $( $lt $( : $clt $(+ $dlt )* )? ),+ >)? ]
             [ $( < $( $lt ),+ >)? ]
-            [ $($( < $( $bc_lt $( : $bc_clt $(+ $bc_dlt )* )? ),+ >)?)? ]
-            [ $($( < $( $bc_lt ),+ >)?)? ]
+            [ $( < $( $bc_lt $( : $bc_clt $(+ $bc_dlt )* )? ),+ >)? ]
+            [ $( < $( $bc_lt ),+ >)? ]
             [] [] [] [] []
             [$($($field $field_delim $field_ty $(= $field_val)?),+)?]
         }
@@ -415,7 +423,7 @@ macro_rules! dep_obj {
     (
         @impl 
         [$builder:ident]
-        [$(#[$attr:meta])*] [$vis:vis] [$name:ident] [$system:ident] [$Id:ty] [$($BuilderCore:ty)?]
+        [$(#[$attr:meta])*] [$vis:vis] [$name:ident] [$system:ident] [$Id:ty] [$BuilderCore:ty]
         [$($g:tt)*] [$($r:tt)*] [$($bc_g:tt)*] [$($bc_r:tt)*]
         [$($builder_methods:tt)*]
         [$($type_fields:tt)*]
@@ -427,15 +435,16 @@ macro_rules! dep_obj {
         $crate::dep_obj! {
             @impl 
             [$builder]
-            [$(#[$attr])*] [$vis] [$name] [$system] [$Id] [$($BuilderCore)?]
+            [$(#[$attr])*] [$vis] [$name] [$system] [$Id] [$BuilderCore]
             [$($g)*] [$($r)*] [$($bc_g)*] [$($bc_r)*]
             [
                 $($builder_methods)*
 
                 $vis fn $field(&mut self, val : $field_ty) -> &mut Self {
+                    let id = self.id;
+                    let context = self.core.context();
                     let ty = unsafe { &*self.ty };
-                    let context = unsafe { &mut *self.context };
-                    self.id . [< $system _set_uncond >] (context, ty.$field(), val);
+                    id . [< $system _set_uncond >] (context, ty.$field(), val);
                     self
                 }
 
@@ -443,9 +452,11 @@ macro_rules! dep_obj {
                     &mut self,
                     callback : fn(context: &mut dyn $crate::dyn_context_Context, owner: $Id, old: &$field_ty)
                 ) -> &mut Self {
+                    let id = self.id;
+                    let context = self.core.context();
                     let ty = unsafe { &*self.ty };
-                    let arena = $crate::dyn_context_ContextExt::get_mut(unsafe { &mut *self.context });
-                    self.id . [< $system _on_changed >] (arena, ty.$field(), callback);
+                    let arena = $crate::dyn_context_ContextExt::get_mut(context);
+                    id . [< $system _on_changed >] (arena, ty.$field(), callback);
                     self
                 }
             ]
@@ -473,7 +484,7 @@ macro_rules! dep_obj {
     (
         @impl 
         [$builder:ident]
-        [$(#[$attr:meta])*] [$vis:vis] [$name:ident] [$system:ident] [$Id:ty] [$($BuilderCore:ty)?]
+        [$(#[$attr:meta])*] [$vis:vis] [$name:ident] [$system:ident] [$Id:ty] [$BuilderCore:ty]
         [$($g:tt)*] [$($r:tt)*] [$($bc_g:tt)*] [$($bc_r:tt)*]
         [$($builder_methods:tt)*]
         [$($type_fields:tt)*]
@@ -485,7 +496,7 @@ macro_rules! dep_obj {
         $crate::dep_obj! {
             @impl 
             [$builder]
-            [$(#[$attr])*] [$vis] [$name] [$system] [$Id] [$($BuilderCore)?]
+            [$(#[$attr])*] [$vis] [$name] [$system] [$Id] [$BuilderCore]
             [$($g)*] [$($r)*] [$($bc_g)*] [$($bc_r)*]
             [
                 $($builder_methods)*
@@ -494,9 +505,11 @@ macro_rules! dep_obj {
                     &mut self,
                     callback : fn(context: &mut dyn $crate::dyn_context_Context, owner: $Id, args: &mut $field_ty)
                 ) -> &mut Self {
+                    let id = self.id;
+                    let context = self.core.context();
                     let ty = unsafe { &*self.ty };
-                    let arena = $crate::dyn_context_ContextExt::get_mut(unsafe { &mut *self.context });
-                    self.id . [< $system _on >] (arena, ty.$field(), callback);
+                    let arena = $crate::dyn_context_ContextExt::get_mut(context);
+                    id . [< $system _on >] (arena, ty.$field(), callback);
                     self
                 }
             ]
@@ -524,7 +537,7 @@ macro_rules! dep_obj {
     (
         @impl 
         [$builder:ident]
-        [$(#[$attr:meta])*] [$vis:vis] [$name:ident] [$system:ident] [$Id:ty] [$($BuilderCore:ty)?]
+        [$(#[$attr:meta])*] [$vis:vis] [$name:ident] [$system:ident] [$Id:ty] [$BuilderCore:ty]
         [$($g:tt)*] [$($r:tt)*] [$($bc_g:tt)*] [$($bc_r:tt)*]
         [$($builder_methods:tt)*]
         [$($type_fields:tt)*]
@@ -542,7 +555,7 @@ macro_rules! dep_obj {
     (
         @impl 
         [$builder:ident]
-        [$(#[$attr:meta])*] [$vis:vis] [$name:ident] [$system:ident] [$Id:ty] [$($BuilderCore:ty)?]
+        [$(#[$attr:meta])*] [$vis:vis] [$name:ident] [$system:ident] [$Id:ty] [$BuilderCore:ty]
         [$($g:tt)*] [$($r:tt)*] [$($bc_g:tt)*] [$($bc_r:tt)*]
         [$($builder_methods:tt)*]
         [$($type_fields:tt)*]
@@ -553,36 +566,31 @@ macro_rules! dep_obj {
     ) => {
         $crate::paste_paste! {
             $vis struct [< $name Builder >] $($bc_g)* {
-                context: *mut dyn $crate::dyn_context_Context,
+                core: $BuilderCore,
                 id: $Id,
                 ty: *const [< $name Type >],
-                $(core_priv: $BuilderCore,)?
             }
 
             impl $($bc_g)* [< $name Builder >] $($bc_r)* {
                 $($builder_methods)*
 
-                fn build_priv<BuildPrivReturnType>(
-                    context: &mut dyn $crate::dyn_context_Context,
+                fn build_priv(
+                    core: $BuilderCore,
                     id: $Id,
                     ty: & [< $name Type >] ,
-                    $(core: $BuilderCore,)?
-                    f: impl $crate::std_ops_FnOnce(&mut Self) -> BuildPrivReturnType
-                ) -> BuildPrivReturnType {
+                    f: impl $crate::std_ops_FnOnce(&mut Self) -> &mut Self
+                ) {
                     let mut builder = Self {
-                        context: context as *mut _,
+                        core,
                         id,
                         ty: ty as *const _,
-                        $(core_priv: { let r: $BuilderCore = core; r },)?
                     };
-                    f(&mut builder)
+                    f(&mut builder);
                 }
 
-                $(
-                    fn core_priv(&self) -> &$BuilderCore { &self.core_priv }
+                fn core_priv(&self) -> &$BuilderCore { &self.core }
 
-                    fn core_priv_mut(&mut self) -> &mut $BuilderCore { &mut self.core_priv }
-                )?
+                fn core_priv_mut(&mut self) -> &mut $BuilderCore { &mut self.core }
             }
 
             $vis struct [< $name Type >] {
