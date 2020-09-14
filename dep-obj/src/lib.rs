@@ -480,7 +480,7 @@ macro_rules! dep_obj {
         [$($type_methods:tt)*]
         [$($type_init:tt)*]
         [$($type_bundle:tt)*]
-        [$field:ident : $field_ty:ty = $field_val:expr $(, $($other_fields:tt)+)?]
+        [$field:ident yield $field_ty:ty $(, $($other_fields:tt)+)?]
     ) => {
         $crate::dep_obj! {
             @impl 
