@@ -25,6 +25,14 @@ pub use paste::paste as paste_paste;
 pub use dyn_context::Context as dyn_context_Context;
 #[doc(hidden)]
 pub use dyn_context::ContextExt as dyn_context_ContextExt;
+#[doc(hidden)]
+pub use core::option::Option as std_option_Option;
+#[doc(hidden)]
+pub use core::option::Option::None as std_option_None;
+#[doc(hidden)]
+pub use core::option::Option::Some as std_option_Some;
+#[doc(hidden)]
+pub use alloc::vec::Vec as std_vec_Vec;
 
 pub struct DepTypeLock(AtomicBool);
 
@@ -357,7 +365,7 @@ macro_rules! DepType {
         $vis:vis enum $name:ident $($tail:tt)+
     ) => {
         DepType! {
-            @impl $name
+            @impl [$name]
         }
     };
     (
@@ -365,11 +373,11 @@ macro_rules! DepType {
         $vis:vis struct $name:ident $($tail:tt)+
     ) => {
         DepType! {
-            @impl $name
+            @impl [$name]
         }
     };
     (
-        @impl $name:ident
+        @impl [$name:ident]
     ) => {
         unsafe impl $crate::DepType for $name {
             fn lock() -> &'static $crate::DepTypeLock {
@@ -385,212 +393,234 @@ macro_rules! dep_obj {
     (
         $(#[$attr:meta])* $vis:vis struct $name:ident
         $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ $(,)?>)?
-        become $set:ident in $id:ty
-        $(where BuilderCore $(< $( $blt:tt $( : $bclt:tt $(+ $bdlt:tt )* )? ),+ $(,)?>)? = $bct:ty)? {
+        become $system:ident in $Id:ty
+        $(where BuilderCore $(< $( $bc_lt:tt $( : $bc_clt:tt $(+ $bc_dlt:tt )* )? ),+ $(,)?>)? = $BuilderCore:ty)? {
             $($(
-               $field:ident $delim:tt $field_ty:ty $(= $field_val:expr)?
+               $field:ident $field_delim:tt $field_ty:ty $(= $field_val:expr)?
             ),+ $(,)?)?
         }
     ) => {
-        dep_obj! {
-            @impl builder id ty this context [$(#[$attr])*] ($vis) $name become $set in $id ;
-            [] [] [] [] [] [] [] [] [$($($field $delim $field_ty $(= $field_val)?),+)?];
-            [$(
-                [ $( $lt ),+ ],
-                [ $( $lt $( : $clt $(+ $dlt )* )? ),+ ]
-            )?]
-            $( $bct [$(
-                [ $( $blt ),+ ],
-                [ $( $blt $( : $bclt $(+ $bdlt )* )? ),+ ]
-            )?])?
-
+        $crate::dep_obj! {
+            @impl
+            [builder] [id] [ty] [this] [context] [arena]
+            [$(#[$attr])*] [$vis] [$name] [$system] [$Id] [$($BuilderCore)?]
+            [ $( < $( $lt $( : $clt $(+ $dlt )* )? ),+ >)? ]
+            [ $( < $( $lt ),+ >)? ]
+            [ $($( < $( $bc_lt $( : $bc_clt $(+ $bc_dlt )* )? ),+ >)?)? ]
+            [ $($( < $( $bc_lt ),+ >)?)? ]
+            [] [] [] [] [] [] [] [] []
+            [$($($field $field_delim $field_ty $(= $field_val)?),+)?]
         }
     };
     (
-        @impl $builder:ident $id_builder:ident $ty:ident $this:ident $context:ident
-        [$(#[$attr:meta])*] ($vis:vis) $name:ident become $set:ident in $id:ty ;
-        [$($x:tt)*]
-        [$($y:tt)*]
-        [$($f:tt)*]
-        [$($b:tt)*]
-        [$($s:tt)*]
-        [$($p:tt)*]
-        [$($c:tt)*]
-        [$($l:tt)*]
-        [$field:ident : $field_ty:ty = $field_val:expr $(, $($other_fields:tt)+)?];
-        [$([ $($g:tt)+ ], [ $($r:tt)+ ])?]
-        $($bct:ty [$([ $($bg:tt)+ ], [ $($br:tt)+ ])?])?
+        @impl 
+        [$builder:ident] [$id:ident] [$ty:ident] [$this:ident] [$context:ident] [$arena:ident]
+        [$(#[$attr:meta])*] [$vis:vis] [$name:ident] [$system:ident] [$Id:ty] [$($BuilderCore:ty)?]
+        [$($g:tt)*] [$($r:tt)*] [$($bc_g:tt)*] [$($bc_r:tt)*]
+        [$($builder_build_setters:tt)*]
+        [$($builder_build_callbacks:tt)*]
+        [$($builder_init:tt)*]
+        [$($builder_fields:tt)*]
+        [$($builder_methods:tt)*]
+        [$($type_fields:tt)*]
+        [$($type_methods:tt)*]
+        [$($type_init:tt)*]
+        [$($type_bundle:tt)*]
+        [$field:ident : $field_ty:ty = $field_val:expr $(, $($other_fields:tt)+)?]
     ) => {
-        dep_obj! {
-            @impl $builder $id_builder $ty $this $context
-            [$(#[$attr])*] ($vis) $name become $set in $id ;
+        $crate::dep_obj! {
+            @impl 
+            [$builder] [$id] [$ty] [$this] [$context] [$arena]
+            [$(#[$attr])*] [$vis] [$name] [$system] [$Id] [$($BuilderCore)?]
+            [$($g)*] [$($r)*] [$($bc_g)*] [$($bc_r)*]
             [
-                $($x)*
-                if let Some(field) = $this.$field.0 {
-                    $id_builder . [< $set _set_uncond >] ($context, $ty.$field(), field);
+                $($builder_build_setters)*
+                if let $crate::std_option_Some(field) = $this.$field.0 {
+                    $id . [< $system _set_uncond >] ($context, $ty.$field(), field);
                 }
+            ]
+            [
+                $($builder_build_callbacks)*
                 for on_changed in $this.$field.1 {
-                    let arena = $crate::dyn_context_ContextExt::get_mut($context);
-                    $id_builder . [< $set _on_changed >] (arena, $ty.$field(), on_changed);
+                    $id . [< $system _on_changed >] ($arena, $ty.$field(), on_changed);
                 }
             ]
             [
-                $($y)*
-                $field : (None, Vec::new()),
+                $($builder_init)*
+                $field : ($crate::std_option_None, $crate::std_vec_Vec::new()),
             ]
             [
-                $($f)*
+                $($builder_fields)*
                 $field : (
-                    Option<$field_ty>,
-                    Vec<fn(context: &mut dyn $crate::dyn_context_Context, owner: $id, old: &$field_ty)>
+                    $crate::std_option_Option<$field_ty>,
+                    $crate::std_vec_Vec<fn(context: &mut dyn $crate::dyn_context_Context, owner: $Id, old: &$field_ty)>
                 ),
             ]
             [
-                $($b)*
+                $($builder_methods)*
 
                 $vis fn $field(&mut self, val : $field_ty) -> &mut Self {
-                    self.$field.0 = Some(val);
+                    self.$field.0 = $crate::std_option_Some(val);
                     self
                 }
 
                 $vis fn [< on_ $field _changed >] (
                     &mut self,
-                    callback : fn(context: &mut dyn $crate::dyn_context_Context, owner: $id, old: &$field_ty)
+                    callback : fn(context: &mut dyn $crate::dyn_context_Context, owner: $Id, old: &$field_ty)
                 ) -> &mut Self {
                     self.$field.1.push(callback);
                     self
                 }
             ]
             [
-                $($s)*
+                $($type_fields)*
                 $field : $crate::DepPropRaw< [< $name Type >] , $field_ty>,
             ]
             [
-                $($p)*
-                $vis fn $field $(< $($g)+ >)? (&self) -> $crate::DepProp<$name $(< $($r)+ >)?, $field_ty> {
+                $($type_methods)*
+                $vis fn $field $($g)* (&self) -> $crate::DepProp<$name $($r)*, $field_ty> {
                     self.$field.owned_by() 
                 }
             ]
             [
-                $($c)*
+                $($type_init)*
                 let $field = $builder.prop(|| $field_val);
             ]
             [
-                $($l)*
+                $($type_bundle)*
                 $field,
             ]
-            [$($($other_fields)+)?];
-            [$([ $($g)+ ], [ $($r)+ ])?]
-            $($bct [$([ $($bg)+ ], [ $($br)+ ])?])?
+            [$($($other_fields)+)?]
         }
     };
     (
-        @impl $builder:ident $id_builder:ident $ty:ident $this:ident $context:ident
-        [$(#[$attr:meta])*] ($vis:vis) $name:ident become $set:ident in $id:ty ;
-        [$($x:tt)*]
-        [$($y:tt)*]
-        [$($f:tt)*]
-        [$($b:tt)*]
-        [$($s:tt)*]
-        [$($p:tt)*]
-        [$($c:tt)*]
-        [$($l:tt)*]
-        [$field:ident yield $field_ty:ty $(, $($other_fields:tt)+)?];
-        [$([ $($g:tt)+ ], [ $($r:tt)+ ])?]
-        $($bct:ty [$([ $($bg:tt)+ ], [ $($br:tt)+ ])?])?
+        @impl 
+        [$builder:ident] [$id:ident] [$ty:ident] [$this:ident] [$context:ident] [$arena:ident]
+        [$(#[$attr:meta])*] [$vis:vis] [$name:ident] [$system:ident] [$Id:ty] [$($BuilderCore:ty)?]
+        [$($g:tt)*] [$($r:tt)*] [$($bc_g:tt)*] [$($bc_r:tt)*]
+        [$($builder_build_setters:tt)*]
+        [$($builder_build_callbacks:tt)*]
+        [$($builder_init:tt)*]
+        [$($builder_fields:tt)*]
+        [$($builder_methods:tt)*]
+        [$($type_fields:tt)*]
+        [$($type_methods:tt)*]
+        [$($type_init:tt)*]
+        [$($type_bundle:tt)*]
+        [$field:ident : $field_ty:ty = $field_val:expr $(, $($other_fields:tt)+)?]
     ) => {
-        dep_obj! {
-            @impl $builder $id_builder $ty $this $context
-            [$(#[$attr])*] ($vis) $name become $set in $id ;
+        $crate::dep_obj! {
+            @impl 
+            [$builder] [$id] [$ty] [$this] [$context] [$arena]
+            [$(#[$attr])*] [$vis] [$name] [$system] [$Id] [$($BuilderCore)?]
+            [$($g)*] [$($r)*] [$($bc_g)*] [$($bc_r)*]
             [
-                $($x)*
+                $($builder_build_setters)*
+            ]
+            [
+                $($builder_build_callbacks)*
                 for on_raised in $this.$field {
-                    let arena = $crate::dyn_context_ContextExt::get_mut($context);
-                    $id_builder . [< $set _on >] (arena, $ty.$field(), on_raised);
+                    $id . [< $system _on >] ($arena, $ty.$field(), on_raised);
                 }
             ]
             [
-                $($y)*
-                $field : Vec::new(),
+                $($builder_init)*
+                $field : $crate::std_vec_Vec::new(),
             ]
             [
-                $($f)*
-                $field : Vec<fn(context: &mut dyn $crate::dyn_context_Context, owner: $id, args: &mut $field_ty)>,
+                $($builder_fields)*
+                $field : $crate::std_vec_Vec<
+                    fn(context: &mut dyn $crate::dyn_context_Context, owner: $Id, args: &mut $field_ty)
+                >,
             ]
             [
-                $($b)*
-                $vis fn [< on_ $field _changed >] (
+                $($builder_methods)*
+
+                $vis fn [< on_ $field >] (
                     &mut self,
-                    callback : fn(context: &mut dyn $crate::dyn_context_Context, owner: $id, args: &mut $field_ty)
+                    callback : fn(context: &mut dyn $crate::dyn_context_Context, owner: $Id, args: &mut $field_ty)
                 ) -> &mut Self {
                     self.$field.push(callback);
                     self
                 }
             ]
             [
-                $($s)*
+                $($type_fields)*
                 $field : $crate::DepEventRaw< [< $name Type >] , $field_ty>,
             ]
             [
-                $($p)*
-                $vis fn $field $(< $($g)+ >)? (&self) -> $crate::DepEvent<$name $(< $($r)+ >)?, $field_ty> {
+                $($type_methods)*
+                $vis fn $field $($g)* (&self) -> $crate::DepEvent<$name $($r)*, $field_ty> {
                     self.$field.owned_by()
                 }
             ]
             [
-                $($c)*
+                $($type_init)*
                 let $field = $builder.event();
             ]
             [
-                $($l)*
+                $($type_bundle)*
                 $field,
             ]
-            [$($($other_fields)+)?];
-            [$([ $($g)+ ], [ $($r)+ ])?]
-            $($bct [$([ $($bg)+ ], [ $($br)+ ])?])?
+            [$($($other_fields)+)?]
         }
     };
     (
-        @impl $builder:ident $id_builder:ident $ty:ident $this:ident $context:ident
-        [$(#[$attr:meta])*] ($vis:vis) $name:ident become $set:ident in $id:ty ;
-        [$($x:tt)*] [$($y:tt)*] [$($f:tt)*] [$($b:tt)*] [$($s:tt)*] [$($p:tt)*] [$($c:tt)*] [$($l:tt)*] [];
-        [$([ $($g:tt)+ ], [ $($r:tt)+ ])?]
-        $($bct:ty [$([ $($bg:tt)+ ], [ $($br:tt)+ ])?])?
+        @impl 
+        [$builder:ident] [$id:ident] [$ty:ident] [$this:ident] [$context:ident] [$arena:ident]
+        [$(#[$attr:meta])*] [$vis:vis] [$name:ident] [$system:ident] [$Id:ty] [$($BuilderCore:ty)?]
+        [$($g:tt)*] [$($r:tt)*] [$($bc_g:tt)*] [$($bc_r:tt)*]
+        [$($builder_build_setters:tt)*]
+        [$($($builder_build_callbacks:tt)+)?]
+        [$($builder_init:tt)*]
+        [$($builder_fields:tt)*]
+        [$($builder_methods:tt)*]
+        [$($type_fields:tt)*]
+        [$($type_methods:tt)*]
+        [$($type_init:tt)*]
+        [$($type_bundle:tt)*]
+        []
     ) => {
         $crate::paste_paste! {
-            $vis struct [< $name Builder >] $($(< $($bg)+ >)?)? {
-                $(core_priv: $bct,)?
-                $($f)*
+            $vis struct [< $name Builder >] $($bc_g)* {
+                $(core_priv: $BuilderCore,)?
+                $($builder_fields)*
             }
 
-            impl $($(< $($bg)+ >)?)? [< $name Builder >] $($(< $($br)+ >)?)? {
-                $($b)*
+            impl $($bc_g)* [< $name Builder >] $($bc_r)* {
+                $($builder_methods)*
 
-                fn new_priv($(core: $bct)?) -> Self {
+                fn new_priv($(core: $BuilderCore)?) -> Self {
                     Self {
-                        $(core_priv: { let r: $bct = core; r },)?
-                        $($y)*
+                        $(core_priv: { let r: $BuilderCore = core; r },)?
+                        $($builder_init)*
                     }
                 }
 
                 $(
-                    fn core_priv(&self) -> &$bct { &self.core_priv }
+                    fn core_priv(&self) -> &$BuilderCore { &self.core_priv }
 
-                    fn core_priv_mut(&mut self) -> &mut $bct { &mut self.core_priv }
+                    fn core_priv_mut(&mut self) -> &mut $BuilderCore { &mut self.core_priv }
                 )?
 
                 fn build_priv(
                     self,
                     $context: &mut dyn $crate::dyn_context_Context,
-                    $id_builder: $id,
+                    $id: $Id,
                     $ty: & [< $name Type >]
                 ) {
                     let $this = self;
-                    $($x)*
+                    $($builder_build_setters)*
+                    $(
+                        let $arena = $crate::dyn_context_ContextExt::get_mut($context);
+                        $($builder_build_callbacks)+
+                    )?
                 }
             }
 
-            $vis struct [< $name Type >] { $($s)* }
+            $vis struct [< $name Type >] {
+                $($type_fields)*
+            }
 
             unsafe impl $crate::DepType for [< $name Type >] {
                 fn lock() -> &'static $crate::DepTypeLock {
@@ -600,29 +630,31 @@ macro_rules! dep_obj {
             }
 
             impl [< $name Type >] {
-                $($p)*
+                $($type_methods)*
 
-                fn new_priv() -> Option<$crate::DepTypeToken<Self>> {
+                fn new_priv() -> $crate::std_option_Option<$crate::DepTypeToken<Self>> {
                     $crate::DepTypeBuilder::new().map(|mut $builder| {
-                        $($c)*
-                        $builder.build(Self { $($l)* })
+                        $($type_init)*
+                        $builder.build(Self {
+                            $($type_bundle)*
+                        })
                     })
                 }
             }
 
             $(#[$attr])*
-            $vis struct $name $(< $($g)+ >)? {
-                core: $crate::DepObjCore< [< $name Type  >] , $id>,
+            $vis struct $name $($g)* {
+                core: $crate::DepObjCore< [< $name Type  >] , $Id>,
             }
 
-            impl $(< $($g)+ >)? $crate::DepObj for $name $(< $($r)+ >)? {
+            impl $($g)* $crate::DepObj for $name $($r)* {
                 type Type = [< $name Type >] ;
-                type Id = $id;
+                type Id = $Id;
                 fn core(&self) -> &$crate::DepObjCore<Self::Type, Self::Id> { &self.core }
                 fn core_mut(&mut self) -> &mut $crate::DepObjCore<Self::Type, Self::Id> { &mut self.core }
             }
 
-            impl $(< $($g)+ >)? $name $(< $($r)+ >)? {
+            impl $($g)* $name $($r)* {
                 fn new_priv(token: &$crate::DepTypeToken< [< $name Type >] >) -> Self {
                     Self { core: $crate::DepObjCore::new(token) }
                 }
