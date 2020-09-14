@@ -1,9 +1,21 @@
+use std::fmt::Debug;
 use std::mem::replace;
 use components_arena::{ComponentId, Id, Component, Arena, ComponentClassMutex};
+use dep_obj::{dep_system};
+use downcast_rs::{Downcast, impl_downcast};
 use macro_attr_2018::macro_attr;
-use educe::Educe;
 use tuifw_screen_base::Screen;
 use crate::view::{View, ViewTree};
+
+pub trait WidgetBehavior {
+    fn load(&self, tree: &mut WidgetTree, widget: Widget, view: View);
+}
+
+pub trait WidgetObj: Downcast + Debug + Send + Sync {
+    fn behavior(&self) -> &'static dyn WidgetBehavior;
+}
+
+impl_downcast!(WidgetObj);
 
 macro_attr! {
     #[derive(ComponentId!)]
@@ -18,15 +30,14 @@ macro_attr! {
 }
 
 macro_attr! {
-    #[derive(Educe, Component!)]
-    #[educe(Debug)]
+    #[derive(Debug, Component!)]
     struct WidgetNode {
         view: Option<View>,
         parent: Option<Widget>,
         last_child: Option<Widget>,
         next: Widget,
-        #[educe(Debug(ignore))]
-        load: Option<fn(tree: &mut WidgetTree, widget: Widget, parent_view: View) -> View>,
+        obj: Option<Box<dyn WidgetObj>>,
+        attached: bool,
     }
 }
 
@@ -57,7 +68,8 @@ impl WidgetTree {
                 parent: None,
                 last_child: None,
                 next: Widget(root),
-                load: None,
+                obj: None,
+                attached: true,
             }, root));
             (root, move |view_tree| (view_tree, Widget(root)))
         });
@@ -71,16 +83,17 @@ impl WidgetTree {
 }
 
 impl Widget {
-    pub fn new(
+    pub fn new<O: WidgetObj>(
         tree: &mut WidgetTree, 
-        load: fn(tree: &mut WidgetTree, widget: Widget, parent_view: View) -> View,
+        obj: O,
     ) -> Widget {
         tree.widget_arena.insert(|widget| (WidgetNode {
             view: None,
             parent: None,
             last_child: None,
             next: Widget(widget),
-            load: Some(load),
+            obj: Some(Box::new(obj)),
+            attached: false,
         }, Widget(widget)))
     }
 
@@ -94,26 +107,49 @@ impl Widget {
             let next = replace(&mut tree.widget_arena[prev.0].next, self);
             tree.widget_arena[self.0].next = next;
         }
-    }
-
-    fn parent(self, tree: &WidgetTree) -> Option<Widget> {
-        tree.widget_arena[self.0].parent
-    }
-
-    pub fn load(self, tree: &mut WidgetTree, parent_view: View) -> View {
-        let parent = self.parent(tree).expect("detached widget cannot be loaded");
-        if parent_view.tag::<Widget>(&tree.view_tree) != parent {
-            panic!("parent view/widget mismatch");
+        if tree.widget_arena[parent.0].attached {
+            self.set_attached(tree);
         }
+    }
+
+    fn next(self, tree: &WidgetTree) -> Widget { tree.widget_arena[self.0].next }
+
+    fn set_attached(self, tree: &mut WidgetTree) {
         let node = &mut tree.widget_arena[self.0];
-        if node.view.is_some() { panic!("widget already loaded"); }
-        let load = node.load.unwrap();
-        let view = load(tree, self, parent_view);
+        node.attached = true;
+        if let Some(last_child) = node.last_child {
+            let mut child = last_child;
+            loop {
+                child = child.next(tree);
+                child.set_attached(tree);
+                if child == last_child { break; }
+            }
+        }
+    }
+
+    pub fn load(self, tree: &mut WidgetTree, view: View) {
         if view.tag::<Widget>(&tree.view_tree) != self {
-            panic!("widget/view tag mismatch");
+            panic!("view/widget tag mismatch");
         }
         let node = &mut tree.widget_arena[self.0];
-        node.view = Some(view);
-        view
+        if !node.attached {
+            panic!("detached widget cannot be loaded");
+        }
+        if let Some(view) = node.view.replace(view) {
+            node.view = Some(view);
+            panic!("widget already loaded");
+        }
+        let behavior = node.obj.as_ref().unwrap().behavior();
+        behavior.load(tree, self, view);
+    }
+
+    dep_system! {
+        pub dyn fn obj(self as this, tree: WidgetTree) -> WidgetObj {
+            if mut {
+                tree.widget_arena[this.0].obj.as_mut().expect("root widget does not have obj")
+            } else {
+                tree.widget_arena[this.0].obj.as_ref().expect("root widget does not have obj")
+            }
+        }
     }
 }
