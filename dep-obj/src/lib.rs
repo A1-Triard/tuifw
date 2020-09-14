@@ -581,6 +581,28 @@ macro_rules! dep_obj {
         [$($type_methods:tt)*]
         [$($type_init:tt)*]
         [$($type_bundle:tt)*]
+        [$field:ident $field_delim:tt $field_ty:ty $(= $field_val:expr)? $(, $($other_fields:tt)+)?]
+    ) => {
+        compile_error!(concat!(
+            "invalid dependency object field '",
+            stringify!($field $field_delim $field_ty $(= $field_val)?),
+            "', allowed forms are '$field: $type = $value', and '$event yield $args'",
+        ));
+    };
+    (
+        @impl 
+        [$builder:ident] [$id:ident] [$ty:ident] [$this:ident] [$context:ident] [$arena:ident]
+        [$(#[$attr:meta])*] [$vis:vis] [$name:ident] [$system:ident] [$Id:ty] [$($BuilderCore:ty)?]
+        [$($g:tt)*] [$($r:tt)*] [$($bc_g:tt)*] [$($bc_r:tt)*]
+        [$($builder_build_setters:tt)*]
+        [$($($builder_build_callbacks:tt)+)?]
+        [$($builder_init:tt)*]
+        [$($builder_fields:tt)*]
+        [$($builder_methods:tt)*]
+        [$($type_fields:tt)*]
+        [$($type_methods:tt)*]
+        [$($type_init:tt)*]
+        [$($type_bundle:tt)*]
         []
     ) => {
         $crate::paste_paste! {
