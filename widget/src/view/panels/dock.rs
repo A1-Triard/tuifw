@@ -22,8 +22,7 @@ impl<'a> ViewBuilderDockPanelExt for ViewBuilder<'a> {
         let view = self.view();
         let tree: &mut ViewTree = self.context().get_mut();
         DockPanel::new(tree, view);
-        let mut builder = DockPanelBuilder::new_priv(self);
-        f(&mut builder);
+        DockPanelBuilder::build_priv(self, view, dock_panel_type(), f);
         self
     }
 }
@@ -33,7 +32,7 @@ impl<'a, 'b> DockPanelBuilder<'a, 'b> {
         &mut self,
         storage: Option<&mut Option<View>>,
         tag: Tag,
-        layout: impl FnOnce(&mut DockLayoutBuilder) -> &mut DockLayoutBuilder,
+        layout: impl for<'c, 'd, 'e> FnOnce(&'c mut DockLayoutBuilder<'d, 'e>) -> &'c mut DockLayoutBuilder<'d, 'e>,
         f: impl for<'c, 'd> FnOnce(&'c mut ViewBuilder<'d>) -> &'c mut ViewBuilder<'d>
     ) -> &mut Self {
         let view = self.core_priv().view();
@@ -41,9 +40,7 @@ impl<'a, 'b> DockPanelBuilder<'a, 'b> {
         let child = View::new(tree, view, |child| (tag, child));
         storage.map(|x| x.replace(child));
         DockLayout::new(tree, child);
-        let mut builder = DockLayoutBuilder::new_priv();
-        layout(&mut builder);
-        builder.build_priv(self.core_priv_mut().context(), child, dock_layout_type());
+        DockLayoutBuilder::build_priv(self.core_priv_mut(), child, dock_layout_type(), layout);
         child.build(self.core_priv_mut().context(), f);
         self
     }
@@ -51,7 +48,7 @@ impl<'a, 'b> DockPanelBuilder<'a, 'b> {
 
 dep_obj! {
     #[derive(Debug)]
-    pub struct DockLayout become layout in View {
+    pub struct DockLayout become layout in View where BuilderCore<'a, 'b> = &'a mut ViewBuilder<'b> {
         dock: Option<Side> = None,
     }
 }

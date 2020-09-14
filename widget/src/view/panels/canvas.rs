@@ -34,7 +34,7 @@ impl<'a, 'b> CanvasPanelBuilder<'a, 'b> {
         &mut self,
         storage: Option<&mut Option<View>>,
         tag: Tag,
-        layout: impl FnOnce(&mut CanvasLayoutBuilder) -> &mut CanvasLayoutBuilder,
+        layout: impl for<'c, 'd, 'e> FnOnce(&'c mut CanvasLayoutBuilder<'d, 'e>) -> &'c mut CanvasLayoutBuilder<'d, 'e>,
         f: impl for<'c, 'd> FnOnce(&'c mut ViewBuilder<'d>) -> &'c mut ViewBuilder<'d>
     ) -> &mut Self {
         let view = self.0.view();
@@ -42,9 +42,7 @@ impl<'a, 'b> CanvasPanelBuilder<'a, 'b> {
         let child = View::new(tree, view, |child| (tag, child));
         storage.map(|x| x.replace(child));
         CanvasLayout::new(tree, child);
-        let mut builder = CanvasLayoutBuilder::new_priv();
-        layout(&mut builder);
-        builder.build_priv(self.0.context(), child, canvas_layout_type());
+        CanvasLayoutBuilder::build_priv(self.0, child, canvas_layout_type(), layout);
         child.build(self.0.context(), f);
         self
     }
@@ -52,7 +50,7 @@ impl<'a, 'b> CanvasPanelBuilder<'a, 'b> {
 
 dep_obj! {
     #[derive(Debug)]
-    pub struct CanvasLayout become layout in View {
+    pub struct CanvasLayout become layout in View where BuilderCore<'a, 'b> = &'a mut ViewBuilder<'b> {
         tl: Point = Point { x: 0, y: 0 },
     }
 }

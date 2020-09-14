@@ -698,26 +698,24 @@ impl View {
 pub trait ViewBuilderRootDecoratorExt {
     fn root_decorator(
         &mut self,
-        f: impl FnOnce(&mut RootDecoratorBuilder) -> &mut RootDecoratorBuilder
+        f: impl for<'a, 'b, 'c> FnOnce(&'a mut RootDecoratorBuilder<'b, 'c>) -> &'a mut RootDecoratorBuilder<'b, 'c>
     ) -> &mut Self;
 }
 
 impl<'a> ViewBuilderRootDecoratorExt for ViewBuilder<'a> {
     fn root_decorator(
         &mut self,
-        f: impl FnOnce(&mut RootDecoratorBuilder) -> &mut RootDecoratorBuilder
+        f: impl for<'b, 'c, 'd> FnOnce(&'b mut RootDecoratorBuilder<'c, 'd>) -> &'b mut RootDecoratorBuilder<'c, 'd>
     ) -> &mut Self {
-        let mut builder = RootDecoratorBuilder::new_priv();
-        f(&mut builder);
         let view = self.view();
-        builder.build_priv(self.context(), view, root_decorator_type());
+        RootDecoratorBuilder::build_priv(self, view, root_decorator_type(), f);
         self
     }
 }
 
 dep_obj! {
     #[derive(Debug)]
-    pub struct RootDecorator become decorator in View {
+    pub struct RootDecorator become decorator in View where BuilderCore<'a, 'b> = &'a mut ViewBuilder<'b> {
         fill: Cow<'static, str> = Cow::Borrowed(" ")
     }
 }
@@ -790,26 +788,24 @@ impl ViewInput {
 pub trait ViewBuilderViewBaseExt {
     fn base(
         &mut self,
-        f: impl FnOnce(&mut ViewBaseBuilder) -> &mut ViewBaseBuilder
+        f: impl for<'a, 'b, 'c> FnOnce(&'a mut ViewBaseBuilder<'b, 'c>) -> &'a mut ViewBaseBuilder<'b, 'c>
     ) -> &mut Self;
 }
 
 impl<'a> ViewBuilderViewBaseExt for ViewBuilder<'a> {
     fn base(
         &mut self,
-        f: impl FnOnce(&mut ViewBaseBuilder) -> &mut ViewBaseBuilder
+        f: impl for<'b, 'c, 'd> FnOnce(&'b mut ViewBaseBuilder<'c, 'd>) -> &'b mut ViewBaseBuilder<'c, 'd>
     ) -> &mut Self {
-        let mut builder = ViewBaseBuilder::new_priv();
-        f(&mut builder);
         let view = self.view();
-        builder.build_priv(self.context(), view, view_base_type());
+        ViewBaseBuilder::build_priv(self, view, view_base_type(), f);
         self
     }
 }
 
 dep_obj! {
     #[derive(Debug)]
-    pub struct ViewBase become base in View {
+    pub struct ViewBase become base in View where BuilderCore<'a, 'b> = &'a mut ViewBuilder<'b> {
         fg: Option<Color> = None,
         bg: Option<Option<Color>> = None,
         attr: Option<Attr> = None,
@@ -862,26 +858,24 @@ impl ViewBase {
 pub trait ViewBuilderViewAlignExt {
     fn align(
         &mut self,
-        f: impl FnOnce(&mut ViewAlignBuilder) -> &mut ViewAlignBuilder
+        f: impl for<'a, 'b, 'c> FnOnce(&'a mut ViewAlignBuilder<'b, 'c>) -> &'a mut ViewAlignBuilder<'b, 'c>
     ) -> &mut Self;
 }
 
 impl<'a> ViewBuilderViewAlignExt for ViewBuilder<'a> {
     fn align(
         &mut self,
-        f: impl FnOnce(&mut ViewAlignBuilder) -> &mut ViewAlignBuilder
+        f: impl for<'b, 'c, 'd> FnOnce(&'b mut ViewAlignBuilder<'c, 'd>) -> &'b mut ViewAlignBuilder<'c, 'd>
     ) -> &mut Self {
-        let mut builder = ViewAlignBuilder::new_priv();
-        f(&mut builder);
         let view = self.view();
-        builder.build_priv(self.context(), view, view_align_type());
+        ViewAlignBuilder::build_priv(self, view, view_align_type(), f);
         self
     }
 }
 
 dep_obj! {
     #[derive(Debug)]
-    pub struct ViewAlign become align in View {
+    pub struct ViewAlign become align in View where BuilderCore<'a, 'b> = &'a mut ViewBuilder<'b> {
         h_align: HAlign = HAlign::Center,
         v_align: VAlign = VAlign::Center,
         min_size: Vector = Vector::null(),

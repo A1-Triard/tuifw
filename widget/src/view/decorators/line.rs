@@ -10,28 +10,26 @@ use crate::view::base::*;
 pub trait ViewBuilderLineDecoratorExt {
     fn line_decorator(
         &mut self,
-        f: impl FnOnce(&mut LineDecoratorBuilder) -> &mut LineDecoratorBuilder
+        f: impl for<'a, 'b, 'c> FnOnce(&'a mut LineDecoratorBuilder<'b, 'c>) -> &'a mut LineDecoratorBuilder<'b, 'c>
     ) -> &mut Self;
 }
 
 impl<'a> ViewBuilderLineDecoratorExt for ViewBuilder<'a> {
     fn line_decorator(
         &mut self,
-        f: impl FnOnce(&mut LineDecoratorBuilder) -> &mut LineDecoratorBuilder
+        f: impl for<'b, 'c, 'd> FnOnce(&'b mut LineDecoratorBuilder<'c, 'd>) -> &'b mut LineDecoratorBuilder<'c, 'd>
     ) -> &mut Self {
-        let mut builder = LineDecoratorBuilder::new_priv();
-        f(&mut builder);
         let view = self.view();
         let tree: &mut ViewTree = self.context().get_mut();
         LineDecorator::new(tree, view);
-        builder.build_priv(self.context(), view, line_decorator_type());
+        LineDecoratorBuilder::build_priv(self, view, line_decorator_type(), f);
         self
     }
 }
 
 dep_obj! {
     #[derive(Debug)]
-    pub struct LineDecorator become decorator in View {
+    pub struct LineDecorator become decorator in View where BuilderCore<'a, 'b> = &'a mut ViewBuilder<'b> {
         orient: Orient = Orient::Hor,
         length: i16 = 3,
         near: Cow<'static, str> = Cow::Borrowed(""),

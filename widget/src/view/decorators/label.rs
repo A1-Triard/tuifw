@@ -13,28 +13,26 @@ use unicode_segmentation::UnicodeSegmentation;
 pub trait ViewBuilderLabelDecoratorExt {
     fn label_decorator(
         &mut self,
-        f: impl FnOnce(&mut LabelDecoratorBuilder) -> &mut LabelDecoratorBuilder
+        f: impl for<'a, 'b, 'c> FnOnce(&'a mut LabelDecoratorBuilder<'b, 'c>) -> &'a mut LabelDecoratorBuilder<'b, 'c>
     ) -> &mut Self;
 }
 
 impl<'a> ViewBuilderLabelDecoratorExt for ViewBuilder<'a> {
     fn label_decorator(
         &mut self,
-        f: impl FnOnce(&mut LabelDecoratorBuilder) -> &mut LabelDecoratorBuilder
+        f: impl for<'b, 'c, 'd> FnOnce(&'b mut LabelDecoratorBuilder<'c, 'd>) -> &'b mut LabelDecoratorBuilder<'c, 'd>
     ) -> &mut Self {
-        let mut builder = LabelDecoratorBuilder::new_priv();
-        f(&mut builder);
         let view = self.view();
         let tree: &mut ViewTree = self.context().get_mut();
         LabelDecorator::new(tree, view);
-        builder.build_priv(self.context(), view, label_decorator_type());
+        LabelDecoratorBuilder::build_priv(self, view, label_decorator_type(), f);
         self
     }
 }
 
 dep_obj! {
     #[derive(Debug)]
-    pub struct LabelDecorator become decorator in View {
+    pub struct LabelDecorator become decorator in View where BuilderCore<'a, 'b> = &'a mut ViewBuilder<'b> {
         text: Cow<'static, str> = Cow::Borrowed(""),
     }
 }

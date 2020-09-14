@@ -11,28 +11,26 @@ use crate::view::base::*;
 pub trait ViewBuilderBorderDecoratorExt {
     fn border_decorator(
         &mut self,
-        f: impl FnOnce(&mut BorderDecoratorBuilder) -> &mut BorderDecoratorBuilder
+        f: impl for<'a, 'b, 'c> FnOnce(&'a mut BorderDecoratorBuilder<'b, 'c>) -> &'a mut BorderDecoratorBuilder<'b, 'c>
     ) -> &mut Self;
 }
 
 impl<'a> ViewBuilderBorderDecoratorExt for ViewBuilder<'a> {
     fn border_decorator(
         &mut self,
-        f: impl FnOnce(&mut BorderDecoratorBuilder) -> &mut BorderDecoratorBuilder
+        f: impl for<'b, 'c, 'd> FnOnce(&'b mut BorderDecoratorBuilder<'c, 'd>) -> &'b mut BorderDecoratorBuilder<'c, 'd>
     ) -> &mut Self {
-        let mut builder = BorderDecoratorBuilder::new_priv();
-        f(&mut builder);
         let view = self.view();
         let tree: &mut ViewTree = self.context().get_mut();
         BorderDecorator::new(tree, view);
-        builder.build_priv(self.context(), view, border_decorator_type());
+        BorderDecoratorBuilder::build_priv(self, view, border_decorator_type(), f);
         self
     }
 }
 
 dep_obj! {
     #[derive(Debug)]
-    pub struct BorderDecorator become decorator in View {
+    pub struct BorderDecorator become decorator in View where BuilderCore<'a, 'b> = &'a mut ViewBuilder<'b> {
         tl: Cow<'static, str> = Cow::Borrowed(""),
         tr: Cow<'static, str> = Cow::Borrowed(""),
         bl: Cow<'static, str> = Cow::Borrowed(""),
