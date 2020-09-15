@@ -1,12 +1,12 @@
 #![deny(warnings)]
 use std::borrow::Cow;
 use dyn_context::ContextExt;
-use tuifw_screen::{Key, Vector, Thickness, HAlign, VAlign, Point, Side, Rect};
-use tuifw_widget::view::{View, ViewTree, view_base_type, ViewBuilderViewAlignExt};
-use tuifw_widget::view::panels::{ViewBuilderCanvasPanelExt, canvas_layout_type};
-use tuifw_widget::view::panels::{ViewBuilderDockPanelExt};
-use tuifw_widget::view::decorators::{ViewBuilderBorderDecoratorExt};
-use tuifw_widget::view::decorators::{ViewBuilderLabelDecoratorExt};
+use tuifw::{Key, Vector, Thickness, HAlign, VAlign, Point, Side, Rect};
+use tuifw::view::{View, ViewTree, view_base_type, ViewBuilderViewAlignExt};
+use tuifw::view::panels::{ViewBuilderCanvasPanelExt, canvas_layout_type};
+use tuifw::view::panels::{ViewBuilderDockPanelExt};
+use tuifw::view::decorators::{ViewBuilderBorderDecoratorExt};
+use tuifw::view::decorators::{ViewBuilderLabelDecoratorExt};
 
 fn build(tree: &mut ViewTree, bounds: Rect) -> View {
     let mut border = None;
