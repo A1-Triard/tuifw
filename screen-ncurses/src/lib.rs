@@ -5,7 +5,6 @@
 #![allow(clippy::many_single_char_names)]
 #![feature(negative_impls)]
 #![feature(extern_types)]
-#![feature(internal_uninit_const)]
 
 #[allow(non_camel_case_types)]
 #[allow(non_snake_case)]
