@@ -12,7 +12,7 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/A1-Triard/tuifw"
 
 [dependencies]
-enum-derive-2018 = { version = "0.3.0", default-features = false }
+enum-derive-2018 = { version = "0.3.1", default-features = false }
 macro-attr-2018 = "0.4.0"
 bitflags = "1.2.1"
 either = { version = "1.5.3", default-features = false }
