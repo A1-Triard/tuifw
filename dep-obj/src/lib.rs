@@ -2,9 +2,6 @@
 
 #![no_std]
 extern crate alloc;
-pub(crate) mod std {
-    pub use core::*;
-}
 
 use alloc::alloc::{alloc, dealloc, Layout};
 use alloc::{vec};
@@ -21,6 +18,12 @@ use dyn_context::Context;
 
 #[doc(hidden)]
 pub use paste::paste as paste_paste;
+#[doc(hidden)]
+pub use core::compile_error as std_compile_error;
+#[doc(hidden)]
+pub use core::stringify as std_stringify;
+#[doc(hidden)]
+pub use core::concat as std_concat;
 #[doc(hidden)]
 pub use dyn_context::Context as dyn_context_Context;
 #[doc(hidden)]
@@ -557,9 +560,9 @@ macro_rules! dep_obj {
         [$($type_bundle:tt)*]
         [$field:ident $field_delim:tt $field_ty:ty $(= $field_val:expr)? $(, $($other_fields:tt)+)?]
     ) => {
-        compile_error!(concat!(
+        $crate::std_compile_error!($crate::std_concat!(
             "invalid dependency object field '",
-            stringify!($field $field_delim $field_ty $(= $field_val)?),
+            $crate::std_stringify!($field $field_delim $field_ty $(= $field_val)?),
             "', allowed forms are '$field: $type = $value', and '$event yield $args'",
         ));
     };
