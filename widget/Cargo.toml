@@ -1,7 +1,7 @@
 [package]
 edition = "2018"
 name = "tuifw-widget"
-version = "0.6.0"
+version = "0.7.0"
 authors = ["warlock <internalmike@gmail.com>"]
 description = "Text User Interface Framework. UI primitives and widgets."
 readme = "README.md"
@@ -12,19 +12,19 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/A1-Triard/tuifw"
 
 [dependencies]
-tuifw-screen-base = { path = "../screen-base", version = "0.6.0" }
-tuifw-window = { path = "../window", version = "0.6.0" }
-components-arena = "0.8.5"
-dyn-context = "0.0.6"
-dep-obj = "0.0.24"
-macro-attr-2018 = "0.3.3"
+tuifw-screen-base = { path = "../screen-base", version = "0.7.0" }
+tuifw-window = { path = "../window", version = "0.7.0" }
+components-arena = "0.9.0"
+dyn-context = "0.0.8"
+dep-obj = "0.0.25"
+macro-attr-2018 = "0.4.0"
 downcast-rs = "1.2.0"
 once_cell = "1.4.0"
 either = "1.5.3"
-enum-derive-2018 = "0.2.1"
+enum-derive-2018 = "0.3.0"
 unicode-width = "0.1.8"
 unicode-segmentation = "1.6.0"
 educe = "0.4.13"
 
 [dev-dependencies]
-tuifw-screen = { path = "../screen", version = "0.6.0" }
+tuifw-screen = { path = "../screen", version = "0.7.0" }

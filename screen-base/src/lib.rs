@@ -23,10 +23,6 @@ use enum_derive_2018::{EnumDisplay, EnumFromStr, IterVariants};
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 
-mod std {
-    pub use core::*;
-}
-
 macro_attr! {
     #[derive(Eq, PartialEq, Debug, Hash, Clone, Copy, Ord, PartialOrd)]
     #[derive(EnumDisplay!, EnumFromStr!)]
