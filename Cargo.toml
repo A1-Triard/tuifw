@@ -1,7 +1,7 @@
 [package]
 edition = "2018"
 name = "tuifw"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["warlock <internalmike@gmail.com>"]
 description = "Text User Interface Framework."
 readme = "README.md"
@@ -22,19 +22,19 @@ members = [
 ]
 
 [dependencies]
-tuifw-screen-base = { path = "screen-base", version = "0.7.0" }
-tuifw-window = { path = "window", version = "0.7.0" }
-components-arena = "0.9.0"
-dyn-context = "0.0.8"
-dep-obj = "0.0.25"
-macro-attr-2018 = "0.4.0"
+tuifw-screen-base = { path = "screen-base", version = "0.8.0" }
+tuifw-window = { path = "window", version = "0.8.0" }
+components-arena = "1.0.1"
+dyn-context = "0.1.0"
+dep-obj = "0.0.26"
+macro-attr-2018 = "1.0.0"
 downcast-rs = "1.2.0"
 once_cell = "1.4.0"
 either = "1.5.3"
-enum-derive-2018 = "0.3.1"
+enum-derive-2018 = "1.0.1"
 unicode-width = "0.1.8"
 unicode-segmentation = "1.6.0"
 educe = "0.4.13"
 
 [dev-dependencies]
-tuifw-screen = { path = "screen", version = "0.7.0" }
+tuifw-screen = { path = "screen", version = "0.8.0" }
