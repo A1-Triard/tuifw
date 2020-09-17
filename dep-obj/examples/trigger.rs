@@ -185,11 +185,11 @@ struct TriggerChips {
 }
 
 context! {
-    struct TriggerContext {
-        dyn circuit: mut Circuit,
-        dyn or_legs: ref DepTypeToken<OrLegsType>,
-        dyn not_legs: ref DepTypeToken<NotLegsType>,
-        dyn chips: ref TriggerChips,
+    dyn struct TriggerContext {
+        circuit: mut Circuit,
+        or_legs: ref DepTypeToken<OrLegsType>,
+        not_legs: ref DepTypeToken<NotLegsType>,
+        chips: ref TriggerChips,
     }
 }
 
