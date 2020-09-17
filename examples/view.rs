@@ -1,5 +1,6 @@
 #![deny(warnings)]
 use std::borrow::Cow;
+use either::Right;
 use dyn_context::ContextExt;
 use tuifw::{Key, Vector, Thickness, HAlign, VAlign, Point, Side, Rect};
 use tuifw::view::{View, ViewTree, view_base_type, ViewBuilderViewAlignExt};
@@ -28,30 +29,30 @@ fn build(tree: &mut ViewTree, bounds: Rect) -> View {
                     .b(Cow::Borrowed("═"))
                 )
                 .dock_panel(|panel| panel
-                    .child(None, (), |layout| layout.dock(Some(Side::Top)), |view| view
+                    .child(None, (), |layout| layout.dock(Right(Side::Top)), |view| view
                         .label_decorator(|label| label.text(Cow::Borrowed("↑")))
                     )
-                    .child(None, (), |layout| layout.dock(Some(Side::Top)), |view| view
+                    .child(None, (), |layout| layout.dock(Right(Side::Top)), |view| view
                         .label_decorator(|label| label.text(Cow::Borrowed("k")))
                     )
-                    .child(None, (), |layout| layout.dock(Some(Side::Bottom)), |view| view
+                    .child(None, (), |layout| layout.dock(Right(Side::Bottom)), |view| view
                         .label_decorator(|label| label.text(Cow::Borrowed("↓")))
                     )
-                    .child(None, (), |layout| layout.dock(Some(Side::Bottom)), |view| view
+                    .child(None, (), |layout| layout.dock(Right(Side::Bottom)), |view| view
                         .label_decorator(|label| label.text(Cow::Borrowed("j")))
                     )
-                    .child(None, (), |layout| layout.dock(Some(Side::Left)), |view| view
+                    .child(None, (), |layout| layout.dock(Right(Side::Left)), |view| view
                         .align(|align| align.margin(Thickness::new(1, 0, 0, 0)))
                         .label_decorator(|label| label.text(Cow::Borrowed("←")))
                     )
-                    .child(None, (), |layout| layout.dock(Some(Side::Left)), |view| view
+                    .child(None, (), |layout| layout.dock(Right(Side::Left)), |view| view
                         .label_decorator(|label| label.text(Cow::Borrowed("h")))
                     )
-                    .child(None, (), |layout| layout.dock(Some(Side::Right)), |view| view
+                    .child(None, (), |layout| layout.dock(Right(Side::Right)), |view| view
                         .align(|align| align.margin(Thickness::new(0, 0, 1, 0)))
                         .label_decorator(|label| label.text(Cow::Borrowed("→")))
                     )
-                    .child(None, (), |layout| layout.dock(Some(Side::Right)), |view| view
+                    .child(None, (), |layout| layout.dock(Right(Side::Right)), |view| view
                         .label_decorator(|label| label.text(Cow::Borrowed("l")))
                     )
                 )

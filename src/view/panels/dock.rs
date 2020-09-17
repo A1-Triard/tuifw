@@ -1,10 +1,12 @@
-use std::cmp::{min};
+use std::cmp::{min, max};
 use std::fmt::Debug;
+use std::hint::unreachable_unchecked;
 use tuifw_screen_base::{Vector, Rect, Side, Orient, Thickness};
 use components_arena::ComponentId;
 use dep_obj::{dep_obj, DepTypeToken};
 use dyn_context::{Context, ContextExt};
 use once_cell::sync::{self};
+use either::{Either, Left, Right};
 use crate::view::base::*;
 
 pub trait ViewBuilderDockPanelExt {
@@ -49,7 +51,7 @@ impl<'a, 'b> DockPanelBuilder<'a, 'b> {
 dep_obj! {
     #[derive(Debug)]
     pub struct DockLayout become layout in View where BuilderCore<'a, 'b> = &'a mut ViewBuilder<'b> {
-        dock: Option<Side> = None,
+        dock: Either<f32, Side> = Either::Left(1.),
     }
 }
 
@@ -113,30 +115,121 @@ impl PanelBehavior for DockPanelBehavior {
         &self,
         view: View,
         tree: &mut ViewTree,
-        mut size: (Option<i16>, Option<i16>)
+        children_measure_size: (Option<i16>, Option<i16>)
     ) -> Vector {
         let mut children_size = Vector::null();
         if let Some(last_child) = view.last_child(tree) {
+            let mut size = children_measure_size;
+            let mut last_undocked_child = None;
+            let mut factor_sum = 0.;
+            let mut orient = None;
+            let mut breadth = 0;
             let mut child = last_child;
             loop {
                 child = child.next(tree);
-                let &dock = child.layout_get(tree, dock_layout_type().dock());
-                let w = if dock == Some(Side::Left) || dock == Some(Side::Right) { None } else { size.0 };
-                let h = if dock == Some(Side::Top) || dock == Some(Side::Bottom) { None } else { size.1 };
+                let dock = match child.layout_get(tree, dock_layout_type().dock()) {
+                    &Right(dock) => dock,
+                    &Left(factor) => {
+                        factor_sum += factor;
+                        last_undocked_child = Some(child);
+                        continue;
+                    }
+                };
+                let w = if dock == Side::Left || dock == Side::Right { None } else { size.0 };
+                let h = if dock == Side::Top || dock == Side::Bottom { None } else { size.1 };
                 child.measure(tree, (w, h));
                 let child_size = child.desired_size(tree);
-                let orient = match dock.unwrap_or_else(|| *view.panel_get(tree, dock_panel_type().base())) {
-                    Side::Left | Side::Right => Orient::Hor,
-                    Side::Top | Side::Bottom => Orient::Vert,
+                let (child_orient, child_breadth) = match dock {
+                    Side::Left | Side::Right => {
+                        size.0.as_mut().map(|w| *w = (*w as u16).saturating_sub(child_size.x as u16) as i16);
+                        children_size.x = (children_size.x as u16).saturating_add(child_size.x as u16) as i16;
+                        (Orient::Hor, child_size.y as u16)
+                    },
+                    Side::Top | Side::Bottom => {
+                        size.1.as_mut().map(|h| *h = (*h as u16).saturating_sub(child_size.y as u16) as i16);
+                        children_size.y = (children_size.y as u16).saturating_add(child_size.y as u16) as i16;
+                        (Orient::Vert, child_size.x as u16)
+                    }
                 };
-                if orient == Orient::Hor {
-                    size.0.as_mut().map(|w| *w = (*w as u16).saturating_sub(child_size.x as u16) as i16);
-                    children_size.x = (children_size.x as u16).saturating_add(child_size.x as u16) as i16;
+                if Some(child_orient) == orient {
+                    breadth = max(breadth, child_breadth);
                 } else {
-                    size.1.as_mut().map(|h| *h = (*h as u16).saturating_sub(child_size.y as u16) as i16);
-                    children_size.y = (children_size.y as u16).saturating_add(child_size.y as u16) as i16;
+                    if let Some(orient) = orient {
+                        match orient {
+                            Orient::Hor => children_size.y = (children_size.y as u16).saturating_add(breadth) as i16,
+                            Orient::Vert => children_size.x = (children_size.x as u16).saturating_add(breadth) as i16,
+                        }
+                    }
+                    orient = Some(child_orient);
+                    breadth = child_breadth;
                 }
                 if child == last_child { break; }
+            }
+            match orient.unwrap_or_else(|| unsafe { unreachable_unchecked() }) {
+                Orient::Hor => children_size.y = (children_size.y as u16).saturating_add(breadth) as i16,
+                Orient::Vert => children_size.x = (children_size.x as u16).saturating_add(breadth) as i16,
+            }
+            if let Some(last_undocked_child) = last_undocked_child {
+                let orient = match view.panel_get(tree, dock_panel_type().base()) {
+                    Side::Left | Side::Right => Orient::Hor,
+                    Side::Top | Side::Bottom => Orient::Vert
+                };
+                let mut breadth = 0u16;
+                let mut length = 0u16;
+                let mut size = (size.0.map(|w| (w, w)), size.1.map(|h| (h, h)));
+                let mut child = last_child;
+                loop {
+                    child = child.next(tree);
+                    let factor = match child.layout_get(tree, dock_layout_type().dock()) {
+                        &Right(_) => continue,
+                        &Left(factor) => factor
+                    };
+                    let child_size = match orient {
+                        Orient::Hor => {
+                            let child_w = size.0.as_mut().map(|&mut (w, ref mut last_w)| if child == last_undocked_child {
+                                *last_w
+                            } else {
+                                let child_w = frac(factor, factor_sum, w);
+                                *last_w = (*last_w as u16).saturating_sub(child_w as u16) as i16;
+                                child_w
+                            });
+                            (child_w, size.1.map(|x| x.0))
+                        },
+                        Orient::Vert => {
+                            let child_h = size.1.as_mut().map(|&mut (h, ref mut last_h)| if child == last_undocked_child {
+                                *last_h
+                            } else {
+                                let child_h = frac(factor, factor_sum, h);
+                                *last_h = (*last_h as u16).saturating_sub(child_h as u16) as i16;
+                                child_h
+                            });
+                            (size.0.map(|x| x.0), child_h)
+                        },
+                    };
+                    child.measure(tree, child_size);
+                    let child_size = child.desired_size(tree);
+                    match orient {
+                        Orient::Hor => {
+                            length = length.saturating_add(child_size.x as u16);
+                            breadth = max(breadth, child_size.y as u16);
+                        },
+                        Orient::Vert => {
+                            length = length.saturating_add(child_size.y as u16);
+                            breadth = max(breadth, child_size.x as u16);
+                        }
+                    }
+                    if child == last_undocked_child { break; }
+                }
+                match orient {
+                    Orient::Hor => {
+                        children_size.x = (children_size.x as u16).saturating_add(length) as i16;
+                        children_size.y = (children_size.y as u16).saturating_add(breadth) as i16;
+                    },
+                    Orient::Vert => {
+                        children_size.y = (children_size.y as u16).saturating_add(length) as i16;
+                        children_size.x = (children_size.x as u16).saturating_add(breadth) as i16;
+                    },
+                }
             }
         }
         children_size
@@ -148,23 +241,30 @@ impl PanelBehavior for DockPanelBehavior {
         tree: &mut ViewTree,
         children_arrange_bounds: Rect
     ) -> Rect {
-        let mut bounds = children_arrange_bounds;
-        let mut children_rect = Rect { tl: bounds.tl, size: Vector::null() };
+        let mut children_rect = Rect { tl: children_arrange_bounds.tl, size: Vector::null() };
         if let Some(last_child) = view.last_child(tree) {
+            let mut last_undocked_child = None;
+            let mut bounds = children_arrange_bounds;
+            let mut factor_sum = 0.;
             let mut child = last_child;
             loop {
                 child = child.next(tree);
-                let child_size = child.desired_size(tree);
-                let dock = child.layout_get(tree, dock_layout_type().dock());
-                let child_size = match dock {
-                    Some(Side::Left) => Vector { x: child_size.x, y: bounds.h() },
-                    Some(Side::Right) => Vector { x: child_size.x, y: bounds.h() },
-                    Some(Side::Top) => Vector { y: child_size.y, x: bounds.w() },
-                    Some(Side::Bottom) => Vector { y: child_size.y, x: bounds.w() },
-                    None => bounds.size,
+                let dock = match child.layout_get(tree, dock_layout_type().dock()) {
+                    &Right(dock) => dock,
+                    &Left(factor) => {
+                        factor_sum += factor;
+                        last_undocked_child = Some(child);
+                        continue;
+                    }
                 };
-                let base = dock.unwrap_or_else(|| *view.panel_get(tree, dock_panel_type().base()));
-                let child_tl = match base {
+                let child_size = child.desired_size(tree);
+                let child_size = match dock {
+                    Side::Left => Vector { x: child_size.x, y: bounds.h() },
+                    Side::Right => Vector { x: child_size.x, y: bounds.h() },
+                    Side::Top => Vector { y: child_size.y, x: bounds.w() },
+                    Side::Bottom => Vector { y: child_size.y, x: bounds.w() },
+                };
+                let child_tl = match dock {
                     Side::Left | Side::Top => bounds.tl,
                     Side::Right => bounds.tr().offset(-Vector { x: child_size.x, y: 0 }),
                     Side::Bottom => bounds.bl().offset(-Vector { y: child_size.y, x: 0 }),
@@ -172,7 +272,7 @@ impl PanelBehavior for DockPanelBehavior {
                 let child_rect = Rect { tl: child_tl, size: child_size };
                 child.arrange(tree, child_rect);
                 children_rect = children_rect.union_intersect(child_rect, children_arrange_bounds);
-                let d = match base {
+                let d = match dock {
                     Side::Left => unsafe { Thickness::new_unchecked(
                         min(child_rect.w() as u16, bounds.w() as u16) as u32 as i32, 0, 0, 0
                     ) },
@@ -189,7 +289,59 @@ impl PanelBehavior for DockPanelBehavior {
                 bounds = d.shrink_rect(bounds);
                 if child == last_child { break; }
             }
+            if let Some(last_undocked_child) = last_undocked_child {
+                children_rect = children_arrange_bounds;
+                let base_bounds = bounds;
+                let &dock = view.panel_get(tree, dock_panel_type().base());
+                let mut child = last_child;
+                loop {
+                    child = child.next(tree);
+                    let factor = match child.layout_get(tree, dock_layout_type().dock()) {
+                        &Right(_) => continue,
+                        &Left(factor) => factor
+                    };
+                    let child_size = if child == last_undocked_child {
+                        bounds.size
+                    } else {
+                        match dock {
+                            Side::Left | Side::Right =>
+                                Vector { x: frac(factor, factor_sum, base_bounds.w()), y: bounds.h() },
+                            Side::Top | Side::Bottom =>
+                                Vector { y: frac(factor, factor_sum, base_bounds.h()), x: bounds.w() },
+                        }
+                    };
+                    let child_tl = match dock {
+                        Side::Left | Side::Top => bounds.tl,
+                        Side::Right => bounds.tr().offset(-Vector { x: child_size.x, y: 0 }),
+                        Side::Bottom => bounds.bl().offset(-Vector { y: child_size.y, x: 0 }),
+                    };
+                    let child_rect = Rect { tl: child_tl, size: child_size };
+                    child.arrange(tree, child_rect);
+                    let d = match dock {
+                        Side::Left => unsafe { Thickness::new_unchecked(
+                            min(child_rect.w() as u16, bounds.w() as u16) as u32 as i32, 0, 0, 0
+                        ) },
+                        Side::Right => unsafe { Thickness::new_unchecked(
+                            0, 0, min(child_rect.w() as u16, bounds.w() as u16) as u32 as i32, 0
+                        ) },
+                        Side::Top => unsafe { Thickness::new_unchecked(
+                            0, min(child_rect.h() as u16, bounds.h() as u16) as u32 as i32, 0, 0
+                        ) },
+                        Side::Bottom => unsafe { Thickness::new_unchecked(
+                            0, 0, 0, min(child_rect.h() as u16, bounds.h() as u16) as u32 as i32
+                        ) },
+                    };
+                    bounds = d.shrink_rect(bounds);
+                    if child == last_undocked_child { break; }
+                }
+            }
         }
         children_rect
     }
+}
+
+fn frac(numerator: f32, denominator: f32, scale: i16) -> i16 {
+    let frac = numerator * (scale as u16 as f32) / denominator;
+    if !frac.is_finite() || frac < 0. || frac > scale as u16 as f32 { return 0; }
+    frac.round() as u16 as i16
 }

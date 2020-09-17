@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use tuifw_screen_base::Side;
 use dep_obj::{dep_obj, DepTypeToken};
 use once_cell::sync::{self};
+use either::Right;
 use crate::base::{Widget, WidgetTree, WidgetObj, WidgetBehavior, ViewBuilderWidgetExt};
 use crate::view::View;
 use crate::view::decorators::{ViewBuilderLabelDecoratorExt};
@@ -41,10 +42,10 @@ impl WidgetBehavior for ButtonBehavior {
         view.build(tree, |view| view
             .dock_panel(|panel| {
                 panel
-                    .child(None, button, |layout| layout.dock(Some(Side::Left)), |view| view
+                    .child(None, button, |layout| layout.dock(Right(Side::Left)), |view| view
                         .label_decorator(|label| label.text(Cow::Borrowed("[ ")))
                     )
-                    .child(None, button, |layout| layout.dock(Some(Side::Right)), |view| view
+                    .child(None, button, |layout| layout.dock(Right(Side::Right)), |view| view
                         .label_decorator(|label| label.text(Cow::Borrowed(" ]")))
                     )
                 ;
