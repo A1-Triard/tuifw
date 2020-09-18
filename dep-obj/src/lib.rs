@@ -9,11 +9,13 @@ use alloc::{vec};
 use alloc::vec::{Vec};
 use core::cmp::max;
 use core::convert::TryInto;
+use core::fmt::Debug;
 use core::marker::PhantomData;
 use core::mem::{replace, align_of, size_of, transmute};
 use core::ptr::{self, NonNull, null_mut};
 use core::sync::atomic::{AtomicBool, Ordering};
 use components_arena::ComponentId;
+use dyn_clone::{DynClone, clone_trait_object};
 use educe::Educe;
 use dyn_context::Context;
 
@@ -366,9 +368,12 @@ impl<OwnerType: DepType, OwnerId: ComponentId> Drop for DepObjCore<OwnerType, Ow
     }
 }
 
+#[derive(Educe)]
+#[educe(Debug(bound="PropType: Debug"), Clone)]
 pub struct Setter<Owner: DepObj, PropType: Clone> {
     pub prop: DepProp<Owner, PropType>,
     pub value: PropType,
+    #[educe(Debug(ignore))]
     pub system_set: fn(
         id: Owner::Id,
         context: &mut dyn Context,
@@ -377,9 +382,11 @@ pub struct Setter<Owner: DepObj, PropType: Clone> {
     ) -> PropType,
 }
 
-pub trait AnySetter<OwnerId: ComponentId> {
+pub trait AnySetter<OwnerId: ComponentId>: DynClone {
     fn apply(&self, context: &mut dyn Context, id: OwnerId);
 }
+
+clone_trait_object!(<OwnerId: ComponentId> AnySetter<OwnerId>);
 
 impl<Owner: DepObj, PropType: Clone> AnySetter<Owner::Id> for Setter<Owner, PropType> {
     fn apply(&self, context: &mut dyn Context, id: Owner::Id) {
@@ -387,6 +394,7 @@ impl<Owner: DepObj, PropType: Clone> AnySetter<Owner::Id> for Setter<Owner, Prop
     }
 }
 
+#[derive(Clone)]
 pub struct Style<OwnerId: ComponentId> {
     pub setters: Vec<Box<dyn AnySetter<OwnerId>>>,
 }
@@ -399,6 +407,7 @@ impl<OwnerId: ComponentId> Style<OwnerId> {
     }
 }
 
+#[derive(Clone)]
 pub struct Template<OwnerId: ComponentId> {
     pub ctor: fn(context: &mut dyn Context, id: OwnerId),
     pub style: Style<OwnerId>,
@@ -449,7 +458,7 @@ macro_rules! dep_obj {
         become $system:ident in $Id:ty
         $(where BuilderCore $(< $( $bc_lt:tt $( : $bc_clt:tt $(+ $bc_dlt:tt )* )? ),+ $(,)?>)? = $BuilderCore:ty)? {
             $($(
-               $field:ident $field_delim:tt $field_ty:ty $(= $field_val:expr)?
+               $(#[$no_clone:ident])? $field:ident $field_delim:tt $field_ty:ty $(= $field_val:expr)?
             ),+ $(,)?)?
         }
     ) => {
@@ -467,6 +476,77 @@ macro_rules! dep_obj {
             )?]
             [] [] [] [] []
             [$($($field $field_delim $field_ty $(= $field_val)?),+)?]
+        }
+    };
+    (
+        @impl 
+        [$builder:ident]
+        [$(#[$attr:meta])*] [$vis:vis] [$name:ident] [$system:ident] [$Id:ty]
+        [$($g:tt)*] [$($r:tt)*]
+        [$(
+            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*]
+            [$($builder_methods:tt)*]
+        )?]
+        [$($type_fields:tt)*]
+        [$($type_methods:tt)*]
+        [$($type_init:tt)*]
+        [$($type_bundle:tt)*]
+        [$($style_builder_methods:tt)*]
+        [#[move] $field:ident : $field_ty:ty = $field_val:expr $(, $($other_fields:tt)+)?]
+    ) => {
+        $crate::dep_obj! {
+            @impl 
+            [$builder]
+            [$(#[$attr])*] [$vis] [$name] [$system] [$Id]
+            [$($g)*] [$($r)*]
+            [$(
+                [$BuilderCore] [$($bc_g)*] [$($bc_r)*]
+                [
+                    $($builder_methods)*
+
+                    $vis fn $field(&mut self, val : $field_ty) -> &mut Self {
+                        let id = self.id;
+                        let context = self.core.context();
+                        let ty = unsafe { &*self.ty };
+                        id . [< $system _set_uncond >] (context, ty.$field(), val);
+                        self
+                    }
+
+                    $vis fn [< on_ $field _changed >] (
+                        &mut self,
+                        callback : fn(context: &mut dyn $crate::dyn_context_Context, owner: $Id, old: &$field_ty)
+                    ) -> &mut Self {
+                        let id = self.id;
+                        let context = self.core.context();
+                        let ty = unsafe { &*self.ty };
+                        let arena = $crate::dyn_context_ContextExt::get_mut(context);
+                        id . [< $system _on_changed >] (arena, ty.$field(), callback);
+                        self
+                    }
+                ]
+            )?]
+            [
+                $($type_fields)*
+                $field : $crate::DepPropRaw< [< $name Type >] , $field_ty>,
+            ]
+            [
+                $($type_methods)*
+                $vis fn $field $($g)* (&self) -> $crate::DepProp<$name $($r)*, $field_ty> {
+                    self.$field.owned_by() 
+                }
+            ]
+            [
+                $($type_init)*
+                let $field = $builder.prop(|| $field_val);
+            ]
+            [
+                $($type_bundle)*
+                $field,
+            ]
+            [
+                $($style_builder_methods)*
+            ]
+            [$($($other_fields)+)?]
         }
     };
     (
@@ -625,12 +705,12 @@ macro_rules! dep_obj {
         [$($type_init:tt)*]
         [$($type_bundle:tt)*]
         [$($style_builder_methods:tt)*]
-        [$field:ident $field_delim:tt $field_ty:ty $(= $field_val:expr)? $(, $($other_fields:tt)+)?]
+        [$(#[$no_clone:ident])? $field:ident $field_delim:tt $field_ty:ty $(= $field_val:expr)? $(, $($other_fields:tt)+)?]
     ) => {
         $crate::std_compile_error!($crate::std_concat!(
             "invalid dependency object field '",
-            $crate::std_stringify!($field $field_delim $field_ty $(= $field_val)?),
-            "', allowed forms are '$field: $type = $value', and '$event yield $args'",
+            $crate::std_stringify!($(#[$no_clone:ident])? $field $field_delim $field_ty $(= $field_val)?),
+            "', allowed forms are '$(#[move])? $field: $type = $value', and '$event yield $args'",
         ));
     };
     (

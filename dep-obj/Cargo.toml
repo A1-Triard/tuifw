@@ -20,6 +20,7 @@ educe = "0.4.13"
 components-arena = { version = "1.0.1", default-features = false }
 dyn-context = { version = "0.2.0", default-features = false }
 paste = "1.0.0"
+dyn-clone = "1.0.2"
 
 [dev-dependencies]
 macro-attr-2018 = "1.0.0"
