@@ -43,6 +43,8 @@ pub use core::ops::FnOnce as std_ops_FnOnce;
 pub use alloc::boxed::Box as std_boxed_Box;
 #[doc(hidden)]
 pub use core::mem::replace as std_mem_replace;
+#[doc(hidden)]
+pub use generics::parse as generics_parse;
 
 pub struct DepTypeLock(AtomicBool);
 
@@ -424,7 +426,7 @@ impl<OwnerId: ComponentId> Template<OwnerId> {
 macro_rules! DepType {
     (
         ()
-        $vis:vis enum $name:ident $($tail:tt)+
+        $vis:vis enum $name:ident $($body:tt)*
     ) => {
         DepType! {
             @impl [$name]
@@ -432,7 +434,7 @@ macro_rules! DepType {
     };
     (
         ()
-        $vis:vis struct $name:ident $($tail:tt)+
+        $vis:vis struct $name:ident $($body:tt)*
     ) => {
         DepType! {
             @impl [$name]
@@ -453,38 +455,78 @@ macro_rules! DepType {
 #[macro_export]
 macro_rules! dep_obj {
     (
-        $(#[$attr:meta])* $vis:vis struct $name:ident
-        $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ $(,)?>)?
+        $(#[$attr:meta])* $vis:vis struct $name:ident $($body:tt)*
+    ) => {
+        $crate::generics_parse! {
+            $crate::dep_obj {
+                @struct [$(#[$attr])*] [$vis] [$name]
+            }
+            $($body)*
+        }
+    };
+    (
+        @struct [$(#[$attr:meta])*] [$vis:vis] [$name:ident]
+        [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         become $system:ident in $Id:ty
-        $(where BuilderCore $(< $( $bc_lt:tt $( : $bc_clt:tt $(+ $bc_dlt:tt )* )? ),+ $(,)?>)? = $BuilderCore:ty)? {
+        { $($body:tt)* }
+    ) => {
+        $crate::dep_obj! {
+            @core [$(#[$attr])*] [$vis] [$name]
+            [$($g)*] [$($r)*] [$($w)*]
+            [$system] [$Id] [$($body)*]
+        }
+    };
+    (
+        @struct [$(#[$attr:meta])*] [$vis:vis] [$name:ident]
+        [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
+        become $system:ident in $Id:ty
+        { $($body:tt)* }
+
+        use $($core:tt)*
+    ) => {
+        $crate::generics_parse! {
+            $crate::dep_obj {
+                @core [$(#[$attr])*] [$vis] [$name]
+                [$($g)*] [$($r)*] [$($w)*]
+                [$system] [$Id] [$($body)*]
+            }
+            $($core)*
+        }
+    };
+    (
+        @core [$(#[$attr:meta])*] [$vis:vis] [$name:ident]
+        [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
+        [$system:ident] [$Id:ty]
+        [
             $($(
                $(#[$no_clone:ident])? $field:ident $field_delim:tt $field_ty:ty $(= $field_val:expr)?
             ),+ $(,)?)?
-        }
+        ]
+        $(
+            [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*] $BuilderCore:ty as BuilderCore;
+        )?
     ) => {
         $crate::dep_obj! {
             @impl
             [builder]
             [$(#[$attr])*] [$vis] [$name] [$system] [$Id]
-            [ $( < $( $lt $( : $clt $(+ $dlt )* )? ),+ >)? ]
-            [ $( < $( $lt ),+ >)? ]
+            [$($g)*] [$($r)*] [$($w)*]
             [$(
                 [$BuilderCore]
-                [ $( < $( $bc_lt $( : $bc_clt $(+ $bc_dlt )* )? ),+ >)? ]
-                [ $( < $( $bc_lt ),+ >)? ]
+                [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]
                 []
             )?]
             [] [] [] [] []
-            [$($($field $field_delim $field_ty $(= $field_val)?),+)?]
+            [$($($(#[$no_clone])? $field $field_delim $field_ty $(= $field_val)?),+)?]
         }
     };
     (
         @impl 
         [$builder:ident]
         [$(#[$attr:meta])*] [$vis:vis] [$name:ident] [$system:ident] [$Id:ty]
-        [$($g:tt)*] [$($r:tt)*]
+        [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         [$(
-            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*]
+            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$(bc_w:tt)*]
             [$($builder_methods:tt)*]
         )?]
         [$($type_fields:tt)*]
@@ -498,9 +540,9 @@ macro_rules! dep_obj {
             @impl 
             [$builder]
             [$(#[$attr])*] [$vis] [$name] [$system] [$Id]
-            [$($g)*] [$($r)*]
+            [$($g)*] [$($r)*] [$($w)*]
             [$(
-                [$BuilderCore] [$($bc_g)*] [$($bc_r)*]
+                [$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]
                 [
                     $($builder_methods)*
 
@@ -531,7 +573,7 @@ macro_rules! dep_obj {
             ]
             [
                 $($type_methods)*
-                $vis fn $field $($g)* (&self) -> $crate::DepProp<$name $($r)*, $field_ty> {
+                $vis fn $field $($g)* (&self) -> $crate::DepProp<$name $($r)*, $field_ty> $($w)* {
                     self.$field.owned_by() 
                 }
             ]
@@ -553,9 +595,9 @@ macro_rules! dep_obj {
         @impl 
         [$builder:ident]
         [$(#[$attr:meta])*] [$vis:vis] [$name:ident] [$system:ident] [$Id:ty]
-        [$($g:tt)*] [$($r:tt)*]
+        [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         [$(
-            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*]
+            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$(bc_w:tt)*]
             [$($builder_methods:tt)*]
         )?]
         [$($type_fields:tt)*]
@@ -569,9 +611,9 @@ macro_rules! dep_obj {
             @impl 
             [$builder]
             [$(#[$attr])*] [$vis] [$name] [$system] [$Id]
-            [$($g)*] [$($r)*]
+            [$($g)*] [$($r)*] [$($w)*]
             [$(
-                [$BuilderCore] [$($bc_g)*] [$($bc_r)*]
+                [$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]
                 [
                     $($builder_methods)*
 
@@ -602,7 +644,7 @@ macro_rules! dep_obj {
             ]
             [
                 $($type_methods)*
-                $vis fn $field $($g)* (&self) -> $crate::DepProp<$name $($r)*, $field_ty> {
+                $vis fn $field $($g)* (&self) -> $crate::DepProp<$name $($r)*, $field_ty> $($w)* {
                     self.$field.owned_by() 
                 }
             ]
@@ -632,9 +674,9 @@ macro_rules! dep_obj {
         @impl 
         [$builder:ident]
         [$(#[$attr:meta])*] [$vis:vis] [$name:ident] [$system:ident] [$Id:ty]
-        [$($g:tt)*] [$($r:tt)*]
+        [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         [$(
-            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*]
+            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$(bc_w:tt)*]
             [$($builder_methods:tt)*]
         )?]
         [$($type_fields:tt)*]
@@ -648,9 +690,9 @@ macro_rules! dep_obj {
             @impl 
             [$builder]
             [$(#[$attr])*] [$vis] [$name] [$system] [$Id]
-            [$($g)*] [$($r)*]
+            [$($g)*] [$($r)*] [$($w)*]
             [$(
-                [$BuilderCore] [$($bc_g)*] [$($bc_r)*]
+                [$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]
                 [
                     $($builder_methods)*
 
@@ -673,7 +715,7 @@ macro_rules! dep_obj {
             ]
             [
                 $($type_methods)*
-                $vis fn $field $($g)* (&self) -> $crate::DepEvent<$name $($r)*, $field_ty> {
+                $vis fn $field $($g)* (&self) -> $crate::DepEvent<$name $($r)*, $field_ty> $($w)* {
                     self.$field.owned_by()
                 }
             ]
@@ -695,9 +737,9 @@ macro_rules! dep_obj {
         @impl 
         [$builder:ident]
         [$(#[$attr:meta])*] [$vis:vis] [$name:ident] [$system:ident] [$Id:ty]
-        [$($g:tt)*] [$($r:tt)*]
+        [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         [$(
-            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*]
+            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$(bc_w:tt)*]
             [$($builder_methods:tt)*]
         )?]
         [$($type_fields:tt)*]
@@ -717,9 +759,9 @@ macro_rules! dep_obj {
         @impl 
         [$builder:ident]
         [$(#[$attr:meta])*] [$vis:vis] [$name:ident] [$system:ident] [$Id:ty]
-        [$($g:tt)*] [$($r:tt)*]
+        [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         [$(
-            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*]
+            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$(bc_w:tt)*]
             [$($builder_methods:tt)*]
         )?]
         [$($type_fields:tt)*]
@@ -731,13 +773,13 @@ macro_rules! dep_obj {
     ) => {
         $crate::paste_paste! {
             $(
-                $vis struct [< $name Builder >] $($bc_g)* {
+                $vis struct [< $name Builder >] $($bc_g)* $($bc_w)* {
                     core: $BuilderCore,
                     id: $Id,
                     ty: *const [< $name Type >],
                 }
 
-                impl $($bc_g)* [< $name Builder >] $($bc_r)* {
+                impl $($bc_g)* [< $name Builder >] $($bc_r)* $($bc_w)* {
                     $($builder_methods)*
 
                     fn build_priv(
@@ -793,18 +835,18 @@ macro_rules! dep_obj {
             }
 
             $(#[$attr])*
-            $vis struct $name $($g)* {
+            $vis struct $name $($g)* $($w)* {
                 core: $crate::DepObjCore< [< $name Type  >] , $Id>,
             }
 
-            impl $($g)* $crate::DepObj for $name $($r)* {
+            impl $($g)* $crate::DepObj for $name $($r)* $($w)* {
                 type Type = [< $name Type >] ;
                 type Id = $Id;
                 fn core(&self) -> &$crate::DepObjCore<Self::Type, Self::Id> { &self.core }
                 fn core_mut(&mut self) -> &mut $crate::DepObjCore<Self::Type, Self::Id> { &mut self.core }
             }
 
-            impl $($g)* $name $($r)* {
+            impl $($g)* $name $($r)* $($w)* {
                 fn new_priv(token: &$crate::DepTypeToken< [< $name Type >] >) -> Self {
                     Self { core: $crate::DepObjCore::new(token) }
                 }
