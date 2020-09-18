@@ -4,6 +4,7 @@
 extern crate alloc;
 
 use alloc::alloc::{alloc, dealloc, Layout};
+use alloc::boxed::Box;
 use alloc::{vec};
 use alloc::vec::{Vec};
 use core::cmp::max;
@@ -36,6 +37,10 @@ pub use alloc::vec::Vec as std_vec_Vec;
 pub use core::cmp::Eq as std_cmp_Eq;
 #[doc(hidden)]
 pub use core::ops::FnOnce as std_ops_FnOnce;
+#[doc(hidden)]
+pub use alloc::boxed::Box as std_boxed_Box;
+#[doc(hidden)]
+pub use core::mem::replace as std_mem_replace;
 
 pub struct DepTypeLock(AtomicBool);
 
@@ -361,6 +366,51 @@ impl<OwnerType: DepType, OwnerId: ComponentId> Drop for DepObjCore<OwnerType, Ow
     }
 }
 
+pub struct Setter<Owner: DepObj, PropType: Clone> {
+    pub prop: DepProp<Owner, PropType>,
+    pub value: PropType,
+    pub system_set: fn(
+        id: Owner::Id,
+        context: &mut dyn Context,
+        prop: DepProp<Owner, PropType>,
+        value: PropType
+    ) -> PropType,
+}
+
+pub trait AnySetter<OwnerId: ComponentId> {
+    fn apply(&self, context: &mut dyn Context, id: OwnerId);
+}
+
+impl<Owner: DepObj, PropType: Clone> AnySetter<Owner::Id> for Setter<Owner, PropType> {
+    fn apply(&self, context: &mut dyn Context, id: Owner::Id) {
+        (self.system_set)(id, context, self.prop, self.value.clone());
+    }
+}
+
+pub struct Style<OwnerId: ComponentId> {
+    pub setters: Vec<Box<dyn AnySetter<OwnerId>>>,
+}
+
+impl<OwnerId: ComponentId> Style<OwnerId> {
+    pub fn apply(&self, context: &mut dyn Context, id: OwnerId) {
+        for setter in &self.setters {
+            setter.apply(context, id);
+        }
+    }
+}
+
+pub struct Template<OwnerId: ComponentId> {
+    pub ctor: fn(context: &mut dyn Context, id: OwnerId),
+    pub style: Style<OwnerId>,
+}
+
+impl<OwnerId: ComponentId> Template<OwnerId> {
+    pub fn apply(&self, context: &mut dyn Context, id: OwnerId) {
+        (self.ctor)(context, id);
+        self.style.apply(context, id);
+    }
+}
+
 #[macro_export]
 macro_rules! DepType {
     (
@@ -415,7 +465,7 @@ macro_rules! dep_obj {
                 [ $( < $( $bc_lt ),+ >)? ]
                 []
             )?]
-            [] [] [] []
+            [] [] [] [] []
             [$($($field $field_delim $field_ty $(= $field_val)?),+)?]
         }
     };
@@ -432,6 +482,7 @@ macro_rules! dep_obj {
         [$($type_methods:tt)*]
         [$($type_init:tt)*]
         [$($type_bundle:tt)*]
+        [$($style_builder_methods:tt)*]
         [$field:ident : $field_ty:ty = $field_val:expr $(, $($other_fields:tt)+)?]
     ) => {
         $crate::dep_obj! {
@@ -483,6 +534,17 @@ macro_rules! dep_obj {
                 $($type_bundle)*
                 $field,
             ]
+            [
+                $($style_builder_methods)*
+                $vis fn $field(&mut self, value: $field_ty) -> &mut Self {
+                    self.style.setters.push($crate::std_boxed_Box::new($crate::Setter {
+                        system_set: $Id :: [< $system _set_uncond >] ,
+                        prop: self.ty.$field(),
+                        value
+                    }));
+                    self
+                }
+            ]
             [$($($other_fields)+)?]
         }
     };
@@ -499,6 +561,7 @@ macro_rules! dep_obj {
         [$($type_methods:tt)*]
         [$($type_init:tt)*]
         [$($type_bundle:tt)*]
+        [$($style_builder_methods:tt)*]
         [$field:ident yield $field_ty:ty $(, $($other_fields:tt)+)?]
     ) => {
         $crate::dep_obj! {
@@ -542,6 +605,9 @@ macro_rules! dep_obj {
                 $($type_bundle)*
                 $field,
             ]
+            [
+                $($style_builder_methods)*
+            ]
             [$($($other_fields)+)?]
         }
     };
@@ -558,6 +624,7 @@ macro_rules! dep_obj {
         [$($type_methods:tt)*]
         [$($type_init:tt)*]
         [$($type_bundle:tt)*]
+        [$($style_builder_methods:tt)*]
         [$field:ident $field_delim:tt $field_ty:ty $(= $field_val:expr)? $(, $($other_fields:tt)+)?]
     ) => {
         $crate::std_compile_error!($crate::std_concat!(
@@ -579,6 +646,7 @@ macro_rules! dep_obj {
         [$($type_methods:tt)*]
         [$($type_init:tt)*]
         [$($type_bundle:tt)*]
+        [$($style_builder_methods:tt)*]
         []
     ) => {
         $crate::paste_paste! {
@@ -634,6 +702,14 @@ macro_rules! dep_obj {
                         })
                     })
                 }
+
+                $vis fn style<'a>(&'a self) -> [< $name StyleBuilder >] <'a> {
+                    [< $name StyleBuilder >] {
+                        ty: self,
+                        style: $crate::Style { setters: $crate::std_vec_Vec::new() }
+                    }
+                }
+
             }
 
             $(#[$attr])*
@@ -652,6 +728,19 @@ macro_rules! dep_obj {
                 fn new_priv(token: &$crate::DepTypeToken< [< $name Type >] >) -> Self {
                     Self { core: $crate::DepObjCore::new(token) }
                 }
+            }
+
+            $vis struct [< $name StyleBuilder >] <'a> {
+                ty: &'a [< $name Type >] ,
+                style: $crate::Style<$Id>,
+            }
+
+            impl<'a> [< $name StyleBuilder >] <'a> {
+                pub fn build(&mut self) -> $crate::Style<$Id> {
+                    $crate::std_mem_replace(&mut self.style, $crate::Style { setters: $crate::std_vec_Vec::new() })
+                }
+
+                $($style_builder_methods)*
             }
         }
     };
