@@ -494,6 +494,21 @@ macro_rules! dep_obj {
         }
     };
     (
+        @struct [$(#[$attr:meta])*] [$vis:vis] [$name:ident]
+        [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
+        $($body:tt)*
+    ) => {
+        $crate::std_compile_error!("\
+            invalid dependency object, allowed form iѕ '
+            $(#[$attr])* $vis struct $name $(<...>)? become $system in $Id $(where ...)? {
+                ...
+            }
+
+            $(use $(<...>)? $BuilderCore as BuilderCore $(where ...);
+            '\
+        ");
+    };
+    (
         @core [$(#[$attr:meta])*] [$vis:vis] [$name:ident]
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         [$system:ident] [$Id:ty]
@@ -519,6 +534,23 @@ macro_rules! dep_obj {
             [] [] [] [] []
             [$($($(#[$no_clone])? $field $field_delim $field_ty $(= $field_val)?),+)?]
         }
+    };
+    (
+        @core [$(#[$attr:meta])*] [$vis:vis] [$name:ident]
+        [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
+        [$system:ident] [$Id:ty]
+        [
+            $($body:tt)*
+        ]
+        $(
+            [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*] $BuilderCore:ty as BuilderCore;
+        )?
+    ) => {
+        $crate::std_compile_error!("\
+            invalid dependency object field, \
+            allowed forms are '$(#[move])? $field: $type = $value', and '$event yield $args'; \
+            fields should be comma-separated\
+        ");
     };
     (
         @impl 
