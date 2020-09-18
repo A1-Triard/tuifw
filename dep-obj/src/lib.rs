@@ -558,7 +558,7 @@ macro_rules! dep_obj {
         [$(#[$attr:meta])*] [$vis:vis] [$name:ident] [$system:ident] [$Id:ty]
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         [$(
-            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$(bc_w:tt)*]
+            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
             [$($builder_methods:tt)*]
         )?]
         [$($type_fields:tt)*]
@@ -629,7 +629,7 @@ macro_rules! dep_obj {
         [$(#[$attr:meta])*] [$vis:vis] [$name:ident] [$system:ident] [$Id:ty]
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         [$(
-            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$(bc_w:tt)*]
+            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
             [$($builder_methods:tt)*]
         )?]
         [$($type_fields:tt)*]
@@ -708,7 +708,7 @@ macro_rules! dep_obj {
         [$(#[$attr:meta])*] [$vis:vis] [$name:ident] [$system:ident] [$Id:ty]
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         [$(
-            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$(bc_w:tt)*]
+            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
             [$($builder_methods:tt)*]
         )?]
         [$($type_fields:tt)*]
@@ -771,7 +771,7 @@ macro_rules! dep_obj {
         [$(#[$attr:meta])*] [$vis:vis] [$name:ident] [$system:ident] [$Id:ty]
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         [$(
-            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$(bc_w:tt)*]
+            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
             [$($builder_methods:tt)*]
         )?]
         [$($type_fields:tt)*]
@@ -793,7 +793,7 @@ macro_rules! dep_obj {
         [$(#[$attr:meta])*] [$vis:vis] [$name:ident] [$system:ident] [$Id:ty]
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         [$(
-            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$(bc_w:tt)*]
+            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
             [$($builder_methods:tt)*]
         )?]
         [$($type_fields:tt)*]
