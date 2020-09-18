@@ -715,9 +715,11 @@ impl<'a> ViewBuilderRootDecoratorExt for ViewBuilder<'a> {
 
 dep_obj! {
     #[derive(Debug)]
-    pub struct RootDecorator become decorator in View where BuilderCore<'a, 'b> = &'a mut ViewBuilder<'b> {
+    pub struct RootDecorator become decorator in View {
         fill: Cow<'static, str> = Cow::Borrowed(" ")
     }
+
+    use<'a, 'b> &'a mut ViewBuilder<'b> as BuilderCore;
 }
 
 static ROOT_DECORATOR_TOKEN: sync::Lazy<DepTypeToken<RootDecoratorType>> = sync::Lazy::new(||
@@ -805,7 +807,7 @@ impl<'a> ViewBuilderViewBaseExt for ViewBuilder<'a> {
 
 dep_obj! {
     #[derive(Debug)]
-    pub struct ViewBase become base in View where BuilderCore<'a, 'b> = &'a mut ViewBuilder<'b> {
+    pub struct ViewBase become base in View {
         fg: Option<Color> = None,
         bg: Option<Option<Color>> = None,
         attr: Option<Attr> = None,
@@ -813,6 +815,8 @@ dep_obj! {
         lost_focus yield (),
         input yield ViewInput,
     }
+
+    use<'a, 'b> &'a mut ViewBuilder<'b> as BuilderCore;
 }
 
 static VIEW_BASE_TOKEN: sync::Lazy<DepTypeToken<ViewBaseType>> = sync::Lazy::new(||
@@ -875,7 +879,7 @@ impl<'a> ViewBuilderViewAlignExt for ViewBuilder<'a> {
 
 dep_obj! {
     #[derive(Debug)]
-    pub struct ViewAlign become align in View where BuilderCore<'a, 'b> = &'a mut ViewBuilder<'b> {
+    pub struct ViewAlign become align in View {
         h_align: HAlign = HAlign::Center,
         v_align: VAlign = VAlign::Center,
         min_size: Vector = Vector::null(),
@@ -885,6 +889,8 @@ dep_obj! {
         h: Option<i16> = None,
         margin: Thickness = Thickness::all(0),
     }
+
+    use<'a, 'b> &'a mut ViewBuilder<'b> as BuilderCore;
 }
 
 static VIEW_ALIGN_TOKEN: sync::Lazy<DepTypeToken<ViewAlignType>> = sync::Lazy::new(||

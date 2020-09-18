@@ -50,9 +50,11 @@ impl<'a, 'b> DockPanelBuilder<'a, 'b> {
 
 dep_obj! {
     #[derive(Debug)]
-    pub struct DockLayout become layout in View where BuilderCore<'a, 'b> = &'a mut ViewBuilder<'b> {
+    pub struct DockLayout become layout in View {
         dock: Either<f32, Side> = Either::Left(1.),
     }
+
+    use<'a, 'b> &'a mut ViewBuilder<'b> as BuilderCore;
 }
 
 static DOCK_LAYOUT_TOKEN: sync::Lazy<DepTypeToken<DockLayoutType>> = sync::Lazy::new(||
@@ -81,9 +83,11 @@ impl Layout for DockLayout { }
 
 dep_obj! {
     #[derive(Debug)]
-    pub struct DockPanel become panel in View where BuilderCore<'a, 'b> = &'a mut ViewBuilder<'b>{
+    pub struct DockPanel become panel in View {
         base: Side = Side::Top,
     }
+
+    use<'a, 'b> &'a mut ViewBuilder<'b> as BuilderCore;
 }
 
 static DOCK_PANEL_TOKEN: sync::Lazy<DepTypeToken<DockPanelType>> = sync::Lazy::new(||

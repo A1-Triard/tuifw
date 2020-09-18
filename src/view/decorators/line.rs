@@ -29,13 +29,15 @@ impl<'a> ViewBuilderLineDecoratorExt for ViewBuilder<'a> {
 
 dep_obj! {
     #[derive(Debug)]
-    pub struct LineDecorator become decorator in View where BuilderCore<'a, 'b> = &'a mut ViewBuilder<'b> {
+    pub struct LineDecorator become decorator in View {
         orient: Orient = Orient::Hor,
         length: i16 = 3,
         near: Cow<'static, str> = Cow::Borrowed(""),
         stroke: Cow<'static, str> = Cow::Borrowed(""),
         far: Cow<'static, str> = Cow::Borrowed(""),
     }
+
+    use<'a, 'b> &'a mut ViewBuilder<'b> as BuilderCore;
 }
 
 static LINE_DECORATOR_TOKEN: sync::Lazy<DepTypeToken<LineDecoratorType>> = sync::Lazy::new(||

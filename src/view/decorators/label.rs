@@ -32,9 +32,11 @@ impl<'a> ViewBuilderLabelDecoratorExt for ViewBuilder<'a> {
 
 dep_obj! {
     #[derive(Debug)]
-    pub struct LabelDecorator become decorator in View where BuilderCore<'a, 'b> = &'a mut ViewBuilder<'b> {
+    pub struct LabelDecorator become decorator in View {
         text: Cow<'static, str> = Cow::Borrowed(""),
     }
+
+    use<'a, 'b> &'a mut ViewBuilder<'b> as BuilderCore;
 }
 
 static LABEL_DECORATOR_TOKEN: sync::Lazy<DepTypeToken<LabelDecoratorType>> = sync::Lazy::new(||

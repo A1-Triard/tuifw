@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use std::mem::replace;
 use components_arena::{ComponentId, Id, Component, Arena, ComponentClassMutex};
 use dyn_context::{Context, ContextExt};
-use dep_obj::{dep_system};
+use dep_obj::{dep_system, dep_obj, Template, Style};
 use downcast_rs::{Downcast, impl_downcast};
 use macro_attr_2018::macro_attr;
 use tuifw_screen_base::Screen;
@@ -104,6 +104,9 @@ impl WidgetTree {
             _root: root,
         }
     }
+
+    //pub fn update(context: &mut dyn Context, wait: bool) -> Result<bool, Box<dyn Any>> {
+    //}
 }
 
 impl Widget {
@@ -189,4 +192,28 @@ impl<'a> ViewBuilderWidgetExt for ViewBuilder<'a> {
         widget.load(tree, view);
         self
     }
+}
+
+dep_obj! {
+    #[derive(Debug)]
+    pub struct Root become obj in Widget {
+        panel_template: Option<Template<View>> = None,
+        decorator_style: Option<Style<View>> = None,
+    }
+}
+
+struct RootBehavior;
+
+impl WidgetBehavior for RootBehavior {
+    fn load(&self, _tree: &mut WidgetTree, _widget: Widget, _view: View) {
+        panic!("root widget always loaded");
+    }
+}
+
+impl Root {
+    const BEHAVIOR: &'static dyn WidgetBehavior = &RootBehavior;
+}
+
+impl WidgetObj for Root {
+    fn behavior(&self) -> &'static dyn WidgetBehavior { Root::BEHAVIOR }
 }

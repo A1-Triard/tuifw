@@ -50,9 +50,11 @@ impl<'a, 'b> CanvasPanelBuilder<'a, 'b> {
 
 dep_obj! {
     #[derive(Debug)]
-    pub struct CanvasLayout become layout in View where BuilderCore<'a, 'b> = &'a mut ViewBuilder<'b> {
+    pub struct CanvasLayout become layout in View {
         tl: Point = Point { x: 0, y: 0 },
     }
+
+    use<'a, 'b> &'a mut ViewBuilder<'b> as BuilderCore;
 }
 
 static CANVAS_LAYOUT_TOKEN: sync::Lazy<DepTypeToken<CanvasLayoutType>> = sync::Lazy::new(||

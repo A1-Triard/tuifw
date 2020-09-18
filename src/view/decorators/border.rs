@@ -30,7 +30,7 @@ impl<'a> ViewBuilderBorderDecoratorExt for ViewBuilder<'a> {
 
 dep_obj! {
     #[derive(Debug)]
-    pub struct BorderDecorator become decorator in View where BuilderCore<'a, 'b> = &'a mut ViewBuilder<'b> {
+    pub struct BorderDecorator become decorator in View {
         tl: Cow<'static, str> = Cow::Borrowed(""),
         tr: Cow<'static, str> = Cow::Borrowed(""),
         bl: Cow<'static, str> = Cow::Borrowed(""),
@@ -40,6 +40,8 @@ dep_obj! {
         r: Cow<'static, str> = Cow::Borrowed(""),
         b: Cow<'static, str> = Cow::Borrowed(""),
     }
+
+    use<'a, 'b> &'a mut ViewBuilder<'b> as BuilderCore;
 }
 
 static BORDER_DECORATOR_TOKEN: sync::Lazy<DepTypeToken<BorderDecoratorType>> = sync::Lazy::new(||
