@@ -504,7 +504,7 @@ macro_rules! dep_obj {
                 ...
             }
 
-            $(use $(<...>)? $BuilderCore as BuilderCore $(where ...);
+            $(use $(<...>)? $BuilderCore as BuilderCore $(where ...);)?
             '\
         ");
     };
