@@ -1,1067 +1,284 @@
+#![feature(const_fn)]
+#![feature(unchecked_math)]
 #![deny(warnings)]
 
 #![no_std]
 extern crate alloc;
 
-use alloc::alloc::{alloc, dealloc, Layout};
-use alloc::boxed::Box;
-use alloc::{vec};
-use alloc::vec::{Vec};
-use core::cmp::max;
-use core::convert::TryInto;
+use alloc::vec::Vec;
 use core::fmt::Debug;
 use core::marker::PhantomData;
-use core::mem::{replace, align_of, size_of, transmute};
-use core::ptr::{self, NonNull, null_mut};
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::mem::replace;
 use components_arena::ComponentId;
-use dyn_clone::{DynClone, clone_trait_object};
-use educe::Educe;
 use dyn_context::Context;
+use educe::Educe;
 
 #[doc(hidden)]
-pub use paste::paste as paste_paste;
+pub use core::default::Default as std_default_Default;
 #[doc(hidden)]
-pub use core::compile_error as std_compile_error;
-#[doc(hidden)]
-pub use core::stringify as std_stringify;
-#[doc(hidden)]
-pub use core::concat as std_concat;
-#[doc(hidden)]
-pub use dyn_context::Context as dyn_context_Context;
-#[doc(hidden)]
-pub use dyn_context::ContextExt as dyn_context_ContextExt;
-#[doc(hidden)]
-pub use core::option::Option as std_option_Option;
-#[doc(hidden)]
-pub use alloc::vec::Vec as std_vec_Vec;
-#[doc(hidden)]
-pub use core::cmp::Eq as std_cmp_Eq;
-#[doc(hidden)]
-pub use core::ops::FnOnce as std_ops_FnOnce;
-#[doc(hidden)]
-pub use alloc::boxed::Box as std_boxed_Box;
-#[doc(hidden)]
-pub use core::mem::replace as std_mem_replace;
+pub use core::fmt::Debug as std_fmt_Debug;
 #[doc(hidden)]
 pub use generics::parse as generics_parse;
+#[doc(hidden)]
+pub use paste::paste as paste_paste;
 
-pub struct DepTypeLock(AtomicBool);
+pub trait DepPropType: Debug + Clone + 'static { }
 
-impl DepTypeLock {
-    pub const fn new() -> Self { DepTypeLock(AtomicBool::new(false)) }
+impl<PropType: Debug + Clone + 'static> DepPropType for PropType { }
+
+#[derive(Educe)]
+#[educe(Debug)]
+pub struct DepObjEntry<OwnerId: ComponentId, PropType: DepPropType> {
+    default: &'static PropType,
+    style: Option<PropType>,
+    local: Option<PropType>,
+    #[educe(Debug(ignore))]
+    on_changed: Vec<fn(context: &mut dyn Context, id: OwnerId, old: &PropType)>,
 }
 
-impl Default for DepTypeLock {
-    fn default() -> Self { DepTypeLock::new() }
+pub struct DepPropOnChanged<OwnerId: ComponentId, PropType: DepPropType> {
+    callbacks: Vec<fn(context: &mut dyn Context, id: OwnerId, old: &PropType)>,
 }
 
-pub struct DepTypeToken<OwnerType: DepType> {
-    layout: Layout,
-    default: Vec<(isize, unsafe fn(usize, *mut u8), usize)>,
-    drop: Vec<(isize, unsafe fn(*mut u8))>,
-    events: usize,
-    ty: OwnerType,
+impl<OwnerId: ComponentId, PropType: DepPropType> DepPropOnChanged<OwnerId, PropType> {
+    pub fn raise(self, context: &mut dyn Context, id: OwnerId, old: &PropType) {
+        for callback in self.callbacks {
+            callback(context, id, old);
+        }
+    }
 }
 
-impl<Type: DepType> DepTypeToken<Type> {
-    pub fn ty(&self) -> &Type { &self.ty }
-}
-
-pub unsafe trait DepType {
-    fn lock() -> &'static DepTypeLock;
+impl<OwnerId: ComponentId, PropType: DepPropType> DepObjEntry<OwnerId, PropType> {
+    pub const fn new(default: &'static PropType) -> Self {
+        DepObjEntry {
+            default,
+            style: None,
+            local: None,
+            on_changed: Vec::new()
+        }
+    }
 }
 
 pub trait DepObj {
-    type Type: DepType;
     type Id: ComponentId;
-    fn core(&self) -> &DepObjCore<Self::Type, Self::Id> where Self: Sized;
-    fn core_mut(&mut self) -> &mut DepObjCore<Self::Type, Self::Id> where Self: Sized;
-}
-
-#[derive(Debug)]
-struct Entry<PropType> {
-    value: PropType,
-    on_changed: Vec<usize>,
-}
-
-unsafe fn store_default<PropType>(fn_ptr: usize, props: *mut u8) {
-    let fn_ptr: fn() -> PropType = transmute(fn_ptr);
-    ptr::write(props as *mut Entry<PropType>, Entry { value: fn_ptr(), on_changed: Vec::new() });
-}
-
-unsafe fn drop_entry<PropType>(props: *mut u8) {
-    ptr::drop_in_place(props as *mut Entry<PropType>);
 }
 
 #[derive(Educe)]
-#[educe(Debug)]
-pub struct DepTypeBuilder<OwnerType: DepType> {
-    align: usize,
-    size: usize,
-    default: Vec<(isize, unsafe fn(usize, *mut u8), usize)>,
-    drop: Vec<(isize, unsafe fn(*mut u8))>,
-    events: usize,
-    phantom: PhantomData<OwnerType>,
+#[educe(Debug, Clone, Copy)]
+pub struct DepProp<Owner: DepObj, PropType: DepPropType> {
+    offset: usize,
+    phantom: (PhantomData<Owner>, PhantomData<PropType>)
 }
 
-unsafe impl<OwnerType: DepType> Send for DepTypeBuilder<OwnerType> { }
-unsafe impl<OwnerType: DepType> Sync for DepTypeBuilder<OwnerType> { }
-impl<OwnerType: DepType> Unpin for DepTypeBuilder<OwnerType> { }
+impl<Owner: DepObj, PropType: DepPropType> DepProp<Owner, PropType> {
+    pub const unsafe fn new(offset: usize) -> Self {
+        DepProp { offset, phantom: (PhantomData, PhantomData) }
+    }
 
-impl<OwnerType: DepType> DepTypeBuilder<OwnerType> {
-    pub fn new() -> Option<Self> {
-        let lock = OwnerType::lock();
-        if lock.0.compare_and_swap(false, true, Ordering::Relaxed) {
-            None
-        } else {
-            Some(DepTypeBuilder {
-                size: 0,
-                align: 1,
-                default: Vec::new(),
-                drop: Vec::new(),
-                events: 0,
-                phantom: PhantomData
-            })
+    fn entry(self, owner: &Owner) -> &DepObjEntry<Owner::Id, PropType> {
+        unsafe {
+            let entry = (owner as *const _ as usize).unchecked_add(self.offset);
+            let entry = entry as *const DepObjEntry<Owner::Id, PropType>;
+            &*entry
         }
     }
 
-    pub fn prop<PropType>(&mut self, default: fn() -> PropType) -> DepPropRaw<OwnerType, PropType> {
-        let align = align_of::<Entry<PropType>>();
-        self.align = max(self.align, align);
-        let padding = (align - self.size % align) % align;
-        self.size = self.size.checked_add(padding).expect("out of memory");
-        let offset = self.size.try_into().expect("out of memory");
-        debug_assert_ne!(size_of::<Entry<PropType>>(), 0);
-        self.size = self.size.checked_add(size_of::<Entry<PropType>>()).expect("out of memory");
-        self.default.push((offset, store_default::<PropType>, default as usize));
-        self.drop.push((offset, drop_entry::<PropType>));
-        DepPropRaw { offset, phantom: (PhantomData, PhantomData) }
-    }
-
-    pub fn event<ArgsType>(&mut self) -> DepEventRaw<OwnerType, ArgsType> {
-        let index = self.events;
-        self.events = index.checked_add(1).expect("out of memory");
-        DepEventRaw { index, phantom: (PhantomData, PhantomData) }
-    }
-
-    pub fn build(mut self, ty: OwnerType) -> DepTypeToken<OwnerType> {
-        self.default.shrink_to_fit();
-        self.drop.shrink_to_fit();
-        DepTypeToken {
-            layout: Layout::from_size_align(self.size, self.align).expect("out of memory"),
-            default: self.default,
-            drop: self.drop,
-            events: self.events,
-            ty
+    fn entry_mut(self, owner: &mut Owner) -> &mut DepObjEntry<Owner::Id, PropType> {
+        unsafe {
+            let entry = (owner as *mut _ as usize).unchecked_add(self.offset);
+            let entry = entry as *mut DepObjEntry<Owner::Id, PropType>;
+            &mut *entry
         }
     }
-}
 
-pub struct OnRaised<OwnerId: ComponentId, ArgsType>(
-    Vec<usize>,
-    (PhantomData<OwnerId>, PhantomData<ArgsType>),
-);
-
-impl<OwnerId: ComponentId, ArgsType> OnRaised<OwnerId, ArgsType> {
-    pub fn raise(self, context: &mut dyn Context, owner_id: OwnerId, args: &mut ArgsType) {
-        for on_raised in self.0 {
-            let on_raised: fn(context: &mut dyn Context, owner_id: OwnerId, args: &mut ArgsType) =
-                unsafe { transmute(on_raised) };
-            on_raised(context, owner_id, args);
-        }
-    }
-}
-
-#[derive(Educe)]
-#[educe(Debug, Copy, Clone, Eq, PartialEq)]
-#[educe(Hash, Ord, PartialOrd)]
-pub struct DepEventRaw<OwnerType: DepType, ArgsType> {
-    index: usize,
-    phantom: (PhantomData<OwnerType>, PhantomData<ArgsType>),
-}
-
-unsafe impl<OwnerType: DepType, ArgsType> Send for DepEventRaw<OwnerType, ArgsType> { }
-unsafe impl<OwnerType: DepType, ArgsType> Sync for DepEventRaw<OwnerType, ArgsType> { }
-impl<OwnerType: DepType, ArgsType> Unpin for DepEventRaw<OwnerType, ArgsType> { }
-
-impl<OwnerType: DepType, ArgsType> DepEventRaw<OwnerType, ArgsType> {
-    pub fn owned_by<Owner: DepObj<Type=OwnerType>>(self) -> DepEvent<Owner, ArgsType> {
-        DepEvent(self, PhantomData)
-    }
-}
-
-#[derive(Educe)]
-#[educe(Debug, Copy, Clone, Eq, PartialEq)]
-#[educe(Hash, Ord, PartialOrd)]
-pub struct DepEvent<Owner: DepObj, ArgsType>(
-    DepEventRaw<Owner::Type, ArgsType>,
-    PhantomData<Owner>,
-);
-
-unsafe impl<Owner: DepObj, ArgsType> Send for DepEvent<Owner, ArgsType> { }
-unsafe impl<Owner: DepObj, ArgsType> Sync for DepEvent<Owner, ArgsType> { }
-impl<Owner: DepObj, ArgsType> Unpin for DepEvent<Owner, ArgsType> { }
-
-impl<Owner: DepObj, ArgsType> DepEvent<Owner, ArgsType> {
-    pub fn on_raised(
-        self,
-        obj: &mut Owner,
-        callback: fn(context: &mut dyn Context, owner_id: Owner::Id, args: &mut ArgsType)
-    ) {
-        let callback = unsafe { transmute(callback) };
-        let on_raised = unsafe { obj.core_mut().events.get_unchecked_mut(self.0.index) };
-        on_raised.push(callback);
+    pub fn get(self, owner: &Owner) -> &PropType {
+        let entry = self.entry(owner);
+        entry.local.as_ref().or_else(|| entry.style.as_ref()).unwrap_or(entry.default)
     }
 
-    pub fn raise(
-        self,
-        obj: &Owner,
-    ) -> OnRaised<Owner::Id, ArgsType> {
-        let on_raised = unsafe { obj.core().events.get_unchecked(self.0.index) };
-        OnRaised(on_raised.clone(), (PhantomData, PhantomData))
-    }
-}
-
-pub struct OnChanged<OwnerId: ComponentId, PropType>(
-    Vec<usize>,
-    (PhantomData<OwnerId>, PhantomData<PropType>),
-);
-
-impl<OwnerId: ComponentId, PropType> OnChanged<OwnerId, PropType> {
-    pub fn raise(self, context: &mut dyn Context, owner_id: OwnerId, old: &PropType) {
-        for on_changed in self.0 {
-            let on_changed: fn(context: &mut dyn Context, owner_id: OwnerId, old: &PropType) =
-                unsafe { transmute(on_changed) };
-            on_changed(context, owner_id, old);
-        }
-    }
-}
-
-#[derive(Educe)]
-#[educe(Debug, Copy, Clone, Eq, PartialEq)]
-#[educe(Hash, Ord, PartialOrd)]
-pub struct DepPropRaw<OwnerType: DepType, PropType> {
-    offset: isize,
-    phantom: (PhantomData<OwnerType>, PhantomData<PropType>),
-}
-
-unsafe impl<OwnerType: DepType, PropType> Send for DepPropRaw<OwnerType, PropType> { }
-unsafe impl<OwnerType: DepType, PropType> Sync for DepPropRaw<OwnerType, PropType> { }
-impl<OwnerType: DepType, PropType> Unpin for DepPropRaw<OwnerType, PropType> { }
-
-impl<OwnerType: DepType, PropType> DepPropRaw<OwnerType, PropType> {
-    pub fn owned_by<Owner: DepObj<Type=OwnerType>>(self) -> DepProp<Owner, PropType> {
-        DepProp(self, PhantomData)
-    }
-
-    fn get_entry<OwnerId: ComponentId>(
-        self,
-        obj_props: &DepObjCore<OwnerType, OwnerId>
-    ) -> &Entry<PropType> {
-        unsafe { &*(obj_props.props.offset(self.offset) as *const Entry<PropType>) }
-    }
-
-    fn get_entry_mut<OwnerId: ComponentId>(
-        self,
-        obj_props: &mut DepObjCore<OwnerType, OwnerId>
-    ) -> &mut Entry<PropType> {
-        unsafe { &mut *(obj_props.props.offset(self.offset) as *mut Entry<PropType>) }
-    }
-}
-
-#[derive(Educe)]
-#[educe(Debug, Copy, Clone, Eq, PartialEq)]
-#[educe(Hash, Ord, PartialOrd)]
-pub struct DepProp<Owner: DepObj, PropType>(
-    DepPropRaw<Owner::Type, PropType>,
-    PhantomData<Owner>,
-);
-
-unsafe impl<Owner: DepObj, PropType> Send for DepProp<Owner, PropType> { }
-unsafe impl<Owner: DepObj, PropType> Sync for DepProp<Owner, PropType> { }
-impl<Owner: DepObj, PropType> Unpin for DepProp<Owner, PropType> { }
-
-impl<Owner: DepObj, PropType: Eq> DepProp<Owner, PropType> {
-    pub fn set_distinct(
-        self,
-        obj: &mut Owner,
-        value: PropType
-    ) -> (PropType, OnChanged<Owner::Id, PropType>) {
-        let entry = self.0.get_entry_mut(obj.core_mut());
-        let old = replace(&mut entry.value, value);
-        let on_changed = if old == entry.value { Vec::new() } else { entry.on_changed.clone() };
-        (old, OnChanged(on_changed, (PhantomData, PhantomData)))
-    }
-}
-
-impl<Owner: DepObj, PropType> DepProp<Owner, PropType> {
     pub fn set_uncond(
         self,
-        obj: &mut Owner,
-        value: PropType
-    ) -> (PropType, OnChanged<Owner::Id, PropType>) {
-        let entry = self.0.get_entry_mut(obj.core_mut());
-        let old = replace(&mut entry.value, value);
-        (old, OnChanged(entry.on_changed.clone(), (PhantomData, PhantomData)))
-    }
-
-    pub fn get(
-        self,
-        obj: &Owner
-    ) -> &PropType {
-        &self.0.get_entry(obj.core()).value
-    }
-
-    pub fn on_changed(
-        self,
-        obj: &mut Owner,
-        callback: fn(context: &mut dyn Context, owner_id: Owner::Id, old: &PropType)
-    ) {
-        let callback = unsafe { transmute(callback) };
-        let entry = self.0.get_entry_mut(obj.core_mut());
-        entry.on_changed.push(callback);
-    }
-}
-
-#[derive(Educe)]
-#[educe(Debug)]
-pub struct DepObjCore<OwnerType: DepType, OwnerId: ComponentId> {
-    layout: Layout,
-    props: *mut u8,
-    drop: Vec<(isize, unsafe fn(*mut u8))>,
-    events: Vec<Vec<usize>>,
-    phantom: (PhantomData<OwnerType>, PhantomData<OwnerId>)
-}
-
-unsafe impl<OwnerType: DepType, OwnerId: ComponentId> Send for DepObjCore<OwnerType, OwnerId> { }
-unsafe impl<OwnerType: DepType, OwnerId: ComponentId> Sync for DepObjCore<OwnerType, OwnerId> { }
-impl<OwnerType: DepType, OwnerId: ComponentId> Unpin for DepObjCore<OwnerType, OwnerId> { }
-
-impl<OwnerType: DepType, OwnerId: ComponentId> DepObjCore<OwnerType, OwnerId> {
-    pub fn new(ty_token: &DepTypeToken<OwnerType>) -> DepObjCore<OwnerType, OwnerId> {
-        let props = if ty_token.layout.size() == 0 {
-            null_mut()
-        } else {
-            NonNull::new(unsafe { alloc(ty_token.layout) }).expect("out of memory").as_ptr()
-        };
-        for &(offset, store, fn_ptr) in &ty_token.default {
-            unsafe { store(fn_ptr, props.offset(offset)) };
-        }
-        DepObjCore {
-            layout: ty_token.layout,
-            props,
-            drop: ty_token.drop.clone(),
-            events: vec![Vec::new(); ty_token.events],
-            phantom: (PhantomData, PhantomData)
-        }
-    }
-}
-
-impl<OwnerType: DepType, OwnerId: ComponentId> Drop for DepObjCore<OwnerType, OwnerId> {
-    fn drop(&mut self) {
-        if !self.props.is_null() {
-            for &(offset, drop_entry) in &self.drop {
-                unsafe { drop_entry(self.props.offset(offset)) };
-            }
-            unsafe { dealloc(self.props, self.layout) };
-            self.props = null_mut();
-        }
-    }
-}
-
-#[derive(Educe)]
-#[educe(Debug(bound="PropType: Debug"), Clone)]
-pub struct Setter<Owner: DepObj, PropType: Clone> {
-    pub prop: DepProp<Owner, PropType>,
-    pub value: PropType,
-    #[educe(Debug(ignore))]
-    pub system_set: fn(
-        id: Owner::Id,
-        context: &mut dyn Context,
-        prop: DepProp<Owner, PropType>,
-        value: PropType
-    ) -> PropType,
-}
-
-pub trait AnySetter<OwnerId: ComponentId>: DynClone {
-    fn apply(&self, context: &mut dyn Context, id: OwnerId);
-}
-
-clone_trait_object!(<OwnerId: ComponentId> AnySetter<OwnerId>);
-
-impl<Owner: DepObj, PropType: Clone> AnySetter<Owner::Id> for Setter<Owner, PropType> {
-    fn apply(&self, context: &mut dyn Context, id: Owner::Id) {
-        (self.system_set)(id, context, self.prop, self.value.clone());
-    }
-}
-
-#[derive(Clone)]
-pub struct Style<OwnerId: ComponentId> {
-    pub setters: Vec<Box<dyn AnySetter<OwnerId>>>,
-}
-
-impl<OwnerId: ComponentId> Style<OwnerId> {
-    pub fn apply(&self, context: &mut dyn Context, id: OwnerId) {
-        for setter in &self.setters {
-            setter.apply(context, id);
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct Template<OwnerId: ComponentId> {
-    pub ctor: fn(context: &mut dyn Context, id: OwnerId),
-    pub style: Style<OwnerId>,
-}
-
-impl<OwnerId: ComponentId> Template<OwnerId> {
-    pub fn apply(&self, context: &mut dyn Context, id: OwnerId) {
-        (self.ctor)(context, id);
-        self.style.apply(context, id);
+        owner: &mut Owner,
+        value: Option<PropType>
+    ) -> (Option<PropType>, DepPropOnChanged<Owner::Id, PropType>) {
+        let entry_mut = self.entry_mut(owner);
+        let old = replace(&mut entry_mut.local, value);
+        let on_changed = DepPropOnChanged { callbacks: entry_mut.on_changed.clone() };
+        (old, on_changed)
     }
 }
 
 #[macro_export]
-macro_rules! DepType {
-    (
-        ()
-        $vis:vis enum $name:ident $($body:tt)*
-    ) => {
-        DepType! {
-            @impl [$name]
-        }
-    };
-    (
-        ()
-        $vis:vis struct $name:ident $($body:tt)*
-    ) => {
-        DepType! {
-            @impl [$name]
-        }
-    };
-    (
-        @impl [$name:ident]
-    ) => {
-        unsafe impl $crate::DepType for $name {
-            fn lock() -> &'static $crate::DepTypeLock {
-                static LOCK: $crate::DepTypeLock = $crate::DepTypeLock::new();
-                &LOCK
-            }
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! dep_obj {
+macro_rules! dep_type {
     (
         $(#[$attr:meta])* $vis:vis struct $name:ident $($body:tt)*
     ) => {
         $crate::generics_parse! {
-            $crate::dep_obj {
-                @struct [$(#[$attr])*] [$vis] [$name]
+            $crate::dep_type {
+                @parsed_generics
+                $(#[$attr])* $vis struct $name
             }
             $($body)*
         }
     };
     (
-        @struct [$(#[$attr:meta])*] [$vis:vis] [$name:ident]
+        @parsed_generics
+        $(#[$attr:meta])* $vis:vis struct $name:ident
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
-        become $system:ident in $Id:ty
-        { $($body:tt)* }
+        become $obj:ident in $Id:ty
+        {
+            $($($field:ident $delim:tt $field_ty:ty $(= $field_val:expr)?),+ $(,)?)?
+        }
     ) => {
-        $crate::dep_obj! {
-            @core [$(#[$attr])*] [$vis] [$name]
+        $crate::dep_type! {
+            @unroll_fields
+            [$([$attr])*] [$vis] [$name] [$obj] [$Id]
             [$($g)*] [$($r)*] [$($w)*]
-            [$system] [$Id] [$($body)*]
+            [] [] []
+            [$($([$field $delim $field_ty $(= $field_val)?])+)?]
         }
     };
     (
-        @struct [$(#[$attr:meta])*] [$vis:vis] [$name:ident]
-        [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
-        become $system:ident in $Id:ty
-        { $($body:tt)* }
-
-        use $($core:tt)*
-    ) => {
-        $crate::generics_parse! {
-            $crate::dep_obj {
-                @core [$(#[$attr])*] [$vis] [$name]
-                [$($g)*] [$($r)*] [$($w)*]
-                [$system] [$Id] [$($body)*]
-            }
-            $($core)*
-        }
-    };
-    (
-        @struct [$(#[$attr:meta])*] [$vis:vis] [$name:ident]
+        @parsed_generics
+        $(#[$attr:meta])* $vis:vis struct $name:ident
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         $($body:tt)*
     ) => {
-        $crate::std_compile_error!("\
-            invalid dependency object, allowed form iѕ '
-            $(#[$attr])* $vis struct $name $(<...>)? become $system in $Id $(where ...)? {
-                ...
-            }
-
-            $(use $(<...>)? $BuilderCore as BuilderCore $(where ...);)?
-            '\
-        ");
     };
     (
-        @core [$(#[$attr:meta])*] [$vis:vis] [$name:ident]
+        @unroll_fields
+        [$([$attr:meta])*] [$vis:vis] [$name:ident] [$obj:ident] [$Id:ty]
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
-        [$system:ident] [$Id:ty]
-        [
-            $($(
-               $(#[$no_clone:ident])? $field:ident $field_delim:tt $field_ty:ty $(= $field_val:expr)?
-            ),+ $(,)?)?
-        ]
-        $(
-            [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*] $BuilderCore:ty as BuilderCore;
-        )?
+        [$($core_fields:tt)*]
+        [$($core_new:tt)*]
+        [$($dep_props:tt)*]
+        [[$field:ident : $field_ty:ty = $field_val:expr] $($fields:tt)*]
     ) => {
-        $crate::dep_obj! {
-            @impl
-            [builder]
-            [$(#[$attr])*] [$vis] [$name] [$system] [$Id]
+        $crate::dep_type! {
+            @unroll_fields
+            [$([$attr])*] [$vis] [$name] [$obj] [$Id]
             [$($g)*] [$($r)*] [$($w)*]
-            [$(
-                [$BuilderCore]
-                [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]
-                []
-            )?]
-            [] [] [] [] []
-            [$($($(#[$no_clone])? $field $field_delim $field_ty $(= $field_val)?),+)?]
+            [
+                $($core_fields)*
+                $field: $crate::DepObjEntry<$Id, $field_ty>,
+            ]
+            [
+                $($core_new)*
+                $field: $crate::DepObjEntry::new(&Self:: [< $field:upper _DEFAULT >] ),
+            ]
+            [
+                $($dep_props)*
+
+                const [< $field:upper _DEFAULT >] : $field_ty = $field_val;
+
+                $vis const [< $field:upper >] : $crate::DepProp<Self, $field_ty> = {
+                    let offset = &raw const (0usize as *const [< $name Core >] $($r)*).$field as usize;
+                    unsafe { $crate::DepProp::new(offset) }
+                };
+            ]
+            [$($fields)*]
         }
     };
     (
-        @core [$(#[$attr:meta])*] [$vis:vis] [$name:ident]
+        @unroll_fields
+        [$([$attr:meta])*] [$vis:vis] [$name:ident] [$obj:ident] [$Id:ty]
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
-        [$system:ident] [$Id:ty]
-        [
-            $($body:tt)*
-        ]
-        $(
-            [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*] $BuilderCore:ty as BuilderCore;
-        )?
+        [$($core_fields:tt)*]
+        [$($core_new:tt)*]
+        [$($dep_props:tt)*]
+        [[$field:ident $delim:tt $field_ty:ty $(= $field_val:expr)?] $($fields:tt)*]
     ) => {
-        $crate::std_compile_error!("\
-            invalid dependency object field, \
-            allowed forms are '$(#[move])? $field: $type = $value', and '$event yield $args'; \
-            fields should be comma-separated\
-        ");
     };
     (
-        @impl 
-        [$builder:ident]
-        [$(#[$attr:meta])*] [$vis:vis] [$name:ident] [$system:ident] [$Id:ty]
+        @unroll_fields
+        [$([$attr:meta])*] [$vis:vis] [$name:ident] [$obj:ident] [$Id:ty]
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
-        [$(
-            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
-            [$($builder_methods:tt)*]
-        )?]
-        [$($type_fields:tt)*]
-        [$($type_methods:tt)*]
-        [$($type_init:tt)*]
-        [$($type_bundle:tt)*]
-        [$($style_builder_methods:tt)*]
-        [#[move] $field:ident : $field_ty:ty = $field_val:expr $(, $($other_fields:tt)+)?]
-    ) => {
-        $crate::dep_obj! {
-            @impl 
-            [$builder]
-            [$(#[$attr])*] [$vis] [$name] [$system] [$Id]
-            [$($g)*] [$($r)*] [$($w)*]
-            [$(
-                [$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]
-                [
-                    $($builder_methods)*
-
-                    $vis fn $field(&mut self, val : $field_ty) -> &mut Self {
-                        let id = self.id;
-                        let context = self.core.context();
-                        let ty = unsafe { &*self.ty };
-                        id . [< $system _set_uncond >] (context, ty.$field(), val);
-                        self
-                    }
-
-                    $vis fn [< on_ $field _changed >] (
-                        &mut self,
-                        callback : fn(context: &mut dyn $crate::dyn_context_Context, owner: $Id, old: &$field_ty)
-                    ) -> &mut Self {
-                        let id = self.id;
-                        let context = self.core.context();
-                        let ty = unsafe { &*self.ty };
-                        let arena = $crate::dyn_context_ContextExt::get_mut(context);
-                        id . [< $system _on_changed >] (arena, ty.$field(), callback);
-                        self
-                    }
-                ]
-            )?]
-            [
-                $($type_fields)*
-                $field : $crate::DepPropRaw< [< $name Type >] , $field_ty>,
-            ]
-            [
-                $($type_methods)*
-                $vis fn $field $($g)* (&self) -> $crate::DepProp<$name $($r)*, $field_ty> $($w)* {
-                    self.$field.owned_by() 
-                }
-            ]
-            [
-                $($type_init)*
-                let $field = $builder.prop(|| $field_val);
-            ]
-            [
-                $($type_bundle)*
-                $field,
-            ]
-            [
-                $($style_builder_methods)*
-            ]
-            [$($($other_fields)+)?]
-        }
-    };
-    (
-        @impl 
-        [$builder:ident]
-        [$(#[$attr:meta])*] [$vis:vis] [$name:ident] [$system:ident] [$Id:ty]
-        [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
-        [$(
-            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
-            [$($builder_methods:tt)*]
-        )?]
-        [$($type_fields:tt)*]
-        [$($type_methods:tt)*]
-        [$($type_init:tt)*]
-        [$($type_bundle:tt)*]
-        [$($style_builder_methods:tt)*]
-        [$field:ident : $field_ty:ty = $field_val:expr $(, $($other_fields:tt)+)?]
-    ) => {
-        $crate::dep_obj! {
-            @impl 
-            [$builder]
-            [$(#[$attr])*] [$vis] [$name] [$system] [$Id]
-            [$($g)*] [$($r)*] [$($w)*]
-            [$(
-                [$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]
-                [
-                    $($builder_methods)*
-
-                    $vis fn $field(&mut self, val : $field_ty) -> &mut Self {
-                        let id = self.id;
-                        let context = self.core.context();
-                        let ty = unsafe { &*self.ty };
-                        id . [< $system _set_uncond >] (context, ty.$field(), val);
-                        self
-                    }
-
-                    $vis fn [< on_ $field _changed >] (
-                        &mut self,
-                        callback : fn(context: &mut dyn $crate::dyn_context_Context, owner: $Id, old: &$field_ty)
-                    ) -> &mut Self {
-                        let id = self.id;
-                        let context = self.core.context();
-                        let ty = unsafe { &*self.ty };
-                        let arena = $crate::dyn_context_ContextExt::get_mut(context);
-                        id . [< $system _on_changed >] (arena, ty.$field(), callback);
-                        self
-                    }
-                ]
-            )?]
-            [
-                $($type_fields)*
-                $field : $crate::DepPropRaw< [< $name Type >] , $field_ty>,
-            ]
-            [
-                $($type_methods)*
-                $vis fn $field $($g)* (&self) -> $crate::DepProp<$name $($r)*, $field_ty> $($w)* {
-                    self.$field.owned_by() 
-                }
-            ]
-            [
-                $($type_init)*
-                let $field = $builder.prop(|| $field_val);
-            ]
-            [
-                $($type_bundle)*
-                $field,
-            ]
-            [
-                $($style_builder_methods)*
-                $vis fn $field(&mut self, value: $field_ty) -> &mut Self {
-                    self.style.setters.push($crate::std_boxed_Box::new($crate::Setter {
-                        system_set: $Id :: [< $system _set_uncond >] ,
-                        prop: self.ty.$field(),
-                        value
-                    }));
-                    self
-                }
-            ]
-            [$($($other_fields)+)?]
-        }
-    };
-    (
-        @impl 
-        [$builder:ident]
-        [$(#[$attr:meta])*] [$vis:vis] [$name:ident] [$system:ident] [$Id:ty]
-        [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
-        [$(
-            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
-            [$($builder_methods:tt)*]
-        )?]
-        [$($type_fields:tt)*]
-        [$($type_methods:tt)*]
-        [$($type_init:tt)*]
-        [$($type_bundle:tt)*]
-        [$($style_builder_methods:tt)*]
-        [$field:ident yield $field_ty:ty $(, $($other_fields:tt)+)?]
-    ) => {
-        $crate::dep_obj! {
-            @impl 
-            [$builder]
-            [$(#[$attr])*] [$vis] [$name] [$system] [$Id]
-            [$($g)*] [$($r)*] [$($w)*]
-            [$(
-                [$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]
-                [
-                    $($builder_methods)*
-
-                    $vis fn [< on_ $field >] (
-                        &mut self,
-                        callback : fn(context: &mut dyn $crate::dyn_context_Context, owner: $Id, args: &mut $field_ty)
-                    ) -> &mut Self {
-                        let id = self.id;
-                        let context = self.core.context();
-                        let ty = unsafe { &*self.ty };
-                        let arena = $crate::dyn_context_ContextExt::get_mut(context);
-                        id . [< $system _on >] (arena, ty.$field(), callback);
-                        self
-                    }
-                ]
-            )?]
-            [
-                $($type_fields)*
-                $field : $crate::DepEventRaw< [< $name Type >] , $field_ty>,
-            ]
-            [
-                $($type_methods)*
-                $vis fn $field $($g)* (&self) -> $crate::DepEvent<$name $($r)*, $field_ty> $($w)* {
-                    self.$field.owned_by()
-                }
-            ]
-            [
-                $($type_init)*
-                let $field = $builder.event();
-            ]
-            [
-                $($type_bundle)*
-                $field,
-            ]
-            [
-                $($style_builder_methods)*
-            ]
-            [$($($other_fields)+)?]
-        }
-    };
-    (
-        @impl 
-        [$builder:ident]
-        [$(#[$attr:meta])*] [$vis:vis] [$name:ident] [$system:ident] [$Id:ty]
-        [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
-        [$(
-            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
-            [$($builder_methods:tt)*]
-        )?]
-        [$($type_fields:tt)*]
-        [$($type_methods:tt)*]
-        [$($type_init:tt)*]
-        [$($type_bundle:tt)*]
-        [$($style_builder_methods:tt)*]
-        [$(#[$no_clone:ident])? $field:ident $field_delim:tt $field_ty:ty $(= $field_val:expr)? $(, $($other_fields:tt)+)?]
-    ) => {
-        $crate::std_compile_error!($crate::std_concat!(
-            "invalid dependency object field '",
-            $crate::std_stringify!($(#[$no_clone:ident])? $field $field_delim $field_ty $(= $field_val)?),
-            "', allowed forms are '$(#[move])? $field: $type = $value', and '$event yield $args'",
-        ));
-    };
-    (
-        @impl 
-        [$builder:ident]
-        [$(#[$attr:meta])*] [$vis:vis] [$name:ident] [$system:ident] [$Id:ty]
-        [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
-        [$(
-            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
-            [$($builder_methods:tt)*]
-        )?]
-        [$($type_fields:tt)*]
-        [$($type_methods:tt)*]
-        [$($type_init:tt)*]
-        [$($type_bundle:tt)*]
-        [$($style_builder_methods:tt)*]
+        [$($core_fields:tt)*]
+        [$($core_new:tt)*]
+        [$($dep_props:tt)*]
         []
     ) => {
         $crate::paste_paste! {
-            $(
-                $vis struct [< $name Builder >] $($bc_g)* $($bc_w)* {
-                    core: $BuilderCore,
-                    id: $Id,
-                    ty: *const [< $name Type >],
-                }
-
-                impl $($bc_g)* [< $name Builder >] $($bc_r)* $($bc_w)* {
-                    $($builder_methods)*
-
-                    fn build_priv(
-                        core: $BuilderCore,
-                        id: $Id,
-                        ty: & [< $name Type >] ,
-                        f: impl $crate::std_ops_FnOnce(&mut Self) -> &mut Self
-                    ) {
-                        let mut builder = Self {
-                            core,
-                            id,
-                            ty: ty as *const _,
-                        };
-                        f(&mut builder);
-                    }
-
-                    fn core_priv(&self) -> &$BuilderCore { &self.core }
-
-                    fn core_priv_mut(&mut self) -> &mut $BuilderCore { &mut self.core }
-                }
-            )?
-
-            $vis struct [< $name Type >] {
-                $($type_fields)*
+            #[derive($crate::std_fmt_Debug)]
+            struct [< $name Core >] $($g)* $($w)* {
+                $($core_fields)*
             }
 
-            unsafe impl $crate::DepType for [< $name Type >] {
-                fn lock() -> &'static $crate::DepTypeLock {
-                    static LOCK: $crate::DepTypeLock = $crate::DepTypeLock::new();
-                    &LOCK
+            impl $($g)* [< $name Core >] $($r)* $($w)* {
+                const fn new() -> Self {
+                    Self {
+                        $($core_new)*
+                    }
                 }
             }
 
-            impl [< $name Type >] {
-                $($type_methods)*
-
-                fn new_priv() -> $crate::std_option_Option<$crate::DepTypeToken<Self>> {
-                    $crate::DepTypeBuilder::new().map(|mut $builder| {
-                        $($type_init)*
-                        $builder.build(Self {
-                            $($type_bundle)*
-                        })
-                    })
-                }
-
-                $vis fn style<'a>(&'a self) -> [< $name StyleBuilder >] <'a> {
-                    [< $name StyleBuilder >] {
-                        ty: self,
-                        style: $crate::Style { setters: $crate::std_vec_Vec::new() }
-                    }
-                }
-
+            impl $($g)* $crate::std_default_Default for [< $name Core >] $($r)* $($w)* {
+                fn default() -> Self { Self::new() }
             }
 
             $(#[$attr])*
             $vis struct $name $($g)* $($w)* {
-                core: $crate::DepObjCore< [< $name Type  >] , $Id>,
-            }
-
-            impl $($g)* $crate::DepObj for $name $($r)* $($w)* {
-                type Type = [< $name Type >] ;
-                type Id = $Id;
-                fn core(&self) -> &$crate::DepObjCore<Self::Type, Self::Id> { &self.core }
-                fn core_mut(&mut self) -> &mut $crate::DepObjCore<Self::Type, Self::Id> { &mut self.core }
+                core: [< $name Core >] $($r)*
             }
 
             impl $($g)* $name $($r)* $($w)* {
-                fn new_priv(token: &$crate::DepTypeToken< [< $name Type >] >) -> Self {
-                    Self { core: $crate::DepObjCore::new(token) }
-                }
-            }
-
-            $vis struct [< $name StyleBuilder >] <'a> {
-                ty: &'a [< $name Type >] ,
-                style: $crate::Style<$Id>,
-            }
-
-            impl<'a> [< $name StyleBuilder >] <'a> {
-                pub fn build(&mut self) -> $crate::Style<$Id> {
-                    $crate::std_mem_replace(&mut self.style, $crate::Style { setters: $crate::std_vec_Vec::new() })
+                const fn new_priv() -> Self {
+                    Self { core: [< $name Core >] ::new() }
                 }
 
-                $($style_builder_methods)*
+                $($dep_props)*
+            }
+
+            impl $($g)* $crate::DepObj for $name $($r)* $($w)* {
+                type Id = $Id;
             }
         }
     };
 }
 
-#[macro_export]
-macro_rules! dep_system {
+macro_rules! dep_obj {
     (
-        $vis:vis fn $name:ident (self as $this:ident, $arena:ident : $Arena:ty) -> $System:ty {
-            if mut { $field_mut:expr } else { $field:expr }
-        }
     ) => {
-        $crate::paste_paste! {
-            $vis fn [< $name _get >] <DepSystemValueType>(
-                self,
-                $arena: &$Arena,
-                prop: $crate::DepProp<$System, DepSystemValueType>
-            ) -> &DepSystemValueType {
-                let $this = self;
-                let system = $field;
-                prop.get(system)
-            }
-
-            $vis fn [< $name _set_uncond >] <DepSystemValueType>(
-                self,
-                context: &mut dyn $crate::dyn_context_Context,
-                prop: $crate::DepProp<$System, DepSystemValueType>,
-                value: DepSystemValueType,
-            ) -> DepSystemValueType {
-                let $this = self;
-                let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
-                let system = $field_mut;
-                let (old, on_changed) = prop.set_uncond(system, value);
-                on_changed.raise(context, self, &old);
-                old
-            }
-
-            $vis fn [< $name _set_distinct >] <DepSystemValueType: $crate::std_cmp_Eq>(
-                self,
-                context: &mut dyn $crate::dyn_context_Context,
-                prop: $crate::DepProp<$System, DepSystemValueType>,
-                value: DepSystemValueType,
-            ) -> DepSystemValueType {
-                let $this = self;
-                let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
-                let system = $field_mut;
-                let (old, on_changed) = prop.set_distinct(system, value);
-                on_changed.raise(context, self, &old);
-                old
-            }
-
-            $vis fn [< $name _on_changed >] <DepSystemValueType>(
-                self,
-                $arena: &mut $Arena,
-                prop: $crate::DepProp<$System, DepSystemValueType>,
-                on_changed: fn(context: &mut dyn $crate::dyn_context_Context, owner: Self, old: &DepSystemValueType),
-            ) {
-                let $this = self;
-                let system = $field_mut;
-                prop.on_changed(system, on_changed);
-            }
-
-            $vis fn [< $name _raise >] <DepSystemArgsType>(
-                self,
-                context: &mut dyn $crate::dyn_context_Context,
-                event: $crate::DepEvent<$System, DepSystemArgsType>,
-                args: &mut DepSystemArgsType,
-            ) {
-                let $this = self;
-                let $arena = $crate::dyn_context_ContextExt::get::<$Arena>(context);
-                let system = $field;
-                let on_raised = event.raise(system);
-                on_raised.raise(context, self, args);
-            }
-
-            $vis fn [< $name _on >] <DepSystemArgsType>(
-                self,
-                $arena: &mut $Arena,
-                event: $crate::DepEvent<$System, DepSystemArgsType>,
-                on_raised: fn(context: &mut dyn $crate::dyn_context_Context, owner: Self, args: &mut DepSystemArgsType),
-            ) {
-                let $this = self;
-                let system = $field_mut;
-                event.on_raised(system, on_raised);
-            }
-        }
     };
-    (
-        $vis:vis dyn fn $name:ident (self as $this:ident, $arena:ident : $Arena:ty) -> $System:tt {
-            if mut { $field_mut:expr } else { $field:expr }
+}
+
+#[cfg(test)]
+mod test {
+    use alloc::boxed::Box;
+    use components_arena::{Arena, Id, ComponentId, Component, ComponentClassToken};
+    use educe::Educe;
+    use macro_attr_2018::macro_attr;
+
+    macro_attr! {
+        #[derive(Debug, Component!)]
+        struct TestNode {
+            obj1: Option<Box<TestObj1>>,
         }
-    ) => {
-        $crate::paste_paste! {
-            $vis fn [< $name _get >] <DepSystemType: $System + $crate::DepObj<Id=Self>, DepSystemValueType>(
-                self,
-                $arena: &$Arena,
-                prop: $crate::DepProp<DepSystemType, DepSystemValueType>
-            ) -> &DepSystemValueType {
-                let $this = self;
-                let system = $field.downcast_ref::<DepSystemType>().expect("invalid cast");
-                prop.get(system)
-            }
+    }
 
-            $vis fn [< $name _set_uncond >] <DepSystemType: $System + $crate::DepObj<Id=Self>, DepSystemValueType>(
-                self,
-                context: &mut dyn $crate::dyn_context_Context,
-                prop: $crate::DepProp<DepSystemType, DepSystemValueType>,
-                value: DepSystemValueType,
-            ) -> DepSystemValueType {
-                let $this = self;
-                let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
-                let system = $field_mut.downcast_mut::<DepSystemType>().expect("invalid cast");
-                let (old, on_changed) = prop.set_uncond(system, value);
-                on_changed.raise(context, self, &old);
-                old
-            }
+    macro_attr! {
+        #[derive(Educe, ComponentId!)]
+        #[educe(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+        struct TestId(Id<TestNode>);
+    }
 
-            $vis fn [< $name _set_distinct >] <
-                DepSystemType: $System + $crate::DepObj<Id=Self>, DepSystemValueType: $crate::std_cmp_Eq
-            >(
-                self,
-                context: &mut dyn $crate::dyn_context_Context,
-                prop: $crate::DepProp<DepSystemType, DepSystemValueType>,
-                value: DepSystemValueType,
-            ) -> DepSystemValueType {
-                let $this = self;
-                let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
-                let system = $field_mut.downcast_mut::<DepSystemType>().expect("invalid cast");
-                let (old, on_changed) = prop.set_distinct(system, value);
-                on_changed.raise(context, self, &old);
-                old
-            }
-
-            $vis fn [< $name _on_changed >] <DepSystemType: $System + $crate::DepObj<Id=Self>, DepSystemValueType>(
-                self,
-                $arena: &mut $Arena,
-                prop: $crate::DepProp<DepSystemType, DepSystemValueType>,
-                on_changed: fn(context: &mut dyn $crate::dyn_context_Context, owner: Self, old: &DepSystemValueType),
-            ) {
-                let $this = self;
-                let system = $field_mut.downcast_mut::<DepSystemType>().expect("invalid cast");
-                prop.on_changed(system, on_changed);
-            }
-
-            $vis fn [< $name _raise >] <DepSystemType: $System + $crate::DepObj<Id=Self>, DepSystemArgsType>(
-                self,
-                context: &mut dyn $crate::dyn_context_Context,
-                event: $crate::DepEvent<DepSystemType, DepSystemArgsType>,
-                args: &mut DepSystemArgsType,
-            ) {
-                let $this = self;
-                let $arena = $crate::dyn_context_ContextExt::get::<$Arena>(context);
-                let system = $field.downcast_ref::<DepSystemType>().expect("invalid cast");
-                let on_raised = event.raise(system);
-                on_raised.raise(context, self, args);
-            }
-
-            $vis fn [< $name _on >] <DepSystemType: $System + $crate::DepObj<Id=Self>, DepSystemArgsType>(
-                self,
-                $arena: &mut $Arena,
-                event: $crate::DepEvent<DepSystemType, DepSystemArgsType>,
-                on_raised: fn(context: &mut dyn $crate::dyn_context_Context, owner: Self, args: &mut DepSystemArgsType),
-            ) {
-                let $this = self;
-                let system = $field_mut.downcast_mut::<DepSystemType>().expect("invalid cast");
-                event.on_raised(system, on_raised);
-            }
+    dep_type! {
+        #[derive(Debug)]
+        struct TestObj1 become obj1 in TestId {
         }
-    };
+    }
+
+    impl TestObj1 {
+        pub fn new(arena: &mut Arena<TestNode>, id: TestId) {
+            arena[id.0].obj1 = Some(Box::new(TestObj1::new_priv()));
+        }
+    }
+
+    #[test]
+    fn create_test_obj_1() {
+        let mut test_node_token = ComponentClassToken::new().unwrap();
+        let mut arena = Arena::new(&mut test_node_token);
+        let id = arena.insert(|id| (TestNode { obj1: None }, TestId(id)));
+        TestObj1::new(&mut arena, id);
+    }
 }
