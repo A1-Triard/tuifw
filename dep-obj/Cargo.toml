@@ -18,10 +18,11 @@ rustdoc-args = ["--cfg", "docsrs"]
 [dependencies]
 educe = "0.4.13"
 components-arena = { version = "1.0.1", default-features = false }
-dyn-context = { version = "0.2.0", default-features = false }
+dyn-context = { version = "0.3.0", default-features = false }
 paste = "1.0.0"
 dyn-clone = "1.0.2"
 generics = "0.1.2"
+memoffset = { version = "0.5.5", features = ["unstable_const", "unstable_raw"] }
 
 [dev-dependencies]
 macro-attr-2018 = "1.0.0"
