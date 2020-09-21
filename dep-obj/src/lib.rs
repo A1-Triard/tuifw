@@ -138,6 +138,31 @@ impl<Owner: DepObj, PropType: DepPropType> DepProp<Owner, PropType> {
     }
 }
 
+pub struct Setter<Owner: DepObj, PropType: DepPropType> {
+    obj_set_uncond: fn(
+        id: OwnerId,
+        context: &mut dyn Context,
+        prop: DepProp<Owner, PropType>,
+        value: PropType
+    ) -> PropType,
+    prop: DepProp<Owner, PropType>,
+    value: PropType,
+}
+
+pub trait AnySetter<OwnerId: ComponentId> {
+    fn apply(&self, context: &mut dyn Context, id: OwnerId);
+}
+
+impl<Owner: DepObj, PropType: DepPropType> AnySetter<Owner::Id> for Setter<Owner, PropType> {
+    fn apply(&self, context: &mut dyn Context, id: OwnerId) {
+        (self.obj_set_uncond)(id, context, self.prop, self.value.clone());
+    }
+}
+
+pub struct Style<OwnerId: ComponentId> {
+    setters: Vec<Box<dyn AnySetter<OwnerId>>,
+}
+
 #[macro_export]
 macro_rules! dep_type {
     (
