@@ -17,12 +17,12 @@ use alloc::boxed::Box;
 use alloc::collections::TryReserveError;
 use alloc::vec::Vec;
 use core::fmt::Debug;
-use core::marker::PhantomData;
 use core::mem::replace;
 use components_arena::ComponentId;
 use dyn_clone::{DynClone, clone_trait_object};
 use dyn_context::Context;
 use educe::Educe;
+use phantom_type::PhantomType;
 
 #[doc(hidden)]
 pub use core::default::Default as std_default_Default;
@@ -41,9 +41,9 @@ pub use memoffset::offset_of as memoffset_offset_of;
 #[doc(hidden)]
 pub use paste::paste as paste_paste;
 
-pub trait DepPropType: Clone + Debug + 'static { }
+pub trait DepPropType: Clone + Debug + Send + Sync + 'static { }
 
-impl<PropType: Clone + Debug + 'static> DepPropType for PropType { }
+impl<PropType: Clone + Debug + Send + Sync + 'static> DepPropType for PropType { }
 
 #[derive(Educe)]
 #[educe(Debug)]
@@ -89,12 +89,13 @@ pub trait DepType: Sized {
 #[educe(Debug, Clone, Copy)]
 pub struct DepProp<Owner: DepType, PropType: DepPropType> {
     offset: usize,
-    phantom: (PhantomData<Owner>, PhantomData<PropType>)
+    _phantom: PhantomType<(Owner, PropType)>
 }
+
 
 impl<Owner: DepType, PropType: DepPropType> DepProp<Owner, PropType> {
     pub const unsafe fn new(offset: usize) -> Self {
-        DepProp { offset, phantom: (PhantomData, PhantomData) }
+        DepProp { offset, _phantom: PhantomType::new() }
     }
 
     pub fn offset(self) -> usize { self.offset }
@@ -157,7 +158,7 @@ struct Setter<Owner: DepType, PropType: DepPropType> {
     value: PropType,
 }
 
-trait AnySetter<Owner: DepType>: Debug + DynClone {
+trait AnySetter<Owner: DepType>: Debug + DynClone + Send + Sync {
     fn prop_offset(&self) -> usize;
     fn un_apply(
         &self,
