@@ -3,18 +3,24 @@
 #![feature(const_ptr_offset_from)]
 #![feature(const_raw_ptr_deref)]
 #![feature(raw_ref_macros)]
+#![feature(shrink_to)]
+#![feature(try_reserve)]
 #![feature(unchecked_math)]
 #![deny(warnings)]
 
-#![no_std]
+#![cfg_attr(not(test), no_std)]
+#[cfg(test)]
+extern crate core;
 extern crate alloc;
 
 use alloc::boxed::Box;
+use alloc::collections::TryReserveError;
 use alloc::vec::Vec;
 use core::fmt::Debug;
 use core::marker::PhantomData;
 use core::mem::replace;
 use components_arena::ComponentId;
+use dyn_clone::{DynClone, clone_trait_object};
 use dyn_context::Context;
 use educe::Educe;
 
@@ -22,6 +28,8 @@ use educe::Educe;
 pub use core::default::Default as std_default_Default;
 #[doc(hidden)]
 pub use core::fmt::Debug as std_fmt_Debug;
+#[doc(hidden)]
+pub use core::option::Option as std_option_Option;
 #[doc(hidden)]
 pub use dyn_context::Context as dyn_context_Context;
 #[doc(hidden)]
@@ -70,7 +78,7 @@ impl<OwnerId: ComponentId, PropType: DepPropType> DepEntry<OwnerId, PropType> {
     }
 }
 
-pub trait DepType {
+pub trait DepType: Sized {
     type Id: ComponentId;
 
     #[doc(hidden)]
@@ -88,6 +96,8 @@ impl<Owner: DepType, PropType: DepPropType> DepProp<Owner, PropType> {
     pub const unsafe fn new(offset: usize) -> Self {
         DepProp { offset, phantom: (PhantomData, PhantomData) }
     }
+
+    pub fn offset(self) -> usize { self.offset }
 
     fn entry(self, owner: &Owner) -> &DepEntry<Owner::Id, PropType> {
         unsafe {
@@ -140,13 +150,15 @@ impl<Owner: DepType, PropType: DepPropType> DepProp<Owner, PropType> {
     }
 }
 
-pub struct Setter<Owner: DepType, PropType: DepPropType> {
+#[derive(Educe)]
+#[educe(Debug, Clone)]
+struct Setter<Owner: DepType, PropType: DepPropType> {
     prop: DepProp<Owner, PropType>,
     value: PropType,
 }
 
-trait AnySetter<Owner: DepType> {
-    fn prop_id(&self) -> usize;
+trait AnySetter<Owner: DepType>: Debug + DynClone {
+    fn prop_offset(&self) -> usize;
     fn un_apply(
         &self,
         owner: &mut Owner,
@@ -154,8 +166,10 @@ trait AnySetter<Owner: DepType> {
     ) -> Option<Box<dyn for<'a> FnOnce(&'a mut dyn Context, Owner::Id)>>;
 }
 
+clone_trait_object!(<Owner: DepType> AnySetter<Owner>);
+
 impl<Owner: DepType, PropType: DepPropType> AnySetter<Owner> for Setter<Owner, PropType> where Owner::Id: 'static {
-    fn prop_id(&self) -> usize { self.prop.offset }
+    fn prop_offset(&self) -> usize { self.prop.offset }
 
     fn un_apply(
         &self,
@@ -177,8 +191,57 @@ impl<Owner: DepType, PropType: DepPropType> AnySetter<Owner> for Setter<Owner, P
     }
 }
 
-pub struct Style<Owner: DepType + ?Sized> {
+#[derive(Educe)]
+#[educe(Debug, Clone, Default)]
+pub struct Style<Owner: DepType> {
     setters: Vec<Box<dyn AnySetter<Owner>>>,
+}
+
+impl<Owner: DepType> Style<Owner> {
+    pub fn new() -> Self { Style { setters: Vec::new() } }
+
+    pub fn with_capacity(capacity: usize) -> Self { Style { setters: Vec::with_capacity(capacity) } }
+
+    pub fn capacity(&self) -> usize { self.setters.capacity() }
+
+    pub fn clear(&mut self) { self.setters.clear(); }
+
+    pub fn contains_prop<PropType: DepPropType>(&self, prop: DepProp<Owner, PropType>) -> bool {
+        self.setters.binary_search_by_key(&prop.offset, |x| x.prop_offset()).is_ok()
+    }
+
+    pub fn insert<PropType: DepPropType>(
+        &mut self,
+        prop: DepProp<Owner, PropType>,
+        value: PropType
+    ) -> bool where Owner: 'static {
+        let setter = Box::new(Setter { prop, value });
+        match self.setters.binary_search_by_key(&prop.offset, |x| x.prop_offset()) {
+            Ok(index) => { self.setters[index] = setter; true }
+            Err(index) => { self.setters.insert(index, setter); false }
+        }
+    }
+
+    pub fn is_empty(&self) -> bool { self.setters.is_empty() }
+
+    pub fn len(&self) -> usize { self.setters.len() }
+
+    pub fn remove<PropType: DepPropType>(&mut self, prop: DepProp<Owner, PropType>) -> bool {
+        match self.setters.binary_search_by_key(&prop.offset, |x| x.prop_offset()) {
+            Ok(index) => { self.setters.remove(index); true }
+            Err(_) => false
+        }
+    }
+
+    pub fn reserve(&mut self, additional: usize) { self.setters.reserve(additional) }
+
+    pub fn shrink_to(&mut self, min_capacity: usize) { self.setters.shrink_to(min_capacity) }
+
+    pub fn shrink_to_fit(&mut self) { self.setters.shrink_to_fit() }
+
+    pub fn try_reserve(&mut self, additional: usize) -> Result<(), TryReserveError> {
+        self.setters.try_reserve(additional)
+    }
 }
 
 pub struct StyleOnChanged<OwnerId: ComponentId> {
@@ -205,7 +268,10 @@ impl<Owner: DepType> Style<Owner> {
                 .iter()
                 .filter(|setter| new_style.as_ref().map_or(
                     true,
-                    |new_style| new_style.setters.binary_search_by_key(&setter.prop_id(), |x| x.prop_id()).is_err()
+                    |new_style| new_style.setters.binary_search_by_key(
+                        &setter.prop_offset(),
+                        |x| x.prop_offset()
+                    ).is_err()
                 ))
                 .filter_map(|setter| setter.un_apply(owner, true))
                 .for_each(|x| on_changed.push(x))
@@ -331,12 +397,14 @@ macro_rules! dep_type {
         $crate::paste_paste! {
             #[derive($crate::std_fmt_Debug)]
             struct [< $name Core >] $($g)* $($w)* {
+                dep_type_core_style: $crate::std_option_Option<$crate::Style<$name $($r)*>>,
                 $($core_fields)*
             }
 
             impl $($g)* [< $name Core >] $($r)* $($w)* {
                 const fn new() -> Self {
                     Self {
+                        dep_type_core_style: $crate::std_option_Option::None,
                         $($core_new)*
                     }
                 }
@@ -363,6 +431,10 @@ macro_rules! dep_type {
 
             impl $($g)* $crate::DepType for $name $($r)* $($w)* {
                 type Id = $Id;
+
+                fn style__(&mut self) -> &mut $crate::std_option_Option<$crate::Style<$name $($r)*>> {
+                    &mut self.core.dep_type_core_style
+                }
             }
         }
     };
@@ -414,6 +486,20 @@ macro_rules! dep_obj {
                 let obj = $field_mut;
                 prop.on_changed(obj, on_changed);
             }
+
+            $vis fn [< $name _apply_style >] (
+                self,
+                context: &mut dyn $crate::dyn_context_Context,
+                style: $crate::Style<$ty>,
+            ) -> $crate::std_option_Option<$crate::Style<$ty>> {
+                let $this = self;
+                let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
+                let obj = $field_mut;
+                let (old, on_changed) = style.apply(obj);
+                on_changed.raise(context, self);
+                old
+            }
+
         }
     };
     (
@@ -449,7 +535,7 @@ macro_rules! dep_obj {
                 let obj = $field_mut.downcast_mut::<Owner>().expect("invalid cast");
                 let (old, on_changed) = prop.set_uncond(obj, value);
                 on_changed.raise(context, self, &old);
-                old.into_local()
+                old
             }
 
             $vis fn [< $name _on_changed >] <
@@ -469,14 +555,30 @@ macro_rules! dep_obj {
                 let obj = $field_mut.downcast_mut::<Owner>().expect("invalid cast");
                 prop.on_changed(obj, on_changed);
             }
+
+            $vis fn [< $name _apply_style >] <
+                Owner: $ty + $crate::DepType<Id=Self>,
+            >(
+                self,
+                context: &mut dyn $crate::dyn_context_Context,
+                style: $crate::Style<Owner>,
+            ) -> $crate::std_option_Option<$crate::Style<Owner>> {
+                let $this = self;
+                let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
+                let obj = $field_mut.downcast_mut::<Owner>().expect("invalid cast");
+                let (old, on_changed) = style.apply(obj);
+                on_changed.raise(context, self);
+                old
+            }
         }
     };
 }
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use alloc::boxed::Box;
-    use components_arena::{Arena, Id, ComponentId, Component, ComponentClassToken};
+    use components_arena::{Arena, Id, ComponentId, Component, ComponentClassMutex};
     use dyn_context::Context;
     use educe::Educe;
     use macro_attr_2018::macro_attr;
@@ -487,6 +589,8 @@ mod test {
             obj1: Option<Box<TestObj1>>,
         }
     }
+
+    static TEST_NODE: ComponentClassMutex<TestNode> = ComponentClassMutex::new();
 
     macro_attr! {
         #[derive(Educe, ComponentId!)]
@@ -527,13 +631,29 @@ mod test {
 
     #[test]
     fn create_test_obj_1() {
-        let mut test_node_token = ComponentClassToken::new().unwrap();
-        let mut arena = TestArena(Arena::new(&mut test_node_token));
+        let mut arena = TestArena(Arena::new(&mut TEST_NODE.lock().unwrap()));
         let id = arena.0.insert(|id| (TestNode { obj1: None }, TestId(id)));
         TestObj1::new(&mut arena, id);
         assert_eq!(id.obj1_get(&arena, TestObj1::INT_VAL), &42);
         id.obj1_on_changed(&mut arena, TestObj1::INT_VAL, |_, _, _| { });
         id.obj1_set_uncond(&mut arena, TestObj1::INT_VAL, 43);
         assert_eq!(id.obj1_get(&arena, TestObj1::INT_VAL), &43);
+    }
+
+    #[test]
+    fn test_obj_1_style() {
+        let mut arena = TestArena(Arena::new(&mut TEST_NODE.lock().unwrap()));
+        let id = arena.0.insert(|id| (TestNode { obj1: None }, TestId(id)));
+        TestObj1::new(&mut arena, id);
+        assert_eq!(id.obj1_get(&arena, TestObj1::INT_VAL), &42);
+        let mut style = Style::new();
+        style.insert(TestObj1::INT_VAL, 43);
+        id.obj1_apply_style(&mut arena, style.clone());
+        assert_eq!(id.obj1_get(&arena, TestObj1::INT_VAL), &43);
+        id.obj1_set_uncond(&mut arena, TestObj1::INT_VAL, 44);
+        assert_eq!(id.obj1_get(&arena, TestObj1::INT_VAL), &44);
+        style.insert(TestObj1::INT_VAL, 45);
+        id.obj1_apply_style(&mut arena, style);
+        assert_eq!(id.obj1_get(&arena, TestObj1::INT_VAL), &44);
     }
 }
