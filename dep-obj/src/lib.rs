@@ -9,6 +9,7 @@
 #![no_std]
 extern crate alloc;
 
+use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::fmt::Debug;
 use core::marker::PhantomData;
@@ -21,8 +22,6 @@ use educe::Educe;
 pub use core::default::Default as std_default_Default;
 #[doc(hidden)]
 pub use core::fmt::Debug as std_fmt_Debug;
-#[doc(hidden)]
-pub use core::option::Option as std_option_Option;
 #[doc(hidden)]
 pub use dyn_context::Context as dyn_context_Context;
 #[doc(hidden)]
@@ -40,7 +39,7 @@ impl<PropType: Clone + Debug + 'static> DepPropType for PropType { }
 
 #[derive(Educe)]
 #[educe(Debug)]
-pub struct DepObjEntry<OwnerId: ComponentId, PropType: DepPropType> {
+pub struct DepEntry<OwnerId: ComponentId, PropType: DepPropType> {
     default: &'static PropType,
     style: Option<PropType>,
     local: Option<PropType>,
@@ -60,9 +59,9 @@ impl<OwnerId: ComponentId, PropType: DepPropType> DepPropOnChanged<OwnerId, Prop
     }
 }
 
-impl<OwnerId: ComponentId, PropType: DepPropType> DepObjEntry<OwnerId, PropType> {
+impl<OwnerId: ComponentId, PropType: DepPropType> DepEntry<OwnerId, PropType> {
     pub const fn new(default: &'static PropType) -> Self {
-        DepObjEntry {
+        DepEntry {
             default,
             style: None,
             local: None,
@@ -71,34 +70,34 @@ impl<OwnerId: ComponentId, PropType: DepPropType> DepObjEntry<OwnerId, PropType>
     }
 }
 
-pub trait DepObj {
+pub trait DepType {
     type Id: ComponentId;
 }
 
 #[derive(Educe)]
 #[educe(Debug, Clone, Copy)]
-pub struct DepProp<Owner: DepObj, PropType: DepPropType> {
+pub struct DepProp<Owner: DepType, PropType: DepPropType> {
     offset: usize,
     phantom: (PhantomData<Owner>, PhantomData<PropType>)
 }
 
-impl<Owner: DepObj, PropType: DepPropType> DepProp<Owner, PropType> {
+impl<Owner: DepType, PropType: DepPropType> DepProp<Owner, PropType> {
     pub const unsafe fn new(offset: usize) -> Self {
         DepProp { offset, phantom: (PhantomData, PhantomData) }
     }
 
-    fn entry(self, owner: &Owner) -> &DepObjEntry<Owner::Id, PropType> {
+    fn entry(self, owner: &Owner) -> &DepEntry<Owner::Id, PropType> {
         unsafe {
             let entry = (owner as *const _ as usize).unchecked_add(self.offset);
-            let entry = entry as *const DepObjEntry<Owner::Id, PropType>;
+            let entry = entry as *const DepEntry<Owner::Id, PropType>;
             &*entry
         }
     }
 
-    fn entry_mut(self, owner: &mut Owner) -> &mut DepObjEntry<Owner::Id, PropType> {
+    fn entry_mut(self, owner: &mut Owner) -> &mut DepEntry<Owner::Id, PropType> {
         unsafe {
             let entry = (owner as *mut _ as usize).unchecked_add(self.offset);
-            let entry = entry as *mut DepObjEntry<Owner::Id, PropType>;
+            let entry = entry as *mut DepEntry<Owner::Id, PropType>;
             &mut *entry
         }
     }
@@ -138,9 +137,9 @@ impl<Owner: DepObj, PropType: DepPropType> DepProp<Owner, PropType> {
     }
 }
 
-pub struct Setter<Owner: DepObj, PropType: DepPropType> {
+pub struct Setter<Owner: DepType, PropType: DepPropType> {
     obj_set_uncond: fn(
-        id: OwnerId,
+        id: Owner::Id,
         context: &mut dyn Context,
         prop: DepProp<Owner, PropType>,
         value: PropType
@@ -153,14 +152,14 @@ pub trait AnySetter<OwnerId: ComponentId> {
     fn apply(&self, context: &mut dyn Context, id: OwnerId);
 }
 
-impl<Owner: DepObj, PropType: DepPropType> AnySetter<Owner::Id> for Setter<Owner, PropType> {
-    fn apply(&self, context: &mut dyn Context, id: OwnerId) {
+impl<Owner: DepType, PropType: DepPropType> AnySetter<Owner::Id> for Setter<Owner, PropType> {
+    fn apply(&self, context: &mut dyn Context, id: Owner::Id) {
         (self.obj_set_uncond)(id, context, self.prop, self.value.clone());
     }
 }
 
 pub struct Style<OwnerId: ComponentId> {
-    setters: Vec<Box<dyn AnySetter<OwnerId>>,
+    setters: Vec<Box<dyn AnySetter<OwnerId>>>,
 }
 
 #[macro_export]
@@ -216,11 +215,11 @@ macro_rules! dep_type {
             [$($g)*] [$($r)*] [$($w)*]
             [
                 $($core_fields)*
-                $field: $crate::DepObjEntry<$Id, $field_ty>,
+                $field: $crate::DepEntry<$Id, $field_ty>,
             ]
             [
                 $($core_new)*
-                $field: $crate::DepObjEntry::new(&Self:: [< $field:upper _DEFAULT >] ),
+                $field: $crate::DepEntry::new(&Self:: [< $field:upper _DEFAULT >] ),
             ]
             [
                 $($core_consts)*
@@ -293,7 +292,7 @@ macro_rules! dep_type {
                 $($dep_props)*
             }
 
-            impl $($g)* $crate::DepObj for $name $($r)* $($w)* {
+            impl $($g)* $crate::DepType for $name $($r)* $($w)* {
                 type Id = $Id;
             }
         }
@@ -355,42 +354,42 @@ macro_rules! dep_obj {
     ) => {
         $crate::paste_paste! {
             $vis fn [< $name _get >] <
-                DepType: $ty + $crate::DepObj<Id=Self>,
+                Owner: $ty + $crate::DepType<Id=Self>,
                 DepObjValueType: $crate::DepPropType
             > (
                 self,
                 $arena: &$Arena,
-                prop: $crate::DepProp<DepType, DepObjValueType>
+                prop: $crate::DepProp<Owner, DepObjValueType>
             ) -> &DepObjValueType {
                 let $this = self;
-                let obj = $field.downcast_ref::<DepType>().expect("invalid cast");
+                let obj = $field.downcast_ref::<Owner>().expect("invalid cast");
                 prop.get(obj)
             }
 
             $vis fn [< $name _set_uncond >] <
-                DepType: $ty + $crate::DepObj<Id=Self>,
+                Owner: $ty + $crate::DepType<Id=Self>,
                 DepObjValueType: $crate::DepPropType
             >(
                 self,
                 context: &mut dyn $crate::dyn_context_Context,
-                prop: $crate::DepProp<DepType, DepObjValueType>,
+                prop: $crate::DepProp<Owner, DepObjValueType>,
                 value: DepObjValueType,
-            ) -> $crate::std_option_Option<DepObjValueType> {
+            ) -> DepObjValueType {
                 let $this = self;
                 let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
-                let obj = $field_mut.downcast_mut::<DepType>().expect("invalid cast");
+                let obj = $field_mut.downcast_mut::<Owner>().expect("invalid cast");
                 let (old, on_changed) = prop.set_uncond(obj, value);
                 on_changed.raise(context, self, &old);
                 old.into_local()
             }
 
             $vis fn [< $name _on_changed >] <
-                DepType: $ty + $crate::DepObj<Id=Self>,
+                Owner: $ty + $crate::DepType<Id=Self>,
                 DepObjValueType: $crate::DepPropType
             >(
                 self,
                 $arena: &mut $Arena,
-                prop: $crate::DepProp<DepType, DepObjValueType>,
+                prop: $crate::DepProp<Owner, DepObjValueType>,
                 on_changed: fn(
                     context: &mut dyn $crate::dyn_context_Context,
                     id: Self,
@@ -398,7 +397,7 @@ macro_rules! dep_obj {
                 ),
             ) {
                 let $this = self;
-                let obj = $field_mut.downcast_mut::<DepType>().expect("invalid cast");
+                let obj = $field_mut.downcast_mut::<Owner>().expect("invalid cast");
                 prop.on_changed(obj, on_changed);
             }
         }
