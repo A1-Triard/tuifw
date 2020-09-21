@@ -72,6 +72,9 @@ impl<OwnerId: ComponentId, PropType: DepPropType> DepEntry<OwnerId, PropType> {
 
 pub trait DepType {
     type Id: ComponentId;
+
+    #[doc(hidden)]
+    fn style__(&mut self) -> &mut Option<Style<Self>>;
 }
 
 #[derive(Educe)]
@@ -138,35 +141,93 @@ impl<Owner: DepType, PropType: DepPropType> DepProp<Owner, PropType> {
 }
 
 pub struct Setter<Owner: DepType, PropType: DepPropType> {
-    pub obj_set_uncond: fn(
-        id: Owner::Id,
-        context: &mut dyn Context,
-        prop: DepProp<Owner, PropType>,
-        value: PropType
-    ) -> PropType,
-    pub prop: DepProp<Owner, PropType>,
-    pub value: PropType,
+    prop: DepProp<Owner, PropType>,
+    value: PropType,
 }
 
-pub trait AnySetter<OwnerId: ComponentId> {
-    fn apply(&self, context: &mut dyn Context, id: OwnerId);
+trait AnySetter<Owner: DepType> {
+    fn prop_id(&self) -> usize;
+    fn un_apply(
+        &self,
+        owner: &mut Owner,
+        unapply: bool
+    ) -> Option<Box<dyn for<'a> FnOnce(&'a mut dyn Context, Owner::Id)>>;
 }
 
-impl<Owner: DepType, PropType: DepPropType> AnySetter<Owner::Id> for Setter<Owner, PropType> {
-    fn apply(&self, context: &mut dyn Context, id: Owner::Id) {
-        (self.obj_set_uncond)(id, context, self.prop, self.value.clone());
+impl<Owner: DepType, PropType: DepPropType> AnySetter<Owner> for Setter<Owner, PropType> where Owner::Id: 'static {
+    fn prop_id(&self) -> usize { self.prop.offset }
+
+    fn un_apply(
+        &self,
+        owner: &mut Owner,
+        unapply: bool
+    ) -> Option<Box<dyn for<'a> FnOnce(&'a mut dyn Context, Owner::Id)>> {
+        let entry_mut = self.prop.entry_mut(owner);
+        let on_changed = if entry_mut.local.is_some() {
+            None
+        } else {
+            Some(DepPropOnChanged { callbacks: entry_mut.on_changed.clone() })
+        };
+        let value = if unapply { None } else { Some(self.value.clone()) };
+        let old = replace(&mut entry_mut.style, value);
+        on_changed.map(|on_changed| {
+            let old = old.unwrap_or_else(|| entry_mut.default.clone());
+            Box::new(move |context: &'_ mut dyn Context, id| on_changed.raise(context, id, &old)) as _
+        })
     }
 }
 
-pub struct Style<OwnerId: ComponentId> {
-    setters: Vec<Box<dyn AnySetter<OwnerId>>>,
+pub struct Style<Owner: DepType + ?Sized> {
+    setters: Vec<Box<dyn AnySetter<Owner>>>,
 }
 
-impl<OwnerId: ComponentId> Style<OwnerId> {
-    pub fn apply(&self, context: &mut dyn Context, id: OwnerId) {
-        for setter in &self.setters {
-            setter.apply(context, id);
+pub struct StyleOnChanged<OwnerId: ComponentId> {
+    callbacks: Vec<Box<dyn FnOnce(&mut dyn Context, OwnerId)>>
+}
+
+impl<OwnerId: ComponentId> StyleOnChanged<OwnerId> {
+    pub fn raise(self, context: &mut dyn Context, id: OwnerId) {
+        for callback in self.callbacks {
+            callback(context, id);
         }
+    }
+}
+
+impl<Owner: DepType> Style<Owner> {
+    fn un_apply(
+        owner: &mut Owner,
+        new_style: Option<Self>
+    ) -> (Option<Style<Owner>>, StyleOnChanged<Owner::Id>) {
+        let mut on_changed = Vec::new();
+        let old_style = owner.style__().take();
+        if let Some(old_style) = old_style.as_ref() {
+            old_style.setters
+                .iter()
+                .filter(|setter| new_style.as_ref().map_or(
+                    true,
+                    |new_style| new_style.setters.binary_search_by_key(&setter.prop_id(), |x| x.prop_id()).is_err()
+                ))
+                .filter_map(|setter| setter.un_apply(owner, true))
+                .for_each(|x| on_changed.push(x))
+            ;
+        }
+        if let Some(new_style) = new_style.as_ref() {
+            new_style.setters
+                .iter()
+                .filter_map(|setter| setter.un_apply(owner, false))
+                .for_each(|x| on_changed.push(x))
+            ;
+        }
+        *owner.style__() = new_style;
+        (old_style, StyleOnChanged { callbacks: on_changed })
+    }
+
+    pub fn apply(self, owner: &mut Owner) -> (Option<Style<Owner>>, StyleOnChanged<Owner::Id>) {
+        Self::un_apply(owner, Some(self))
+    }
+
+    pub fn unapply(owner: &mut Owner) -> (Option<Style<Owner>>, StyleOnChanged<Owner::Id>) {
+        Self::un_apply(owner, None)
     }
 }
 
