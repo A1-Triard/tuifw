@@ -34,17 +34,9 @@ pub use memoffset::offset_of as memoffset_offset_of;
 #[doc(hidden)]
 pub use paste::paste as paste_paste;
 
-pub trait DepPropType: Debug + 'static { }
+pub trait DepPropType: Clone + Debug + 'static { }
 
-impl<PropType: Debug + 'static> DepPropType for PropType { }
-
-pub struct DepObjValue<PropType: DepPropType> {
-    local: Option<PropType>,
-}
-
-impl<PropType: DepPropType> DepObjValue<PropType> {
-    pub fn into_local(self) -> Option<PropType> { self.local }
-}
+impl<PropType: Clone + Debug + 'static> DepPropType for PropType { }
 
 #[derive(Educe)]
 #[educe(Debug)]
@@ -53,15 +45,15 @@ pub struct DepObjEntry<OwnerId: ComponentId, PropType: DepPropType> {
     style: Option<PropType>,
     local: Option<PropType>,
     #[educe(Debug(ignore))]
-    on_changed: Vec<fn(context: &mut dyn Context, id: OwnerId, old: &DepObjValue<PropType>)>,
+    on_changed: Vec<fn(context: &mut dyn Context, id: OwnerId, old: &PropType)>,
 }
 
 pub struct DepPropOnChanged<OwnerId: ComponentId, PropType: DepPropType> {
-    callbacks: Vec<fn(context: &mut dyn Context, id: OwnerId, old: &DepObjValue<PropType>)>,
+    callbacks: Vec<fn(context: &mut dyn Context, id: OwnerId, old: &PropType)>,
 }
 
 impl<OwnerId: ComponentId, PropType: DepPropType> DepPropOnChanged<OwnerId, PropType> {
-    pub fn raise(self, context: &mut dyn Context, id: OwnerId, old: &DepObjValue<PropType>) {
+    pub fn raise(self, context: &mut dyn Context, id: OwnerId, old: &PropType) {
         for callback in self.callbacks {
             callback(context, id, old);
         }
@@ -111,12 +103,12 @@ impl<Owner: DepObj, PropType: DepPropType> DepProp<Owner, PropType> {
         }
     }
 
-    pub fn get_non_local(self, owner: &Owner) -> &PropType {
+    fn get_non_local(self, owner: &Owner) -> &PropType {
         let entry = self.entry(owner);
         entry.style.as_ref().unwrap_or(entry.default)
     }
 
-    pub fn get_local(self, owner: &Owner) -> Option<&PropType> {
+    fn get_local(self, owner: &Owner) -> Option<&PropType> {
         let entry = self.entry(owner);
         entry.local.as_ref()
     }
@@ -129,17 +121,17 @@ impl<Owner: DepObj, PropType: DepPropType> DepProp<Owner, PropType> {
         self,
         owner: &mut Owner,
         value: Option<PropType>
-    ) -> (DepObjValue<PropType>, DepPropOnChanged<Owner::Id, PropType>) {
+    ) -> (PropType, DepPropOnChanged<Owner::Id, PropType>) {
         let entry_mut = self.entry_mut(owner);
-        let old = DepObjValue { local: replace(&mut entry_mut.local, value) };
         let on_changed = DepPropOnChanged { callbacks: entry_mut.on_changed.clone() };
+        let old = replace(&mut entry_mut.local, value).unwrap_or_else(|| self.get_non_local(owner).clone());
         (old, on_changed)
     }
 
     pub fn on_changed(
         self,
         owner: &mut Owner,
-        callback: fn(context: &mut dyn Context, id: Owner::Id, old: &DepObjValue<PropType>),
+        callback: fn(context: &mut dyn Context, id: Owner::Id, old: &PropType),
     ) {
         let entry_mut = self.entry_mut(owner);
         entry_mut.on_changed.push(callback);
@@ -306,13 +298,13 @@ macro_rules! dep_obj {
                 context: &mut dyn $crate::dyn_context_Context,
                 prop: $crate::DepProp<$ty, DepObjValueType>,
                 value: DepObjValueType,
-            ) -> $crate::std_option_Option<DepObjValueType> {
+            ) -> DepObjValueType {
                 let $this = self;
                 let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
                 let obj = $field_mut;
                 let (old, on_changed) = prop.set_uncond(obj, Some(value));
                 on_changed.raise(context, self, &old);
-                old.into_local()
+                old
             }
 
             $vis fn [< $name _on_changed >] <DepObjValueType: $crate::DepPropType>(
@@ -322,7 +314,7 @@ macro_rules! dep_obj {
                 on_changed: fn(
                     context: &mut dyn $crate::dyn_context_Context,
                     id: Self,
-                    old: &$crate::DepObjValue<DepObjValueType>
+                    old: &DepObjValueType
                 ),
             ) {
                 let $this = self;
@@ -377,7 +369,7 @@ macro_rules! dep_obj {
                 on_changed: fn(
                     context: &mut dyn $crate::dyn_context_Context,
                     id: Self,
-                    old: &$crate::DepObjValue<DepObjValueType>
+                    old: &DepObjValueType
                 ),
             ) {
                 let $this = self;
