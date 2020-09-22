@@ -337,22 +337,78 @@ impl<Owner: DepType> Style<Owner> {
     }
 }
 
+pub trait DepObjBuilderCore<Owner: DepType> {
+    fn context(&self) -> &dyn Context;
+    fn context_mut(&mut self) -> &mut dyn Context;
+    fn id(&self) -> Owner::Id;
+}
+
 #[macro_export]
 macro_rules! dep_type {
     (
+        type BuilderCore $($token:tt)*
+    ) => {
+        $crate::generics_parse! {
+            $crate::dep_type {
+                @type BuilderCore
+            }
+        }
+        $($token)*
+    };
+    (
+        @type BuilderCore
+        [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
+        = $BuilderCore:ty;
+
         $(#[$attr:meta])* $vis:vis struct $name:ident $($body:tt)*
     ) => {
         $crate::generics_parse! {
             $crate::dep_type {
-                @parsed_generics
-                $(#[$attr])* $vis struct $name
+                @struct
+                [$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]
+                [$([$attr])*] [$vis] [$name]
             }
             $($body)*
         }
     };
     (
-        @parsed_generics
-        $(#[$attr:meta])* $vis:vis struct $name:ident
+        @type BuilderCore
+        [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
+        = $BuilderCore:ty;
+
+        $($token:tt)*
+    ) => {
+        $crate::std_compile_error!("\
+            invalid dep type definition; allowed form is \
+            '$(#[$attr])* $vis struct $name $(<$generics> $(where $where_clause)?)? { ... }'\
+        ");
+    };
+    (
+        @type BuilderCore
+        [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
+        $($token:tt)*
+    ) => {
+        $crate::std_compile_error!("\
+            invalid dep type builder core definition; allowed form is \
+            'type BuilderCore $(<$generics> $($where_clause)?)? = $builder_core_type;
+        ");
+    };
+    (
+        $(#[$attr:meta])* $vis:vis struct $name:ident $($body:tt)*
+    ) => {
+        $crate::generics_parse! {
+            $crate::dep_type {
+                @struct
+                [] [] [] []
+                [$([$attr])*] [$vis] [$name]
+            }
+            $($body)*
+        }
+    };
+    (
+        @struct
+        [$($BuilderCore:ty)?] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
+        [$([$attr:meta])*] [$vis:vis] [$name:ident]
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         become $obj:ident in $Id:ty
         {
@@ -361,21 +417,130 @@ macro_rules! dep_type {
     ) => {
         $crate::dep_type! {
             @unroll_fields
+            [$($BuilderCore)?] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]
             [$([$attr])*] [$vis] [$name] [$obj] [$Id]
             [$($g)*] [$($r)*] [$($w)*]
             [] [] [] []
+
             [$($([$field $delim $field_ty $(= $field_val)?])+)?]
         }
     };
     (
-        @parsed_generics
-        $(#[$attr:meta])* $vis:vis struct $name:ident
+        @struct
+        [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
+        [$([$attr:meta])*] [$vis:vis] [$name:ident]
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
-        $($body:tt)*
+        become $obj:ident in $Id:ty
+        {
+            $($($field:ident $delim:tt $field_ty:ty $(= $field_val:expr)?),+ $(,)?)?
+        }
+        $($token:tt)+
     ) => {
+        $crate::std_compile_error!("unexpected extra tokens after dep type definition body");
+    };
+    (
+        @struct
+        [] [] [] []
+        [$([$attr:meta])*] [$vis:vis] [$name:ident]
+        [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
+        become $obj:ident in $Id:ty
+        {
+            $($($field:ident $delim:tt $field_ty:ty $(= $field_val:expr)?),+ $(,)?)?
+        }
+
+        type BuilderCore $($token:tt)*
+    ) => {
+        $crate::generics_parse! {
+            $crate::dep_type {
+                @type BuilderCore after
+                [$([$attr])*] [$vis] [$name] [$obj] [$Id]
+                [$($g)*] [$($r)*] [$($w)*]
+                [$($([$field $delim $field_ty $(= $field_val)?])+)?]
+            }
+            $($token)*
+        }
+    };
+    (
+        @struct
+        [] [] [] []
+        [$([$attr:meta])*] [$vis:vis] [$name:ident]
+        [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
+        become $obj:ident in $Id:ty
+        {
+            $($($field:ident $delim:tt $field_ty:ty $(= $field_val:expr)?),+ $(,)?)?
+        }
+
+        $($token:tt)*
+    ) => {
+        $crate::std_compile_error!("\
+            invalid dep type builder core definition; allowed form is \
+            'type BuilderCore $(<$generics> $($where_clause)?)? = $builder_core_type;
+        ");
+    };
+    (
+        @struct
+        [$($BuilderCore:ty)?] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
+        [$([$attr:meta])*] [$vis:vis] [$name:ident]
+        [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
+        $($token:tt)*
+    ) => {
+        $crate::std_compile_error!("\
+            invalid dep type definition, allowed form is\n\
+            \n\
+            $(#[$attr])* $vis struct $name $(<$generics> $(where $where_clause)?)? {\n\
+                $field_1_name $(: $field_1_type = $field_1_value | yield $field_1_type),\n\
+                $field_2_name $(: $field_2_type = $field_2_value | yield $field_2_type),\n\
+                ...\n\
+            }\n\
+            \n\
+        ");
+    };
+    (
+        @type BuilderCore after
+        [$([$attr:meta])*] [$vis:vis] [$name:ident] [$obj:ident] [$Id:ty]
+        [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
+        [$($([$field:ident $delim:tt $field_ty:ty $(= $field_val:expr)?])+)?]
+        [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
+        = $BuilderCore:ty;
+    ) => {
+        $crate::dep_type! {
+            @unroll_fields
+            [$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]
+            [$([$attr])*] [$vis] [$name] [$obj] [$Id]
+            [$($g)*] [$($r)*] [$($w)*]
+            [] [] [] []
+
+            [$($([$field $delim $field_ty $(= $field_val)?])+)?]
+        }
+    };
+    (
+        @type BuilderCore after
+        [$([$attr:meta])*] [$vis:vis] [$name:ident] [$obj:ident] [$Id:ty]
+        [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
+        [$($([$field:ident $delim:tt $field_ty:ty $(= $field_val:expr)?])+)?]
+        [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
+        = $BuilderCore:ty;
+
+        $($token:tt)*
+    ) => {
+        $crate::std_compile_error!("unexpected extra tokens after dep type builder core definition");
+    };
+    (
+        @type BuilderCore after
+        [$([$attr:meta])*] [$vis:vis] [$name:ident] [$obj:ident] [$Id:ty]
+        [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
+        [$($([$field:ident $delim:tt $field_ty:ty $(= $field_val:expr)?])+)?]
+        [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
+        $($token:tt)*
+    ) => {
+        $crate::std_compile_error!("\
+            invalid dep type builder core definition; allowed form is \
+            'type BuilderCore $(<$generics> $($where_clause)?)? = $builder_core_type;
+        ");
     };
     (
         @unroll_fields
+        [$($BuilderCore:ty)?] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
         [$([$attr:meta])*] [$vis:vis] [$name:ident] [$obj:ident] [$Id:ty]
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         [$($core_fields:tt)*]
@@ -386,6 +551,7 @@ macro_rules! dep_type {
     ) => {
         $crate::dep_type! {
             @unroll_fields
+            [$($BuilderCore)?] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]
             [$([$attr])*] [$vis] [$name] [$obj] [$Id]
             [$($g)*] [$($r)*] [$($w)*]
             [
@@ -415,6 +581,7 @@ macro_rules! dep_type {
     };
     (
         @unroll_fields
+        [$($BuilderCore:ty)?] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
         [$([$attr:meta])*] [$vis:vis] [$name:ident] [$obj:ident] [$Id:ty]
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         [$($core_fields:tt)*]
@@ -426,6 +593,7 @@ macro_rules! dep_type {
     };
     (
         @unroll_fields
+        [$($BuilderCore:ty)?] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
         [$([$attr:meta])*] [$vis:vis] [$name:ident] [$obj:ident] [$Id:ty]
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         [$($core_fields:tt)*]
