@@ -594,6 +594,18 @@ macro_rules! dep_obj {
                 old
             }
 
+            #[allow(dead_code)]
+            $vis fn [< $name _unapply_style >] (
+                self,
+                context: &mut dyn $crate::dyn_context_Context,
+            ) -> $crate::std_option_Option<$crate::Style<$ty>> {
+                let $this = self;
+                let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
+                let obj = $field_mut;
+                let (old, on_changed) = <$crate::Style::<$ty>>::unapply(obj);
+                on_changed.raise(context, self);
+                old
+            }
         }
     };
     (
@@ -723,6 +735,21 @@ macro_rules! dep_obj {
                 on_changed.raise(context, self);
                 old
             }
+
+            #[allow(dead_code)]
+            $vis fn [< $name _unapply_style >] <
+                Owner: $ty + $crate::DepType<Id=Self>,
+            >(
+                self,
+                context: &mut dyn $crate::dyn_context_Context,
+            ) -> $crate::std_option_Option<$crate::Style<Owner>> {
+                let $this = self;
+                let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
+                let obj = $field_mut.downcast_mut::<Owner>().expect("invalid cast");
+                let (old, on_changed) = <$crate::Style::<Owner>>::unapply(obj);
+                on_changed.raise(context, self);
+                old
+            }
         }
     };
 }
@@ -755,9 +782,9 @@ mod test {
         dep_obj! {
             pub fn obj1(self as this, arena: TestArena) -> TestObj1 {
                 if mut {
-                    arena.0[this.0].obj1.as_mut().unwrap()
+                    arena.0[this.0].obj1.as_mut().unwrap().as_mut()
                 } else {
-                    arena.0[this.0].obj1.as_ref().unwrap()
+                    arena.0[this.0].obj1.as_ref().unwrap().as_ref()
                 }
             }
         }
