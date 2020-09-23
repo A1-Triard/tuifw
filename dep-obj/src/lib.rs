@@ -417,11 +417,10 @@ macro_rules! dep_type {
     ) => {
         $crate::dep_type! {
             @unroll_fields
-            [$([$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*])?]
             [$([$attr])*] [$vis] [$name] [$obj] [$Id]
             [$($g)*] [$($r)*] [$($w)*]
             [] [] [] []
-
+            [$([$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*] [])?]
             [$($([$field $delim $field_ty $(= $field_val)?])+)?]
         }
     };
@@ -505,12 +504,11 @@ macro_rules! dep_type {
     ) => {
         $crate::dep_type! {
             @unroll_fields
-            [[$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]]
             [$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]
             [$([$attr])*] [$vis] [$name] [$obj] [$Id]
             [$($g)*] [$($r)*] [$($w)*]
             [] [] [] []
-
+            [[$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*] []]
             [$($([$field $delim $field_ty $(= $field_val)?])+)?]
         }
     };
@@ -541,18 +539,20 @@ macro_rules! dep_type {
     };
     (
         @unroll_fields
-        [$([$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*])?]
         [$([$attr:meta])*] [$vis:vis] [$name:ident] [$obj:ident] [$Id:ty]
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         [$($core_fields:tt)*]
         [$($core_new:tt)*]
         [$($core_consts:tt)*]
         [$($dep_props:tt)*]
+        [$(
+            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
+            [$($builder_methods:tt)*]
+        )?]
         [[$field:ident : $field_ty:ty = $field_val:expr] $($fields:tt)*]
     ) => {
         $crate::dep_type! {
             @unroll_fields
-            [$([$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*])?]
             [$([$attr])*] [$vis] [$name] [$obj] [$Id]
             [$($g)*] [$($r)*] [$($w)*]
             [
@@ -577,30 +577,47 @@ macro_rules! dep_type {
                     }
                 };
             ]
+            [$(
+                [$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]
+                [
+                    $($builder_methods)*
+
+                    $vis fn $field(&mut self, value: $field_ty) -> &mut Self {
+                        self.core.id(). [< $obj _set_uncond >] (self.core.context_mut(), value);
+                        self
+                    }
+                ]
+            )?]
             [$($fields)*]
         }
     };
     (
         @unroll_fields
-        [$([$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*])?]
         [$([$attr:meta])*] [$vis:vis] [$name:ident] [$obj:ident] [$Id:ty]
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         [$($core_fields:tt)*]
         [$($core_new:tt)*]
         [$($core_consts:tt)*]
         [$($dep_props:tt)*]
+        [$(
+            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
+            [$($builder_methods:tt)*]
+        )?]
         [[$field:ident $delim:tt $field_ty:ty $(= $field_val:expr)?] $($fields:tt)*]
     ) => {
     };
     (
         @unroll_fields
-        [$([$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*])?]
         [$([$attr:meta])*] [$vis:vis] [$name:ident] [$obj:ident] [$Id:ty]
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         [$($core_fields:tt)*]
         [$($core_new:tt)*]
         [$($core_consts:tt)*]
         [$($dep_props:tt)*]
+        [$(
+            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
+            [$($builder_methods:tt)*]
+        )?]
         []
     ) => {
         $crate::paste_paste! {
@@ -649,6 +666,14 @@ macro_rules! dep_type {
             $(
                 $vis struct [< $name Builder >] $($bc_g)* $($bc_w)* {
                     core: $BuilderCore $($bc_r)*,
+                }
+
+                impl $($bc_g)* [< $name Builder >] $($bc_r)* $($bc_w)* {
+                    fn new_priv(core: $BuilderCore $($bc_r)*) -> Self {
+                        Self { core }
+                    }
+
+                    $($builder_methods)*
                 }
             )?
         }
