@@ -634,7 +634,9 @@ macro_rules! dep_type {
                     $($builder_methods)*
 
                     $vis fn $field(&mut self, value: $field_ty) -> &mut Self {
-                        self.core.id(). [< $obj _set_uncond >] (self.core.context_mut(), value);
+                        let id = <$BuilderCore as $crate::DepObjBuilderCore<$Id>>::id(&self.core);
+                        let context = <$BuilderCore as $crate::DepObjBuilderCore<$Id>>::context_mut(&mut self.core);
+                        id. [< $obj _set_uncond >] (context, $name:: [< $field:upper >] , value);
                         self
                     }
                 ]
@@ -721,11 +723,11 @@ macro_rules! dep_type {
 
             $(
                 $vis struct [< $name Builder >] $($bc_g)* $($bc_w)* {
-                    core: $BuilderCore $($bc_r)*,
+                    core: $BuilderCore,
                 }
 
                 impl $($bc_g)* [< $name Builder >] $($bc_r)* $($bc_w)* {
-                    fn new_priv(core: $BuilderCore $($bc_r)*) -> Self {
+                    fn new_priv(core: $BuilderCore) -> Self {
                         Self { core }
                     }
 
@@ -1046,6 +1048,17 @@ mod test {
         }
     }
 
+    struct TestIdBuilder<'a> {
+        id: TestId,
+        arena: &'a mut TestArena
+    }
+
+    impl<'a> DepObjBuilderCore<TestId> for TestIdBuilder<'a> {
+        fn id(&self) -> TestId { self.id }
+        fn context(&self) -> &dyn Context { self.arena }
+        fn context_mut(&mut self) -> &mut dyn Context { self.arena }
+    }
+
     macro_attr! {
         #[derive(Context!)]
         struct TestArena(Arena<TestNode>);
@@ -1057,6 +1070,8 @@ mod test {
         struct TestObj1 become obj1 in TestId {
             int_val: i32 = 42,
         }
+
+        type BuilderCore<'a> = TestIdBuilder<'a>;
     }
 
     impl TestObj1 {
@@ -1108,5 +1123,15 @@ mod test {
         assert_eq!(id.obj1_get(&arena, TestObj1::INT_VAL), &44);
         id.obj1_unset_uncond(&mut arena, TestObj1::INT_VAL);
         assert_eq!(id.obj1_get(&arena, TestObj1::INT_VAL), &45);
+    }
+
+    #[test]
+    fn test_obj_1_builder() {
+        let mut arena = TestArena(Arena::new(&mut TEST_NODE.lock().unwrap()));
+        let id = arena.0.insert(|id| (TestNode { obj1: None }, TestId(id)));
+        TestObj1::new(&mut arena, id);
+        let mut builder = TestObj1Builder::new_priv(TestIdBuilder { id, arena: &mut arena });
+        builder.int_val(1);
+        assert_eq!(id.obj1_get(&arena, TestObj1::INT_VAL), &1);
     }
 }
