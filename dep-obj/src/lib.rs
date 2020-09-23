@@ -37,6 +37,8 @@ pub use dyn_context::Context as dyn_context_Context;
 #[doc(hidden)]
 pub use dyn_context::ContextExt as dyn_context_ContextExt;
 #[doc(hidden)]
+pub use generics::concat as generics_concat;
+#[doc(hidden)]
 pub use generics::parse as generics_parse;
 #[doc(hidden)]
 pub use memoffset::offset_of as memoffset_offset_of;
@@ -416,11 +418,10 @@ macro_rules! dep_type {
         }
     ) => {
         $crate::dep_type! {
-            @unroll_fields
+            @concat_generics
             [$([$attr])*] [$vis] [$name] [$obj] [$Id]
             [$($g)*] [$($r)*] [$($w)*]
-            [] [] [] []
-            [$([$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*] [])?]
+            [$([$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*])?]
             [$($([$field $delim $field_ty $(= $field_val)?])+)?]
         }
     };
@@ -503,12 +504,10 @@ macro_rules! dep_type {
         = $BuilderCore:ty;
     ) => {
         $crate::dep_type! {
-            @unroll_fields
-            [$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]
+            @concat_generics
             [$([$attr])*] [$vis] [$name] [$obj] [$Id]
             [$($g)*] [$($r)*] [$($w)*]
-            [] [] [] []
-            [[$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*] []]
+            [[$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]]
             [$($([$field $delim $field_ty $(= $field_val)?])+)?]
         }
     };
@@ -536,6 +535,58 @@ macro_rules! dep_type {
             invalid dep type builder core definition; allowed form is \
             'type BuilderCore $(<$generics> $($where_clause)?)? = $builder_core_type;
         ");
+    };
+    (
+        @concat_generics
+        [$([$attr:meta])*] [$vis:vis] [$name:ident] [$obj:ident] [$Id:ty]
+        [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
+        [[$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]]
+        [$([$field:ident $delim:tt $field_ty:ty $(= $field_val:expr)?])*]
+    ) => {
+        $crate::generics_concat! {
+            $crate::dep_type {
+                @concat_generics_done
+                [$BuilderCore]
+                [$([$attr])*] [$vis] [$name] [$obj] [$Id]
+                [$($g)*] [$($r)*] [$($w)*]
+                [$([$field $delim $field_ty $(= $field_val)?])*]
+            }
+            [$($g)*] [$($r)*] [$($w)*],
+            [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]
+        }
+    };
+    (
+        @concat_generics_done
+        [$BuilderCore:ty]
+        [$([$attr:meta])*] [$vis:vis] [$name:ident] [$obj:ident] [$Id:ty]
+        [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
+        [$([$field:ident $delim:tt $field_ty:ty $(= $field_val:expr)?])*]
+        [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
+    ) => {
+        $crate::dep_type! {
+            @unroll_fields
+            [$([$attr])*] [$vis] [$name] [$obj] [$Id]
+            [$($g)*] [$($r)*] [$($w)*]
+            [] [] [] []
+            [[$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*] []]
+            [$([$field $delim $field_ty $(= $field_val)?])*]
+        }
+    };
+    (
+        @concat_generics
+        [$([$attr:meta])*] [$vis:vis] [$name:ident] [$obj:ident] [$Id:ty]
+        [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
+        []
+        [$([$field:ident $delim:tt $field_ty:ty $(= $field_val:expr)?])*]
+    ) => {
+        $crate::dep_type! {
+            @unroll_fields
+            [$([$attr])*] [$vis] [$name] [$obj] [$Id]
+            [$($g)*] [$($r)*] [$($w)*]
+            [] [] [] []
+            []
+            [$([$field $delim $field_ty $(= $field_val)?])*]
+        }
     };
     (
         @unroll_fields
@@ -605,6 +656,11 @@ macro_rules! dep_type {
         )?]
         [[$field:ident $delim:tt $field_ty:ty $(= $field_val:expr)?] $($fields:tt)*]
     ) => {
+        $crate::std_compile_error!("\
+            invalid dep type field definition, allowed forms are \
+            '$field_name : $field_type = $field_value', and \
+            '$field_name yield $field_type'\
+        ");
     };
     (
         @unroll_fields
