@@ -489,7 +489,7 @@ impl base_Screen for Screen {
         if let Some((invalidated_l, x0)) = x0 {
             let invalidated_r = Self::end_text(size.x, line, x);
             self.invalidated = self.invalidated
-                .union(Rect::with_tl_br(Point { x: invalidated_l, y: p.y }, Point { x: invalidated_r, y: p.y + 1 }))
+                .union(Rect::from_tl_br(Point { x: invalidated_l, y: p.y }, Point { x: invalidated_r, y: p.y + 1 }))
                 .unwrap().right().unwrap()
             ;
             x0 .. x
@@ -498,7 +498,7 @@ impl base_Screen for Screen {
         }
     }
 
-    fn update(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Box<dyn Any>> {
+    fn update(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Box<dyn core::any::Any>> {
         self.update_raw(cursor, wait).map_err(|e| Box::new(e) as _)
     }
 }
