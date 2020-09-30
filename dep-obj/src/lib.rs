@@ -57,7 +57,7 @@ impl<PropType: Clone + Debug + Send + Sync + 'static> DepPropType for PropType {
 
 #[derive(Educe)]
 #[educe(Debug)]
-pub struct DepEntry<OwnerId: ComponentId, PropType: DepPropType> {
+pub struct DepPropEntry<OwnerId: ComponentId, PropType: DepPropType> {
     default: &'static PropType,
     style: Option<PropType>,
     local: Option<PropType>,
@@ -77,14 +77,39 @@ impl<OwnerId: ComponentId, PropType: DepPropType> DepPropOnChanged<OwnerId, Prop
     }
 }
 
-impl<OwnerId: ComponentId, PropType: DepPropType> DepEntry<OwnerId, PropType> {
+impl<OwnerId: ComponentId, PropType: DepPropType> DepPropEntry<OwnerId, PropType> {
     pub const fn new(default: &'static PropType) -> Self {
-        DepEntry {
+        DepPropEntry {
             default,
             style: None,
             local: None,
             on_changed: Vec::new()
         }
+    }
+}
+
+#[derive(Educe)]
+#[educe(Debug)]
+pub struct DepEventEntry<OwnerId: ComponentId, ArgsType> {
+    #[educe(Debug(ignore))]
+    on_raised: Vec<fn(context: &mut dyn Context, id: OwnerId, args: &mut ArgsType)>,
+}
+
+pub struct DepEventOnRaised<OwnerId: ComponentId, ArgsType> {
+    callbacks: Vec<fn(context: &mut dyn Context, id: OwnerId, args: &mut ArgsType)>,
+}
+
+impl<OwnerId: ComponentId, ArgsType> DepEventOnRaised<OwnerId, ArgsType> {
+    pub fn call(self, context: &mut dyn Context, id: OwnerId, args: &mut ArgsType) {
+        for callback in self.callbacks {
+            callback(context, id, args);
+        }
+    }
+}
+
+impl<OwnerId: ComponentId, ArgsType> DepEventEntry<OwnerId, ArgsType> {
+    pub const fn new() -> Self {
+        DepEventEntry { on_raised: Vec::new() }
     }
 }
 
@@ -97,11 +122,58 @@ pub trait DepType: Sized {
 
 #[derive(Educe)]
 #[educe(Debug, Clone, Copy)]
+pub struct DepEvent<Owner: DepType, ArgsType> {
+    offset: usize,
+    _phantom: PhantomType<(Owner, ArgsType)>
+}
+
+impl<Owner: DepType, ArgsType> DepEvent<Owner, ArgsType> {
+    pub const unsafe fn new(offset: usize) -> Self {
+        DepEvent { offset, _phantom: PhantomType::new() }
+    }
+
+    pub fn offset(self) -> usize { self.offset }
+
+    fn entry(self, owner: &Owner) -> &DepEventEntry<Owner::Id, ArgsType> {
+        unsafe {
+            let entry = (owner as *const _ as usize).unchecked_add(self.offset);
+            let entry = entry as *const DepEventEntry<Owner::Id, ArgsType>;
+            &*entry
+        }
+    }
+
+    fn entry_mut(self, owner: &mut Owner) -> &mut DepEventEntry<Owner::Id, ArgsType> {
+        unsafe {
+            let entry = (owner as *mut _ as usize).unchecked_add(self.offset);
+            let entry = entry as *mut DepEventEntry<Owner::Id, ArgsType>;
+            &mut *entry
+        }
+    }
+
+    pub fn raise(
+        self,
+        owner: &Owner,
+    ) -> DepEventOnRaised<Owner::Id, ArgsType> {
+        let entry = self.entry(owner);
+        DepEventOnRaised { callbacks: entry.on_raised.clone() }
+    }
+
+    pub fn on_raised(
+        self,
+        owner: &mut Owner,
+        callback: fn(context: &mut dyn Context, id: Owner::Id, args: &mut ArgsType),
+    ) {
+        let entry_mut = self.entry_mut(owner);
+        entry_mut.on_raised.push(callback);
+    }
+}
+
+#[derive(Educe)]
+#[educe(Debug, Clone, Copy)]
 pub struct DepProp<Owner: DepType, PropType: DepPropType> {
     offset: usize,
     _phantom: PhantomType<(Owner, PropType)>
 }
-
 
 impl<Owner: DepType, PropType: DepPropType> DepProp<Owner, PropType> {
     pub const unsafe fn new(offset: usize) -> Self {
@@ -110,18 +182,18 @@ impl<Owner: DepType, PropType: DepPropType> DepProp<Owner, PropType> {
 
     pub fn offset(self) -> usize { self.offset }
 
-    fn entry(self, owner: &Owner) -> &DepEntry<Owner::Id, PropType> {
+    fn entry(self, owner: &Owner) -> &DepPropEntry<Owner::Id, PropType> {
         unsafe {
             let entry = (owner as *const _ as usize).unchecked_add(self.offset);
-            let entry = entry as *const DepEntry<Owner::Id, PropType>;
+            let entry = entry as *const DepPropEntry<Owner::Id, PropType>;
             &*entry
         }
     }
 
-    fn entry_mut(self, owner: &mut Owner) -> &mut DepEntry<Owner::Id, PropType> {
+    fn entry_mut(self, owner: &mut Owner) -> &mut DepPropEntry<Owner::Id, PropType> {
         unsafe {
             let entry = (owner as *mut _ as usize).unchecked_add(self.offset);
-            let entry = entry as *mut DepEntry<Owner::Id, PropType>;
+            let entry = entry as *mut DepPropEntry<Owner::Id, PropType>;
             &mut *entry
         }
     }
@@ -614,11 +686,11 @@ macro_rules! dep_type {
             [$($g)*] [$($r)*] [$($w)*]
             [
                 $($core_fields)*
-                $field: $crate::DepEntry<$Id, $field_ty>,
+                $field: $crate::DepPropEntry<$Id, $field_ty>,
             ]
             [
                 $($core_new)*
-                $field: $crate::DepEntry::new(&Self:: [< $field:upper _DEFAULT >] ),
+                $field: $crate::DepPropEntry::new(&Self:: [< $field:upper _DEFAULT >] ),
             ]
             [
                 $($core_consts)*
@@ -645,6 +717,54 @@ macro_rules! dep_type {
                         id. [< $obj _set_uncond >] (context, $name:: [< $field:upper >] , value);
                         self
                     }
+                ]
+            )?]
+            [$($fields)*]
+        }
+    };
+    (
+        @unroll_fields
+        [$([$attr:meta])*] [$vis:vis] [$name:ident] [$obj:ident] [$Id:ty]
+        [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
+        [$($core_fields:tt)*]
+        [$($core_new:tt)*]
+        [$($core_consts:tt)*]
+        [$($dep_props:tt)*]
+        [$(
+            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
+            [$($builder_methods:tt)*]
+        )?]
+        [[$event:ident yield $event_args:ty] $($fields:tt)*]
+    ) => {
+        $crate::dep_type! {
+            @unroll_fields
+            [$([$attr])*] [$vis] [$name] [$obj] [$Id]
+            [$($g)*] [$($r)*] [$($w)*]
+            [
+                $($core_fields)*
+                $event: $crate::DepEventEntry<$Id, $event_args>,
+            ]
+            [
+                $($core_new)*
+                $event: $crate::DepEventEntry::new(),
+            ]
+            [
+                $($core_consts)*
+            ]
+            [
+                $($dep_props)*
+
+                $vis const [< $event:upper >] : $crate::DepEvent<Self, $event_args> = {
+                    unsafe { 
+                        let offset = $crate::memoffset_offset_of!( [< $name Core >] $($r)*, $event );
+                        $crate::DepEvent::new(offset)
+                    }
+                };
+            ]
+            [$(
+                [$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]
+                [
+                    $($builder_methods)*
                 ]
             )?]
             [$($fields)*]
