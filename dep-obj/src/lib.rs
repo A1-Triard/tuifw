@@ -312,6 +312,13 @@ impl<Owner: DepType, PropType: DepPropType> AnySetter<Owner> for Setter<Owner, P
 }
 
 #[derive(Educe)]
+#[educe(Debug, Clone)]
+pub struct Template<OwnerId: ComponentId> {
+    #[educe(Debug(ignore))]
+    pub load: fn(context: &mut dyn Context, id: OwnerId),
+}
+
+#[derive(Educe)]
 #[educe(Debug, Clone, Default)]
 pub struct Style<Owner: DepType> {
     setters: Vec<Box<dyn AnySetter<Owner>>>,
