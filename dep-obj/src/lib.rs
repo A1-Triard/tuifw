@@ -1,4 +1,5 @@
 #![feature(const_fn)]
+#![feature(const_fn_fn_ptr_basics)]
 #![feature(const_maybe_uninit_as_ptr)]
 #![feature(const_ptr_offset_from)]
 #![feature(const_raw_ptr_deref)]
@@ -6,6 +7,7 @@
 #![feature(shrink_to)]
 #![feature(try_reserve)]
 #![feature(unchecked_math)]
+
 #![deny(warnings)]
 
 #![cfg_attr(not(test), no_std)]
