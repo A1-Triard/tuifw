@@ -27,11 +27,17 @@ use phantom_type::PhantomType;
 #[doc(hidden)]
 pub use core::cmp::PartialEq as std_cmp_PartialEq;
 #[doc(hidden)]
+pub use core::compile_error as std_compile_error;
+#[doc(hidden)]
+pub use core::concat as std_concat;
+#[doc(hidden)]
 pub use core::default::Default as std_default_Default;
 #[doc(hidden)]
 pub use core::fmt::Debug as std_fmt_Debug;
 #[doc(hidden)]
 pub use core::option::Option as std_option_Option;
+#[doc(hidden)]
+pub use core::stringify as std_stringify;
 #[doc(hidden)]
 pub use dyn_context::Context as dyn_context_Context;
 #[doc(hidden)]
@@ -658,11 +664,17 @@ macro_rules! dep_type {
         )?]
         [[$field:ident $delim:tt $field_ty:ty $(= $field_val:expr)?] $($fields:tt)*]
     ) => {
-        $crate::std_compile_error!("\
-            invalid dep type field definition, allowed forms are \
+        $crate::std_compile_error!($crate::std_concat!("\
+            invalid dep type field definition\n\
+            \n\
+        ",
+            $crate::std_stringify!($field $delim $field_ty $(= $field_val)?),
+        "\
+            \n\n\
+            allowed forms are \
             '$field_name : $field_type = $field_value', and \
             '$field_name yield $field_type'\
-        ");
+        "));
     };
     (
         @unroll_fields
