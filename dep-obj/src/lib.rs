@@ -711,7 +711,7 @@ macro_rules! dep_type {
                 [
                     $($builder_methods)*
 
-                    $vis fn $field(&mut self, value: $field_ty) -> &mut Self {
+                    $vis fn $field(mut self, value: $field_ty) -> Self {
                         let id = <$BuilderCore as $crate::DepObjBuilderCore<$Id>>::id(&self.core);
                         let context = <$BuilderCore as $crate::DepObjBuilderCore<$Id>>::context_mut(&mut self.core);
                         id. [< $obj _set_uncond >] (context, $name:: [< $field:upper >] , value);
@@ -864,7 +864,10 @@ macro_rules! dep_type {
                     }
 
                     #[allow(dead_code)]
-                    fn core_priv(&self) -> &$BuilderCore { &self.core }
+                    fn core_priv(self) -> $BuilderCore { self.core }
+
+                    #[allow(dead_code)]
+                    fn core_priv_ref(&self) -> &$BuilderCore { &self.core }
 
                     #[allow(dead_code)]
                     fn core_priv_mut(&mut self) -> &mut $BuilderCore { &mut self.core }
@@ -1334,7 +1337,7 @@ mod test {
         let mut arena = TestArena(Arena::new(&mut TEST_NODE.lock().unwrap()));
         let id = arena.0.insert(|id| (TestNode { obj1: None }, TestId(id)));
         TestObj1::new(&mut arena, id);
-        let mut builder = TestObj1Builder::new_priv(TestIdBuilder { id, arena: &mut arena });
+        let builder = TestObj1Builder::new_priv(TestIdBuilder { id, arena: &mut arena });
         builder.int_val(1);
         assert_eq!(id.obj1_get(&arena, TestObj1::INT_VAL), &1);
     }
