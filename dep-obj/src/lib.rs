@@ -971,6 +971,36 @@ macro_rules! dep_obj {
             }
 
             #[allow(dead_code)]
+            $vis fn [< $name _raise >] <DepEventArgsType>(
+                self,
+                context: &mut dyn $crate::dyn_context_Context,
+                event: $crate::DepEvent<$ty, DepEventArgsType>,
+                args: &mut DepEventArgsType,
+            ) {
+                let $this = self;
+                let $arena = $crate::dyn_context_ContextExt::get::<$Arena>(context);
+                let obj = $field;
+                let on_raised = event.raise(obj);
+                on_raised.call(context, self, args);
+            }
+
+            #[allow(dead_code)]
+            $vis fn [< $name _on >] <DepEventArgsType>(
+                self,
+                $arena: &mut $Arena,
+                event: $crate::DepEvent<$ty, DepEventArgsType>,
+                on_raised: fn(
+                    context: &mut dyn $crate::dyn_context_Context,
+                    id: Self,
+                    args: &mut DepEventArgsType
+                ),
+            ) {
+                let $this = self;
+                let obj = $field_mut;
+                event.on_raised(obj, on_raised);
+            }
+
+            #[allow(dead_code)]
             $vis fn [< $name _apply_style >] (
                 self,
                 context: &mut dyn $crate::dyn_context_Context,
@@ -1108,6 +1138,42 @@ macro_rules! dep_obj {
                 let $this = self;
                 let obj = $field_mut.downcast_mut::<Owner>().expect("invalid cast");
                 prop.on_changed(obj, on_changed);
+            }
+
+            #[allow(dead_code)]
+            $vis fn [< $name _raise >] <
+                Owner: $ty + $crate::DepType<Id=Self>,
+                DepEventArgsType
+            >(
+                self,
+                context: &mut dyn $crate::dyn_context_Context,
+                event: $crate::DepEvent<Owner, DepEventArgsType>,
+                args: &mut DepEventArgsType,
+            ) {
+                let $this = self;
+                let $arena = $crate::dyn_context_ContextExt::get::<$Arena>(context);
+                let obj = $field.downcast_ref::<Owner>().expect("invalid cast");
+                let on_raised = event.raise(obj);
+                on_raised.call(context, self, args);
+            }
+
+            #[allow(dead_code)]
+            $vis fn [< $name _on >] <
+                Owner: $ty + $crate::DepType<Id=Self>,
+                DepEventArgsType
+            >(
+                self,
+                $arena: &mut $Arena,
+                event: $crate::DepEvent<Owner, DepEventArgsType>,
+                on_raised: fn(
+                    context: &mut dyn $crate::dyn_context_Context,
+                    id: Self,
+                    args: &mut DepEventArgsType
+                ),
+            ) {
+                let $this = self;
+                let obj = $field_mut.downcast_mut::<Owner>().expect("invalid cast");
+                event.on_raised(obj, on_raised);
             }
 
             #[allow(dead_code)]
