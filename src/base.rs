@@ -3,11 +3,11 @@ use std::fmt::Debug;
 use std::mem::replace;
 use components_arena::{ComponentId, Id, Component, Arena, ComponentClassMutex};
 use dyn_context::{Context, ContextExt};
-use dep_obj::{dep_system, dep_obj, Template, Style};
+use dep_obj::{dep_type, dep_obj, Style, DepObjBuilderCore, Template};
 use downcast_rs::{Downcast, impl_downcast};
 use macro_attr_2018::macro_attr;
 use tuifw_screen_base::Screen;
-use crate::view::{View, ViewTree, ViewBuilder};
+use crate::view::{View, ViewTree, ViewBuilder, RootDecorator};
 
 pub trait WidgetBehavior {
     fn load(&self, tree: &mut WidgetTree, widget: Widget, view: View);
@@ -170,7 +170,7 @@ impl Widget {
         behavior.load(tree, self, view);
     }
 
-    dep_system! {
+    dep_obj! {
         pub dyn fn obj(self as this, tree: WidgetTree) -> WidgetObj {
             if mut {
                 tree.widget_arena[this.0].obj.as_mut().expect("root widget does not have obj")
@@ -182,23 +182,23 @@ impl Widget {
 }
 
 pub trait ViewBuilderWidgetExt {
-    fn widget(&mut self, widget: Widget) -> &mut Self;
+    fn widget(self, widget: Widget) -> Self;
 }
 
 impl<'a> ViewBuilderWidgetExt for ViewBuilder<'a> {
-    fn widget(&mut self, widget: Widget) -> &mut Self {
-        let view = self.view();
-        let tree = self.context().get_mut::<WidgetTree>();
+    fn widget(mut self, widget: Widget) -> Self {
+        let view = self.id();
+        let tree = self.context_mut().get_mut::<WidgetTree>();
         widget.load(tree, view);
         self
     }
 }
 
-dep_obj! {
+dep_type! {
     #[derive(Debug)]
     pub struct Root become obj in Widget {
         panel_template: Option<Template<View>> = None,
-        decorator_style: Option<Style<View>> = None,
+        decorator_style: Option<Style<RootDecorator>> = None,
     }
 }
 

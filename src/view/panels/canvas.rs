@@ -1,67 +1,60 @@
 use std::fmt::Debug;
 use tuifw_screen_base::{Vector, Point, Rect};
 use components_arena::ComponentId;
-use dep_obj::{dep_obj, DepTypeToken};
+use dep_obj::{dep_type, DepObjBuilderCore};
 use dyn_context::{Context, ContextExt};
-use once_cell::sync::{self};
 use crate::view::base::*;
 
 pub trait ViewBuilderCanvasPanelExt {
     fn canvas_panel(
-        &mut self,
-        f: impl for<'a, 'b, 'c> FnOnce(&'a mut CanvasPanelBuilder<'b, 'c>) -> &'a mut CanvasPanelBuilder<'b, 'c>
-    ) -> &mut Self;
+        self,
+        f: impl for<'a> FnOnce(CanvasPanelBuilder<'a>) -> CanvasPanelBuilder<'a>
+    ) -> Self;
 }
 
 impl<'a> ViewBuilderCanvasPanelExt for ViewBuilder<'a> {
     fn canvas_panel(
-        &mut self,
-        f: impl for<'b, 'c, 'd> FnOnce(&'b mut CanvasPanelBuilder<'c, 'd>) -> &'b mut CanvasPanelBuilder<'c, 'd>
-    ) -> &mut Self {
-        let view = self.view();
-        let tree: &mut ViewTree = self.context().get_mut();
+        mut self,
+        f: impl for<'b> FnOnce(CanvasPanelBuilder<'b>) -> CanvasPanelBuilder<'b>
+    ) -> Self {
+        let view = self.id();
+        let tree: &mut ViewTree = self.context_mut().get_mut();
         CanvasPanel::new(tree, view);
-        let mut builder = CanvasPanelBuilder(self);
-        f(&mut builder);
-        self
+        f(CanvasPanelBuilder(self)).0
     }
 }
 
-pub struct CanvasPanelBuilder<'a, 'b>(&'a mut ViewBuilder<'b>);
+pub struct CanvasPanelBuilder<'a>(ViewBuilder<'a>);
 
-impl<'a, 'b> CanvasPanelBuilder<'a, 'b> {
+impl<'a> CanvasPanelBuilder<'a> {
     pub fn child<Tag: ComponentId>(
-        &mut self,
+        mut self,
         storage: Option<&mut Option<View>>,
         tag: Tag,
-        layout: impl for<'c, 'd, 'e> FnOnce(&'c mut CanvasLayoutBuilder<'d, 'e>) -> &'c mut CanvasLayoutBuilder<'d, 'e>,
-        f: impl for<'c, 'd> FnOnce(&'c mut ViewBuilder<'d>) -> &'c mut ViewBuilder<'d>
-    ) -> &mut Self {
-        let view = self.0.view();
-        let tree: &mut ViewTree = self.0.context().get_mut();
+        layout: impl for<'b> FnOnce(CanvasLayoutBuilder<'b>) -> CanvasLayoutBuilder<'b>,
+        f: impl for<'b> FnOnce(ViewBuilder<'b>) -> ViewBuilder<'b>
+    ) -> Self {
+        let view = self.0.id();
+        let tree: &mut ViewTree = self.0.context_mut().get_mut();
         let child = View::new(tree, view, |child| (tag, child));
         storage.map(|x| x.replace(child));
         CanvasLayout::new(tree, child);
-        CanvasLayoutBuilder::build_priv(self.0, child, canvas_layout_type(), layout);
-        child.build(self.0.context(), f);
+        child.build(self.0.context_mut(), |child_builder| {
+            let child_builder = layout(CanvasLayoutBuilder::new_priv(child_builder)).core_priv();
+            f(child_builder)
+        });
         self
     }
 }
 
-dep_obj! {
+dep_type! {
     #[derive(Debug)]
     pub struct CanvasLayout become layout in View {
         tl: Point = Point { x: 0, y: 0 },
     }
 
-    use<'a, 'b> &'a mut ViewBuilder<'b> as BuilderCore;
+    type BuilderCore<'a> = ViewBuilder<'a>;
 }
-
-static CANVAS_LAYOUT_TOKEN: sync::Lazy<DepTypeToken<CanvasLayoutType>> = sync::Lazy::new(||
-    CanvasLayoutType::new_priv().expect("CanvasLayoutType builder locked")
-);
-
-pub fn canvas_layout_type() -> &'static CanvasLayoutType { CANVAS_LAYOUT_TOKEN.ty() }
 
 impl CanvasLayout {
     #[allow(clippy::new_ret_no_self)]
@@ -69,8 +62,8 @@ impl CanvasLayout {
         tree: &mut ViewTree,
         view: View,
     ) {
-        view.set_layout(tree, CanvasLayout::new_priv(&CANVAS_LAYOUT_TOKEN));
-        view.layout_on_changed(tree, canvas_layout_type().tl(), Self::invalidate_parent_arrange);
+        view.set_layout(tree, CanvasLayout::new_priv());
+        view.layout_on_changed(tree, CanvasLayout::TL, Self::invalidate_parent_arrange);
     }
 
     fn invalidate_parent_arrange(context: &mut dyn Context, view: View, _old: &Point) {
@@ -130,7 +123,7 @@ impl PanelBehavior for CanvasPanelBehavior {
             let mut child = last_child;
             loop {
                 child = child.next(tree);
-                let child_offset = child.layout_get(tree, canvas_layout_type().tl())
+                let child_offset = child.layout_get(tree, CanvasLayout::TL)
                     .offset_from(Point { x: 0, y: 0 });
                 let child_size = child.desired_size(tree);
                 child.arrange(tree, Rect {

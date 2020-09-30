@@ -2,32 +2,30 @@ use std::borrow::Cow;
 use std::fmt::Debug;
 use tuifw_screen_base::{Vector, Point, Rect, Orient};
 use tuifw_window::{RenderPort};
-use dep_obj::{dep_obj, DepTypeToken};
+use dep_obj::{dep_type, DepObjBuilderCore};
 use dyn_context::{Context, ContextExt};
-use once_cell::sync::{self};
 use crate::view::base::*;
 
 pub trait ViewBuilderLineDecoratorExt {
     fn line_decorator(
-        &mut self,
-        f: impl for<'a, 'b, 'c> FnOnce(&'a mut LineDecoratorBuilder<'b, 'c>) -> &'a mut LineDecoratorBuilder<'b, 'c>
-    ) -> &mut Self;
+        self,
+        f: impl for<'a> FnOnce(LineDecoratorBuilder<'a>) -> LineDecoratorBuilder<'a>
+    ) -> Self;
 }
 
 impl<'a> ViewBuilderLineDecoratorExt for ViewBuilder<'a> {
     fn line_decorator(
-        &mut self,
-        f: impl for<'b, 'c, 'd> FnOnce(&'b mut LineDecoratorBuilder<'c, 'd>) -> &'b mut LineDecoratorBuilder<'c, 'd>
-    ) -> &mut Self {
-        let view = self.view();
-        let tree: &mut ViewTree = self.context().get_mut();
+        mut self,
+        f: impl for<'b> FnOnce(LineDecoratorBuilder<'b>) -> LineDecoratorBuilder<'b>
+    ) -> Self {
+        let view = self.id();
+        let tree: &mut ViewTree = self.context_mut().get_mut();
         LineDecorator::new(tree, view);
-        LineDecoratorBuilder::build_priv(self, view, line_decorator_type(), f);
-        self
+        f(LineDecoratorBuilder::new_priv(self)).core_priv()
     }
 }
 
-dep_obj! {
+dep_type! {
     #[derive(Debug)]
     pub struct LineDecorator become decorator in View {
         orient: Orient = Orient::Hor,
@@ -37,14 +35,8 @@ dep_obj! {
         far: Cow<'static, str> = Cow::Borrowed(""),
     }
 
-    use<'a, 'b> &'a mut ViewBuilder<'b> as BuilderCore;
+    type BuilderCore<'a> = ViewBuilder<'a>;
 }
-
-static LINE_DECORATOR_TOKEN: sync::Lazy<DepTypeToken<LineDecoratorType>> = sync::Lazy::new(||
-    LineDecoratorType::new_priv().expect("LineDecoratorType builder locked")
-);
-
-pub fn line_decorator_type() -> &'static LineDecoratorType { LINE_DECORATOR_TOKEN.ty() }
 
 impl LineDecorator {
     const BEHAVIOR: LineDecoratorBehavior = LineDecoratorBehavior;
@@ -54,12 +46,12 @@ impl LineDecorator {
         tree: &mut ViewTree,
         view: View,
     ) {
-        view.set_decorator(tree, LineDecorator::new_priv(&LINE_DECORATOR_TOKEN));
-        view.decorator_on_changed(tree, line_decorator_type().orient(), Self::invalidate_measure);
-        view.decorator_on_changed(tree, line_decorator_type().length(), Self::invalidate_measure);
-        view.decorator_on_changed(tree, line_decorator_type().near(), Self::invalidate_near);
-        view.decorator_on_changed(tree, line_decorator_type().stroke(), Self::invalidate_stroke);
-        view.decorator_on_changed(tree, line_decorator_type().far(), Self::invalidate_far);
+        view.set_decorator(tree, LineDecorator::new_priv());
+        view.decorator_on_changed(tree, LineDecorator::ORIENT, Self::invalidate_measure);
+        view.decorator_on_changed(tree, LineDecorator::LENGTH, Self::invalidate_measure);
+        view.decorator_on_changed(tree, LineDecorator::NEAR, Self::invalidate_near);
+        view.decorator_on_changed(tree, LineDecorator::STROKE, Self::invalidate_stroke);
+        view.decorator_on_changed(tree, LineDecorator::FAR, Self::invalidate_far);
     }
 
     fn invalidate_measure<T>(context: &mut dyn Context, view: View, _old: &T) {
@@ -80,7 +72,7 @@ impl LineDecorator {
 
     fn invalidate_far(context: &mut dyn Context, view: View, _old: &Cow<'static, str>) {
         let tree: &mut ViewTree = context.get_mut();
-        let &orient = view.decorator_get(tree, line_decorator_type().orient());
+        let &orient = view.decorator_get(tree, LineDecorator::ORIENT);
         let size = view.render_bounds(tree).size;
         let invalidated = if orient == Orient::Vert {
             Rect { tl: Point { x: 0, y: size.y.wrapping_sub(1) }, size: Vector { x: 1, y: 1 } }
@@ -108,8 +100,8 @@ impl DecoratorBehavior for LineDecoratorBehavior {
     }
 
     fn desired_size(&self, view: View, tree: &mut ViewTree, _children_desired_size: Vector) -> Vector {
-        let &orient = view.decorator_get(tree, line_decorator_type().orient());
-        let &length = view.decorator_get(tree, line_decorator_type().length());
+        let &orient = view.decorator_get(tree, LineDecorator::ORIENT);
+        let &length = view.decorator_get(tree, LineDecorator::LENGTH);
         if orient == Orient::Vert {
             Vector {  x: 1, y: length }
         } else {
@@ -122,8 +114,8 @@ impl DecoratorBehavior for LineDecoratorBehavior {
     }
 
     fn render_bounds(&self, view: View, tree: &mut ViewTree, _children_render_bounds: Rect) -> Rect {
-        let &orient = view.decorator_get(tree, line_decorator_type().orient());
-        let &length = view.decorator_get(tree, line_decorator_type().length());
+        let &orient = view.decorator_get(tree, LineDecorator::ORIENT);
+        let &length = view.decorator_get(tree, LineDecorator::LENGTH);
         if orient == Orient::Vert {
             Rect { tl: Point { x: 0, y: 0 }, size: Vector {  x: 1, y: length } }
         } else {
@@ -132,11 +124,11 @@ impl DecoratorBehavior for LineDecoratorBehavior {
     }
 
     fn render(&self, view: View, tree: &ViewTree, port: &mut RenderPort) {
-        let &orient = view.decorator_get(tree, line_decorator_type().orient());
-        let &length = view.decorator_get(tree, line_decorator_type().length());
-        let near = view.decorator_get(tree, line_decorator_type().near());
-        let stroke = view.decorator_get(tree, line_decorator_type().stroke());
-        let far = view.decorator_get(tree, line_decorator_type().far());
+        let &orient = view.decorator_get(tree, LineDecorator::ORIENT);
+        let &length = view.decorator_get(tree, LineDecorator::LENGTH);
+        let near = view.decorator_get(tree, LineDecorator::NEAR);
+        let stroke = view.decorator_get(tree, LineDecorator::STROKE);
+        let far = view.decorator_get(tree, LineDecorator::FAR);
         let fg = view.actual_fg(tree);
         let bg = view.actual_bg(tree);
         let attr = view.actual_attr(tree);

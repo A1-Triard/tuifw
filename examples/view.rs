@@ -3,8 +3,8 @@ use std::borrow::Cow;
 use either::Right;
 use dyn_context::ContextExt;
 use tuifw::{Key, Vector, Thickness, HAlign, VAlign, Point, Side, Rect};
-use tuifw::view::{View, ViewTree, view_base_type, ViewBuilderViewAlignExt};
-use tuifw::view::panels::{ViewBuilderCanvasPanelExt, canvas_layout_type};
+use tuifw::view::{View, ViewTree, ViewBase, ViewBuilderViewAlignExt};
+use tuifw::view::panels::{ViewBuilderCanvasPanelExt, CanvasLayout};
 use tuifw::view::panels::{ViewBuilderDockPanelExt};
 use tuifw::view::decorators::{ViewBuilderBorderDecoratorExt};
 use tuifw::view::decorators::{ViewBuilderLabelDecoratorExt};
@@ -68,7 +68,7 @@ fn main() {
     let bounds = padding.shrink_rect(Rect { tl: Point { x: 0, y: 0 }, size: screen.size() });
     let tree = &mut ViewTree::new(screen, |_| ((), |tree| tree));
     let border = build(tree, bounds);
-    border.base_on(tree, view_base_type().input(), |context, border, input| {
+    border.base_on(tree, ViewBase::INPUT, |context, border, input| {
         let tree: &mut ViewTree = context.get_mut();
         let d = match input.key() {
             (n, Key::Left) | (n, Key::Char('h')) =>
@@ -82,8 +82,8 @@ fn main() {
             (_, Key::Escape) => return tree.quit(),
             _ => return,
         };
-        let tl = border.layout_get(tree, canvas_layout_type().tl()).offset(d);
-        border.layout_set_distinct(tree, canvas_layout_type().tl(), tl);
+        let tl = border.layout_get(tree, CanvasLayout::TL).offset(d);
+        border.layout_set_distinct(tree, CanvasLayout::TL, tl);
     });
     border.focus(tree);
     while ViewTree::update(tree, true).unwrap() { }

@@ -3,65 +3,59 @@ use std::fmt::Debug;
 use std::hint::unreachable_unchecked;
 use tuifw_screen_base::{Vector, Rect, Side, Orient, Thickness};
 use components_arena::ComponentId;
-use dep_obj::{dep_obj, DepTypeToken};
+use dep_obj::{dep_type, DepObjBuilderCore};
 use dyn_context::{Context, ContextExt};
-use once_cell::sync::{self};
 use either::{Either, Left, Right};
 use crate::view::base::*;
 
 pub trait ViewBuilderDockPanelExt {
     fn dock_panel(
-        &mut self,
-        f: impl for<'a, 'b, 'c> FnOnce(&'a mut DockPanelBuilder<'b, 'c>) -> &'a mut DockPanelBuilder<'b, 'c>
-    ) -> &mut Self;
+        self,
+        f: impl for<'a> FnOnce(DockPanelBuilder<'a>) -> DockPanelBuilder<'a>
+    ) -> Self;
 }
 
 impl<'a> ViewBuilderDockPanelExt for ViewBuilder<'a> {
     fn dock_panel(
-        &mut self,
-        f: impl for<'b, 'c, 'd> FnOnce(&'b mut DockPanelBuilder<'c, 'd>) -> &'b mut DockPanelBuilder<'c, 'd>
-    ) -> &mut Self {
-        let view = self.view();
-        let tree: &mut ViewTree = self.context().get_mut();
+        mut self,
+        f: impl for<'b> FnOnce(DockPanelBuilder<'b>) -> DockPanelBuilder<'b>
+    ) -> Self {
+        let view = self.id();
+        let tree: &mut ViewTree = self.context_mut().get_mut();
         DockPanel::new(tree, view);
-        DockPanelBuilder::build_priv(self, view, dock_panel_type(), f);
-        self
+        f(DockPanelBuilder::new_priv(self)).core_priv()
     }
 }
 
-impl<'a, 'b> DockPanelBuilder<'a, 'b> {
+impl<'a> DockPanelBuilder<'a> {
     pub fn child<Tag: ComponentId>(
-        &mut self,
+        mut self,
         storage: Option<&mut Option<View>>,
         tag: Tag,
-        layout: impl for<'c, 'd, 'e> FnOnce(&'c mut DockLayoutBuilder<'d, 'e>) -> &'c mut DockLayoutBuilder<'d, 'e>,
-        f: impl for<'c, 'd> FnOnce(&'c mut ViewBuilder<'d>) -> &'c mut ViewBuilder<'d>
-    ) -> &mut Self {
-        let view = self.core_priv().view();
-        let tree: &mut ViewTree = self.core_priv_mut().context().get_mut();
+        layout: impl for<'b> FnOnce(DockLayoutBuilder<'b>) -> DockLayoutBuilder<'b>,
+        f: impl for<'b> FnOnce(ViewBuilder<'b>) -> ViewBuilder<'b>
+    ) -> Self {
+        let view = self.core_priv_ref().id();
+        let tree: &mut ViewTree = self.core_priv_mut().context_mut().get_mut();
         let child = View::new(tree, view, |child| (tag, child));
         storage.map(|x| x.replace(child));
         DockLayout::new(tree, child);
-        DockLayoutBuilder::build_priv(self.core_priv_mut(), child, dock_layout_type(), layout);
-        child.build(self.core_priv_mut().context(), f);
+        child.build(self.core_priv_mut().context_mut(), |child_builder| {
+            let child_builder = layout(DockLayoutBuilder::new_priv(child_builder)).core_priv();
+            f(child_builder)
+        });
         self
     }
 }
 
-dep_obj! {
+dep_type! {
     #[derive(Debug)]
     pub struct DockLayout become layout in View {
         dock: Either<f32, Side> = Either::Left(1.),
     }
 
-    use<'a, 'b> &'a mut ViewBuilder<'b> as BuilderCore;
+    type BuilderCore<'a> = ViewBuilder<'a>;
 }
-
-static DOCK_LAYOUT_TOKEN: sync::Lazy<DepTypeToken<DockLayoutType>> = sync::Lazy::new(||
-    DockLayoutType::new_priv().expect("DockLayoutType builder locked")
-);
-
-pub fn dock_layout_type() -> &'static DockLayoutType { DOCK_LAYOUT_TOKEN.ty() }
 
 impl DockLayout {
     #[allow(clippy::new_ret_no_self)]
@@ -69,8 +63,8 @@ impl DockLayout {
         tree: &mut ViewTree,
         view: View,
     ) {
-        view.set_layout(tree, DockLayout::new_priv(&DOCK_LAYOUT_TOKEN));
-        view.layout_on_changed(tree, dock_layout_type().dock(), Self::invalidate_parent_measure);
+        view.set_layout(tree, DockLayout::new_priv());
+        view.layout_on_changed(tree, DockLayout::DOCK, Self::invalidate_parent_measure);
     }
 
     fn invalidate_parent_measure<T>(context: &mut dyn Context, view: View, _old: &T) {
@@ -81,20 +75,14 @@ impl DockLayout {
 
 impl Layout for DockLayout { }
 
-dep_obj! {
+dep_type! {
     #[derive(Debug)]
     pub struct DockPanel become panel in View {
         base: Side = Side::Top,
     }
 
-    use<'a, 'b> &'a mut ViewBuilder<'b> as BuilderCore;
+    type BuilderCore<'a> = ViewBuilder<'a>;
 }
-
-static DOCK_PANEL_TOKEN: sync::Lazy<DepTypeToken<DockPanelType>> = sync::Lazy::new(||
-    DockPanelType::new_priv().expect("DockPanelType builder locked")
-);
-
-pub fn dock_panel_type() -> &'static DockPanelType { DOCK_PANEL_TOKEN.ty() }
 
 impl DockPanel {
     const BEHAVIOR: DockPanelBehavior = DockPanelBehavior;
@@ -104,7 +92,7 @@ impl DockPanel {
         tree: &mut ViewTree,
         view: View,
     ) {
-        view.set_panel(tree, DockPanel::new_priv(&DOCK_PANEL_TOKEN));
+        view.set_panel(tree, DockPanel::new_priv());
     }
 }
 
@@ -131,7 +119,7 @@ impl PanelBehavior for DockPanelBehavior {
             let mut child = last_child;
             loop {
                 child = child.next(tree);
-                let dock = match child.layout_get(tree, dock_layout_type().dock()) {
+                let dock = match child.layout_get(tree, DockLayout::DOCK) {
                     &Right(dock) => dock,
                     &Left(factor) => {
                         factor_sum += factor;
@@ -174,7 +162,7 @@ impl PanelBehavior for DockPanelBehavior {
                 Orient::Vert => children_size.x = (children_size.x as u16).saturating_add(breadth) as i16,
             }
             if let Some(last_undocked_child) = last_undocked_child {
-                let orient = match view.panel_get(tree, dock_panel_type().base()) {
+                let orient = match view.panel_get(tree, DockPanel::BASE) {
                     Side::Left | Side::Right => Orient::Hor,
                     Side::Top | Side::Bottom => Orient::Vert
                 };
@@ -184,7 +172,7 @@ impl PanelBehavior for DockPanelBehavior {
                 let mut child = last_child;
                 loop {
                     child = child.next(tree);
-                    let factor = match child.layout_get(tree, dock_layout_type().dock()) {
+                    let factor = match child.layout_get(tree, DockLayout::DOCK) {
                         &Right(_) => continue,
                         &Left(factor) => factor
                     };
@@ -253,7 +241,7 @@ impl PanelBehavior for DockPanelBehavior {
             let mut child = last_child;
             loop {
                 child = child.next(tree);
-                let dock = match child.layout_get(tree, dock_layout_type().dock()) {
+                let dock = match child.layout_get(tree, DockLayout::DOCK) {
                     &Right(dock) => dock,
                     &Left(factor) => {
                         factor_sum += factor;
@@ -296,11 +284,11 @@ impl PanelBehavior for DockPanelBehavior {
             if let Some(last_undocked_child) = last_undocked_child {
                 children_rect = children_arrange_bounds;
                 let base_bounds = bounds;
-                let &dock = view.panel_get(tree, dock_panel_type().base());
+                let &dock = view.panel_get(tree, DockPanel::BASE);
                 let mut child = last_child;
                 loop {
                     child = child.next(tree);
-                    let factor = match child.layout_get(tree, dock_layout_type().dock()) {
+                    let factor = match child.layout_get(tree, DockLayout::DOCK) {
                         &Right(_) => continue,
                         &Left(factor) => factor
                     };

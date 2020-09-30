@@ -1,8 +1,11 @@
+#![feature(const_fn)]
+#![feature(const_panic)]
+#![feature(stmt_expr_attributes)]
+
 #![deny(warnings)]
 #![allow(clippy::collapsible_if)]
 #![allow(clippy::many_single_char_names)]
 #![allow(clippy::too_many_arguments)]
-#![feature(stmt_expr_attributes)]
 
 #![no_std]
 extern crate alloc;
@@ -144,7 +147,7 @@ pub struct Vector {
 }
 
 impl Vector {
-    pub fn null() -> Vector { Vector { x: 0, y: 0 } }
+    pub const fn null() -> Vector { Vector { x: 0, y: 0 } }
 
     pub fn is_null(self) -> bool { self.x == 0 && self.y == 0 }
 
@@ -258,7 +261,7 @@ pub struct Thickness {
 }
 
 impl Thickness {
-    pub fn new(l: i32, t: i32, r: i32, b: i32) -> Self {
+    pub const fn new(l: i32, t: i32, r: i32, b: i32) -> Self {
         assert!(l >= -(u16::MAX as u32 as i32) && l <= u16::MAX as u32 as i32);
         assert!(t >= -(u16::MAX as u32 as i32) && t <= u16::MAX as u32 as i32);
         assert!(r >= -(u16::MAX as u32 as i32) && r <= u16::MAX as u32 as i32);
@@ -266,11 +269,11 @@ impl Thickness {
         Thickness { l, t, r, b }
     }
 
-    pub unsafe fn new_unchecked(l: i32, t: i32, r: i32, b: i32) -> Self {
+    pub const unsafe fn new_unchecked(l: i32, t: i32, r: i32, b: i32) -> Self {
         Thickness { l, t, r, b }
     }
 
-    pub fn all(a: i32) -> Thickness {
+    pub const fn all(a: i32) -> Thickness {
         assert!(a >= -(u16::MAX as u32 as i32) && a <= u16::MAX as u32 as i32);
         Thickness { l: a, t: a, r: a, b: a }
     }

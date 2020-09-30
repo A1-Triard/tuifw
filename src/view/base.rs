@@ -6,10 +6,9 @@ use std::iter::{self};
 use std::mem::{replace};
 use std::num::{NonZeroU16};
 use components_arena::{RawId, Component, Id, Arena, ComponentClassMutex, ComponentId};
-use dep_obj::{dep_obj, dep_system, DepTypeToken, DepProp};
-use dyn_context::{TrivialContext, Context, ContextExt};
+use dep_obj::{dep_obj, dep_type, DepProp, DepPropType, DepObjBuilderCore};
+use dyn_context::{Context, ContextExt};
 use downcast_rs::{Downcast, impl_downcast};
-use once_cell::sync::{self};
 use tuifw_screen_base::{Key, Event, Screen, Vector, Point, Rect, Attr, Color, HAlign, VAlign, Thickness};
 use tuifw_window::{RenderPort, WindowTree, Window};
 use macro_attr_2018::macro_attr;
@@ -86,18 +85,18 @@ macro_attr! {
 
 static VIEW_NODE: ComponentClassMutex<ViewNode> = ComponentClassMutex::new();
 
-#[derive(Debug)]
-pub struct ViewTree {
-    arena: Arena<ViewNode>,
-    window_tree: Option<WindowTree>,
-    screen_size: Vector,
-    root: View,
-    focused: View,
-    actual_focused: View,
-    quit: bool,
+macro_attr! {
+    #[derive(Debug, Context!)]
+    pub struct ViewTree {
+        arena: Arena<ViewNode>,
+        window_tree: Option<WindowTree>,
+        screen_size: Vector,
+        root: View,
+        focused: View,
+        actual_focused: View,
+        quit: bool,
+    }
 }
-
-impl TrivialContext for ViewTree { }
 
 impl ViewTree {
     pub fn new<Tag: ComponentId, T, F: FnOnce(Self) -> T>(
@@ -108,11 +107,11 @@ impl ViewTree {
         let (result, window_tree, root) = arena.insert(|view| {
             let window_tree = WindowTree::new(screen, render_view);
             let screen_size = window_tree.screen_size();
-            let decorator = RootDecorator::new_priv(&ROOT_DECORATOR_TOKEN);
+            let decorator = RootDecorator::new_priv();
             let (tag, result) = root_tag(View(view));
             (ViewNode {
                 tag: tag.into_raw(),
-                base: ViewBase::new_priv(&VIEW_BASE_TOKEN),
+                base: ViewBase::new_priv(),
                 align: None,
                 decorator: Some(Box::new(decorator) as _),
                 window: None,
@@ -137,7 +136,7 @@ impl ViewTree {
             actual_focused: root,
             quit: false,
         };
-        root.decorator_on_changed(&mut tree, root_decorator_type().fill(), RootDecorator::invalidate_screen);
+        root.decorator_on_changed(&mut tree, RootDecorator::FILL, RootDecorator::invalidate_screen);
         result(tree)
     }
 
@@ -169,7 +168,7 @@ impl ViewTree {
             let mut input = ViewInput { key: (n, key), handled: false };
             let mut view = tree.actual_focused;
             loop {
-                view.base_raise(context, view_base_type().input(), &mut input);
+                view.base_raise(context, ViewBase::INPUT, &mut input);
                 if input.handled { break; }
                 let tree: &ViewTree = context.get();
                 if let Some(parent) = view.parent(tree) {
@@ -193,7 +192,7 @@ impl ViewTree {
         tree.actual_focused = focused;
         let mut view = actual_focused;
         loop {
-            view.base_raise(context, view_base_type().lost_focus(), &mut ());
+            view.base_raise(context, ViewBase::LOST_FOCUS, &mut ());
             let tree: &ViewTree = context.get();
             if let Some(parent) = view.parent(tree) {
                 view = parent;
@@ -203,7 +202,7 @@ impl ViewTree {
         }
         let mut view = focused;
         loop {
-            view.base_raise(context, view_base_type().got_focus(), &mut ());
+            view.base_raise(context, ViewBase::GOT_FOCUS, &mut ());
             let tree: &ViewTree = context.get();
             if let Some(parent) = view.parent(tree) {
                 view = parent;
@@ -230,9 +229,10 @@ pub struct ViewBuilder<'a> {
     context: &'a mut dyn Context,
 }
 
-impl<'a> ViewBuilder<'a> {
-    pub fn view(&self) -> View { self.view }
-    pub fn context(&mut self) -> &mut dyn Context { self.context }
+impl<'a> DepObjBuilderCore<View> for ViewBuilder<'a> {
+    fn id(&self) -> View { self.view }
+    fn context(&self) -> &dyn Context { self.context }
+    fn context_mut(&mut self) -> &mut dyn Context { self.context }
 }
 
 macro_attr! {
@@ -252,8 +252,8 @@ impl View {
             let (tag, result) = tag(View(view));
             (ViewNode {
                 tag: tag.into_raw(),
-                base: ViewBase::new_priv(&VIEW_BASE_TOKEN),
-                align: Some(ViewAlign::new_priv(&VIEW_ALIGN_TOKEN)),
+                base: ViewBase::new_priv(),
+                align: Some(ViewAlign::new_priv()),
                 decorator: None,
                 window: None,
                 layout: None,
@@ -272,17 +272,17 @@ impl View {
             let next = replace(&mut tree.arena[prev.0].next, view);
             tree.arena[view.0].next = next;
         }
-        view.base_on_changed(tree, view_base_type().bg(), ViewBase::on_bg_changed);
-        view.base_on_changed(tree, view_base_type().fg(), ViewBase::on_fg_changed);
-        view.base_on_changed(tree, view_base_type().attr(), ViewBase::on_attr_changed);
-        view.align_on_changed(tree, view_align_type().min_size(), ViewAlign::invalidate_measure);
-        view.align_on_changed(tree, view_align_type().max_w(), ViewAlign::invalidate_measure);
-        view.align_on_changed(tree, view_align_type().max_h(), ViewAlign::invalidate_measure);
-        view.align_on_changed(tree, view_align_type().w(), ViewAlign::invalidate_measure);
-        view.align_on_changed(tree, view_align_type().h(), ViewAlign::invalidate_measure);
-        view.align_on_changed(tree, view_align_type().h_align(), ViewAlign::invalidate_arrange);
-        view.align_on_changed(tree, view_align_type().v_align(), ViewAlign::invalidate_arrange);
-        view.align_on_changed(tree, view_align_type().margin(), ViewAlign::invalidate_measure);
+        view.base_on_changed(tree, ViewBase::BG, ViewBase::on_bg_changed);
+        view.base_on_changed(tree, ViewBase::FG, ViewBase::on_fg_changed);
+        view.base_on_changed(tree, ViewBase::ATTR, ViewBase::on_attr_changed);
+        view.align_on_changed(tree, ViewAlign::MIN_SIZE, ViewAlign::invalidate_measure);
+        view.align_on_changed(tree, ViewAlign::MAX_W, ViewAlign::invalidate_measure);
+        view.align_on_changed(tree, ViewAlign::MAX_H, ViewAlign::invalidate_measure);
+        view.align_on_changed(tree, ViewAlign::W, ViewAlign::invalidate_measure);
+        view.align_on_changed(tree, ViewAlign::H, ViewAlign::invalidate_measure);
+        view.align_on_changed(tree, ViewAlign::H_ALIGN, ViewAlign::invalidate_arrange);
+        view.align_on_changed(tree, ViewAlign::V_ALIGN, ViewAlign::invalidate_arrange);
+        view.align_on_changed(tree, ViewAlign::MARGIN, ViewAlign::invalidate_measure);
         view.invalidate_measure(tree);
         result
     }
@@ -294,10 +294,9 @@ impl View {
     pub fn build<'a>(
         self,
         context: &'a mut dyn Context,
-        f: impl for<'b> FnOnce(&'b mut ViewBuilder<'a>) -> &'b mut ViewBuilder<'a>
+        f: impl FnOnce(ViewBuilder<'a>) -> ViewBuilder<'a>
     ) {
-        let mut builder = ViewBuilder { view: self, context };
-        f(&mut builder);
+        f(ViewBuilder { view: self, context });
     }
 
     pub fn focus(self, tree: &mut ViewTree) -> View {
@@ -431,29 +430,29 @@ impl View {
 
     pub fn actual_fg(self, tree: &ViewTree) -> Color {
         self.self_and_parents(tree)
-            .find_map(|view| *view.base_get(tree, view_base_type().fg()))
+            .find_map(|view| *view.base_get(tree, ViewBase::FG))
             .unwrap_or(Color::Green)
     }
 
     pub fn actual_bg(self, tree: &ViewTree) -> Option<Color> {
         self.self_and_parents(tree)
-            .find_map(|view| *view.base_get(tree, view_base_type().bg()))
+            .find_map(|view| *view.base_get(tree, ViewBase::BG))
             .unwrap_or(None)
     }
 
     pub fn actual_attr(self, tree: &ViewTree) -> Attr {
         self.self_and_parents(tree)
-            .find_map(|view| *view.base_get(tree, view_base_type().attr()))
+            .find_map(|view| *view.base_get(tree, ViewBase::ATTR))
             .unwrap_or(Attr::empty())
     }
 
-    dep_system! {
+    dep_obj! {
         pub fn base(self as this, tree: ViewTree) -> ViewBase {
             if mut { &mut tree.arena[this.0].base } else { &tree.arena[this.0].base }
         }
     }
 
-    dep_system! {
+    dep_obj! {
         pub fn align(self as this, tree: ViewTree) -> ViewAlign {
             if mut {
                 tree.arena[this.0].align.as_mut().expect("root view does not have align")
@@ -463,7 +462,7 @@ impl View {
         }
     }
 
-    dep_system! {
+    dep_obj! {
         pub dyn fn decorator(self as this, tree: ViewTree) -> Decorator {
             if mut {
                 tree.arena[this.0].decorator.as_mut().expect("Decorator missing")
@@ -473,7 +472,7 @@ impl View {
         }
     }
 
-    dep_system! {
+    dep_obj! {
         pub dyn fn layout(self as this, tree: ViewTree) -> Layout {
             if mut {
                 tree.arena[this.0].layout.as_mut().expect("Layout missing")
@@ -483,7 +482,7 @@ impl View {
         }
     }
 
-    dep_system! {
+    dep_obj! {
         pub dyn fn panel(self as this, tree: ViewTree) -> Panel {
             if mut {
                 tree.arena[this.0].panel.as_mut().expect("Panel missing")
@@ -539,12 +538,12 @@ impl View {
 
     fn min_max(self, tree: &ViewTree) -> Option<(Vector, (Option<i16>, Option<i16>))> {
         if self != tree.root {
-            let w = self.align_get(tree, view_align_type().w());
-            let h = self.align_get(tree, view_align_type().h());
-            let min_size = self.align_get(tree, view_align_type().min_size());
+            let w = self.align_get(tree, ViewAlign::W);
+            let h = self.align_get(tree, ViewAlign::H);
+            let min_size = self.align_get(tree, ViewAlign::MIN_SIZE);
             let min_size = Vector { x: w.unwrap_or(min_size.x), y: h.unwrap_or(min_size.y) };
-            let &max_w = self.align_get(tree, view_align_type().max_w());
-            let &max_h = self.align_get(tree, view_align_type().max_h());
+            let &max_w = self.align_get(tree, ViewAlign::MAX_W);
+            let &max_h = self.align_get(tree, ViewAlign::MAX_H);
             let max_size = (w.or(max_w), h.or(max_h));
             Some((min_size, max_size))
         } else {
@@ -559,7 +558,7 @@ impl View {
         let margin = if self == tree.root {
             Thickness::default()
         } else {
-            *self.align_get(tree, view_align_type().margin())
+            *self.align_get(tree, ViewAlign::MARGIN)
         };
         size.0.as_mut().map(|w| *w = margin.shrink_band_w(*w));
         size.1.as_mut().map(|h| *h = margin.shrink_band_h(*h));
@@ -633,15 +632,15 @@ impl View {
         let margin = if self == tree.root {
             Thickness::default()
         } else {
-            *self.align_get(tree, view_align_type().margin())
+            *self.align_get(tree, ViewAlign::MARGIN)
         };
         rect = margin.shrink_rect(rect);
         let (h_align, v_align) = if self == tree.root {
             (HAlign::Left, VAlign::Top)
         } else {
             (
-                *self.align_get(tree, view_align_type().h_align()),
-                *self.align_get(tree, view_align_type().v_align())
+                *self.align_get(tree, ViewAlign::H_ALIGN),
+                *self.align_get(tree, ViewAlign::V_ALIGN)
             )
         };
         let min_max = self.min_max(tree);
@@ -697,36 +696,28 @@ impl View {
 
 pub trait ViewBuilderRootDecoratorExt {
     fn root_decorator(
-        &mut self,
-        f: impl for<'a, 'b, 'c> FnOnce(&'a mut RootDecoratorBuilder<'b, 'c>) -> &'a mut RootDecoratorBuilder<'b, 'c>
-    ) -> &mut Self;
+        self,
+        f: impl for<'a> FnOnce(RootDecoratorBuilder<'a>) -> RootDecoratorBuilder<'a>
+    ) -> Self;
 }
 
 impl<'a> ViewBuilderRootDecoratorExt for ViewBuilder<'a> {
     fn root_decorator(
-        &mut self,
-        f: impl for<'b, 'c, 'd> FnOnce(&'b mut RootDecoratorBuilder<'c, 'd>) -> &'b mut RootDecoratorBuilder<'c, 'd>
-    ) -> &mut Self {
-        let view = self.view();
-        RootDecoratorBuilder::build_priv(self, view, root_decorator_type(), f);
-        self
+        self,
+        f: impl for<'b> FnOnce(RootDecoratorBuilder<'b>) -> RootDecoratorBuilder<'b>
+    ) -> Self {
+        f(RootDecoratorBuilder::new_priv(self)).core_priv()
     }
 }
 
-dep_obj! {
+dep_type! {
     #[derive(Debug)]
     pub struct RootDecorator become decorator in View {
         fill: Cow<'static, str> = Cow::Borrowed(" ")
     }
 
-    use<'a, 'b> &'a mut ViewBuilder<'b> as BuilderCore;
+    type BuilderCore<'a> = ViewBuilder<'a>;
 }
-
-static ROOT_DECORATOR_TOKEN: sync::Lazy<DepTypeToken<RootDecoratorType>> = sync::Lazy::new(||
-    RootDecoratorType::new_priv().expect("RootDecoratorType builder locked")
-);
-
-pub fn root_decorator_type() -> &'static RootDecoratorType { ROOT_DECORATOR_TOKEN.ty() }
 
 impl RootDecorator {
     const BEHAVIOR: RootDecoratorBehavior = RootDecoratorBehavior;
@@ -766,7 +757,7 @@ impl DecoratorBehavior for RootDecoratorBehavior {
     }
 
     fn render(&self, view: View, tree: &ViewTree, port: &mut RenderPort) {
-        let fill = view.decorator_get(tree, root_decorator_type().fill());
+        let fill = view.decorator_get(tree, RootDecorator::FILL);
         let fg = view.actual_fg(tree);
         let bg = view.actual_bg(tree);
         let attr = view.actual_attr(tree);
@@ -789,23 +780,21 @@ impl ViewInput {
 
 pub trait ViewBuilderViewBaseExt {
     fn base(
-        &mut self,
-        f: impl for<'a, 'b, 'c> FnOnce(&'a mut ViewBaseBuilder<'b, 'c>) -> &'a mut ViewBaseBuilder<'b, 'c>
-    ) -> &mut Self;
+        self,
+        f: impl for<'a> FnOnce(ViewBaseBuilder<'a>) -> ViewBaseBuilder<'a>
+    ) -> Self;
 }
 
 impl<'a> ViewBuilderViewBaseExt for ViewBuilder<'a> {
     fn base(
-        &mut self,
-        f: impl for<'b, 'c, 'd> FnOnce(&'b mut ViewBaseBuilder<'c, 'd>) -> &'b mut ViewBaseBuilder<'c, 'd>
-    ) -> &mut Self {
-        let view = self.view();
-        ViewBaseBuilder::build_priv(self, view, view_base_type(), f);
-        self
+        self,
+        f: impl for<'b> FnOnce(ViewBaseBuilder<'b>) -> ViewBaseBuilder<'b>
+    ) -> Self {
+        f(ViewBaseBuilder::new_priv(self)).core_priv()
     }
 }
 
-dep_obj! {
+dep_type! {
     #[derive(Debug)]
     pub struct ViewBase become base in View {
         fg: Option<Color> = None,
@@ -816,17 +805,11 @@ dep_obj! {
         input yield ViewInput,
     }
 
-    use<'a, 'b> &'a mut ViewBuilder<'b> as BuilderCore;
+    type BuilderCore<'a> = ViewBuilder<'a>;
 }
 
-static VIEW_BASE_TOKEN: sync::Lazy<DepTypeToken<ViewBaseType>> = sync::Lazy::new(||
-    ViewBaseType::new_priv().expect("ViewBaseType builder locked")
-);
-
-pub fn view_base_type() -> &'static ViewBaseType { VIEW_BASE_TOKEN.ty() }
-
 impl ViewBase {
-    fn on_inheritable_render_changed<T>(
+    fn on_inheritable_render_changed<T: DepPropType>(
         context: &mut dyn Context,
         view: View,
         prop: DepProp<Self, Option<T>>,
@@ -847,37 +830,35 @@ impl ViewBase {
     }
 
     fn on_fg_changed(context: &mut dyn Context, view: View, _old: &Option<Color>) {
-        Self::on_inheritable_render_changed(context, view, view_base_type().fg());
+        Self::on_inheritable_render_changed(context, view, ViewBase::FG);
     }
 
     fn on_bg_changed(context: &mut dyn Context, view: View, _old: &Option<Option<Color>>) {
-        Self::on_inheritable_render_changed(context, view, view_base_type().bg());
+        Self::on_inheritable_render_changed(context, view, ViewBase::BG);
     }
 
     fn on_attr_changed(context: &mut dyn Context, view: View, _old: &Option<Attr>) {
-        Self::on_inheritable_render_changed(context, view, view_base_type().attr());
+        Self::on_inheritable_render_changed(context, view, ViewBase::ATTR);
     }
 }
 
 pub trait ViewBuilderViewAlignExt {
     fn align(
-        &mut self,
-        f: impl for<'a, 'b, 'c> FnOnce(&'a mut ViewAlignBuilder<'b, 'c>) -> &'a mut ViewAlignBuilder<'b, 'c>
-    ) -> &mut Self;
+        self,
+        f: impl for<'a> FnOnce(ViewAlignBuilder<'a>) -> ViewAlignBuilder<'a>
+    ) -> Self;
 }
 
 impl<'a> ViewBuilderViewAlignExt for ViewBuilder<'a> {
     fn align(
-        &mut self,
-        f: impl for<'b, 'c, 'd> FnOnce(&'b mut ViewAlignBuilder<'c, 'd>) -> &'b mut ViewAlignBuilder<'c, 'd>
-    ) -> &mut Self {
-        let view = self.view();
-        ViewAlignBuilder::build_priv(self, view, view_align_type(), f);
-        self
+        self,
+        f: impl for<'b> FnOnce(ViewAlignBuilder<'b>) -> ViewAlignBuilder<'b>
+    ) -> Self {
+        f(ViewAlignBuilder::new_priv(self)).core_priv()
     }
 }
 
-dep_obj! {
+dep_type! {
     #[derive(Debug)]
     pub struct ViewAlign become align in View {
         h_align: HAlign = HAlign::Center,
@@ -890,14 +871,8 @@ dep_obj! {
         margin: Thickness = Thickness::all(0),
     }
 
-    use<'a, 'b> &'a mut ViewBuilder<'b> as BuilderCore;
+    type BuilderCore<'a> = ViewBuilder<'a>;
 }
-
-static VIEW_ALIGN_TOKEN: sync::Lazy<DepTypeToken<ViewAlignType>> = sync::Lazy::new(||
-    ViewAlignType::new_priv().expect("ViewAlignType builder locked")
-);
-
-pub fn view_align_type() -> &'static ViewAlignType { VIEW_ALIGN_TOKEN.ty() }
 
 impl ViewAlign {
     fn invalidate_measure<T>(context: &mut dyn Context, view: View, _old: &T) {

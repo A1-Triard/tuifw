@@ -3,47 +3,39 @@ use std::fmt::Debug;
 use std::num::NonZeroI16;
 use tuifw_screen_base::{Vector, Point, Rect};
 use tuifw_window::{RenderPort};
-use dep_obj::{dep_obj, DepTypeToken};
+use dep_obj::{dep_type, DepObjBuilderCore};
 use dyn_context::{Context, ContextExt};
-use once_cell::sync::{self};
 use crate::view::base::*;
 use unicode_width::UnicodeWidthChar;
 use unicode_segmentation::UnicodeSegmentation;
 
 pub trait ViewBuilderLabelDecoratorExt {
     fn label_decorator(
-        &mut self,
-        f: impl for<'a, 'b, 'c> FnOnce(&'a mut LabelDecoratorBuilder<'b, 'c>) -> &'a mut LabelDecoratorBuilder<'b, 'c>
-    ) -> &mut Self;
+        self,
+        f: impl for<'a> FnOnce(LabelDecoratorBuilder<'a>) -> LabelDecoratorBuilder<'a>
+    ) -> Self;
 }
 
 impl<'a> ViewBuilderLabelDecoratorExt for ViewBuilder<'a> {
     fn label_decorator(
-        &mut self,
-        f: impl for<'b, 'c, 'd> FnOnce(&'b mut LabelDecoratorBuilder<'c, 'd>) -> &'b mut LabelDecoratorBuilder<'c, 'd>
-    ) -> &mut Self {
-        let view = self.view();
-        let tree: &mut ViewTree = self.context().get_mut();
+        mut self,
+        f: impl for<'b> FnOnce(LabelDecoratorBuilder<'b>) -> LabelDecoratorBuilder<'b>
+    ) -> Self {
+        let view = self.id();
+        let tree: &mut ViewTree = self.context_mut().get_mut();
         LabelDecorator::new(tree, view);
-        LabelDecoratorBuilder::build_priv(self, view, label_decorator_type(), f);
-        self
+        f(LabelDecoratorBuilder::new_priv(self)).core_priv()
     }
 }
 
-dep_obj! {
+dep_type! {
     #[derive(Debug)]
     pub struct LabelDecorator become decorator in View {
         text: Cow<'static, str> = Cow::Borrowed(""),
     }
 
-    use<'a, 'b> &'a mut ViewBuilder<'b> as BuilderCore;
+    type BuilderCore<'a> = ViewBuilder<'a>;
 }
-
-static LABEL_DECORATOR_TOKEN: sync::Lazy<DepTypeToken<LabelDecoratorType>> = sync::Lazy::new(||
-    LabelDecoratorType::new_priv().expect("LabelDecoratorType builder locked")
-);
-
-pub fn label_decorator_type() -> &'static LabelDecoratorType { LABEL_DECORATOR_TOKEN.ty() }
 
 impl LabelDecorator {
     const BEHAVIOR: LabelDecoratorBehavior = LabelDecoratorBehavior;
@@ -53,8 +45,8 @@ impl LabelDecorator {
         tree: &mut ViewTree,
         view: View,
     ) {
-        view.set_decorator(tree, LabelDecorator::new_priv(&LABEL_DECORATOR_TOKEN));
-        view.decorator_on_changed(tree, label_decorator_type().text(), Self::invalidate_measure);
+        view.set_decorator(tree, LabelDecorator::new_priv());
+        view.decorator_on_changed(tree, LabelDecorator::TEXT, Self::invalidate_measure);
     }
 
     fn invalidate_measure<T>(context: &mut dyn Context, view: View, _old: &T) {
@@ -80,7 +72,7 @@ impl DecoratorBehavior for LabelDecoratorBehavior {
     }
 
     fn desired_size(&self, view: View, tree: &mut ViewTree, _children_desired_size: Vector) -> Vector {
-        let text: &str = view.decorator_get(tree, label_decorator_type().text()).borrow();
+        let text: &str = view.decorator_get(tree, LabelDecorator::TEXT).borrow();
         let width = text
             .graphemes(true)
             .map(|g| g
@@ -97,7 +89,7 @@ impl DecoratorBehavior for LabelDecoratorBehavior {
     }
 
     fn render_bounds(&self, view: View, tree: &mut ViewTree, _children_render_bounds: Rect) -> Rect {
-        let text: &str = view.decorator_get(tree, label_decorator_type().text()).borrow();
+        let text: &str = view.decorator_get(tree, LabelDecorator::TEXT).borrow();
         let width = text
             .graphemes(true)
             .map(|g| g
@@ -110,7 +102,7 @@ impl DecoratorBehavior for LabelDecoratorBehavior {
     }
 
     fn render(&self, view: View, tree: &ViewTree, port: &mut RenderPort) {
-        let text: &str = view.decorator_get(tree, label_decorator_type().text()).borrow();
+        let text: &str = view.decorator_get(tree, LabelDecorator::TEXT).borrow();
         let fg = view.actual_fg(tree);
         let bg = view.actual_bg(tree);
         let attr = view.actual_attr(tree);
