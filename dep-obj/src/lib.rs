@@ -863,6 +863,12 @@ macro_rules! dep_type {
                         Self { core }
                     }
 
+                    #[allow(dead_code)]
+                    fn core_priv(&self) -> &$BuilderCore { &self.core }
+
+                    #[allow(dead_code)]
+                    fn core_priv_mut(&mut self) -> &mut $BuilderCore { &mut self.core }
+
                     $($builder_methods)*
                 }
             )?
