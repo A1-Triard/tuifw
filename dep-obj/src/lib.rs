@@ -1,6 +1,7 @@
 #![feature(const_fn)]
 #![feature(const_fn_fn_ptr_basics)]
 #![feature(const_maybe_uninit_as_ptr)]
+#![feature(const_mut_refs)]
 #![feature(const_ptr_offset_from)]
 #![feature(const_raw_ptr_deref)]
 #![feature(raw_ref_macros)]
