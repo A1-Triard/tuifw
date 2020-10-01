@@ -35,7 +35,7 @@ impl WidgetTemplate for ButtonTemplate {
     fn load(&self, context: &mut dyn Context) -> Widget {
         let tree: &mut WidgetTree = context.get_mut();
         let widget = Button::new(tree);
-        widget.obj_apply_style(context, self.0.clone());
+        widget.obj_apply_style(context, Some(self.0.clone()));
         widget
     }
 }

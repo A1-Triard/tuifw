@@ -768,6 +768,7 @@ impl DecoratorBehavior for RootDecoratorBehavior {
 
 pub trait ViewTemplate: Debug + DynClone + Send + Sync {
     fn load(&self, context: &mut dyn Context, view: View);
+    fn unload(&self, context: &mut dyn Context, view: View);
 }
 
 clone_trait_object!(ViewTemplate);

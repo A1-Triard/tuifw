@@ -1,4 +1,5 @@
 use components_arena::{ComponentId, Id, Component, Arena, ComponentClassMutex};
+use core::hint::unreachable_unchecked;
 use crate::view::{View, ViewTree, ViewBuilder, RootDecorator, ViewTemplate};
 use dep_obj::{dep_type, dep_obj, Style, DepObjBuilderCore};
 use downcast_rs::{Downcast, impl_downcast};
@@ -93,17 +94,31 @@ impl WidgetTree {
                 parent: None,
                 last_child: None,
                 next: Widget(root),
-                obj: None,
+                obj: Some(Box::new(Root::new_priv())),
                 attached: true,
             }, root));
             (root, move |view_tree| (view_tree, Widget(root)))
         });
-        WidgetTree {
+        let mut tree = WidgetTree {
             widget_arena,
             _model_arena: model_arena,
             view_tree,
             _root: root,
-        }
+        };
+        root.obj_on_changed(&mut tree, Root::PANEL_TEMPLATE, |context, root, old| {
+            let tree: &WidgetTree = context.get();
+            let root_view = tree.widget_arena[root.0].view.unwrap_or_else(|| unsafe { unreachable_unchecked() });
+            let new = root.obj_get(tree, Root::PANEL_TEMPLATE).clone();
+            old.as_ref().map(|x| x.unload(context, root_view));
+            new.map(|x| x.load(context, root_view));
+        });
+        root.obj_on_changed(&mut tree, Root::DECORATOR_STYLE, |context, root, _old| {
+            let tree: &WidgetTree = context.get();
+            let root_view = tree.widget_arena[root.0].view.unwrap_or_else(|| unsafe { unreachable_unchecked() });
+            let decorator_style = root.obj_get(tree, Root::DECORATOR_STYLE).clone();
+            root_view.decorator_apply_style(context, decorator_style);
+        });
+        tree
     }
 
     //pub fn update(context: &mut dyn Context, wait: bool) -> Result<bool, Box<dyn Any>> {

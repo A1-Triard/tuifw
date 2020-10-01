@@ -82,6 +82,11 @@ impl ViewTemplate for CanvasPanelTemplate {
         let tree: &mut ViewTree = context.get_mut();
         CanvasPanel::new(tree, view);
     }
+
+    fn unload(&self, context: &mut dyn Context, view: View) {
+        let tree: &mut ViewTree = context.get_mut();
+        view.unset_panel(tree);
+    }
 }
 
 #[derive(Debug)]
