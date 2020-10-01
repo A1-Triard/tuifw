@@ -379,19 +379,20 @@ impl<OwnerId: ComponentId> StyleOnChanged<OwnerId> {
     }
 }
 
-impl<Owner: DepType> Style<Owner> {
-    fn un_apply(
-        owner: &mut Owner,
-        new_style: Option<Self>
-    ) -> (Option<Style<Owner>>, StyleOnChanged<Owner::Id>) {
+pub trait OptionStyleExt<Owner: DepType>: Sized {
+    fn apply(self, owner: &mut Owner) -> (Option<Style<Owner>>, StyleOnChanged<Owner::Id>);
+}
+
+impl<Owner: DepType> OptionStyleExt<Owner> for Option<Style<Owner>> {
+    fn apply(self, owner: &mut Owner) -> (Option<Style<Owner>>, StyleOnChanged<Owner::Id>) {
         let mut on_changed = Vec::new();
-        let old_style = owner.style__().take();
-        if let Some(old_style) = old_style.as_ref() {
-            old_style.setters
+        let old = owner.style__().take();
+        if let Some(old) = old.as_ref() {
+            old.setters
                 .iter()
-                .filter(|setter| new_style.as_ref().map_or(
+                .filter(|setter| self.as_ref().map_or(
                     true,
-                    |new_style| new_style.setters.binary_search_by_key(
+                    |new| new.setters.binary_search_by_key(
                         &setter.prop_offset(),
                         |x| x.prop_offset()
                     ).is_err()
@@ -400,23 +401,15 @@ impl<Owner: DepType> Style<Owner> {
                 .for_each(|x| on_changed.push(x))
             ;
         }
-        if let Some(new_style) = new_style.as_ref() {
-            new_style.setters
+        if let Some(new) = self.as_ref() {
+            new.setters
                 .iter()
                 .filter_map(|setter| setter.un_apply(owner, false))
                 .for_each(|x| on_changed.push(x))
             ;
         }
-        *owner.style__() = new_style;
-        (old_style, StyleOnChanged { callbacks: on_changed })
-    }
-
-    pub fn apply(self, owner: &mut Owner) -> (Option<Style<Owner>>, StyleOnChanged<Owner::Id>) {
-        Self::un_apply(owner, Some(self))
-    }
-
-    pub fn unapply(owner: &mut Owner) -> (Option<Style<Owner>>, StyleOnChanged<Owner::Id>) {
-        Self::un_apply(owner, None)
+        *owner.style__() = self;
+        (old, StyleOnChanged { callbacks: on_changed })
     }
 }
 
@@ -1016,25 +1009,12 @@ macro_rules! dep_obj {
             $vis fn [< $name _apply_style >] (
                 self,
                 context: &mut dyn $crate::dyn_context_Context,
-                style: $crate::Style<$ty>,
+                style: $crate::std_option_Option<$crate::Style<$ty>>,
             ) -> $crate::std_option_Option<$crate::Style<$ty>> {
                 let $this = self;
                 let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
                 let obj = $field_mut;
-                let (old, on_changed) = style.apply(obj);
-                on_changed.raise(context, self);
-                old
-            }
-
-            #[allow(dead_code)]
-            $vis fn [< $name _unapply_style >] (
-                self,
-                context: &mut dyn $crate::dyn_context_Context,
-            ) -> $crate::std_option_Option<$crate::Style<$ty>> {
-                let $this = self;
-                let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
-                let obj = $field_mut;
-                let (old, on_changed) = <$crate::Style::<$ty>>::unapply(obj);
+                let (old, on_changed) = $crate::OptionStyleExt::apply(style, obj);
                 on_changed.raise(context, self);
                 old
             }
@@ -1194,27 +1174,12 @@ macro_rules! dep_obj {
             >(
                 self,
                 context: &mut dyn $crate::dyn_context_Context,
-                style: $crate::Style<Owner>,
+                style: $crate::std_option_Option<$crate::Style<Owner>>,
             ) -> $crate::std_option_Option<$crate::Style<Owner>> {
                 let $this = self;
                 let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
                 let obj = $field_mut.downcast_mut::<Owner>().expect("invalid cast");
-                let (old, on_changed) = style.apply(obj);
-                on_changed.raise(context, self);
-                old
-            }
-
-            #[allow(dead_code)]
-            $vis fn [< $name _unapply_style >] <
-                Owner: $ty + $crate::DepType<Id=Self>,
-            >(
-                self,
-                context: &mut dyn $crate::dyn_context_Context,
-            ) -> $crate::std_option_Option<$crate::Style<Owner>> {
-                let $this = self;
-                let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
-                let obj = $field_mut.downcast_mut::<Owner>().expect("invalid cast");
-                let (old, on_changed) = <$crate::Style::<Owner>>::unapply(obj);
+                let (old, on_changed) = $crate::OptionStyleExt::apply(style, obj);
                 on_changed.raise(context, self);
                 old
             }
@@ -1324,12 +1289,12 @@ mod test {
         assert_eq!(id.obj1_get(&arena, TestObj1::INT_VAL), &42);
         let mut style = Style::new();
         style.insert(TestObj1::INT_VAL, 43);
-        id.obj1_apply_style(&mut arena, style.clone());
+        id.obj1_apply_style(&mut arena, Some(style.clone()));
         assert_eq!(id.obj1_get(&arena, TestObj1::INT_VAL), &43);
         id.obj1_set_uncond(&mut arena, TestObj1::INT_VAL, 44);
         assert_eq!(id.obj1_get(&arena, TestObj1::INT_VAL), &44);
         style.insert(TestObj1::INT_VAL, 45);
-        id.obj1_apply_style(&mut arena, style);
+        id.obj1_apply_style(&mut arena, Some(style));
         assert_eq!(id.obj1_get(&arena, TestObj1::INT_VAL), &44);
         id.obj1_unset_uncond(&mut arena, TestObj1::INT_VAL);
         assert_eq!(id.obj1_get(&arena, TestObj1::INT_VAL), &45);
