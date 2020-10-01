@@ -204,7 +204,7 @@ pub trait ViewBuilderWidgetExt {
 impl<'a> ViewBuilderWidgetExt for ViewBuilder<'a> {
     fn widget(mut self, widget: Widget) -> Self {
         let view = self.id();
-        let tree = self.context_mut().get_mut::<WidgetTree>();
+        let tree: &mut WidgetTree = self.context_mut().get_mut();
         widget.load(tree, view);
         self
     }
