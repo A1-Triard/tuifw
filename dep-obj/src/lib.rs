@@ -314,12 +314,6 @@ impl<Owner: DepType, PropType: DepPropType> AnySetter<Owner> for Setter<Owner, P
     }
 }
 
-pub trait Template<OwnerId: ComponentId>: Debug + DynClone + Send + Sync {
-    fn load(&self, context: &mut dyn Context, id: OwnerId);
-}
-
-clone_trait_object!(<OwnerId: ComponentId> Template<OwnerId>);
-
 #[derive(Educe)]
 #[educe(Debug, Clone, Default)]
 pub struct Style<Owner: DepType> {
