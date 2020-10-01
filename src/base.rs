@@ -1,13 +1,14 @@
+use components_arena::{ComponentId, Id, Component, Arena, ComponentClassMutex};
+use crate::view::{View, ViewTree, ViewBuilder, RootDecorator, ViewTemplate};
+use dep_obj::{dep_type, dep_obj, Style, DepObjBuilderCore};
+use downcast_rs::{Downcast, impl_downcast};
+use dyn_clone::{DynClone, clone_trait_object};
+use dyn_context::{Context, ContextExt};
+use macro_attr_2018::macro_attr;
 use std::any::{Any, TypeId};
 use std::fmt::Debug;
 use std::mem::replace;
-use components_arena::{ComponentId, Id, Component, Arena, ComponentClassMutex};
-use dyn_context::{Context, ContextExt};
-use dep_obj::{dep_type, dep_obj, Style, DepObjBuilderCore, Template};
-use downcast_rs::{Downcast, impl_downcast};
-use macro_attr_2018::macro_attr;
 use tuifw_screen_base::Screen;
-use crate::view::{View, ViewTree, ViewBuilder, RootDecorator};
 
 pub trait WidgetBehavior {
     fn load(&self, tree: &mut WidgetTree, widget: Widget, view: View);
@@ -194,10 +195,16 @@ impl<'a> ViewBuilderWidgetExt for ViewBuilder<'a> {
     }
 }
 
+pub trait WidgetTemplate: Debug + DynClone + Send + Sync {
+    fn load(&self, context: &mut dyn Context) -> Widget;
+}
+
+clone_trait_object!(WidgetTemplate);
+
 dep_type! {
     #[derive(Debug)]
     pub struct Root become obj in Widget {
-        panel_template: Option<Template<View>> = None,
+        panel_template: Option<Box<dyn ViewTemplate>> = None,
         decorator_style: Option<Style<RootDecorator>> = None,
     }
 }

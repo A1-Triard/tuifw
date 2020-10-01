@@ -1,11 +1,12 @@
-use std::borrow::Cow;
-use tuifw_screen_base::Side;
-use dep_obj::{dep_type};
-use either::Right;
-use crate::base::{Widget, WidgetTree, WidgetObj, WidgetBehavior, ViewBuilderWidgetExt};
+use crate::base::{WidgetTemplate, Widget, WidgetTree, WidgetObj, WidgetBehavior, ViewBuilderWidgetExt};
 use crate::view::View;
 use crate::view::decorators::{ViewBuilderLabelDecoratorExt};
 use crate::view::panels::{ViewBuilderDockPanelExt};
+use dep_obj::{dep_type, Style};
+use dyn_context::{Context, ContextExt};
+use either::Right;
+use std::borrow::Cow;
+use tuifw_screen_base::Side;
 
 dep_type! {
     #[derive(Debug)]
@@ -20,6 +21,22 @@ impl Button {
     #[allow(clippy::new_ret_no_self)]
     pub fn new(tree: &mut WidgetTree) -> Widget {
         Widget::new(tree, Button::new_priv())
+    }
+
+    pub fn template(style: Style<Button>) -> Box<dyn WidgetTemplate> {
+        Box::new(ButtonTemplate(style))
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ButtonTemplate(Style<Button>);
+
+impl WidgetTemplate for ButtonTemplate {
+    fn load(&self, context: &mut dyn Context) -> Widget {
+        let tree: &mut WidgetTree = context.get_mut();
+        let widget = Button::new(tree);
+        widget.obj_apply_style(context, self.0.clone());
+        widget
     }
 }
 

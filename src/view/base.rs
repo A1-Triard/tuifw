@@ -7,6 +7,7 @@ use std::mem::{replace};
 use std::num::{NonZeroU16};
 use components_arena::{RawId, Component, Id, Arena, ComponentClassMutex, ComponentId};
 use dep_obj::{dep_obj, dep_type, DepProp, DepPropType, DepObjBuilderCore};
+use dyn_clone::{DynClone, clone_trait_object};
 use dyn_context::{Context, ContextExt};
 use downcast_rs::{Downcast, impl_downcast};
 use tuifw_screen_base::{Key, Event, Screen, Vector, Point, Rect, Attr, Color, HAlign, VAlign, Thickness};
@@ -764,6 +765,12 @@ impl DecoratorBehavior for RootDecoratorBehavior {
         port.fill(|port, p| port.out(p, fg, bg, attr, fill));
     }
 }
+
+pub trait ViewTemplate: Debug + DynClone + Send + Sync {
+    fn load(&self, context: &mut dyn Context, view: View);
+}
+
+clone_trait_object!(ViewTemplate);
 
 pub struct ViewInput {
     key: (NonZeroU16, Key),

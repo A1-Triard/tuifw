@@ -74,6 +74,16 @@ impl CanvasLayout {
 
 impl Layout for CanvasLayout { }
 
+#[derive(Debug, Clone)]
+struct CanvasPanelTemplate;
+
+impl ViewTemplate for CanvasPanelTemplate {
+    fn load(&self, context: &mut dyn Context, view: View) {
+        let tree: &mut ViewTree = context.get_mut();
+        CanvasPanel::new(tree, view);
+    }
+}
+
 #[derive(Debug)]
 pub struct CanvasPanel(());
 
@@ -86,6 +96,10 @@ impl CanvasPanel {
         view: View,
     ) {
         view.set_panel(tree, CanvasPanel(()));
+    }
+
+    pub fn template() -> Box<dyn ViewTemplate> {
+        Box::new(CanvasPanelTemplate)
     }
 }
 
