@@ -19,9 +19,10 @@ extern crate alloc;
 use alloc::boxed::Box;
 use alloc::collections::TryReserveError;
 use alloc::vec::Vec;
+use components_arena::ComponentId;
 use core::fmt::Debug;
 use core::mem::replace;
-use components_arena::ComponentId;
+use core::ops::Range;
 use dyn_clone::{DynClone, clone_trait_object};
 use dyn_context::Context;
 use educe::Educe;
@@ -91,6 +92,43 @@ impl<OwnerId: ComponentId, PropType: DepPropType> DepPropEntry<OwnerId, PropType
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub enum DepVecChange<ItemType: DepPropType> {
+    Reset,
+    Inserted(Range<usize>),
+    Removed(usize, Vec<ItemType>),
+    Moved(Range<usize>, usize),
+}
+
+#[derive(Educe)]
+#[educe(Debug)]
+pub struct DepVecEntry<OwnerId: ComponentId, ItemType: DepPropType> {
+    items: Vec<ItemType>,
+    #[educe(Debug(ignore))]
+    on_changed: Vec<fn(context: &mut dyn Context, id: OwnerId, change: &DepVecChange<ItemType>)>,
+}
+
+pub struct DepVecOnChanged<OwnerId: ComponentId, ItemType: DepPropType> {
+    callbacks: Vec<fn(context: &mut dyn Context, id: OwnerId, change: &DepVecChange<ItemType>)>,
+}
+
+impl<OwnerId: ComponentId, ItemType: DepPropType> DepVecOnChanged<OwnerId, ItemType> {
+    pub fn raise(self, context: &mut dyn Context, id: OwnerId, change: &DepVecChange<ItemType>) {
+        for callback in self.callbacks {
+            callback(context, id, change);
+        }
+    }
+}
+
+impl<OwnerId: ComponentId, ItemType: DepPropType> DepVecEntry<OwnerId, ItemType> {
+    pub const fn new() -> Self {
+        DepVecEntry {
+            items: Vec::new(),
+            on_changed: Vec::new()
+        }
+    }
+}
+
 #[derive(Educe)]
 #[educe(Debug)]
 pub struct DepEventEntry<OwnerId: ComponentId, ArgsType> {
@@ -121,54 +159,6 @@ pub trait DepType: Sized {
 
     #[doc(hidden)]
     fn style__(&mut self) -> &mut Option<Style<Self>>;
-}
-
-#[derive(Educe)]
-#[educe(Debug, Clone, Copy)]
-pub struct DepEvent<Owner: DepType, ArgsType> {
-    offset: usize,
-    _phantom: PhantomType<(Owner, ArgsType)>
-}
-
-impl<Owner: DepType, ArgsType> DepEvent<Owner, ArgsType> {
-    pub const unsafe fn new(offset: usize) -> Self {
-        DepEvent { offset, _phantom: PhantomType::new() }
-    }
-
-    pub fn offset(self) -> usize { self.offset }
-
-    fn entry(self, owner: &Owner) -> &DepEventEntry<Owner::Id, ArgsType> {
-        unsafe {
-            let entry = (owner as *const _ as usize).unchecked_add(self.offset);
-            let entry = entry as *const DepEventEntry<Owner::Id, ArgsType>;
-            &*entry
-        }
-    }
-
-    fn entry_mut(self, owner: &mut Owner) -> &mut DepEventEntry<Owner::Id, ArgsType> {
-        unsafe {
-            let entry = (owner as *mut _ as usize).unchecked_add(self.offset);
-            let entry = entry as *mut DepEventEntry<Owner::Id, ArgsType>;
-            &mut *entry
-        }
-    }
-
-    pub fn raise(
-        self,
-        owner: &Owner,
-    ) -> DepEventOnRaised<Owner::Id, ArgsType> {
-        let entry = self.entry(owner);
-        DepEventOnRaised { callbacks: entry.on_raised.clone() }
-    }
-
-    pub fn on_raised(
-        self,
-        owner: &mut Owner,
-        callback: fn(context: &mut dyn Context, id: Owner::Id, args: &mut ArgsType),
-    ) {
-        let entry_mut = self.entry_mut(owner);
-        entry_mut.on_raised.push(callback);
-    }
 }
 
 #[derive(Educe)]
@@ -270,6 +260,112 @@ impl<Owner: DepType, PropType: DepPropType> DepProp<Owner, PropType> {
     ) {
         let entry_mut = self.entry_mut(owner);
         entry_mut.on_changed.push(callback);
+    }
+}
+
+#[derive(Educe)]
+#[educe(Debug, Clone, Copy)]
+pub struct DepVec<Owner: DepType, ItemType: DepPropType> {
+    offset: usize,
+    _phantom: PhantomType<(Owner, ItemType)>
+}
+
+impl<Owner: DepType, ItemType: DepPropType> DepVec<Owner, ItemType> {
+    pub const unsafe fn new(offset: usize) -> Self {
+        DepVec { offset, _phantom: PhantomType::new() }
+    }
+
+    pub fn offset(self) -> usize { self.offset }
+
+    fn entry(self, owner: &Owner) -> &DepVecEntry<Owner::Id, ItemType> {
+        unsafe {
+            let entry = (owner as *const _ as usize).unchecked_add(self.offset);
+            let entry = entry as *const DepVecEntry<Owner::Id, ItemType>;
+            &*entry
+        }
+    }
+
+    fn entry_mut(self, owner: &mut Owner) -> &mut DepVecEntry<Owner::Id, ItemType> {
+        unsafe {
+            let entry = (owner as *mut _ as usize).unchecked_add(self.offset);
+            let entry = entry as *mut DepVecEntry<Owner::Id, ItemType>;
+            &mut *entry
+        }
+    }
+
+    pub fn items(self, owner: &Owner) -> &Vec<ItemType> {
+        let entry = self.entry(owner);
+        &entry.items
+    }
+
+    pub fn push(
+        self,
+        owner: &mut Owner,
+        item: ItemType
+    ) -> (DepVecChange<ItemType>, DepVecOnChanged<Owner::Id, ItemType>) {
+        let entry_mut = self.entry_mut(owner);
+        entry_mut.items.push(item);
+        let change = DepVecChange::Inserted(
+            unsafe { entry_mut.items.len().unchecked_sub(1) } .. entry_mut.items.len()
+        );
+        (change, DepVecOnChanged { callbacks: entry_mut.on_changed.clone() })
+    }
+
+    pub fn on_changed(
+        self,
+        owner: &mut Owner,
+        callback: fn(context: &mut dyn Context, id: Owner::Id, change: &DepVecChange<ItemType>),
+    ) {
+        let entry_mut = self.entry_mut(owner);
+        entry_mut.on_changed.push(callback);
+    }
+}
+
+#[derive(Educe)]
+#[educe(Debug, Clone, Copy)]
+pub struct DepEvent<Owner: DepType, ArgsType> {
+    offset: usize,
+    _phantom: PhantomType<(Owner, ArgsType)>
+}
+
+impl<Owner: DepType, ArgsType> DepEvent<Owner, ArgsType> {
+    pub const unsafe fn new(offset: usize) -> Self {
+        DepEvent { offset, _phantom: PhantomType::new() }
+    }
+
+    pub fn offset(self) -> usize { self.offset }
+
+    fn entry(self, owner: &Owner) -> &DepEventEntry<Owner::Id, ArgsType> {
+        unsafe {
+            let entry = (owner as *const _ as usize).unchecked_add(self.offset);
+            let entry = entry as *const DepEventEntry<Owner::Id, ArgsType>;
+            &*entry
+        }
+    }
+
+    fn entry_mut(self, owner: &mut Owner) -> &mut DepEventEntry<Owner::Id, ArgsType> {
+        unsafe {
+            let entry = (owner as *mut _ as usize).unchecked_add(self.offset);
+            let entry = entry as *mut DepEventEntry<Owner::Id, ArgsType>;
+            &mut *entry
+        }
+    }
+
+    pub fn raise(
+        self,
+        owner: &Owner,
+    ) -> DepEventOnRaised<Owner::Id, ArgsType> {
+        let entry = self.entry(owner);
+        DepEventOnRaised { callbacks: entry.on_raised.clone() }
+    }
+
+    pub fn on_raised(
+        self,
+        owner: &mut Owner,
+        callback: fn(context: &mut dyn Context, id: Owner::Id, args: &mut ArgsType),
+    ) {
+        let entry_mut = self.entry_mut(owner);
+        entry_mut.on_raised.push(callback);
     }
 }
 
@@ -456,7 +552,8 @@ macro_rules! dep_type {
     ) => {
         $crate::std_compile_error!("\
             invalid dep type definition; allowed form is \
-            '$(#[$attr])* $vis struct $name $(<$generics> $(where $where_clause)?)? { ... }'\
+            '$(#[$attr])* $vis struct $name $(<$generics> $(where $where_clause)?)? \
+            become $obj in $Id { ... }'\
         ");
     };
     (
@@ -561,9 +658,9 @@ macro_rules! dep_type {
         $crate::std_compile_error!("\
             invalid dep type definition, allowed form is\n\
             \n\
-            $(#[$attr])* $vis struct $name $(<$generics> $(where $where_clause)?)? {\n\
-                $field_1_name $(: $field_1_type = $field_1_value | yield $field_1_type),\n\
-                $field_2_name $(: $field_2_type = $field_2_value | yield $field_2_type),\n\
+            $(#[$attr])* $vis struct $name $(<$generics> $(where $where_clause)?)? become $obj in $Id {\n\
+                $field_1_name $(: $field_1_type = $field_1_value | [] $field_1_type | yield $field_1_type),\n\
+                $field_2_name $(: $field_2_type = $field_2_value | [] $field_2_type | yield $field_2_type),\n\
                 ...\n\
             }\n\
             \n\
@@ -730,6 +827,54 @@ macro_rules! dep_type {
             [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
             [$($builder_methods:tt)*]
         )?]
+        [[$field:ident [] $field_ty:ty] $($fields:tt)*]
+    ) => {
+        $crate::dep_type! {
+            @unroll_fields
+            [$([$attr])*] [$vis] [$name] [$obj] [$Id]
+            [$($g)*] [$($r)*] [$($w)*]
+            [
+                $($core_fields)*
+                $field: $crate::DepVecEntry<$Id, $field_ty>,
+            ]
+            [
+                $($core_new)*
+                $field: $crate::DepVecEntry::new(),
+            ]
+            [
+                $($core_consts)*
+            ]
+            [
+                $($dep_props)*
+
+                $vis const [< $field:upper >] : $crate::DepVec<Self, $field_ty> = {
+                    unsafe { 
+                        let offset = $crate::memoffset_offset_of!( [< $name Core >] $($r)*, $field );
+                        $crate::DepVec::new(offset)
+                    }
+                };
+            ]
+            [$(
+                [$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]
+                [
+                    $($builder_methods)*
+                ]
+            )?]
+            [$($fields)*]
+        }
+    };
+    (
+        @unroll_fields
+        [$([$attr:meta])*] [$vis:vis] [$name:ident] [$obj:ident] [$Id:ty]
+        [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
+        [$($core_fields:tt)*]
+        [$($core_new:tt)*]
+        [$($core_consts:tt)*]
+        [$($dep_props:tt)*]
+        [$(
+            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
+            [$($builder_methods:tt)*]
+        )?]
         [[$event:ident yield $event_args:ty] $($fields:tt)*]
     ) => {
         $crate::dep_type! {
@@ -788,7 +933,8 @@ macro_rules! dep_type {
         "\
             \n\n\
             allowed forms are \
-            '$field_name : $field_type = $field_value', and \
+            '$field_name : $field_type = $field_value', \
+            '$field_name [] $field_type', and \
             '$field_name yield $field_type'\
         "));
     };
