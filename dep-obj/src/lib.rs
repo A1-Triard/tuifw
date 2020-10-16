@@ -24,14 +24,10 @@ use core::fmt::Debug;
 use core::mem::replace;
 use core::ops::Range;
 use dyn_clone::{DynClone, clone_trait_object};
-use dyn_context::Context;
+use dyn_context::{Context, ContextExt};
 use educe::Educe;
 use phantom_type::PhantomType;
 
-#[doc(hidden)]
-pub use alloc::vec::Vec as std_vec_Vec;
-#[doc(hidden)]
-pub use core::cmp::PartialEq as std_cmp_PartialEq;
 #[doc(hidden)]
 pub use core::compile_error as std_compile_error;
 #[doc(hidden)]
@@ -46,8 +42,6 @@ pub use core::option::Option as std_option_Option;
 pub use core::stringify as std_stringify;
 #[doc(hidden)]
 pub use dyn_context::Context as dyn_context_Context;
-#[doc(hidden)]
-pub use dyn_context::ContextExt as dyn_context_ContextExt;
 #[doc(hidden)]
 pub use generics::concat as generics_concat;
 #[doc(hidden)]
