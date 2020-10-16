@@ -29,6 +29,8 @@ use educe::Educe;
 use phantom_type::PhantomType;
 
 #[doc(hidden)]
+pub use alloc::vec::Vec as std_vec_Vec;
+#[doc(hidden)]
 pub use core::cmp::PartialEq as std_cmp_PartialEq;
 #[doc(hidden)]
 pub use core::compile_error as std_compile_error;
@@ -1164,6 +1166,50 @@ macro_rules! dep_obj {
                 on_changed.raise(context, self);
                 old
             }
+
+            #[allow(dead_code)]
+            $vis fn [< $name _items >] <DepObjValueType: $crate::DepPropType>(
+                self,
+                $arena: &$Arena,
+                vec: $crate::DepVec<$ty, DepObjValueType>
+            ) -> &$crate::std_vec_Vec<DepObjValueType> {
+                let $this = self;
+                let obj = $field;
+                vec.items(obj)
+            }
+
+            #[allow(dead_code)]
+            $vis fn [< $name _push >] <
+                DepObjValueType: $crate::DepPropType + $crate::std_cmp_PartialEq
+            >(
+                self,
+                context: &mut dyn $crate::dyn_context_Context,
+                vec: $crate::DepVec<$ty, DepObjValueType>,
+                value: DepObjValueType,
+            ) -> $crate::DepVecChange<DepObjValueType> {
+                let $this = self;
+                let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
+                let obj = $field_mut;
+                let (change, on_changed) = vec.push(obj, value);
+                on_changed.raise(context, self, &change);
+                change
+            }
+
+            #[allow(dead_code)]
+            $vis fn [< $name _on_vec_changed >] <DepObjValueType: $crate::DepPropType>(
+                self,
+                $arena: &mut $Arena,
+                vec: $crate::DepVec<$ty, DepObjValueType>,
+                on_changed: fn(
+                    context: &mut dyn $crate::dyn_context_Context,
+                    id: Self,
+                    change: &$crate::DepVecChange<DepObjValueType>
+                ),
+            ) {
+                let $this = self;
+                let obj = $field_mut;
+                vec.on_changed(obj, on_changed);
+            }
         }
     };
     (
@@ -1329,6 +1375,57 @@ macro_rules! dep_obj {
                 on_changed.raise(context, self);
                 old
             }
+
+            #[allow(dead_code)]
+            $vis fn [< $name _items >] <
+                Owner: $ty + $crate::DepType<Id=Self>,
+                DepObjValueType: $crate::DepPropType
+            > (
+                self,
+                $arena: &$Arena,
+                vec: $crate::DepVec<Owner, DepObjValueType>
+            ) -> &$crate::std_vec_Vec<DepObjValueType> {
+                let $this = self;
+                let obj = $field.downcast_ref::<Owner>().expect("invalid cast");
+                vec.items(obj)
+            }
+
+            #[allow(dead_code)]
+            $vis fn [< $name _push >] <
+                Owner: $ty + $crate::DepType<Id=Self>,
+                DepObjValueType: $crate::DepPropType + $crate::std_cmp_PartialEq
+            >(
+                self,
+                context: &mut dyn $crate::dyn_context_Context,
+                vec: $crate::DepVec<Owner, DepObjValueType>,
+                value: DepObjValueType,
+            ) -> $crate::DepVecChange<DepObjValueType> {
+                let $this = self;
+                let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
+                let obj = $field_mut.downcast_mut::<Owner>().expect("invalid cast");
+                let (change, on_changed) = vec.push(obj, value);
+                on_changed.raise(context, self, &change);
+                change
+            }
+
+            #[allow(dead_code)]
+            $vis fn [< $name _on_vec_changed >] <
+                Owner: $ty + $crate::DepType<Id=Self>,
+                DepObjValueType: $crate::DepPropType
+            >(
+                self,
+                $arena: &mut $Arena,
+                vec: $crate::DepVec<Owner, DepObjValueType>,
+                on_changed: fn(
+                    context: &mut dyn $crate::dyn_context_Context,
+                    id: Self,
+                    change: &$crate::DepVecChange<DepObjValueType>
+                ),
+            ) {
+                let $this = self;
+                let obj = $field_mut.downcast_mut::<Owner>().expect("invalid cast");
+                vec.on_changed(obj, on_changed);
+            }
         }
     };
 }
@@ -1390,6 +1487,7 @@ mod test {
         #[derive(Debug)]
         struct TestObj1 become obj1 in TestId {
             int_val: i32 = 42,
+            coll [] u64,
         }
 
         type BuilderCore<'a> = TestIdBuilder<'a>;
@@ -1454,5 +1552,15 @@ mod test {
         let builder = TestObj1Builder::new_priv(TestIdBuilder { id, arena: &mut arena });
         builder.int_val(1);
         assert_eq!(id.obj1_get(&arena, TestObj1::INT_VAL), &1);
+    }
+
+    #[test]
+    fn test_obj_1_coll() {
+        let mut arena = TestArena(Arena::new(&mut TEST_NODE.lock().unwrap()));
+        let id = arena.0.insert(|id| (TestNode { obj1: None }, TestId(id)));
+        TestObj1::new(&mut arena, id);
+        assert!(id.obj1_items(&arena, TestObj1::COLL).is_empty());
+        id.obj1_push(&mut arena, TestObj1::COLL, 7);
+        assert_eq!(id.obj1_items(&arena, TestObj1::COLL)[0], 7);
     }
 }
