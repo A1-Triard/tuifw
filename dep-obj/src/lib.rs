@@ -526,6 +526,197 @@ pub trait DepObjBuilderCore<OwnerId: ComponentId> {
     fn id(&self) -> OwnerId;
 }
 
+pub struct DepObjRef<'a, Owner: DepType, Arena> {
+    arena: &'a Arena,
+    id: Owner::Id,
+    get_obj: for<'b> fn(arena: &'b Arena, id: Owner::Id) -> &'b Owner,
+}
+
+impl<'a, Owner: DepType, Arena> DepObjRef<'a, Owner, Arena> {
+    pub fn new(
+        arena: &'a Arena,
+        id: Owner::Id,
+        get_obj: for<'b> fn(arena: &'b Arena, id: Owner::Id) -> &'b Owner,
+    ) -> Self {
+        DepObjRef { arena, id, get_obj }
+    }
+
+    pub fn get<PropType: DepPropType>(&self, prop: DepProp<Owner, PropType>) -> &PropType {
+        let obj = (self.get_obj)(self.arena, self.id);
+        prop.get(obj)
+    }
+
+    pub fn items<ItemType: DepPropType>(&self, vec: DepVec<Owner, ItemType>) -> &Vec<ItemType> {
+        let obj = (self.get_obj)(self.arena, self.id);
+        vec.items(obj)
+    }
+}
+
+pub struct DepObjRefMut<'a, Owner: DepType, Arena> {
+    arena: &'a mut Arena,
+    id: Owner::Id,
+    get_obj_mut: for<'b> fn(arena: &'b mut Arena, id: Owner::Id) -> &'b mut Owner,
+}
+
+impl<'a, Owner: DepType, Arena> DepObjRefMut<'a, Owner, Arena> {
+    pub fn new(
+        arena: &'a mut Arena,
+        id: Owner::Id,
+        get_obj_mut: for<'b> fn(arena: &'b mut Arena, id: Owner::Id) -> &'b mut Owner,
+    ) -> Self {
+        DepObjRefMut { arena, id, get_obj_mut }
+    }
+
+    pub fn on_changed<PropType: DepPropType>(
+        &mut self,
+        prop: DepProp<Owner, PropType>,
+        on_changed: fn(
+            context: &mut dyn Context,
+            id: Owner::Id,
+            old: &PropType
+        ),
+    ) {
+        let obj = (self.get_obj_mut)(self.arena, self.id);
+        prop.on_changed(obj, on_changed);
+    }
+
+    pub fn on<ArgsType>(
+        &mut self,
+        event: DepEvent<Owner, ArgsType>,
+        on_raised: fn(
+            context: &mut dyn Context,
+            id: Owner::Id,
+            args: &mut ArgsType
+        ),
+    ) {
+        let obj = (self.get_obj_mut)(self.arena, self.id);
+        event.on_raised(obj, on_raised);
+    }
+
+    pub fn on_vec_changed<ItemType: DepPropType>(
+        &mut self,
+        vec: DepVec<Owner, ItemType>,
+        on_changed: fn(
+            context: &mut dyn Context,
+            id: Owner::Id,
+            change: &DepVecChange<ItemType>
+        ),
+    ) {
+        let obj = (self.get_obj_mut)(self.arena, self.id);
+        vec.on_changed(obj, on_changed);
+    }
+}
+
+pub struct DepObjMut<'a, Owner: DepType, Arena> {
+    id: Owner::Id,
+    context: &'a mut dyn Context,
+    get_obj_mut: for<'b> fn(arena: &'b mut Arena, id: Owner::Id) -> &'b mut Owner,
+}
+
+impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
+    pub fn new(
+        id: Owner::Id,
+        context: &'a mut dyn Context,
+        get_obj_mut: for<'b> fn(arena: &'b mut Arena, id: Owner::Id) -> &'b mut Owner,
+    ) -> Self {
+        DepObjMut { id, context, get_obj_mut }
+    }
+
+    pub fn set_uncond<PropType: DepPropType>(
+        &mut self,
+        prop: DepProp<Owner, PropType>,
+        value: PropType,
+    ) -> PropType {
+        let arena: &mut Arena = self.context.get_mut();
+        let obj = (self.get_obj_mut)(arena, self.id);
+        let (old, on_changed) = prop.set_uncond(obj, value);
+        on_changed.raise(self.context, self.id, &old);
+        old
+    }
+
+    pub fn unset_uncond<PropType: DepPropType>(
+        &mut self,
+        prop: DepProp<Owner, PropType>,
+    ) -> Option<PropType> {
+        let arena: &mut Arena = self.context.get_mut();
+        let obj = (self.get_obj_mut)(arena, self.id);
+        prop.unset_uncond(obj).map(|(old, on_changed)| {
+            on_changed.raise(self.context, self.id, &old);
+            old
+        })
+    }
+
+    pub fn set_distinct<PropType: DepPropType + PartialEq>(
+        &mut self,
+        prop: DepProp<Owner, PropType>,
+        value: PropType,
+    ) -> Option<PropType> {
+        let arena: &mut Arena = self.context.get_mut();
+        let obj = (self.get_obj_mut)(arena, self.id);
+        prop.set_distinct(obj, value).map(|(old, on_changed)| {
+            on_changed.raise(self.context, self.id, &old);
+            old
+        })
+    }
+
+    pub fn unset_distinct<PropType: DepPropType + PartialEq>(
+        &mut self,
+        prop: DepProp<Owner, PropType>,
+    ) -> Option<PropType> {
+        let arena: &mut Arena = self.context.get_mut();
+        let obj = (self.get_obj_mut)(arena, self.id);
+        prop.unset_distinct(obj).map(|(old, on_changed)| {
+            on_changed.raise(self.context, self.id, &old);
+            old
+        })
+    }
+
+    pub fn raise<ArgsType>(
+        &mut self,
+        event: DepEvent<Owner, ArgsType>,
+        args: &mut ArgsType,
+    ) {
+        let arena: &mut Arena = self.context.get_mut();
+        let obj = (self.get_obj_mut)(arena, self.id);
+        let on_raised = event.raise(obj);
+        on_raised.call(self.context, self.id, args);
+    }
+
+    pub fn apply_style(
+        &mut self,
+        style: Option<Style<Owner>>,
+    ) -> Option<Style<Owner>> {
+        let arena: &mut Arena = self.context.get_mut();
+        let obj = (self.get_obj_mut)(arena, self.id);
+        let (old, on_changed) = style.apply(obj);
+        on_changed.raise(self.context, self.id);
+        old
+    }
+
+    pub fn clear<ItemType: DepPropType>(
+        &mut self,
+        vec: DepVec<Owner, ItemType>,
+    ) -> DepVecChange<ItemType> {
+        let arena: &mut Arena = self.context.get_mut();
+        let obj = (self.get_obj_mut)(arena, self.id);
+        let (change, on_changed) = vec.clear(obj);
+        on_changed.raise(self.context, self.id, &change);
+        change
+    }
+
+    pub fn push<ItemType: DepPropType>(
+        &mut self,
+        vec: DepVec<Owner, ItemType>,
+        value: ItemType,
+    ) -> DepVecChange<ItemType> {
+        let arena: &mut Arena = self.context.get_mut();
+        let obj = (self.get_obj_mut)(arena, self.id);
+        let (change, on_changed) = vec.push(obj, value);
+        on_changed.raise(self.context, self.id, &change);
+        change
+    }
+}
+
 #[macro_export]
 macro_rules! dep_type {
     (
@@ -818,7 +1009,7 @@ macro_rules! dep_type {
                     $vis fn $field(mut self, value: $field_ty) -> Self {
                         let id = <$BuilderCore as $crate::DepObjBuilderCore<$Id>>::id(&self.core);
                         let context = <$BuilderCore as $crate::DepObjBuilderCore<$Id>>::context_mut(&mut self.core);
-                        id. [< $obj _set_uncond >] (context, $name:: [< $field:upper >] , value);
+                        id. [< $obj _mut >] (context).set_uncond($name:: [< $field:upper >] , value);
                         self
                     }
                 ]
@@ -1040,200 +1231,42 @@ macro_rules! dep_obj {
         }
     ) => {
         $crate::paste_paste! {
-            #[allow(dead_code)]
-            $vis fn [< $name _get >] <DepObjValueType: $crate::DepPropType>(
-                self,
-                $arena: &$Arena,
-                prop: $crate::DepProp<$ty, DepObjValueType>
-            ) -> &DepObjValueType {
-                let $this = self;
-                let obj = $field;
-                prop.get(obj)
+            fn [< $name _get_obj_ref_priv >] <'arena_lifetime>(
+                $arena: &'arena_lifetime $Arena,
+                $this: Self
+            ) -> &'arena_lifetime $ty {
+                $field
+            }
+
+            fn [< $name _get_obj_mut_priv >] <'arena_lifetime>(
+                $arena: &'arena_lifetime mut $Arena,
+                $this: Self
+            ) -> &'arena_lifetime mut $ty {
+                $field_mut
             }
 
             #[allow(dead_code)]
-            $vis fn [< $name _set_uncond >] <DepObjValueType: $crate::DepPropType>(
+            $vis fn [< $name _ref >] <'arena_lifetime>(
                 self,
-                context: &mut dyn $crate::dyn_context_Context,
-                prop: $crate::DepProp<$ty, DepObjValueType>,
-                value: DepObjValueType,
-            ) -> DepObjValueType {
-                let $this = self;
-                let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
-                let obj = $field_mut;
-                let (old, on_changed) = prop.set_uncond(obj, value);
-                on_changed.raise(context, self, &old);
-                old
+                $arena: &'arena_lifetime $Arena,
+            ) -> $crate::DepObjRef<'arena_lifetime, $ty, $Arena> {
+                $crate::DepObjRef::new($arena, self, Self:: [< $name _get_obj_ref_priv >] )
             }
 
             #[allow(dead_code)]
-            $vis fn [< $name _unset_uncond >] <DepObjValueType: $crate::DepPropType>(
+            $vis fn [< $name _mut >] <'arena_lifetime>(
                 self,
-                context: &mut dyn $crate::dyn_context_Context,
-                prop: $crate::DepProp<$ty, DepObjValueType>,
-            ) -> $crate::std_option_Option<DepObjValueType> {
-                let $this = self;
-                let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
-                let obj = $field_mut;
-                prop.unset_uncond(obj).map(|(old, on_changed)| {
-                    on_changed.raise(context, self, &old);
-                    old
-                })
+                context: &'arena_lifetime mut dyn $crate::dyn_context_Context,
+            ) -> $crate::DepObjMut<'arena_lifetime, $ty, $Arena> {
+                $crate::DepObjMut::new(self, context, Self:: [< $name _get_obj_mut_priv >] )
             }
 
             #[allow(dead_code)]
-            $vis fn [< $name _set_distinct >] <
-                DepObjValueType: $crate::DepPropType + $crate::std_cmp_PartialEq
-            >(
+            $vis fn $name <'arena_lifetime>(
                 self,
-                context: &mut dyn $crate::dyn_context_Context,
-                prop: $crate::DepProp<$ty, DepObjValueType>,
-                value: DepObjValueType,
-            ) -> $crate::std_option_Option<DepObjValueType> {
-                let $this = self;
-                let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
-                let obj = $field_mut;
-                prop.set_distinct(obj, value).map(|(old, on_changed)| {
-                    on_changed.raise(context, self, &old);
-                    old
-                })
-            }
-
-            #[allow(dead_code)]
-            $vis fn [< $name _unset_distinct >] <
-                DepObjValueType: $crate::DepPropType + $crate::std_cmp_PartialEq
-            >(
-                self,
-                context: &mut dyn $crate::dyn_context_Context,
-                prop: $crate::DepProp<$ty, DepObjValueType>,
-            ) -> $crate::std_option_Option<DepObjValueType> {
-                let $this = self;
-                let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
-                let obj = $field_mut;
-                prop.unset_distinct(obj).map(|(old, on_changed)| {
-                    on_changed.raise(context, self, &old);
-                    old
-                })
-            }
-
-            #[allow(dead_code)]
-            $vis fn [< $name _on_changed >] <DepObjValueType: $crate::DepPropType>(
-                self,
-                $arena: &mut $Arena,
-                prop: $crate::DepProp<$ty, DepObjValueType>,
-                on_changed: fn(
-                    context: &mut dyn $crate::dyn_context_Context,
-                    id: Self,
-                    old: &DepObjValueType
-                ),
-            ) {
-                let $this = self;
-                let obj = $field_mut;
-                prop.on_changed(obj, on_changed);
-            }
-
-            #[allow(dead_code)]
-            $vis fn [< $name _raise >] <DepEventArgsType>(
-                self,
-                context: &mut dyn $crate::dyn_context_Context,
-                event: $crate::DepEvent<$ty, DepEventArgsType>,
-                args: &mut DepEventArgsType,
-            ) {
-                let $this = self;
-                let $arena = $crate::dyn_context_ContextExt::get::<$Arena>(context);
-                let obj = $field;
-                let on_raised = event.raise(obj);
-                on_raised.call(context, self, args);
-            }
-
-            #[allow(dead_code)]
-            $vis fn [< $name _on >] <DepEventArgsType>(
-                self,
-                $arena: &mut $Arena,
-                event: $crate::DepEvent<$ty, DepEventArgsType>,
-                on_raised: fn(
-                    context: &mut dyn $crate::dyn_context_Context,
-                    id: Self,
-                    args: &mut DepEventArgsType
-                ),
-            ) {
-                let $this = self;
-                let obj = $field_mut;
-                event.on_raised(obj, on_raised);
-            }
-
-            #[allow(dead_code)]
-            $vis fn [< $name _apply_style >] (
-                self,
-                context: &mut dyn $crate::dyn_context_Context,
-                style: $crate::std_option_Option<$crate::Style<$ty>>,
-            ) -> $crate::std_option_Option<$crate::Style<$ty>> {
-                let $this = self;
-                let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
-                let obj = $field_mut;
-                let (old, on_changed) = $crate::OptionStyleExt::apply(style, obj);
-                on_changed.raise(context, self);
-                old
-            }
-
-            #[allow(dead_code)]
-            $vis fn [< $name _items >] <DepObjValueType: $crate::DepPropType>(
-                self,
-                $arena: &$Arena,
-                vec: $crate::DepVec<$ty, DepObjValueType>
-            ) -> &$crate::std_vec_Vec<DepObjValueType> {
-                let $this = self;
-                let obj = $field;
-                vec.items(obj)
-            }
-
-            #[allow(dead_code)]
-            $vis fn [< $name _clear >] <
-                DepObjValueType: $crate::DepPropType + $crate::std_cmp_PartialEq
-            >(
-                self,
-                context: &mut dyn $crate::dyn_context_Context,
-                vec: $crate::DepVec<$ty, DepObjValueType>,
-            ) -> $crate::DepVecChange<DepObjValueType> {
-                let $this = self;
-                let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
-                let obj = $field_mut;
-                let (change, on_changed) = vec.clear(obj);
-                on_changed.raise(context, self, &change);
-                change
-            }
-
-            #[allow(dead_code)]
-            $vis fn [< $name _push >] <
-                DepObjValueType: $crate::DepPropType + $crate::std_cmp_PartialEq
-            >(
-                self,
-                context: &mut dyn $crate::dyn_context_Context,
-                vec: $crate::DepVec<$ty, DepObjValueType>,
-                value: DepObjValueType,
-            ) -> $crate::DepVecChange<DepObjValueType> {
-                let $this = self;
-                let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
-                let obj = $field_mut;
-                let (change, on_changed) = vec.push(obj, value);
-                on_changed.raise(context, self, &change);
-                change
-            }
-
-            #[allow(dead_code)]
-            $vis fn [< $name _on_vec_changed >] <DepObjValueType: $crate::DepPropType>(
-                self,
-                $arena: &mut $Arena,
-                vec: $crate::DepVec<$ty, DepObjValueType>,
-                on_changed: fn(
-                    context: &mut dyn $crate::dyn_context_Context,
-                    id: Self,
-                    change: &$crate::DepVecChange<DepObjValueType>
-                ),
-            ) {
-                let $this = self;
-                let obj = $field_mut;
-                vec.on_changed(obj, on_changed);
+                $arena: &'arena_lifetime mut $Arena,
+            ) -> $crate::DepObjRefMut<'arena_lifetime, $ty, $Arena> {
+                $crate::DepObjRefMut::new($arena, self, Self:: [< $name _get_obj_mut_priv >] )
             }
         }
     };
@@ -1243,230 +1276,42 @@ macro_rules! dep_obj {
         }
     ) => {
         $crate::paste_paste! {
-            #[allow(dead_code)]
-            $vis fn [< $name _get >] <
-                Owner: $ty + $crate::DepType<Id=Self>,
-                DepObjValueType: $crate::DepPropType
-            > (
-                self,
-                $arena: &$Arena,
-                prop: $crate::DepProp<Owner, DepObjValueType>
-            ) -> &DepObjValueType {
-                let $this = self;
-                let obj = $field.downcast_ref::<Owner>().expect("invalid cast");
-                prop.get(obj)
+            fn [< $name _get_obj_ref_priv >] <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
+                $arena: &'arena_lifetime $Arena,
+                $this: Self
+            ) -> &'arena_lifetime DepObjType {
+                $field.downcast_ref::<DepObjType>().expect("invalid cast")
+            }
+
+            fn [< $name _get_obj_mut_priv >] <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
+                $arena: &'arena_lifetime mut $Arena,
+                $this: Self
+            ) -> &'arena_lifetime mut DepObjType {
+                $field_mut.downcast_mut::<DepObjType>().expect("invalid cast")
             }
 
             #[allow(dead_code)]
-            $vis fn [< $name _set_uncond >] <
-                Owner: $ty + $crate::DepType<Id=Self>,
-                DepObjValueType: $crate::DepPropType
-            >(
+            $vis fn [< $name _ref >] <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
                 self,
-                context: &mut dyn $crate::dyn_context_Context,
-                prop: $crate::DepProp<Owner, DepObjValueType>,
-                value: DepObjValueType,
-            ) -> DepObjValueType {
-                let $this = self;
-                let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
-                let obj = $field_mut.downcast_mut::<Owner>().expect("invalid cast");
-                let (old, on_changed) = prop.set_uncond(obj, value);
-                on_changed.raise(context, self, &old);
-                old
+                $arena: &'arena_lifetime $Arena,
+            ) -> $crate::DepObjRef<'arena_lifetime, DepObjType, $Arena> {
+                $crate::DepObjRef::new($arena, self, Self:: [< $name _get_obj_ref_priv >] )
             }
 
             #[allow(dead_code)]
-            $vis fn [< $name _unset_uncond >] <
-                Owner: $ty + $crate::DepType<Id=Self>,
-                DepObjValueType: $crate::DepPropType
-            >(
+            $vis fn [< $name _mut >] <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
                 self,
-                context: &mut dyn $crate::dyn_context_Context,
-                prop: $crate::DepProp<Owner, DepObjValueType>,
-            ) -> $crate::std_option_Option<DepObjValueType> {
-                let $this = self;
-                let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
-                let obj = $field_mut.downcast_mut::<Owner>().expect("invalid cast");
-                prop.unset_uncond(obj).map(|(old, on_changed)| {
-                    on_changed.raise(context, self, &old);
-                    old
-                })
+                context: &'arena_lifetime mut dyn $crate::dyn_context_Context,
+            ) -> $crate::DepObjMut<'arena_lifetime, DepObjType, $Arena> {
+                $crate::DepObjMut::new(self, context, Self:: [< $name _get_obj_mut_priv >] )
             }
 
             #[allow(dead_code)]
-            $vis fn [< $name _set_distinct >] <
-                Owner: $ty + $crate::DepType<Id=Self>,
-                DepObjValueType: $crate::DepPropType + $crate::std_cmp_PartialEq
-            >(
+            $vis fn $name <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
                 self,
-                context: &mut dyn $crate::dyn_context_Context,
-                prop: $crate::DepProp<Owner, DepObjValueType>,
-                value: DepObjValueType,
-            ) -> $crate::std_option_Option<DepObjValueType> {
-                let $this = self;
-                let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
-                let obj = $field_mut.downcast_mut::<Owner>().expect("invalid cast");
-                prop.set_distinct(obj, value).map(|(old, on_changed)| {
-                    on_changed.raise(context, self, &old);
-                    old
-                })
-            }
-
-            #[allow(dead_code)]
-            $vis fn [< $name _unset_distinct >] <
-                Owner: $ty + $crate::DepType<Id=Self>,
-                DepObjValueType: $crate::DepPropType + $crate::std_cmp_PartialEq
-            >(
-                self,
-                context: &mut dyn $crate::dyn_context_Context,
-                prop: $crate::DepProp<Owner, DepObjValueType>,
-            ) -> $crate::std_option_Option<DepObjValueType> {
-                let $this = self;
-                let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
-                let obj = $field_mut.downcast_mut::<Owner>().expect("invalid cast");
-                prop.unset_distinct(obj).map(|(old, on_changed)| {
-                    on_changed.raise(context, self, &old);
-                    old
-                })
-            }
-
-            #[allow(dead_code)]
-            $vis fn [< $name _on_changed >] <
-                Owner: $ty + $crate::DepType<Id=Self>,
-                DepObjValueType: $crate::DepPropType
-            >(
-                self,
-                $arena: &mut $Arena,
-                prop: $crate::DepProp<Owner, DepObjValueType>,
-                on_changed: fn(
-                    context: &mut dyn $crate::dyn_context_Context,
-                    id: Self,
-                    old: &DepObjValueType
-                ),
-            ) {
-                let $this = self;
-                let obj = $field_mut.downcast_mut::<Owner>().expect("invalid cast");
-                prop.on_changed(obj, on_changed);
-            }
-
-            #[allow(dead_code)]
-            $vis fn [< $name _raise >] <
-                Owner: $ty + $crate::DepType<Id=Self>,
-                DepEventArgsType
-            >(
-                self,
-                context: &mut dyn $crate::dyn_context_Context,
-                event: $crate::DepEvent<Owner, DepEventArgsType>,
-                args: &mut DepEventArgsType,
-            ) {
-                let $this = self;
-                let $arena = $crate::dyn_context_ContextExt::get::<$Arena>(context);
-                let obj = $field.downcast_ref::<Owner>().expect("invalid cast");
-                let on_raised = event.raise(obj);
-                on_raised.call(context, self, args);
-            }
-
-            #[allow(dead_code)]
-            $vis fn [< $name _on >] <
-                Owner: $ty + $crate::DepType<Id=Self>,
-                DepEventArgsType
-            >(
-                self,
-                $arena: &mut $Arena,
-                event: $crate::DepEvent<Owner, DepEventArgsType>,
-                on_raised: fn(
-                    context: &mut dyn $crate::dyn_context_Context,
-                    id: Self,
-                    args: &mut DepEventArgsType
-                ),
-            ) {
-                let $this = self;
-                let obj = $field_mut.downcast_mut::<Owner>().expect("invalid cast");
-                event.on_raised(obj, on_raised);
-            }
-
-            #[allow(dead_code)]
-            $vis fn [< $name _apply_style >] <
-                Owner: $ty + $crate::DepType<Id=Self>,
-            >(
-                self,
-                context: &mut dyn $crate::dyn_context_Context,
-                style: $crate::std_option_Option<$crate::Style<Owner>>,
-            ) -> $crate::std_option_Option<$crate::Style<Owner>> {
-                let $this = self;
-                let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
-                let obj = $field_mut.downcast_mut::<Owner>().expect("invalid cast");
-                let (old, on_changed) = $crate::OptionStyleExt::apply(style, obj);
-                on_changed.raise(context, self);
-                old
-            }
-
-            #[allow(dead_code)]
-            $vis fn [< $name _items >] <
-                Owner: $ty + $crate::DepType<Id=Self>,
-                DepObjValueType: $crate::DepPropType
-            > (
-                self,
-                $arena: &$Arena,
-                vec: $crate::DepVec<Owner, DepObjValueType>
-            ) -> &$crate::std_vec_Vec<DepObjValueType> {
-                let $this = self;
-                let obj = $field.downcast_ref::<Owner>().expect("invalid cast");
-                vec.items(obj)
-            }
-
-            #[allow(dead_code)]
-            $vis fn [< $name _clear >] <
-                Owner: $ty + $crate::DepType<Id=Self>,
-                DepObjValueType: $crate::DepPropType + $crate::std_cmp_PartialEq
-            >(
-                self,
-                context: &mut dyn $crate::dyn_context_Context,
-                vec: $crate::DepVec<Owner, DepObjValueType>,
-            ) -> $crate::DepVecChange<DepObjValueType> {
-                let $this = self;
-                let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
-                let obj = $field_mut.downcast_mut::<Owner>().expect("invalid cast");
-                let (change, on_changed) = vec.clear(obj);
-                on_changed.raise(context, self, &change);
-                change
-            }
-
-            #[allow(dead_code)]
-            $vis fn [< $name _push >] <
-                Owner: $ty + $crate::DepType<Id=Self>,
-                DepObjValueType: $crate::DepPropType + $crate::std_cmp_PartialEq
-            >(
-                self,
-                context: &mut dyn $crate::dyn_context_Context,
-                vec: $crate::DepVec<Owner, DepObjValueType>,
-                value: DepObjValueType,
-            ) -> $crate::DepVecChange<DepObjValueType> {
-                let $this = self;
-                let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
-                let obj = $field_mut.downcast_mut::<Owner>().expect("invalid cast");
-                let (change, on_changed) = vec.push(obj, value);
-                on_changed.raise(context, self, &change);
-                change
-            }
-
-            #[allow(dead_code)]
-            $vis fn [< $name _on_vec_changed >] <
-                Owner: $ty + $crate::DepType<Id=Self>,
-                DepObjValueType: $crate::DepPropType
-            >(
-                self,
-                $arena: &mut $Arena,
-                vec: $crate::DepVec<Owner, DepObjValueType>,
-                on_changed: fn(
-                    context: &mut dyn $crate::dyn_context_Context,
-                    id: Self,
-                    change: &$crate::DepVecChange<DepObjValueType>
-                ),
-            ) {
-                let $this = self;
-                let obj = $field_mut.downcast_mut::<Owner>().expect("invalid cast");
-                vec.on_changed(obj, on_changed);
+                $arena: &'arena_lifetime mut $Arena,
+            ) -> $crate::DepObjRefMut<'arena_lifetime, DepObjType, $Arena> {
+                $crate::DepObjRefMut::new($arena, self, Self:: [< $name _get_obj_mut_priv >] )
             }
         }
     };
@@ -1555,15 +1400,15 @@ mod test {
         TestObj1::new(&mut arena, id);
         let mut changed = 0;
         TestContext::call(&mut arena, &mut changed, |context| {
-            assert_eq!(id.obj1_get(context.arena(), TestObj1::INT_VAL), &42);
-            id.obj1_on_changed(context.arena_mut(), TestObj1::INT_VAL, |context, _, _| {
+            assert_eq!(id.obj1_ref(context.arena()).get(TestObj1::INT_VAL), &42);
+            id.obj1(context.arena_mut()).on_changed(TestObj1::INT_VAL, |context, _, _| {
                 let changed: &mut u16 = context.get_mut();
                 *changed += 1;
             });
             assert_eq!(context.changed(), &0);
-            id.obj1_set_uncond(context, TestObj1::INT_VAL, 43);
+            id.obj1_mut(context).set_uncond(TestObj1::INT_VAL, 43);
             assert_eq!(context.changed(), &1);
-            assert_eq!(id.obj1_get(context.arena(), TestObj1::INT_VAL), &43);
+            assert_eq!(id.obj1_ref(context.arena()).get(TestObj1::INT_VAL), &43);
         });
     }
 
@@ -1572,18 +1417,18 @@ mod test {
         let mut arena = TestArena(Arena::new(&mut TEST_NODE.lock().unwrap()));
         let id = arena.0.insert(|id| (TestNode { obj1: None }, TestId(id)));
         TestObj1::new(&mut arena, id);
-        assert_eq!(id.obj1_get(&arena, TestObj1::INT_VAL), &42);
+        assert_eq!(id.obj1_ref(&arena).get(TestObj1::INT_VAL), &42);
         let mut style = Style::new();
         style.insert(TestObj1::INT_VAL, 43);
-        id.obj1_apply_style(&mut arena, Some(style.clone()));
-        assert_eq!(id.obj1_get(&arena, TestObj1::INT_VAL), &43);
-        id.obj1_set_uncond(&mut arena, TestObj1::INT_VAL, 44);
-        assert_eq!(id.obj1_get(&arena, TestObj1::INT_VAL), &44);
+        id.obj1_mut(&mut arena).apply_style(Some(style.clone()));
+        assert_eq!(id.obj1_ref(&arena).get(TestObj1::INT_VAL), &43);
+        id.obj1_mut(&mut arena).set_uncond(TestObj1::INT_VAL, 44);
+        assert_eq!(id.obj1_ref(&arena).get(TestObj1::INT_VAL), &44);
         style.insert(TestObj1::INT_VAL, 45);
-        id.obj1_apply_style(&mut arena, Some(style));
-        assert_eq!(id.obj1_get(&arena, TestObj1::INT_VAL), &44);
-        id.obj1_unset_uncond(&mut arena, TestObj1::INT_VAL);
-        assert_eq!(id.obj1_get(&arena, TestObj1::INT_VAL), &45);
+        id.obj1_mut(&mut arena).apply_style(Some(style));
+        assert_eq!(id.obj1_ref(&arena).get(TestObj1::INT_VAL), &44);
+        id.obj1_mut(&mut arena).unset_uncond(TestObj1::INT_VAL);
+        assert_eq!(id.obj1_ref(&arena).get(TestObj1::INT_VAL), &45);
     }
 
     #[test]
@@ -1593,7 +1438,7 @@ mod test {
         TestObj1::new(&mut arena, id);
         let builder = TestObj1Builder::new_priv(TestIdBuilder { id, arena: &mut arena });
         builder.int_val(1);
-        assert_eq!(id.obj1_get(&arena, TestObj1::INT_VAL), &1);
+        assert_eq!(id.obj1_ref(&arena).get(TestObj1::INT_VAL), &1);
     }
 
     #[test]
@@ -1601,9 +1446,9 @@ mod test {
         let mut arena = TestArena(Arena::new(&mut TEST_NODE.lock().unwrap()));
         let id = arena.0.insert(|id| (TestNode { obj1: None }, TestId(id)));
         TestObj1::new(&mut arena, id);
-        assert!(id.obj1_items(&arena, TestObj1::COLL).is_empty());
-        let change = id.obj1_push(&mut arena, TestObj1::COLL, 7);
+        assert!(id.obj1_ref(&arena).items(TestObj1::COLL).is_empty());
+        let change = id.obj1_mut(&mut arena).push(TestObj1::COLL, 7);
         assert_eq!(change, DepVecChange::Inserted(0 .. 1));
-        assert_eq!(id.obj1_items(&arena, TestObj1::COLL)[0], 7);
+        assert_eq!(id.obj1_ref(&arena).items(TestObj1::COLL)[0], 7);
     }
 }

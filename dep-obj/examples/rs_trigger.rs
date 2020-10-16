@@ -108,16 +108,16 @@ mod or_chip {
                 let (tag, result) = tag(chip);
                 (Box::new(legs) as _, tag, (chip, result))
             });
-            chip.legs_on_changed(circuit, OrLegs::IN_1, Self::update);
-            chip.legs_on_changed(circuit, OrLegs::IN_2, Self::update);
+            chip.legs(circuit).on_changed(OrLegs::IN_1, Self::update);
+            chip.legs(circuit).on_changed(OrLegs::IN_2, Self::update);
             result
         }
 
         fn update(context: &mut dyn Context, chip: Chip, _old: &bool) {
             let circuit: &Circuit= context.get();
-            let in_1 = *chip.legs_get(circuit, OrLegs::IN_1);
-            let in_2 = *chip.legs_get(circuit, OrLegs::IN_2);
-            chip.legs_set_distinct(context, OrLegs::OUT, in_1 | in_2);
+            let in_1 = *chip.legs_ref(circuit).get(OrLegs::IN_1);
+            let in_2 = *chip.legs_ref(circuit).get(OrLegs::IN_2);
+            chip.legs_mut(context).set_distinct(OrLegs::OUT, in_1 | in_2);
         }
     }
 
@@ -148,14 +148,14 @@ mod not_chip {
                 let (tag, result) = tag(chip);
                 (Box::new(legs) as _, tag, (chip, result))
             });
-            chip.legs_on_changed(circuit, NotLegs::IN_, Self::update);
+            chip.legs(circuit).on_changed(NotLegs::IN_, Self::update);
             result
         }
 
         fn update(context: &mut dyn Context, chip: Chip, _old: &bool) {
             let circuit: &Circuit = context.get();
-            let in_ = *chip.legs_get(circuit, NotLegs::IN_);
-            chip.legs_set_distinct(context, NotLegs::OUT, !in_);
+            let in_ = *chip.legs_ref(circuit).get(NotLegs::IN_);
+            chip.legs_mut(context).set_distinct(NotLegs::OUT, !in_);
         }
     }
 
@@ -192,34 +192,34 @@ fn main() {
         let circuit: &Circuit = context.get();
         let chips: &TriggerChips = context.get();
         let or = if not.tag::<usize>(circuit) == 1 { chips.or_2 } else { chips.or_1 };
-        let &out = not.legs_get(circuit, NotLegs::OUT);
-        or.legs_set_uncond(context, OrLegs::IN_2, out);
+        let &out = not.legs_ref(circuit).get(NotLegs::OUT);
+        or.legs_mut(context).set_uncond(OrLegs::IN_2, out);
     };
     let on_or_out_changed = |context: &mut dyn Context, or: Chip, _old: &_| {
         let circuit: &Circuit = context.get();
         let chips: &TriggerChips = context.get();
         let not = if or.tag::<usize>(circuit) == 1 { chips.not_1 } else { chips.not_2 };
-        let &out = or.legs_get(circuit, OrLegs::OUT);
-        not.legs_set_uncond(context, NotLegs::IN_, out);
+        let &out = or.legs_ref(circuit).get(OrLegs::OUT);
+        not.legs_mut(context).set_uncond(NotLegs::IN_, out);
     };
-    not_1.legs_on_changed(circuit, NotLegs::OUT, on_not_out_changed);
-    not_2.legs_on_changed(circuit, NotLegs::OUT, on_not_out_changed);
-    or_1.legs_on_changed(circuit, OrLegs::OUT, on_or_out_changed);
-    or_2.legs_on_changed(circuit, OrLegs::OUT, on_or_out_changed);
-    not_1.legs_on_changed(circuit, NotLegs::OUT, |context, not_1, _old| {
+    not_1.legs(circuit).on_changed(NotLegs::OUT, on_not_out_changed);
+    not_2.legs(circuit).on_changed(NotLegs::OUT, on_not_out_changed);
+    or_1.legs(circuit).on_changed(OrLegs::OUT, on_or_out_changed);
+    or_2.legs(circuit).on_changed(OrLegs::OUT, on_or_out_changed);
+    not_1.legs(circuit).on_changed(NotLegs::OUT, |context, not_1, _old| {
         let circuit: &Circuit = context.get();
-        let &out = not_1.legs_get(circuit, NotLegs::OUT);
+        let &out = not_1.legs_ref(circuit).get(NotLegs::OUT);
         println!("{}", if out { "0 -> 1" } else { "1 -> 0" });
     });
     let chips = TriggerChips { or_1, or_2, not_1, not_2 };
     TriggerContext::call(circuit, &chips, |context| {
-        or_1.legs_set_distinct(context, OrLegs::IN_1, true);
-        or_1.legs_set_distinct(context, OrLegs::IN_1, false);
-        or_2.legs_set_distinct(context, OrLegs::IN_1, true);
-        or_2.legs_set_distinct(context, OrLegs::IN_1, false);
-        or_1.legs_set_distinct(context, OrLegs::IN_1, true);
-        or_1.legs_set_distinct(context, OrLegs::IN_1, false);
-        or_2.legs_set_distinct(context, OrLegs::IN_1, true);
-        or_2.legs_set_distinct(context, OrLegs::IN_1, false);
+        or_1.legs_mut(context).set_distinct(OrLegs::IN_1, true);
+        or_1.legs_mut(context).set_distinct(OrLegs::IN_1, false);
+        or_2.legs_mut(context).set_distinct(OrLegs::IN_1, true);
+        or_2.legs_mut(context).set_distinct(OrLegs::IN_1, false);
+        or_1.legs_mut(context).set_distinct(OrLegs::IN_1, true);
+        or_1.legs_mut(context).set_distinct(OrLegs::IN_1, false);
+        or_2.legs_mut(context).set_distinct(OrLegs::IN_1, true);
+        or_2.legs_mut(context).set_distinct(OrLegs::IN_1, false);
     });
 }
