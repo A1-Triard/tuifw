@@ -300,6 +300,15 @@ impl<Owner: DepType, ItemType: DepPropType> DepVec<Owner, ItemType> {
         &entry.items
     }
 
+    pub fn clear(
+        self,
+        owner: &mut Owner,
+    ) -> (DepVecChange<ItemType>, DepVecOnChanged<Owner::Id, ItemType>) {
+        let entry_mut = self.entry_mut(owner);
+        entry_mut.items.clear();
+        (DepVecChange::Reset, DepVecOnChanged { callbacks: entry_mut.on_changed.clone() })
+    }
+
     pub fn push(
         self,
         owner: &mut Owner,
@@ -1179,6 +1188,22 @@ macro_rules! dep_obj {
             }
 
             #[allow(dead_code)]
+            $vis fn [< $name _clear >] <
+                DepObjValueType: $crate::DepPropType + $crate::std_cmp_PartialEq
+            >(
+                self,
+                context: &mut dyn $crate::dyn_context_Context,
+                vec: $crate::DepVec<$ty, DepObjValueType>,
+            ) -> $crate::DepVecChange<DepObjValueType> {
+                let $this = self;
+                let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
+                let obj = $field_mut;
+                let (change, on_changed) = vec.clear(obj);
+                on_changed.raise(context, self, &change);
+                change
+            }
+
+            #[allow(dead_code)]
             $vis fn [< $name _push >] <
                 DepObjValueType: $crate::DepPropType + $crate::std_cmp_PartialEq
             >(
@@ -1391,6 +1416,23 @@ macro_rules! dep_obj {
             }
 
             #[allow(dead_code)]
+            $vis fn [< $name _clear >] <
+                Owner: $ty + $crate::DepType<Id=Self>,
+                DepObjValueType: $crate::DepPropType + $crate::std_cmp_PartialEq
+            >(
+                self,
+                context: &mut dyn $crate::dyn_context_Context,
+                vec: $crate::DepVec<Owner, DepObjValueType>,
+            ) -> $crate::DepVecChange<DepObjValueType> {
+                let $this = self;
+                let $arena = $crate::dyn_context_ContextExt::get_mut::<$Arena>(context);
+                let obj = $field_mut.downcast_mut::<Owner>().expect("invalid cast");
+                let (change, on_changed) = vec.clear(obj);
+                on_changed.raise(context, self, &change);
+                change
+            }
+
+            #[allow(dead_code)]
             $vis fn [< $name _push >] <
                 Owner: $ty + $crate::DepType<Id=Self>,
                 DepObjValueType: $crate::DepPropType + $crate::std_cmp_PartialEq
@@ -1560,7 +1602,8 @@ mod test {
         let id = arena.0.insert(|id| (TestNode { obj1: None }, TestId(id)));
         TestObj1::new(&mut arena, id);
         assert!(id.obj1_items(&arena, TestObj1::COLL).is_empty());
-        id.obj1_push(&mut arena, TestObj1::COLL, 7);
+        let change = id.obj1_push(&mut arena, TestObj1::COLL, 7);
+        assert_eq!(change, DepVecChange::Inserted(0 .. 1));
         assert_eq!(id.obj1_items(&arena, TestObj1::COLL)[0], 7);
     }
 }
