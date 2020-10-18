@@ -93,7 +93,7 @@ pub enum DepVecChange<ItemType: DepPropType> {
     Reset,
     Inserted(Range<usize>),
     Removed(usize, Vec<ItemType>),
-    Moved(Range<usize>, usize),
+    Swapped(Range<usize>, Range<usize>),
 }
 
 #[derive(Educe)]
@@ -313,6 +313,18 @@ impl<Owner: DepType, ItemType: DepPropType> DepVec<Owner, ItemType> {
         let change = DepVecChange::Inserted(
             unsafe { entry_mut.items.len().unchecked_sub(1) } .. entry_mut.items.len()
         );
+        (change, DepVecOnChanged { callbacks: entry_mut.on_changed.clone() })
+    }
+
+    pub fn insert(
+        self,
+        owner: &mut Owner,
+        index: usize,
+        item: ItemType
+    ) -> (DepVecChange<ItemType>, DepVecOnChanged<Owner::Id, ItemType>) {
+        let entry_mut = self.entry_mut(owner);
+        entry_mut.items.insert(index, item);
+        let change = DepVecChange::Inserted(index .. index + 1);
         (change, DepVecOnChanged { callbacks: entry_mut.on_changed.clone() })
     }
 
@@ -701,11 +713,24 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
     pub fn push<ItemType: DepPropType>(
         &mut self,
         vec: DepVec<Owner, ItemType>,
-        value: ItemType,
+        item: ItemType,
     ) -> DepVecChange<ItemType> {
         let arena: &mut Arena = self.context.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
-        let (change, on_changed) = vec.push(obj, value);
+        let (change, on_changed) = vec.push(obj, item);
+        on_changed.raise(self.context, self.id, &change);
+        change
+    }
+
+    pub fn insert<ItemType: DepPropType>(
+        &mut self,
+        vec: DepVec<Owner, ItemType>,
+        index: usize,
+        item: ItemType
+    ) -> DepVecChange<ItemType> {
+        let arena: &mut Arena = self.context.get_mut();
+        let obj = (self.get_obj_mut)(arena, self.id);
+        let (change, on_changed) = vec.insert(obj, index, item);
         on_changed.raise(self.context, self.id, &change);
         change
     }
