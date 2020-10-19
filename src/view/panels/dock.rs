@@ -64,7 +64,7 @@ impl DockLayout {
         view: View,
     ) {
         view.set_layout(tree, DockLayout::new_priv());
-        view.layout_on_changed(tree, DockLayout::DOCK, Self::invalidate_parent_measure);
+        view.layout(tree).on_changed(DockLayout::DOCK, Self::invalidate_parent_measure);
     }
 
     fn invalidate_parent_measure<T>(context: &mut dyn Context, view: View, _old: &T) {
@@ -119,7 +119,7 @@ impl PanelBehavior for DockPanelBehavior {
             let mut child = last_child;
             loop {
                 child = child.next(tree);
-                let dock = match child.layout_get(tree, DockLayout::DOCK) {
+                let dock = match child.layout_ref(tree).get(DockLayout::DOCK) {
                     &Right(dock) => dock,
                     &Left(factor) => {
                         factor_sum += factor;
@@ -162,7 +162,7 @@ impl PanelBehavior for DockPanelBehavior {
                 Orient::Vert => children_size.x = (children_size.x as u16).saturating_add(breadth) as i16,
             }
             if let Some(last_undocked_child) = last_undocked_child {
-                let orient = match view.panel_get(tree, DockPanel::BASE) {
+                let orient = match view.panel_ref(tree).get(DockPanel::BASE) {
                     Side::Left | Side::Right => Orient::Hor,
                     Side::Top | Side::Bottom => Orient::Vert
                 };
@@ -172,7 +172,7 @@ impl PanelBehavior for DockPanelBehavior {
                 let mut child = last_child;
                 loop {
                     child = child.next(tree);
-                    let factor = match child.layout_get(tree, DockLayout::DOCK) {
+                    let factor = match child.layout_ref(tree).get(DockLayout::DOCK) {
                         &Right(_) => continue,
                         &Left(factor) => factor
                     };
@@ -241,7 +241,7 @@ impl PanelBehavior for DockPanelBehavior {
             let mut child = last_child;
             loop {
                 child = child.next(tree);
-                let dock = match child.layout_get(tree, DockLayout::DOCK) {
+                let dock = match child.layout_ref(tree).get(DockLayout::DOCK) {
                     &Right(dock) => dock,
                     &Left(factor) => {
                         factor_sum += factor;
@@ -284,11 +284,11 @@ impl PanelBehavior for DockPanelBehavior {
             if let Some(last_undocked_child) = last_undocked_child {
                 children_rect = children_arrange_bounds;
                 let base_bounds = bounds;
-                let &dock = view.panel_get(tree, DockPanel::BASE);
+                let &dock = view.panel_ref(tree).get(DockPanel::BASE);
                 let mut child = last_child;
                 loop {
                     child = child.next(tree);
-                    let factor = match child.layout_get(tree, DockLayout::DOCK) {
+                    let factor = match child.layout_ref(tree).get(DockLayout::DOCK) {
                         &Right(_) => continue,
                         &Left(factor) => factor
                     };

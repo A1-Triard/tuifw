@@ -47,11 +47,11 @@ impl LineDecorator {
         view: View,
     ) {
         view.set_decorator(tree, LineDecorator::new_priv());
-        view.decorator_on_changed(tree, LineDecorator::ORIENT, Self::invalidate_measure);
-        view.decorator_on_changed(tree, LineDecorator::LENGTH, Self::invalidate_measure);
-        view.decorator_on_changed(tree, LineDecorator::NEAR, Self::invalidate_near);
-        view.decorator_on_changed(tree, LineDecorator::STROKE, Self::invalidate_stroke);
-        view.decorator_on_changed(tree, LineDecorator::FAR, Self::invalidate_far);
+        view.decorator(tree).on_changed(LineDecorator::ORIENT, Self::invalidate_measure);
+        view.decorator(tree).on_changed(LineDecorator::LENGTH, Self::invalidate_measure);
+        view.decorator(tree).on_changed(LineDecorator::NEAR, Self::invalidate_near);
+        view.decorator(tree).on_changed(LineDecorator::STROKE, Self::invalidate_stroke);
+        view.decorator(tree).on_changed(LineDecorator::FAR, Self::invalidate_far);
     }
 
     fn invalidate_measure<T>(context: &mut dyn Context, view: View, _old: &T) {
@@ -72,7 +72,7 @@ impl LineDecorator {
 
     fn invalidate_far(context: &mut dyn Context, view: View, _old: &Cow<'static, str>) {
         let tree: &mut ViewTree = context.get_mut();
-        let &orient = view.decorator_get(tree, LineDecorator::ORIENT);
+        let &orient = view.decorator_ref(tree).get(LineDecorator::ORIENT);
         let size = view.render_bounds(tree).size;
         let invalidated = if orient == Orient::Vert {
             Rect { tl: Point { x: 0, y: size.y.wrapping_sub(1) }, size: Vector { x: 1, y: 1 } }
@@ -100,8 +100,8 @@ impl DecoratorBehavior for LineDecoratorBehavior {
     }
 
     fn desired_size(&self, view: View, tree: &mut ViewTree, _children_desired_size: Vector) -> Vector {
-        let &orient = view.decorator_get(tree, LineDecorator::ORIENT);
-        let &length = view.decorator_get(tree, LineDecorator::LENGTH);
+        let &orient = view.decorator_ref(tree).get(LineDecorator::ORIENT);
+        let &length = view.decorator_ref(tree).get(LineDecorator::LENGTH);
         if orient == Orient::Vert {
             Vector {  x: 1, y: length }
         } else {
@@ -114,8 +114,8 @@ impl DecoratorBehavior for LineDecoratorBehavior {
     }
 
     fn render_bounds(&self, view: View, tree: &mut ViewTree, _children_render_bounds: Rect) -> Rect {
-        let &orient = view.decorator_get(tree, LineDecorator::ORIENT);
-        let &length = view.decorator_get(tree, LineDecorator::LENGTH);
+        let &orient = view.decorator_ref(tree).get(LineDecorator::ORIENT);
+        let &length = view.decorator_ref(tree).get(LineDecorator::LENGTH);
         if orient == Orient::Vert {
             Rect { tl: Point { x: 0, y: 0 }, size: Vector {  x: 1, y: length } }
         } else {
@@ -124,11 +124,11 @@ impl DecoratorBehavior for LineDecoratorBehavior {
     }
 
     fn render(&self, view: View, tree: &ViewTree, port: &mut RenderPort) {
-        let &orient = view.decorator_get(tree, LineDecorator::ORIENT);
-        let &length = view.decorator_get(tree, LineDecorator::LENGTH);
-        let near = view.decorator_get(tree, LineDecorator::NEAR);
-        let stroke = view.decorator_get(tree, LineDecorator::STROKE);
-        let far = view.decorator_get(tree, LineDecorator::FAR);
+        let &orient = view.decorator_ref(tree).get(LineDecorator::ORIENT);
+        let &length = view.decorator_ref(tree).get(LineDecorator::LENGTH);
+        let near = view.decorator_ref(tree).get(LineDecorator::NEAR);
+        let stroke = view.decorator_ref(tree).get(LineDecorator::STROKE);
+        let far = view.decorator_ref(tree).get(LineDecorator::FAR);
         let fg = view.actual_fg(tree);
         let bg = view.actual_bg(tree);
         let attr = view.actual_attr(tree);

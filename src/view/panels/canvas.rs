@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 use tuifw_screen_base::{Vector, Point, Rect};
 use components_arena::ComponentId;
-use dep_obj::{dep_type, DepObjBuilderCore};
+use dep_obj::{dep_type, DepObjBuilderCore, Style};
 use dyn_context::{Context, ContextExt};
 use crate::view::base::*;
 
@@ -63,7 +63,7 @@ impl CanvasLayout {
         view: View,
     ) {
         view.set_layout(tree, CanvasLayout::new_priv());
-        view.layout_on_changed(tree, CanvasLayout::TL, Self::invalidate_parent_arrange);
+        view.layout(tree).on_changed(CanvasLayout::TL, Self::invalidate_parent_arrange);
     }
 
     fn invalidate_parent_arrange(context: &mut dyn Context, view: View, _old: &Point) {
@@ -75,17 +75,18 @@ impl CanvasLayout {
 impl Layout for CanvasLayout { }
 
 #[derive(Debug, Clone)]
-struct CanvasPanelTemplate;
+struct CanvasPanelTemplate(Style<CanvasLayout>);
 
-impl ViewTemplate for CanvasPanelTemplate {
-    fn load(&self, context: &mut dyn Context, view: View) {
+impl PanelTemplate for CanvasPanelTemplate {
+    fn apply_panel(&self, context: &mut dyn Context, view: View) {
         let tree: &mut ViewTree = context.get_mut();
         CanvasPanel::new(tree, view);
     }
 
-    fn unload(&self, context: &mut dyn Context, view: View) {
+    fn apply_layout(&self, context: &mut dyn Context, view: View) {
         let tree: &mut ViewTree = context.get_mut();
-        view.unset_panel(tree);
+        CanvasLayout::new(tree, view);
+        view.layout_mut(context).apply_style(Some(self.0.clone()));
     }
 }
 
@@ -103,8 +104,8 @@ impl CanvasPanel {
         view.set_panel(tree, CanvasPanel(()));
     }
 
-    pub fn template() -> Box<dyn ViewTemplate> {
-        Box::new(CanvasPanelTemplate)
+    pub fn template(layout_style: Style<CanvasLayout>) -> Box<dyn PanelTemplate> {
+        Box::new(CanvasPanelTemplate(layout_style))
     }
 }
 
@@ -142,7 +143,7 @@ impl PanelBehavior for CanvasPanelBehavior {
             let mut child = last_child;
             loop {
                 child = child.next(tree);
-                let child_offset = child.layout_get(tree, CanvasLayout::TL)
+                let child_offset = child.layout_ref(tree).get(CanvasLayout::TL)
                     .offset_from(Point { x: 0, y: 0 });
                 let child_size = child.desired_size(tree);
                 child.arrange(tree, Rect {

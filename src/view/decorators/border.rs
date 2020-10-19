@@ -51,14 +51,14 @@ impl BorderDecorator {
         view: View,
     ) {
         view.set_decorator(tree, BorderDecorator::new_priv());
-        view.decorator_on_changed(tree, BorderDecorator::TL, Self::invalidate_tl);
-        view.decorator_on_changed(tree, BorderDecorator::TR, Self::invalidate_tr);
-        view.decorator_on_changed(tree, BorderDecorator::BL, Self::invalidate_bl);
-        view.decorator_on_changed(tree, BorderDecorator::BR, Self::invalidate_br);
-        view.decorator_on_changed(tree, BorderDecorator::L, Self::invalidate_l);
-        view.decorator_on_changed(tree, BorderDecorator::T, Self::invalidate_t);
-        view.decorator_on_changed(tree, BorderDecorator::R, Self::invalidate_r);
-        view.decorator_on_changed(tree, BorderDecorator::B, Self::invalidate_b);
+        view.decorator(tree).on_changed(BorderDecorator::TL, Self::invalidate_tl);
+        view.decorator(tree).on_changed(BorderDecorator::TR, Self::invalidate_tr);
+        view.decorator(tree).on_changed(BorderDecorator::BL, Self::invalidate_bl);
+        view.decorator(tree).on_changed(BorderDecorator::BR, Self::invalidate_br);
+        view.decorator(tree).on_changed(BorderDecorator::L, Self::invalidate_l);
+        view.decorator(tree).on_changed(BorderDecorator::T, Self::invalidate_t);
+        view.decorator(tree).on_changed(BorderDecorator::R, Self::invalidate_r);
+        view.decorator(tree).on_changed(BorderDecorator::B, Self::invalidate_b);
     }
 
     fn invalidate_tl(context: &mut dyn Context, view: View, _old: &Cow<'static, str>) {
@@ -146,20 +146,20 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
         tree: &mut ViewTree,
         measure_size: (Option<i16>, Option<i16>)
     ) -> (Option<i16>, Option<i16>) {
-        let tl = !view.decorator_get(tree, BorderDecorator::TL).is_empty();
-        let tr = !view.decorator_get(tree, BorderDecorator::TR).is_empty();
-        let bl = !view.decorator_get(tree, BorderDecorator::BL).is_empty();
-        let br = !view.decorator_get(tree, BorderDecorator::BR).is_empty();
+        let tl = !view.decorator_ref(tree).get(BorderDecorator::TL).is_empty();
+        let tr = !view.decorator_ref(tree).get(BorderDecorator::TR).is_empty();
+        let bl = !view.decorator_ref(tree).get(BorderDecorator::BL).is_empty();
+        let br = !view.decorator_ref(tree).get(BorderDecorator::BR).is_empty();
         let children_measure_width = if let Some(measure_width) = measure_size.0 {
-            let l = tl || bl || !view.decorator_get(tree, BorderDecorator::L).is_empty();
-            let r = tr || br || !view.decorator_get(tree, BorderDecorator::R).is_empty();
+            let l = tl || bl || !view.decorator_ref(tree).get(BorderDecorator::L).is_empty();
+            let r = tr || br || !view.decorator_ref(tree).get(BorderDecorator::R).is_empty();
             Some((measure_width as u16).saturating_sub(if l { 1 } else { 0 }).saturating_sub(if r { 1 } else { 0 }) as i16)
         } else {
             None
         };
         let children_measure_height = if let Some(measure_height) = measure_size.1 {
-            let t = tl || tr || !view.decorator_get(tree, BorderDecorator::T).is_empty();
-            let b = bl || br || !view.decorator_get(tree, BorderDecorator::B).is_empty();
+            let t = tl || tr || !view.decorator_ref(tree).get(BorderDecorator::T).is_empty();
+            let b = bl || br || !view.decorator_ref(tree).get(BorderDecorator::B).is_empty();
             Some((measure_height as u16).saturating_sub(if t { 1 } else { 0 }).saturating_sub(if b { 1 } else { 0 }) as i16)
         } else {
             None
@@ -168,19 +168,19 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
     }
 
     fn desired_size(&self, view: View, tree: &mut ViewTree, children_desired_size: Vector) -> Vector {
-        let tl = !view.decorator_get(tree, BorderDecorator::TL).is_empty();
-        let tr = !view.decorator_get(tree, BorderDecorator::TR).is_empty();
-        let bl = !view.decorator_get(tree, BorderDecorator::BL).is_empty();
-        let br = !view.decorator_get(tree, BorderDecorator::BR).is_empty();
-        let l = tl || bl || !view.decorator_get(tree, BorderDecorator::L).is_empty();
-        let r = tr || br || !view.decorator_get(tree, BorderDecorator::R).is_empty();
+        let tl = !view.decorator_ref(tree).get(BorderDecorator::TL).is_empty();
+        let tr = !view.decorator_ref(tree).get(BorderDecorator::TR).is_empty();
+        let bl = !view.decorator_ref(tree).get(BorderDecorator::BL).is_empty();
+        let br = !view.decorator_ref(tree).get(BorderDecorator::BR).is_empty();
+        let l = tl || bl || !view.decorator_ref(tree).get(BorderDecorator::L).is_empty();
+        let r = tr || br || !view.decorator_ref(tree).get(BorderDecorator::R).is_empty();
         let desired_width = (children_desired_size.x as u16)
             .saturating_add(if l { 1 } else { 0 })
             .saturating_add(if r { 1 } else { 0 })
             as i16
         ;
-        let t = tl || tr || !view.decorator_get(tree, BorderDecorator::T).is_empty();
-        let b = bl || br || !view.decorator_get(tree, BorderDecorator::B).is_empty();
+        let t = tl || tr || !view.decorator_ref(tree).get(BorderDecorator::T).is_empty();
+        let b = bl || br || !view.decorator_ref(tree).get(BorderDecorator::B).is_empty();
         let desired_height = (children_desired_size.y as u16)
             .saturating_add(if t { 1 } else { 0 })
             .saturating_add(if b { 1 } else { 0 })
@@ -190,18 +190,18 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
     }
 
     fn children_arrange_bounds(&self, view: View, tree: &mut ViewTree, arrange_size: Vector) -> Rect {
-        let tl = !view.decorator_get(tree, BorderDecorator::TL).is_empty();
-        let tr = !view.decorator_get(tree, BorderDecorator::TR).is_empty();
-        let bl = !view.decorator_get(tree, BorderDecorator::BL).is_empty();
-        let br = !view.decorator_get(tree, BorderDecorator::BR).is_empty();
-        let l = tl || bl || !view.decorator_get(tree, BorderDecorator::L).is_empty();
-        let t = tl || tr || !view.decorator_get(tree, BorderDecorator::T).is_empty();
+        let tl = !view.decorator_ref(tree).get(BorderDecorator::TL).is_empty();
+        let tr = !view.decorator_ref(tree).get(BorderDecorator::TR).is_empty();
+        let bl = !view.decorator_ref(tree).get(BorderDecorator::BL).is_empty();
+        let br = !view.decorator_ref(tree).get(BorderDecorator::BR).is_empty();
+        let l = tl || bl || !view.decorator_ref(tree).get(BorderDecorator::L).is_empty();
+        let t = tl || tr || !view.decorator_ref(tree).get(BorderDecorator::T).is_empty();
         let tl_offset = Point {
             x: if l { 1 } else { 0 },
             y: if t { 1 } else { 0 },
         };
-        let r = tr || br || !view.decorator_get(tree, BorderDecorator::R).is_empty();
-        let b = bl || br || !view.decorator_get(tree, BorderDecorator::B).is_empty();
+        let r = tr || br || !view.decorator_ref(tree).get(BorderDecorator::R).is_empty();
+        let b = bl || br || !view.decorator_ref(tree).get(BorderDecorator::B).is_empty();
         let br_offset = Vector {
             x: if r { -1 } else { 0 },
             y: if b { -1 } else { 0 },
@@ -211,18 +211,18 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
     }
 
     fn render_bounds(&self, view: View, tree: &mut ViewTree, children_render_bounds: Rect) -> Rect {
-        let tl = !view.decorator_get(tree, BorderDecorator::TL).is_empty();
-        let tr = !view.decorator_get(tree, BorderDecorator::TR).is_empty();
-        let bl = !view.decorator_get(tree, BorderDecorator::BL).is_empty();
-        let br = !view.decorator_get(tree, BorderDecorator::BR).is_empty();
-        let l = tl || bl || !view.decorator_get(tree, BorderDecorator::L).is_empty();
-        let t = tl || tr || !view.decorator_get(tree, BorderDecorator::T).is_empty();
+        let tl = !view.decorator_ref(tree).get(BorderDecorator::TL).is_empty();
+        let tr = !view.decorator_ref(tree).get(BorderDecorator::TR).is_empty();
+        let bl = !view.decorator_ref(tree).get(BorderDecorator::BL).is_empty();
+        let br = !view.decorator_ref(tree).get(BorderDecorator::BR).is_empty();
+        let l = tl || bl || !view.decorator_ref(tree).get(BorderDecorator::L).is_empty();
+        let t = tl || tr || !view.decorator_ref(tree).get(BorderDecorator::T).is_empty();
         let tl_offset = Vector {
             x: if l { -1 } else { 0 },
             y: if t { -1 } else { 0 },
         };
-        let r = tr || br || !view.decorator_get(tree, BorderDecorator::R).is_empty();
-        let b = bl || br || !view.decorator_get(tree, BorderDecorator::B).is_empty();
+        let r = tr || br || !view.decorator_ref(tree).get(BorderDecorator::R).is_empty();
+        let b = bl || br || !view.decorator_ref(tree).get(BorderDecorator::B).is_empty();
         let br_offset = Vector {
             x: if r { 1 } else { 0 },
             y: if b { 1 } else { 0 },
@@ -247,14 +247,14 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
 
     fn render(&self, view: View, tree: &ViewTree, port: &mut RenderPort) {
         let size = view.render_bounds(tree).size;
-        let tl = view.decorator_get(tree, BorderDecorator::TL);
-        let tr = view.decorator_get(tree, BorderDecorator::TR);
-        let bl = view.decorator_get(tree, BorderDecorator::BL);
-        let br = view.decorator_get(tree, BorderDecorator::BR);
-        let l: &str = view.decorator_get(tree, BorderDecorator::L).borrow();
-        let r: &str = view.decorator_get(tree, BorderDecorator::R).borrow();
-        let t: &str = view.decorator_get(tree, BorderDecorator::T).borrow();
-        let b: &str = view.decorator_get(tree, BorderDecorator::B).borrow();
+        let tl = view.decorator_ref(tree).get(BorderDecorator::TL);
+        let tr = view.decorator_ref(tree).get(BorderDecorator::TR);
+        let bl = view.decorator_ref(tree).get(BorderDecorator::BL);
+        let br = view.decorator_ref(tree).get(BorderDecorator::BR);
+        let l: &str = view.decorator_ref(tree).get(BorderDecorator::L).borrow();
+        let r: &str = view.decorator_ref(tree).get(BorderDecorator::R).borrow();
+        let t: &str = view.decorator_ref(tree).get(BorderDecorator::T).borrow();
+        let b: &str = view.decorator_ref(tree).get(BorderDecorator::B).borrow();
         let l = if !l.is_empty() { l } else if !tl.is_empty() || !bl.is_empty() { " " } else { "" };
         let t = if !t.is_empty() { t } else if !tl.is_empty() || !tr.is_empty() { " " } else { "" };
         let r = if !r.is_empty() { r } else if !tr.is_empty() || !br.is_empty() { " " } else { "" };

@@ -35,7 +35,7 @@ impl WidgetTemplate for ButtonTemplate {
     fn load(&self, context: &mut dyn Context) -> Widget {
         let tree: &mut WidgetTree = context.get_mut();
         let widget = Button::new(tree);
-        widget.obj_apply_style(context, Some(self.0.clone()));
+        widget.obj_mut(context).apply_style(Some(self.0.clone()));
         widget
     }
 }
@@ -48,7 +48,7 @@ struct ButtonBehavior;
 
 impl WidgetBehavior for ButtonBehavior {
     fn load(&self, tree: &mut WidgetTree, button: Widget, view: View) {
-        let &content = button.obj_get(tree, Button::CONTENT);
+        let &content = button.obj_ref(tree).get(Button::CONTENT);
         view.build(tree, |view| view
             .dock_panel(|panel| {
                 let panel = panel

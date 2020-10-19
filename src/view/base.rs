@@ -137,7 +137,7 @@ impl ViewTree {
             actual_focused: root,
             quit: false,
         };
-        root.decorator_on_changed(&mut tree, RootDecorator::FILL, RootDecorator::invalidate_screen);
+        root.decorator(&mut tree).on_changed(RootDecorator::FILL, RootDecorator::invalidate_screen);
         result(tree)
     }
 
@@ -169,7 +169,7 @@ impl ViewTree {
             let mut input = ViewInput { key: (n, key), handled: false };
             let mut view = tree.actual_focused;
             loop {
-                view.base_raise(context, ViewBase::INPUT, &mut input);
+                view.base_mut(context).raise(ViewBase::INPUT, &mut input);
                 if input.handled { break; }
                 let tree: &ViewTree = context.get();
                 if let Some(parent) = view.parent(tree) {
@@ -193,7 +193,7 @@ impl ViewTree {
         tree.actual_focused = focused;
         let mut view = actual_focused;
         loop {
-            view.base_raise(context, ViewBase::LOST_FOCUS, &mut ());
+            view.base_mut(context).raise(ViewBase::LOST_FOCUS, &mut ());
             let tree: &ViewTree = context.get();
             if let Some(parent) = view.parent(tree) {
                 view = parent;
@@ -203,7 +203,7 @@ impl ViewTree {
         }
         let mut view = focused;
         loop {
-            view.base_raise(context, ViewBase::GOT_FOCUS, &mut ());
+            view.base_mut(context).raise(ViewBase::GOT_FOCUS, &mut ());
             let tree: &ViewTree = context.get();
             if let Some(parent) = view.parent(tree) {
                 view = parent;
@@ -273,17 +273,17 @@ impl View {
             let next = replace(&mut tree.arena[prev.0].next, view);
             tree.arena[view.0].next = next;
         }
-        view.base_on_changed(tree, ViewBase::BG, ViewBase::on_bg_changed);
-        view.base_on_changed(tree, ViewBase::FG, ViewBase::on_fg_changed);
-        view.base_on_changed(tree, ViewBase::ATTR, ViewBase::on_attr_changed);
-        view.align_on_changed(tree, ViewAlign::MIN_SIZE, ViewAlign::invalidate_measure);
-        view.align_on_changed(tree, ViewAlign::MAX_W, ViewAlign::invalidate_measure);
-        view.align_on_changed(tree, ViewAlign::MAX_H, ViewAlign::invalidate_measure);
-        view.align_on_changed(tree, ViewAlign::W, ViewAlign::invalidate_measure);
-        view.align_on_changed(tree, ViewAlign::H, ViewAlign::invalidate_measure);
-        view.align_on_changed(tree, ViewAlign::H_ALIGN, ViewAlign::invalidate_arrange);
-        view.align_on_changed(tree, ViewAlign::V_ALIGN, ViewAlign::invalidate_arrange);
-        view.align_on_changed(tree, ViewAlign::MARGIN, ViewAlign::invalidate_measure);
+        view.base(tree).on_changed(ViewBase::BG, ViewBase::on_bg_changed);
+        view.base(tree).on_changed(ViewBase::FG, ViewBase::on_fg_changed);
+        view.base(tree).on_changed(ViewBase::ATTR, ViewBase::on_attr_changed);
+        view.align(tree).on_changed(ViewAlign::MIN_SIZE, ViewAlign::invalidate_measure);
+        view.align(tree).on_changed(ViewAlign::MAX_W, ViewAlign::invalidate_measure);
+        view.align(tree).on_changed(ViewAlign::MAX_H, ViewAlign::invalidate_measure);
+        view.align(tree).on_changed(ViewAlign::W, ViewAlign::invalidate_measure);
+        view.align(tree).on_changed(ViewAlign::H, ViewAlign::invalidate_measure);
+        view.align(tree).on_changed(ViewAlign::H_ALIGN, ViewAlign::invalidate_arrange);
+        view.align(tree).on_changed(ViewAlign::V_ALIGN, ViewAlign::invalidate_arrange);
+        view.align(tree).on_changed(ViewAlign::MARGIN, ViewAlign::invalidate_measure);
         view.invalidate_measure(tree);
         result
     }
@@ -431,19 +431,19 @@ impl View {
 
     pub fn actual_fg(self, tree: &ViewTree) -> Color {
         self.self_and_parents(tree)
-            .find_map(|view| *view.base_get(tree, ViewBase::FG))
+            .find_map(|view| *view.base_ref(tree).get(ViewBase::FG))
             .unwrap_or(Color::Green)
     }
 
     pub fn actual_bg(self, tree: &ViewTree) -> Option<Color> {
         self.self_and_parents(tree)
-            .find_map(|view| *view.base_get(tree, ViewBase::BG))
+            .find_map(|view| *view.base_ref(tree).get(ViewBase::BG))
             .unwrap_or(None)
     }
 
     pub fn actual_attr(self, tree: &ViewTree) -> Attr {
         self.self_and_parents(tree)
-            .find_map(|view| *view.base_get(tree, ViewBase::ATTR))
+            .find_map(|view| *view.base_ref(tree).get(ViewBase::ATTR))
             .unwrap_or(Attr::empty())
     }
 
@@ -539,12 +539,12 @@ impl View {
 
     fn min_max(self, tree: &ViewTree) -> Option<(Vector, (Option<i16>, Option<i16>))> {
         if self != tree.root {
-            let w = self.align_get(tree, ViewAlign::W);
-            let h = self.align_get(tree, ViewAlign::H);
-            let min_size = self.align_get(tree, ViewAlign::MIN_SIZE);
+            let w = self.align_ref(tree).get(ViewAlign::W);
+            let h = self.align_ref(tree).get(ViewAlign::H);
+            let min_size = self.align_ref(tree).get(ViewAlign::MIN_SIZE);
             let min_size = Vector { x: w.unwrap_or(min_size.x), y: h.unwrap_or(min_size.y) };
-            let &max_w = self.align_get(tree, ViewAlign::MAX_W);
-            let &max_h = self.align_get(tree, ViewAlign::MAX_H);
+            let &max_w = self.align_ref(tree).get(ViewAlign::MAX_W);
+            let &max_h = self.align_ref(tree).get(ViewAlign::MAX_H);
             let max_size = (w.or(max_w), h.or(max_h));
             Some((min_size, max_size))
         } else {
@@ -559,7 +559,7 @@ impl View {
         let margin = if self == tree.root {
             Thickness::default()
         } else {
-            *self.align_get(tree, ViewAlign::MARGIN)
+            *self.align_ref(tree).get(ViewAlign::MARGIN)
         };
         size.0.as_mut().map(|w| *w = margin.shrink_band_w(*w));
         size.1.as_mut().map(|h| *h = margin.shrink_band_h(*h));
@@ -633,15 +633,15 @@ impl View {
         let margin = if self == tree.root {
             Thickness::default()
         } else {
-            *self.align_get(tree, ViewAlign::MARGIN)
+            *self.align_ref(tree).get(ViewAlign::MARGIN)
         };
         rect = margin.shrink_rect(rect);
         let (h_align, v_align) = if self == tree.root {
             (HAlign::Left, VAlign::Top)
         } else {
             (
-                *self.align_get(tree, ViewAlign::H_ALIGN),
-                *self.align_get(tree, ViewAlign::V_ALIGN)
+                *self.align_ref(tree).get(ViewAlign::H_ALIGN),
+                *self.align_ref(tree).get(ViewAlign::V_ALIGN)
             )
         };
         let min_max = self.min_max(tree);
@@ -758,7 +758,7 @@ impl DecoratorBehavior for RootDecoratorBehavior {
     }
 
     fn render(&self, view: View, tree: &ViewTree, port: &mut RenderPort) {
-        let fill = view.decorator_get(tree, RootDecorator::FILL);
+        let fill = view.decorator_ref(tree).get(RootDecorator::FILL);
         let fg = view.actual_fg(tree);
         let bg = view.actual_bg(tree);
         let attr = view.actual_attr(tree);
@@ -766,12 +766,12 @@ impl DecoratorBehavior for RootDecoratorBehavior {
     }
 }
 
-pub trait ViewTemplate: Debug + DynClone + Send + Sync {
-    fn load(&self, context: &mut dyn Context, view: View);
-    fn unload(&self, context: &mut dyn Context, view: View);
+pub trait PanelTemplate: Debug + DynClone + Send + Sync {
+    fn apply_panel(&self, context: &mut dyn Context, view: View);
+    fn apply_layout(&self, context: &mut dyn Context, view: View);
 }
 
-clone_trait_object!(ViewTemplate);
+clone_trait_object!(PanelTemplate);
 
 pub struct ViewInput {
     key: (NonZeroU16, Key),
@@ -829,8 +829,8 @@ impl ViewBase {
             loop {
                 let tree: &ViewTree = context.get();
                 child = child.next(tree);
-                if child.base_get(tree, prop).is_none() {
-                    child.base_set_uncond(context, prop, None);
+                if child.base_ref(tree).get(prop).is_none() {
+                    child.base_mut(context).set_uncond(prop, None);
                 }
                 if child == last_child { break; }
             }

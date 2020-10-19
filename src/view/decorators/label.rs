@@ -46,7 +46,7 @@ impl LabelDecorator {
         view: View,
     ) {
         view.set_decorator(tree, LabelDecorator::new_priv());
-        view.decorator_on_changed(tree, LabelDecorator::TEXT, Self::invalidate_measure);
+        view.decorator(tree).on_changed(LabelDecorator::TEXT, Self::invalidate_measure);
     }
 
     fn invalidate_measure<T>(context: &mut dyn Context, view: View, _old: &T) {
@@ -72,7 +72,7 @@ impl DecoratorBehavior for LabelDecoratorBehavior {
     }
 
     fn desired_size(&self, view: View, tree: &mut ViewTree, _children_desired_size: Vector) -> Vector {
-        let text: &str = view.decorator_get(tree, LabelDecorator::TEXT).borrow();
+        let text: &str = view.decorator_ref(tree).get(LabelDecorator::TEXT).borrow();
         let width = text
             .graphemes(true)
             .map(|g| g
@@ -89,7 +89,7 @@ impl DecoratorBehavior for LabelDecoratorBehavior {
     }
 
     fn render_bounds(&self, view: View, tree: &mut ViewTree, _children_render_bounds: Rect) -> Rect {
-        let text: &str = view.decorator_get(tree, LabelDecorator::TEXT).borrow();
+        let text: &str = view.decorator_ref(tree).get(LabelDecorator::TEXT).borrow();
         let width = text
             .graphemes(true)
             .map(|g| g
@@ -102,7 +102,7 @@ impl DecoratorBehavior for LabelDecoratorBehavior {
     }
 
     fn render(&self, view: View, tree: &ViewTree, port: &mut RenderPort) {
-        let text: &str = view.decorator_get(tree, LabelDecorator::TEXT).borrow();
+        let text: &str = view.decorator_ref(tree).get(LabelDecorator::TEXT).borrow();
         let fg = view.actual_fg(tree);
         let bg = view.actual_bg(tree);
         let attr = view.actual_attr(tree);

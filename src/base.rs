@@ -1,6 +1,6 @@
 use components_arena::{ComponentId, Id, Component, Arena, ComponentClassMutex};
 use core::hint::unreachable_unchecked;
-use crate::view::{View, ViewTree, ViewBuilder, RootDecorator, ViewTemplate};
+use crate::view::{View, ViewTree, ViewBuilder, RootDecorator, PanelTemplate};
 use dep_obj::{dep_type, dep_obj, Style, DepObjBuilderCore};
 use downcast_rs::{Downcast, impl_downcast};
 use dyn_clone::{DynClone, clone_trait_object};
@@ -105,18 +105,17 @@ impl WidgetTree {
             view_tree,
             _root: root,
         };
-        root.obj_on_changed(&mut tree, Root::PANEL_TEMPLATE, |context, root, old| {
+        root.obj(&mut tree).on_changed(Root::PANEL_TEMPLATE, |context, root, _old| {
             let tree: &WidgetTree = context.get();
             let root_view = tree.widget_arena[root.0].view.unwrap_or_else(|| unsafe { unreachable_unchecked() });
-            let new = root.obj_get(tree, Root::PANEL_TEMPLATE).clone();
-            old.as_ref().map(|x| x.unload(context, root_view));
-            new.map(|x| x.load(context, root_view));
+            let new = root.obj_ref(tree).get(Root::PANEL_TEMPLATE).clone();
+            new.map(|x| x.apply_panel(context, root_view));
         });
-        root.obj_on_changed(&mut tree, Root::DECORATOR_STYLE, |context, root, _old| {
+        root.obj(&mut tree).on_changed(Root::DECORATOR_STYLE, |context, root, _old| {
             let tree: &WidgetTree = context.get();
             let root_view = tree.widget_arena[root.0].view.unwrap_or_else(|| unsafe { unreachable_unchecked() });
-            let decorator_style = root.obj_get(tree, Root::DECORATOR_STYLE).clone();
-            root_view.decorator_apply_style(context, decorator_style);
+            let decorator_style = root.obj_ref(tree).get(Root::DECORATOR_STYLE).clone();
+            root_view.decorator_mut(context).apply_style(decorator_style);
         });
         tree
     }
@@ -151,20 +150,20 @@ impl Widget {
             tree.widget_arena[self.0].next = next;
         }
         if tree.widget_arena[parent.0].attached {
-            self.set_attached(tree);
+            self.set(tree);
         }
     }
 
     fn next(self, tree: &WidgetTree) -> Widget { tree.widget_arena[self.0].next }
 
-    fn set_attached(self, tree: &mut WidgetTree) {
+    fn set(self, tree: &mut WidgetTree) {
         let node = &mut tree.widget_arena[self.0];
         node.attached = true;
         if let Some(last_child) = node.last_child {
             let mut child = last_child;
             loop {
                 child = child.next(tree);
-                child.set_attached(tree);
+                child.set(tree);
                 if child == last_child { break; }
             }
         }
@@ -219,8 +218,9 @@ clone_trait_object!(WidgetTemplate);
 dep_type! {
     #[derive(Debug)]
     pub struct Root become obj in Widget {
-        panel_template: Option<Box<dyn ViewTemplate>> = None,
+        panel_template: Option<Box<dyn PanelTemplate>> = None,
         decorator_style: Option<Style<RootDecorator>> = None,
+        children [Widget],
     }
 }
 
