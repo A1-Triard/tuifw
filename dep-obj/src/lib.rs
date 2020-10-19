@@ -324,7 +324,7 @@ pub struct DepObjRef<'a, Owner: DepType, Arena> {
     get_obj: for<'b> fn(arena: &'b Arena, id: Owner::Id) -> &'b Owner,
 }
 
-impl<'a, Owner: DepType, Arena> DepObjRef<'a, Owner, Arena> {
+impl<'a, Owner: DepType + 'static, Arena> DepObjRef<'a, Owner, Arena> {
     pub fn new(
         arena: &'a Arena,
         id: Owner::Id,
@@ -333,13 +333,13 @@ impl<'a, Owner: DepType, Arena> DepObjRef<'a, Owner, Arena> {
         DepObjRef { arena, id, get_obj }
     }
 
-    pub fn get<PropType: DepPropType>(&self, prop: DepProp<Owner, PropType>) -> &PropType {
+    pub fn get<PropType: DepPropType>(&self, prop: DepProp<Owner, PropType>) -> &'a PropType {
         let obj = (self.get_obj)(self.arena, self.id);
         let entry = prop.entry(obj);
         entry.local.as_ref().or_else(|| entry.style.as_ref()).unwrap_or_else(|| entry.default)
     }
 
-    pub fn items<ItemType: DepPropType>(&self, vec: DepVec<Owner, ItemType>) -> &Vec<ItemType> {
+    pub fn items<ItemType: DepPropType>(&self, vec: DepVec<Owner, ItemType>) -> &'a Vec<ItemType> {
         let obj = (self.get_obj)(self.arena, self.id);
         let entry = vec.entry(obj);
         &entry.items
@@ -1296,7 +1296,8 @@ mod test {
         TestObj1::new(&mut arena, id);
         let mut changed = 0;
         TestContext::call(&mut arena, &mut changed, |context| {
-            assert_eq!(id.obj1_ref(context.arena()).get(TestObj1::INT_VAL), &42);
+            let v = id.obj1_ref(context.arena()).get(TestObj1::INT_VAL);
+            assert_eq!(v, &42);
             id.obj1(context.arena_mut()).on_changed(TestObj1::INT_VAL, |context, _, _| {
                 let changed: &mut u16 = context.get_mut();
                 *changed += 1;
