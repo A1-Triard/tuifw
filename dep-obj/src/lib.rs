@@ -65,18 +65,6 @@ pub struct DepPropEntry<OwnerId: ComponentId, PropType: DepPropType> {
     on_changed: Vec<fn(context: &mut dyn Context, id: OwnerId, old: &PropType)>,
 }
 
-pub struct DepPropOnChanged<OwnerId: ComponentId, PropType: DepPropType> {
-    callbacks: Vec<fn(context: &mut dyn Context, id: OwnerId, old: &PropType)>,
-}
-
-impl<OwnerId: ComponentId, PropType: DepPropType> DepPropOnChanged<OwnerId, PropType> {
-    pub fn raise(self, context: &mut dyn Context, id: OwnerId, old: &PropType) {
-        for callback in self.callbacks {
-            callback(context, id, old);
-        }
-    }
-}
-
 impl<OwnerId: ComponentId, PropType: DepPropType> DepPropEntry<OwnerId, PropType> {
     pub const fn new(default: &'static PropType) -> Self {
         DepPropEntry {
@@ -104,18 +92,6 @@ pub struct DepVecEntry<OwnerId: ComponentId, ItemType: DepPropType> {
     on_changed: Vec<fn(context: &mut dyn Context, id: OwnerId, change: &DepVecChange<ItemType>)>,
 }
 
-pub struct DepVecOnChanged<OwnerId: ComponentId, ItemType: DepPropType> {
-    callbacks: Vec<fn(context: &mut dyn Context, id: OwnerId, change: &DepVecChange<ItemType>)>,
-}
-
-impl<OwnerId: ComponentId, ItemType: DepPropType> DepVecOnChanged<OwnerId, ItemType> {
-    pub fn raise(self, context: &mut dyn Context, id: OwnerId, change: &DepVecChange<ItemType>) {
-        for callback in self.callbacks {
-            callback(context, id, change);
-        }
-    }
-}
-
 impl<OwnerId: ComponentId, ItemType: DepPropType> DepVecEntry<OwnerId, ItemType> {
     pub const fn new() -> Self {
         DepVecEntry {
@@ -130,18 +106,6 @@ impl<OwnerId: ComponentId, ItemType: DepPropType> DepVecEntry<OwnerId, ItemType>
 pub struct DepEventEntry<OwnerId: ComponentId, ArgsType> {
     #[educe(Debug(ignore))]
     on_raised: Vec<fn(context: &mut dyn Context, id: OwnerId, args: &mut ArgsType)>,
-}
-
-pub struct DepEventOnRaised<OwnerId: ComponentId, ArgsType> {
-    callbacks: Vec<fn(context: &mut dyn Context, id: OwnerId, args: &mut ArgsType)>,
-}
-
-impl<OwnerId: ComponentId, ArgsType> DepEventOnRaised<OwnerId, ArgsType> {
-    pub fn call(self, context: &mut dyn Context, id: OwnerId, args: &mut ArgsType) {
-        for callback in self.callbacks {
-            callback(context, id, args);
-        }
-    }
 }
 
 impl<OwnerId: ComponentId, ArgsType> DepEventEntry<OwnerId, ArgsType> {
@@ -186,77 +150,6 @@ impl<Owner: DepType, PropType: DepPropType> DepProp<Owner, PropType> {
             &mut *entry
         }
     }
-
-    pub fn get(self, owner: &Owner) -> &PropType {
-        let entry = self.entry(owner);
-        entry.local.as_ref().or_else(|| entry.style.as_ref()).unwrap_or_else(|| entry.default)
-    }
-
-    pub fn set_uncond(
-        self,
-        owner: &mut Owner,
-        value: PropType
-    ) -> (PropType, DepPropOnChanged<Owner::Id, PropType>) {
-        let entry_mut = self.entry_mut(owner);
-        let on_changed = DepPropOnChanged { callbacks: entry_mut.on_changed.clone() };
-        let old = entry_mut.local.replace(value).unwrap_or_else(||
-            entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default).clone()
-        );
-        (old, on_changed)
-    }
-
-    pub fn unset_uncond(
-        self,
-        owner: &mut Owner,
-    ) -> Option<(PropType, DepPropOnChanged<Owner::Id, PropType>)> {
-        let entry_mut = self.entry_mut(owner);
-        let old = entry_mut.local.take();
-        old.map(|old| {
-            let on_changed = DepPropOnChanged { callbacks: entry_mut.on_changed.clone() };
-            (old, on_changed)
-        })
-    }
-
-    pub fn set_distinct(
-        self,
-        owner: &mut Owner,
-        value: PropType
-    ) -> Option<(PropType, DepPropOnChanged<Owner::Id, PropType>)> where PropType: PartialEq {
-        let entry_mut = self.entry_mut(owner);
-        let old = entry_mut.local.as_ref()
-            .or_else(|| entry_mut.style.as_ref())
-            .unwrap_or_else(|| entry_mut.default)
-        ;
-        if &value == old { return None; }
-        let on_changed = DepPropOnChanged { callbacks: entry_mut.on_changed.clone() };
-        let old = entry_mut.local.replace(value).unwrap_or_else(||
-            entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default).clone()
-        );
-        Some((old, on_changed))
-    }
-
-    pub fn unset_distinct(
-        self,
-        owner: &mut Owner,
-    ) -> Option<(PropType, DepPropOnChanged<Owner::Id, PropType>)> where PropType: PartialEq {
-        let entry_mut = self.entry_mut(owner);
-        let old = entry_mut.local.take();
-        old.and_then(|old| {
-            let new = entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default);
-            if new == &old { return None; }
-            let on_changed = DepPropOnChanged { callbacks: entry_mut.on_changed.clone() };
-            Some((old, on_changed))
-        })
-    }
-
-    pub fn on_changed(
-        self,
-        owner: &mut Owner,
-        callback: fn(context: &mut dyn Context, id: Owner::Id, old: &PropType),
-    ) {
-        let entry_mut = self.entry_mut(owner);
-        entry_mut.on_changed.push(callback);
-    }
 }
 
 #[derive(Educe)]
@@ -288,68 +181,6 @@ impl<Owner: DepType, ItemType: DepPropType> DepVec<Owner, ItemType> {
             &mut *entry
         }
     }
-
-    pub fn items(self, owner: &Owner) -> &Vec<ItemType> {
-        let entry = self.entry(owner);
-        &entry.items
-    }
-
-    pub fn clear(
-        self,
-        owner: &mut Owner,
-    ) -> (DepVecChange<ItemType>, DepVecOnChanged<Owner::Id, ItemType>) {
-        let entry_mut = self.entry_mut(owner);
-        entry_mut.items.clear();
-        (DepVecChange::Reset, DepVecOnChanged { callbacks: entry_mut.on_changed.clone() })
-    }
-
-    pub fn push(
-        self,
-        owner: &mut Owner,
-        item: ItemType
-    ) -> (DepVecChange<ItemType>, DepVecOnChanged<Owner::Id, ItemType>) {
-        let entry_mut = self.entry_mut(owner);
-        entry_mut.items.push(item);
-        let change = DepVecChange::Inserted(
-            unsafe { entry_mut.items.len().unchecked_sub(1) } .. entry_mut.items.len()
-        );
-        (change, DepVecOnChanged { callbacks: entry_mut.on_changed.clone() })
-    }
-
-    pub fn insert(
-        self,
-        owner: &mut Owner,
-        index: usize,
-        item: ItemType
-    ) -> (DepVecChange<ItemType>, DepVecOnChanged<Owner::Id, ItemType>) {
-        let entry_mut = self.entry_mut(owner);
-        entry_mut.items.insert(index, item);
-        let change = DepVecChange::Inserted(index .. index + 1);
-        (change, DepVecOnChanged { callbacks: entry_mut.on_changed.clone() })
-    }
-
-    pub fn append(
-        self,
-        owner: &mut Owner,
-        other: &mut Vec<ItemType>
-    ) -> (DepVecChange<ItemType>, DepVecOnChanged<Owner::Id, ItemType>) {
-        let entry_mut = self.entry_mut(owner);
-        let appended = other.len();
-        entry_mut.items.append(other);
-        let change = DepVecChange::Inserted(
-            unsafe { entry_mut.items.len().unchecked_sub(appended) } .. entry_mut.items.len()
-        );
-        (change, DepVecOnChanged { callbacks: entry_mut.on_changed.clone() })
-    }
-
-    pub fn on_changed(
-        self,
-        owner: &mut Owner,
-        callback: fn(context: &mut dyn Context, id: Owner::Id, change: &DepVecChange<ItemType>),
-    ) {
-        let entry_mut = self.entry_mut(owner);
-        entry_mut.on_changed.push(callback);
-    }
 }
 
 #[derive(Educe)]
@@ -380,23 +211,6 @@ impl<Owner: DepType, ArgsType> DepEvent<Owner, ArgsType> {
             let entry = entry as *mut DepEventEntry<Owner::Id, ArgsType>;
             &mut *entry
         }
-    }
-
-    pub fn raise(
-        self,
-        owner: &Owner,
-    ) -> DepEventOnRaised<Owner::Id, ArgsType> {
-        let entry = self.entry(owner);
-        DepEventOnRaised { callbacks: entry.on_raised.clone() }
-    }
-
-    pub fn on_raised(
-        self,
-        owner: &mut Owner,
-        callback: fn(context: &mut dyn Context, id: Owner::Id, args: &mut ArgsType),
-    ) {
-        let entry_mut = self.entry_mut(owner);
-        entry_mut.on_raised.push(callback);
     }
 }
 
@@ -430,13 +244,17 @@ impl<Owner: DepType, PropType: DepPropType> AnySetter<Owner> for Setter<Owner, P
         let on_changed = if entry_mut.local.is_some() {
             None
         } else {
-            Some(DepPropOnChanged { callbacks: entry_mut.on_changed.clone() })
+            Some(entry_mut.on_changed.clone())
         };
         let value = if unapply { None } else { Some(self.value.clone()) };
         let old = replace(&mut entry_mut.style, value);
         on_changed.map(|on_changed| {
             let old = old.unwrap_or_else(|| entry_mut.default.clone());
-            Box::new(move |context: &'_ mut dyn Context, id| on_changed.raise(context, id, &old)) as _
+            Box::new(move |context: &'_ mut dyn Context, id| {
+                for on_changed in on_changed {
+                    on_changed(context, id, &old);
+                }
+            }) as _
         })
     }
 }
@@ -494,52 +312,6 @@ impl<Owner: DepType> Style<Owner> {
     }
 }
 
-pub struct StyleOnChanged<OwnerId: ComponentId> {
-    callbacks: Vec<Box<dyn FnOnce(&mut dyn Context, OwnerId)>>
-}
-
-impl<OwnerId: ComponentId> StyleOnChanged<OwnerId> {
-    pub fn raise(self, context: &mut dyn Context, id: OwnerId) {
-        for callback in self.callbacks {
-            callback(context, id);
-        }
-    }
-}
-
-pub trait OptionStyleExt<Owner: DepType>: Sized {
-    fn apply(self, owner: &mut Owner) -> (Option<Style<Owner>>, StyleOnChanged<Owner::Id>);
-}
-
-impl<Owner: DepType> OptionStyleExt<Owner> for Option<Style<Owner>> {
-    fn apply(self, owner: &mut Owner) -> (Option<Style<Owner>>, StyleOnChanged<Owner::Id>) {
-        let mut on_changed = Vec::new();
-        let old = owner.style__().take();
-        if let Some(old) = old.as_ref() {
-            old.setters
-                .iter()
-                .filter(|setter| self.as_ref().map_or(
-                    true,
-                    |new| new.setters.binary_search_by_key(
-                        &setter.prop_offset(),
-                        |x| x.prop_offset()
-                    ).is_err()
-                ))
-                .filter_map(|setter| setter.un_apply(owner, true))
-                .for_each(|x| on_changed.push(x))
-            ;
-        }
-        if let Some(new) = self.as_ref() {
-            new.setters
-                .iter()
-                .filter_map(|setter| setter.un_apply(owner, false))
-                .for_each(|x| on_changed.push(x))
-            ;
-        }
-        *owner.style__() = self;
-        (old, StyleOnChanged { callbacks: on_changed })
-    }
-}
-
 pub trait DepObjBuilderCore<OwnerId: ComponentId> {
     fn context(&self) -> &dyn Context;
     fn context_mut(&mut self) -> &mut dyn Context;
@@ -563,12 +335,14 @@ impl<'a, Owner: DepType, Arena> DepObjRef<'a, Owner, Arena> {
 
     pub fn get<PropType: DepPropType>(&self, prop: DepProp<Owner, PropType>) -> &PropType {
         let obj = (self.get_obj)(self.arena, self.id);
-        prop.get(obj)
+        let entry = prop.entry(obj);
+        entry.local.as_ref().or_else(|| entry.style.as_ref()).unwrap_or_else(|| entry.default)
     }
 
     pub fn items<ItemType: DepPropType>(&self, vec: DepVec<Owner, ItemType>) -> &Vec<ItemType> {
         let obj = (self.get_obj)(self.arena, self.id);
-        vec.items(obj)
+        let entry = vec.entry(obj);
+        &entry.items
     }
 }
 
@@ -590,40 +364,43 @@ impl<'a, Owner: DepType, Arena> DepObjRefMut<'a, Owner, Arena> {
     pub fn on_changed<PropType: DepPropType>(
         &mut self,
         prop: DepProp<Owner, PropType>,
-        on_changed: fn(
+        callback: fn(
             context: &mut dyn Context,
             id: Owner::Id,
             old: &PropType
         ),
     ) {
         let obj = (self.get_obj_mut)(self.arena, self.id);
-        prop.on_changed(obj, on_changed);
+        let entry_mut = prop.entry_mut(obj);
+        entry_mut.on_changed.push(callback);
     }
 
     pub fn on<ArgsType>(
         &mut self,
         event: DepEvent<Owner, ArgsType>,
-        on_raised: fn(
+        callback: fn(
             context: &mut dyn Context,
             id: Owner::Id,
             args: &mut ArgsType
         ),
     ) {
         let obj = (self.get_obj_mut)(self.arena, self.id);
-        event.on_raised(obj, on_raised);
+        let entry_mut = event.entry_mut(obj);
+        entry_mut.on_raised.push(callback);
     }
 
     pub fn on_vec_changed<ItemType: DepPropType>(
         &mut self,
         vec: DepVec<Owner, ItemType>,
-        on_changed: fn(
+        callback: fn(
             context: &mut dyn Context,
             id: Owner::Id,
             change: &DepVecChange<ItemType>
         ),
     ) {
         let obj = (self.get_obj_mut)(self.arena, self.id);
-        vec.on_changed(obj, on_changed);
+        let entry_mut = vec.entry_mut(obj);
+        entry_mut.on_changed.push(callback);
     }
 }
 
@@ -649,8 +426,13 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
     ) -> PropType {
         let arena: &mut Arena = self.context.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
-        let (old, on_changed) = prop.set_uncond(obj, value);
-        on_changed.raise(self.context, self.id, &old);
+        let entry_mut = prop.entry_mut(obj);
+        let old = entry_mut.local.replace(value).unwrap_or_else(||
+            entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default).clone()
+        );
+        for on_changed in entry_mut.on_changed.clone() {
+            on_changed(self.context, self.id, &old);
+        }
         old
     }
 
@@ -660,10 +442,15 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
     ) -> Option<PropType> {
         let arena: &mut Arena = self.context.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
-        prop.unset_uncond(obj).map(|(old, on_changed)| {
-            on_changed.raise(self.context, self.id, &old);
-            old
-        })
+        let entry_mut = prop.entry_mut(obj);
+        if let Some(old) = entry_mut.local.take() {
+            for on_changed in entry_mut.on_changed.clone() {
+                on_changed(self.context, self.id, &old);
+            }
+            Some(old)
+        } else {
+            None
+        }
     }
 
     pub fn set_distinct<PropType: DepPropType + PartialEq>(
@@ -673,10 +460,19 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
     ) -> Option<PropType> {
         let arena: &mut Arena = self.context.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
-        prop.set_distinct(obj, value).map(|(old, on_changed)| {
-            on_changed.raise(self.context, self.id, &old);
-            old
-        })
+        let entry_mut = prop.entry_mut(obj);
+        let old = entry_mut.local.as_ref()
+            .or_else(|| entry_mut.style.as_ref())
+            .unwrap_or_else(|| entry_mut.default)
+        ;
+        if &value == old { return None; }
+        let old = entry_mut.local.replace(value).unwrap_or_else(||
+            entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default).clone()
+        );
+        for on_changed in entry_mut.on_changed.clone() {
+            on_changed(self.context, self.id, &old);
+        }
+        Some(old)
     }
 
     pub fn unset_distinct<PropType: DepPropType + PartialEq>(
@@ -685,10 +481,17 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
     ) -> Option<PropType> {
         let arena: &mut Arena = self.context.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
-        prop.unset_distinct(obj).map(|(old, on_changed)| {
-            on_changed.raise(self.context, self.id, &old);
-            old
-        })
+        let entry_mut = prop.entry_mut(obj);
+        if let Some(old) = entry_mut.local.take() {
+            let new = entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default);
+            if new == &old { return None; }
+            for on_changed in entry_mut.on_changed.clone() {
+                on_changed(self.context, self.id, &old);
+            }
+            Some(old)
+        } else {
+            None
+        }
     }
 
     pub fn raise<ArgsType>(
@@ -698,8 +501,10 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
     ) {
         let arena: &mut Arena = self.context.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
-        let on_raised = event.raise(obj);
-        on_raised.call(self.context, self.id, args);
+        let entry = event.entry(obj);
+        for on_raised in entry.on_raised.clone() {
+            on_raised(self.context, self.id, args);
+        }
     }
 
     pub fn apply_style(
@@ -708,8 +513,33 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
     ) -> Option<Style<Owner>> {
         let arena: &mut Arena = self.context.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
-        let (old, on_changed) = style.apply(obj);
-        on_changed.raise(self.context, self.id);
+        let mut on_changed = Vec::new();
+        let old = obj.style__().take();
+        if let Some(old) = old.as_ref() {
+            old.setters
+                .iter()
+                .filter(|setter| style.as_ref().map_or(
+                    true,
+                    |new| new.setters.binary_search_by_key(
+                        &setter.prop_offset(),
+                        |x| x.prop_offset()
+                    ).is_err()
+                ))
+                .filter_map(|setter| setter.un_apply(obj, true))
+                .for_each(|x| on_changed.push(x))
+            ;
+        }
+        if let Some(new) = style.as_ref() {
+            new.setters
+                .iter()
+                .filter_map(|setter| setter.un_apply(obj, false))
+                .for_each(|x| on_changed.push(x))
+            ;
+        }
+        *obj.style__() = style;
+        for on_changed in on_changed {
+            on_changed(self.context, self.id);
+        }
         old
     }
 
@@ -719,8 +549,12 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
     ) -> DepVecChange<ItemType> {
         let arena: &mut Arena = self.context.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
-        let (change, on_changed) = vec.clear(obj);
-        on_changed.raise(self.context, self.id, &change);
+        let entry_mut = vec.entry_mut(obj);
+        entry_mut.items.clear();
+        let change = DepVecChange::Reset;
+        for on_changed in entry_mut.on_changed.clone() {
+            on_changed(self.context, self.id, &change);
+        }
         change
     }
 
@@ -731,8 +565,14 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
     ) -> DepVecChange<ItemType> {
         let arena: &mut Arena = self.context.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
-        let (change, on_changed) = vec.push(obj, item);
-        on_changed.raise(self.context, self.id, &change);
+        let entry_mut = vec.entry_mut(obj);
+        entry_mut.items.push(item);
+        let change = DepVecChange::Inserted(
+            unsafe { entry_mut.items.len().unchecked_sub(1) } .. entry_mut.items.len()
+        );
+        for on_changed in entry_mut.on_changed.clone() {
+            on_changed(self.context, self.id, &change);
+        }
         change
     }
 
@@ -744,8 +584,12 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
     ) -> DepVecChange<ItemType> {
         let arena: &mut Arena = self.context.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
-        let (change, on_changed) = vec.insert(obj, index, item);
-        on_changed.raise(self.context, self.id, &change);
+        let entry_mut = vec.entry_mut(obj);
+        entry_mut.items.insert(index, item);
+        let change = DepVecChange::Inserted(index .. index + 1);
+        for on_changed in entry_mut.on_changed.clone() {
+            on_changed(self.context, self.id, &change);
+        }
         change
     }
 
@@ -756,8 +600,15 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
     ) -> DepVecChange<ItemType> {
         let arena: &mut Arena = self.context.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
-        let (change, on_changed) = vec.append(obj, other);
-        on_changed.raise(self.context, self.id, &change);
+        let entry_mut = vec.entry_mut(obj);
+        let appended = other.len();
+        entry_mut.items.append(other);
+        let change = DepVecChange::Inserted(
+            unsafe { entry_mut.items.len().unchecked_sub(appended) } .. entry_mut.items.len()
+        );
+        for on_changed in entry_mut.on_changed.clone() {
+            on_changed(self.context, self.id, &change);
+        }
         change
     }
 }
