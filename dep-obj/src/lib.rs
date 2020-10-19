@@ -683,7 +683,7 @@ macro_rules! dep_type {
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         become $obj:ident in $Id:ty
         {
-            $($($field:ident $delim:tt $field_ty:ty $(= $field_val:expr)?),+ $(,)?)?
+            $($($field:ident $delim:tt $($field_ty:ty $(= $field_val:expr)?)?),+ $(,)?)?
         }
     ) => {
         $crate::dep_type! {
@@ -691,7 +691,7 @@ macro_rules! dep_type {
             [$([$attr])*] [$vis] [$name] [$obj] [$Id]
             [$($g)*] [$($r)*] [$($w)*]
             [$([$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*])?]
-            [$($([$field $delim $field_ty $(= $field_val)?])+)?]
+            [$($([$field $delim $($field_ty $(= $field_val)?)?])+)?]
         }
     };
     (
@@ -701,7 +701,7 @@ macro_rules! dep_type {
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         become $obj:ident in $Id:ty
         {
-            $($($field:ident $delim:tt $field_ty:ty $(= $field_val:expr)?),+ $(,)?)?
+            $($($field:ident $delim:tt $($field_ty:ty $(= $field_val:expr)?)?),+ $(,)?)?
         }
         $($token:tt)+
     ) => {
@@ -714,7 +714,7 @@ macro_rules! dep_type {
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         become $obj:ident in $Id:ty
         {
-            $($($field:ident $delim:tt $field_ty:ty $(= $field_val:expr)?),+ $(,)?)?
+            $($($field:ident $delim:tt $($field_ty:ty $(= $field_val:expr)?)?),+ $(,)?)?
         }
 
         type BuilderCore $($token:tt)*
@@ -724,7 +724,7 @@ macro_rules! dep_type {
                 @type BuilderCore after
                 [$([$attr])*] [$vis] [$name] [$obj] [$Id]
                 [$($g)*] [$($r)*] [$($w)*]
-                [$($([$field $delim $field_ty $(= $field_val)?])+)?]
+                [$($([$field $delim $($field_ty $(= $field_val)?)?])+)?]
             }
             $($token)*
         }
@@ -736,14 +736,14 @@ macro_rules! dep_type {
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         become $obj:ident in $Id:ty
         {
-            $($($field:ident $delim:tt $field_ty:ty $(= $field_val:expr)?),+ $(,)?)?
+            $($($field:ident $delim:tt $($field_ty:ty $(= $field_val:expr)?)?),+ $(,)?)?
         }
 
         $($token:tt)*
     ) => {
         $crate::std_compile_error!("\
             invalid dep type builder core definition; allowed form is \
-            'type BuilderCore $(<$generics> $($where_clause)?)? = $builder_core_type;
+            'type BuilderCore $(<$generics> $(where $where_clause)?)? = $builder_core_type;
         ");
     };
     (
@@ -757,8 +757,8 @@ macro_rules! dep_type {
             invalid dep type definition, allowed form is\n\
             \n\
             $(#[$attr])* $vis struct $name $(<$generics> $(where $where_clause)?)? become $obj in $Id {\n\
-                $field_1_name $(: $field_1_type = $field_1_value | [] $field_1_type | yield $field_1_type),\n\
-                $field_2_name $(: $field_2_type = $field_2_value | [] $field_2_type | yield $field_2_type),\n\
+                $field_1_name $(: $field_1_type = $field_1_value | [$field_1_type] | yield $field_1_type),\n\
+                $field_2_name $(: $field_2_type = $field_2_value | [$field_2_type] | yield $field_2_type),\n\
                 ...\n\
             }\n\
             \n\
@@ -768,7 +768,7 @@ macro_rules! dep_type {
         @type BuilderCore after
         [$([$attr:meta])*] [$vis:vis] [$name:ident] [$obj:ident] [$Id:ty]
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
-        [$($([$field:ident $delim:tt $field_ty:ty $(= $field_val:expr)?])+)?]
+        [$($([$field:ident $delim:tt $($field_ty:ty $(= $field_val:expr)?)?])+)?]
         [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
         = $BuilderCore:ty;
     ) => {
@@ -777,14 +777,14 @@ macro_rules! dep_type {
             [$([$attr])*] [$vis] [$name] [$obj] [$Id]
             [$($g)*] [$($r)*] [$($w)*]
             [[$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]]
-            [$($([$field $delim $field_ty $(= $field_val)?])+)?]
+            [$($([$field $delim $($field_ty $(= $field_val)?)?])+)?]
         }
     };
     (
         @type BuilderCore after
         [$([$attr:meta])*] [$vis:vis] [$name:ident] [$obj:ident] [$Id:ty]
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
-        [$($([$field:ident $delim:tt $field_ty:ty $(= $field_val:expr)?])+)?]
+        [$($([$field:ident $delim:tt $($field_ty:ty $(= $field_val:expr)?)?])+)?]
         [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
         = $BuilderCore:ty;
 
@@ -796,13 +796,13 @@ macro_rules! dep_type {
         @type BuilderCore after
         [$([$attr:meta])*] [$vis:vis] [$name:ident] [$obj:ident] [$Id:ty]
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
-        [$($([$field:ident $delim:tt $field_ty:ty $(= $field_val:expr)?])+)?]
+        [$($([$field:ident $delim:tt $($field_ty:ty $(= $field_val:expr)?)?])+)?]
         [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
         $($token:tt)*
     ) => {
         $crate::std_compile_error!("\
             invalid dep type builder core definition; allowed form is \
-            'type BuilderCore $(<$generics> $($where_clause)?)? = $builder_core_type;
+            'type BuilderCore $(<$generics> $(where $where_clause)?)? = $builder_core_type;
         ");
     };
     (
@@ -810,7 +810,7 @@ macro_rules! dep_type {
         [$([$attr:meta])*] [$vis:vis] [$name:ident] [$obj:ident] [$Id:ty]
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         [[$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]]
-        [$([$field:ident $delim:tt $field_ty:ty $(= $field_val:expr)?])*]
+        [$([$field:ident $delim:tt $($field_ty:ty $(= $field_val:expr)?)?])*]
     ) => {
         $crate::generics_concat! {
             $crate::dep_type {
@@ -818,7 +818,7 @@ macro_rules! dep_type {
                 [$BuilderCore]
                 [$([$attr])*] [$vis] [$name] [$obj] [$Id]
                 [$($g)*] [$($r)*] [$($w)*]
-                [$([$field $delim $field_ty $(= $field_val)?])*]
+                [$([$field $delim $($field_ty $(= $field_val)?)?])*]
             }
             [$($g)*] [$($r)*] [$($w)*],
             [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]
@@ -829,7 +829,7 @@ macro_rules! dep_type {
         [$BuilderCore:ty]
         [$([$attr:meta])*] [$vis:vis] [$name:ident] [$obj:ident] [$Id:ty]
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
-        [$([$field:ident $delim:tt $field_ty:ty $(= $field_val:expr)?])*]
+        [$([$field:ident $delim:tt $($field_ty:ty $(= $field_val:expr)?)?])*]
         [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
     ) => {
         $crate::dep_type! {
@@ -838,7 +838,7 @@ macro_rules! dep_type {
             [$($g)*] [$($r)*] [$($w)*]
             [] [] [] []
             [[$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*] []]
-            [$([$field $delim $field_ty $(= $field_val)?])*]
+            [$([$field $delim $($field_ty $(= $field_val)?)?])*]
         }
     };
     (
@@ -846,7 +846,7 @@ macro_rules! dep_type {
         [$([$attr:meta])*] [$vis:vis] [$name:ident] [$obj:ident] [$Id:ty]
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         []
-        [$([$field:ident $delim:tt $field_ty:ty $(= $field_val:expr)?])*]
+        [$([$field:ident $delim:tt $($field_ty:ty $(= $field_val:expr)?)?])*]
     ) => {
         $crate::dep_type! {
             @unroll_fields
@@ -854,7 +854,7 @@ macro_rules! dep_type {
             [$($g)*] [$($r)*] [$($w)*]
             [] [] [] []
             []
-            [$([$field $delim $field_ty $(= $field_val)?])*]
+            [$([$field $delim $($field_ty $(= $field_val)?)?])*]
         }
     };
     (
@@ -925,7 +925,7 @@ macro_rules! dep_type {
             [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
             [$($builder_methods:tt)*]
         )?]
-        [[$field:ident [] $field_ty:ty] $($fields:tt)*]
+        [[$field:ident [$field_ty:ty]] $($fields:tt)*]
     ) => {
         $crate::dep_type! {
             @unroll_fields
@@ -1032,7 +1032,7 @@ macro_rules! dep_type {
             \n\n\
             allowed forms are \
             '$field_name : $field_type = $field_value', \
-            '$field_name [] $field_type', and \
+            '$field_name [$field_type]', and \
             '$field_name yield $field_type'\
         "));
     };
@@ -1270,7 +1270,7 @@ mod test {
         #[derive(Debug)]
         struct TestObj1 become obj1 in TestId {
             int_val: i32 = 42,
-            coll [] u64,
+            coll [u64],
         }
 
         type BuilderCore<'a> = TestIdBuilder<'a>;
