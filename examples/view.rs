@@ -68,7 +68,7 @@ fn main() {
     let bounds = padding.shrink_rect(Rect { tl: Point { x: 0, y: 0 }, size: screen.size() });
     let tree = &mut ViewTree::new(screen, |_| ((), |tree| tree));
     let border = build(tree, bounds);
-    border.base_on(tree, ViewBase::INPUT, |context, border, input| {
+    border.base(tree).on(ViewBase::INPUT, |context, border, input| {
         let tree: &mut ViewTree = context.get_mut();
         let d = match input.key() {
             (n, Key::Left) | (n, Key::Char('h')) =>
@@ -82,8 +82,8 @@ fn main() {
             (_, Key::Escape) => return tree.quit(),
             _ => return,
         };
-        let tl = border.layout_get(tree, CanvasLayout::TL).offset(d);
-        border.layout_set_distinct(tree, CanvasLayout::TL, tl);
+        let tl = border.layout_ref(tree).get(CanvasLayout::TL).offset(d);
+        border.layout_mut(tree).set_distinct(CanvasLayout::TL, tl);
     });
     border.focus(tree);
     while ViewTree::update(tree, true).unwrap() { }
