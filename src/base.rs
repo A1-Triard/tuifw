@@ -8,6 +8,7 @@ use dyn_context::{Context, ContextExt};
 use macro_attr_2018::macro_attr;
 use std::any::{Any, TypeId};
 use std::fmt::Debug;
+use std::iter::{self};
 use std::mem::replace;
 use tuifw_screen_base::Screen;
 
@@ -117,6 +118,16 @@ impl WidgetTree {
             let decorator_style = root.obj_ref(tree).get(Root::DECORATOR_STYLE).clone();
             root_view.decorator_mut(context).apply_style(decorator_style);
         });
+        /*
+        root.obj(&mut tree).on_vec_changed(Root::CHILDREN, |context, root, change| {
+            match change {
+                DepVecChange::Reset => {
+                    if let Some(last_child) = 
+                },
+                _ => {}
+            }
+        });
+        */
         tree
     }
 
@@ -139,6 +150,13 @@ impl Widget {
         }, Widget(widget)))
     }
 
+    pub fn drop(self, tree: &mut WidgetTree) {
+        if self.parent(tree).is_some() {
+            self.detach(tree);
+        }
+        tree.widget_arena.remove(self.0);
+    }
+
     pub fn attach(self, tree: &mut WidgetTree, parent: Widget) {
         let node = &mut tree.widget_arena[self.0];
         if let Some(parent) = node.parent.replace(parent) {
@@ -150,20 +168,66 @@ impl Widget {
             tree.widget_arena[self.0].next = next;
         }
         if tree.widget_arena[parent.0].attached {
-            self.set(tree);
+            self.set_attached(tree, true);
         }
     }
 
-    fn next(self, tree: &WidgetTree) -> Widget { tree.widget_arena[self.0].next }
-
-    fn set(self, tree: &mut WidgetTree) {
+    pub fn detach(self, tree: &mut WidgetTree) {
         let node = &mut tree.widget_arena[self.0];
-        node.attached = true;
+        if let Some(view) = node.view.take() {
+            view.drop(&mut tree.view_tree);
+        }
+        if let Some(parent) = tree.widget_arena[self.0].parent.take() {
+            let last_child = tree.widget_arena[parent.0].last_child.unwrap();
+            let mut child = last_child;
+            loop {
+                child = child.next(tree);
+                if child.next(tree) == self {
+                    tree.widget_arena[child.0].next = replace(&mut tree.widget_arena[self.0].next, self);
+                    break;
+                }
+                assert_ne!(child, last_child);
+            }
+            if tree.widget_arena[self.0].attached {
+                self.set_attached(tree, false);
+            }
+        } else {
+            panic!("widget already detached");
+        }
+    }
+
+    pub fn parent(self, tree: &WidgetTree) -> Option<Widget> { tree.widget_arena[self.0].parent }
+
+    pub fn self_and_parents<'a>(self, tree: &'a WidgetTree) -> impl Iterator<Item=Widget> + 'a {
+        let mut view = Some(self);
+        iter::from_fn(move || {
+            let parent = view.and_then(|view| view.parent(tree));
+            replace(&mut view, parent)
+        })
+    }
+
+    pub fn last_child(self, tree: &WidgetTree) -> Option<Widget> { tree.widget_arena[self.0].last_child }
+
+    pub fn next(self, tree: &WidgetTree) -> Widget { tree.widget_arena[self.0].next }
+
+    pub fn children<'a>(self, tree: &'a WidgetTree) -> impl Iterator<Item=Widget> + 'a {
+        let last_child = self.last_child(tree);
+        let mut view = last_child;
+        iter::from_fn(move || {
+            let item = view.map(|view| view.next(tree));
+            view = if item == last_child { None } else { item };
+            item
+        })
+    }
+
+    fn set_attached(self, tree: &mut WidgetTree, attached: bool) {
+        let node = &mut tree.widget_arena[self.0];
+        node.attached = attached;
         if let Some(last_child) = node.last_child {
             let mut child = last_child;
             loop {
                 child = child.next(tree);
-                child.set(tree);
+                child.set_attached(tree, attached);
                 if child == last_child { break; }
             }
         }

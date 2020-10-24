@@ -248,8 +248,7 @@ impl View {
         parent: View,
         tag: impl FnOnce(View) -> (Tag, T)
     ) -> T {
-        let arena = &mut tree.arena;
-        let (view, result) = arena.insert(|view| {
+        let (view, result) = tree.arena.insert(|view| {
             let (tag, result) = tag(View(view));
             (ViewNode {
                 tag: tag.into_raw(),
@@ -286,6 +285,21 @@ impl View {
         view.align(tree).on_changed(ViewAlign::MARGIN, ViewAlign::invalidate_measure);
         view.invalidate_measure(tree);
         result
+    }
+
+    pub fn drop(self, tree: &mut ViewTree) {
+        let parent = self.parent(tree).expect("root cannot be dropped");
+        let last_child = tree.arena[parent.0].last_child.unwrap();
+        let mut child = last_child;
+        loop {
+            child = tree.arena[child.0].next;
+            if tree.arena[child.0].next == self {
+                tree.arena[child.0].next = replace(&mut tree.arena[self.0].next, self);
+                break;
+            }
+            assert_ne!(child, last_child);
+        }
+        tree.arena.remove(self.0);
     }
 
     pub fn tag<Tag: ComponentId>(self, tree: &ViewTree) -> Tag {
