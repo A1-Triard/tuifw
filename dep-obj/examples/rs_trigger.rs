@@ -4,7 +4,6 @@
 #![feature(const_maybe_uninit_as_ptr)]
 #![feature(const_ptr_offset_from)]
 #![feature(const_raw_ptr_deref)]
-#![feature(raw_ref_macros)]
 
 mod circuit {
     use dep_obj::dep_obj;
@@ -162,7 +161,7 @@ mod not_chip {
     impl ChipLegs for NotLegs { }
 }
 
-use dyn_context::{Context, ContextExt, context};
+use dyn_context::{Context, ContextExt, free_lifetimes};
 use circuit::*;
 use or_chip::*;
 use not_chip::*;
@@ -174,12 +173,14 @@ struct TriggerChips {
     pub not_2: Chip,
 }
 
-context! {
-    dyn struct TriggerContext {
-        circuit: mut Circuit,
-        chips: ref TriggerChips,
+free_lifetimes! {
+    struct TriggerContext {
+        circuit: 'circuit mut Circuit,
+        chips: 'chips ref TriggerChips,
     }
 }
+
+Context!(() struct TriggerContext { .. });
 
 fn main() {
     let mut circuit_token = CircuitToken::new().unwrap();
@@ -211,8 +212,8 @@ fn main() {
         let &out = not_1.legs_ref(circuit).get(NotLegs::OUT);
         println!("{}", if out { "0 -> 1" } else { "1 -> 0" });
     });
-    let chips = TriggerChips { or_1, or_2, not_1, not_2 };
-    TriggerContext::call(circuit, &chips, |context| {
+    let chips = &TriggerChips { or_1, or_2, not_1, not_2 };
+    TriggerContextBuilder { circuit, chips, }.build_and_then(|context| {
         or_1.legs_mut(context).set_distinct(OrLegs::IN_1, true);
         or_1.legs_mut(context).set_distinct(OrLegs::IN_1, false);
         or_2.legs_mut(context).set_distinct(OrLegs::IN_1, true);

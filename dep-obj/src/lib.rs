@@ -4,7 +4,6 @@
 #![feature(const_mut_refs)]
 #![feature(const_ptr_offset_from)]
 #![feature(const_raw_ptr_deref)]
-#![feature(raw_ref_macros)]
 #![feature(shrink_to)]
 #![feature(try_reserve)]
 #![feature(unchecked_math)]
@@ -1218,7 +1217,7 @@ mod test {
     use super::*;
     use alloc::boxed::Box;
     use components_arena::{Arena, Id, ComponentId, Component, ComponentClassMutex};
-    use dyn_context::{Context, context};
+    use dyn_context::{Context, free_lifetimes, ContextRefMut};
     use educe::Educe;
     use macro_attr_2018::macro_attr;
 
@@ -1282,12 +1281,13 @@ mod test {
         }
     }
 
-    context! {
-        dyn struct TestContext {
-            arena: mut TestArena,
-            changed: mut u16,
+    free_lifetimes! {
+        struct TestContext {
+            changed: 'changed mut u16,
         }
     }
+    
+    Context!(() struct TestContext { .. });
 
     #[test]
     fn create_test_obj_1() {
@@ -1295,17 +1295,23 @@ mod test {
         let id = arena.0.insert(|id| (TestNode { obj1: None }, TestId(id)));
         TestObj1::new(&mut arena, id);
         let mut changed = 0;
-        TestContext::call(&mut arena, &mut changed, |context| {
-            let v = id.obj1_ref(context.arena()).get(TestObj1::INT_VAL);
-            assert_eq!(v, &42);
-            id.obj1(context.arena_mut()).on_changed(TestObj1::INT_VAL, |context, _, _| {
-                let changed: &mut u16 = context.get_mut();
-                *changed += 1;
-            });
-            assert_eq!(context.changed(), &0);
-            id.obj1_mut(context).set_uncond(TestObj1::INT_VAL, 43);
-            assert_eq!(context.changed(), &1);
-            assert_eq!(id.obj1_ref(context.arena()).get(TestObj1::INT_VAL), &43);
+        TestContextBuilder { changed: &mut changed }.build_and_then(|context| {
+            context.merge_mut_and_then(|context| {
+                let arena = context.get_mut::<TestArena>();
+                let v = id.obj1_ref(arena).get(TestObj1::INT_VAL);
+                assert_eq!(v, &42);
+                id.obj1(arena).on_changed(TestObj1::INT_VAL, |context, _, _| {
+                    let test_context = context.get_mut::<TestContext>();
+                    *test_context.changed_mut() += 1;
+                });
+                let test_context = context.get::<TestContext>();
+                assert_eq!(test_context.changed(), &0);
+                id.obj1_mut(context).set_uncond(TestObj1::INT_VAL, 43);
+                let test_context = context.get::<TestContext>();
+                assert_eq!(test_context.changed(), &1);
+                let arena = context.get::<TestArena>();
+                assert_eq!(id.obj1_ref(arena).get(TestObj1::INT_VAL), &43);
+            }, &mut arena);
         });
     }
 
