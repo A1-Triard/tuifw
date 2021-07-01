@@ -1,10 +1,26 @@
 use libc::*;
-use std::mem::MaybeUninit;
-use std::num::Wrapping;
+use std::mem::transmute;
 
 include!(concat!(env!("OUT_DIR"), "/curses_types.rs"));
 
-//pub const ICONV_ERROR: iconv_t = (Wrapping::<iconv_t>(0) - Wrapping::<iconv_t>(1)).0;
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
+pub struct IconvT(IconvIntT);
+
+impl IconvT {
+    pub const ERROR: IconvT = IconvT(-1);
+
+    pub fn new(iconv_open_result: iconv_t) -> IconvT {
+        IconvT(unsafe { transmute(iconv_open_result) })
+    }
+
+    pub fn is_error(self) -> bool { self.0 == -1 }
+
+    pub fn is_ok(self) -> bool { self.0 != -1 }
+
+    pub fn ok(self) -> Option<iconv_t> {
+        if self.0 == -1 { None } else { Some(unsafe { transmute(self.0) }) }
+    }
+}
 
 pub const COLOR_BLACK: c_short = 0;
 pub const COLOR_RED: c_short = 1;
