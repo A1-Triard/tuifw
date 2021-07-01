@@ -15,6 +15,7 @@ impl IconvT {
 
     pub fn is_error(self) -> bool { self.0 == -1 }
 
+    #[allow(dead_code)]
     pub fn is_ok(self) -> bool { self.0 != -1 }
 
     pub fn ok(self) -> Option<iconv_t> {
