@@ -27,40 +27,29 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: build
-        args: "--verbose --no-default-features ${{ matrix.features }}"
+        args: "--verbose"
     - name: test --tests
       uses: actions-rs/cargo@v1
       with:
         command: test
-        args: "--verbose --tests --no-default-features ${{ matrix.features }}"
+        args: "--verbose --tests"
     - name: test --doc
       uses: actions-rs/cargo@v1
       with:
         command: test
-        args: "--verbose --doc --no-default-features ${{ matrix.features }}"
+        args: "--verbose --doc"
     - name: doc
       uses: actions-rs/cargo@v1
       with:
         command: doc
-        args: "--verbose --no-default-features ${{ matrix.features }}"
-    - name: test --docsrs
-      uses: actions-rs/cargo@v1
-      with:
-        command: test
-        args: "--verbose --doc"
-      env:
-        RUSTFLAGS: "--cfg docsrs"
-        RUSTDOCFLAGS: "--cfg docsrs"
-    - name: --docsrs
-      uses: actions-rs/cargo@v1
-      with:
-        command: doc
         args: "--verbose"
-      env:
-        RUSTFLAGS: "--cfg docsrs"
-        RUSTDOCFLAGS: "--cfg docsrs"
     - name: build --release
       uses: actions-rs/cargo@v1
       with:
         command: build
-        args: "--verbose --release --no-default-features ${{ matrix.features }}"
+        args: "--verbose --release"
+    - name: test --example rs_trigger
+      uses: actions-rs/cargo@v1
+      with:
+        command: test
+        args: "--verbose --example rs_trigger"

@@ -1,4 +1,3 @@
-#![feature(const_fn)]
 #![feature(const_fn_fn_ptr_basics)]
 #![feature(const_maybe_uninit_as_ptr)]
 #![feature(const_mut_refs)]
@@ -14,18 +13,6 @@
 #[cfg(test)]
 extern crate core;
 extern crate alloc;
-
-use alloc::boxed::Box;
-use alloc::collections::TryReserveError;
-use alloc::vec::Vec;
-use components_arena::ComponentId;
-use core::fmt::Debug;
-use core::mem::replace;
-use core::ops::Range;
-use dyn_clone::{DynClone, clone_trait_object};
-use dyn_context::{Context, ContextExt};
-use educe::Educe;
-use phantom_type::PhantomType;
 
 #[doc(hidden)]
 pub use core::compile_error as std_compile_error;
@@ -49,6 +36,18 @@ pub use generics::parse as generics_parse;
 pub use memoffset::offset_of as memoffset_offset_of;
 #[doc(hidden)]
 pub use paste::paste as paste_paste;
+
+use alloc::boxed::Box;
+use alloc::collections::TryReserveError;
+use alloc::vec::Vec;
+use components_arena::ComponentId;
+use core::fmt::Debug;
+use core::mem::replace;
+use core::ops::Range;
+use dyn_clone::{DynClone, clone_trait_object};
+use dyn_context::{Context, ContextExt};
+use educe::Educe;
+use phantom_type::PhantomType;
 
 pub trait DepPropType: Clone + Debug + Send + Sync + 'static { }
 
