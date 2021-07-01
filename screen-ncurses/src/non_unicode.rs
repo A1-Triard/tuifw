@@ -22,8 +22,8 @@ struct Line {
 
 pub struct Screen {
     lines: Vec<Line>,
-    cd: iconv_t,
-    dc: iconv_t,
+    cd: Option<iconv_t>,
+    dc: Option<iconv_t>,
 }
 
 impl !Sync for Screen { }
@@ -34,13 +34,15 @@ impl Screen {
         if no_null(initscr()).is_err() { return Err(io::ErrorKind::Other.into()); }
         let mut s = Screen {
             lines: Vec::with_capacity(max(0, min(LINES, i16::MAX as _)) as i16 as u16 as usize),
-            cd: ICONV_ERROR,
-            dc: ICONV_ERROR
+            cd: None,
+            dc: None
         };
-        s.cd = iconv_open(nl_langinfo(CODESET), b"UTF-8\0".as_ptr() as _);
-        if s.cd == ICONV_ERROR { return Err(io::Error::last_os_error()); }
-        s.dc = iconv_open(b"UTF-8\0".as_ptr() as _, nl_langinfo(CODESET));
-        if s.dc == ICONV_ERROR { return Err(io::Error::last_os_error()); }
+        let cd = iconv_open(nl_langinfo(CODESET), b"UTF-8\0".as_ptr() as _);
+        if cd as _ == -1 { return Err(io::Error::last_os_error()); }
+        s.cd.replace(cd);
+        let dc = iconv_open(b"UTF-8\0".as_ptr() as _, nl_langinfo(CODESET));
+        if dc as _ == -1 { return Err(io::Error::last_os_error()); }
+        s.dc.replace(dc);
         init_settings()?;
         s.resize()?;
         Ok(s)
@@ -66,13 +68,17 @@ impl Screen {
     }
 
     unsafe fn drop_raw(&mut self) -> io::Result<()> {
-        if self.cd != ICONV_ERROR && iconv_close(self.cd) == -1 {
-            return Err(io::Error::last_os_error());
-        }
-        if self.dc != ICONV_ERROR && iconv_close(self.dc) == -1 {
-            return Err(io::Error::last_os_error());
-        }
         no_err(endwin())?;
+        if let Some(cd) = self.cd.take() {
+            if iconv_close(cd) == -1 {
+                return Err(io::Error::last_os_error());
+            }
+        }
+        if let Some(dc) = self.dc.take() {
+            if iconv_close(dc) == -1 {
+                return Err(io::Error::last_os_error());
+            }
+        }
         Ok(())
     }
 
@@ -113,7 +119,7 @@ impl Screen {
         };
         let window = window.unwrap_or_else(|| unsafe { NonNull::new(stdscr).unwrap() });
         unsafe { no_err(nodelay(window.as_ptr(), !wait)) }?;
-        let dc = self.dc;
+        let dc = self.dc.expect("iconv not initialized (2)");
         let e = read_event(window, |w| {
             let c = unsafe { wgetch(w.as_ptr()) };
             if c == ERR { return None; }
@@ -199,7 +205,7 @@ impl base_Screen for Screen {
         debug_assert!(soft.start >= 0 && soft.end > soft.start && soft.end <= self.size().x);
         let text_end = if soft.end <= p.x { return 0 .. 0 } else { soft.end.saturating_sub(p.x) };
         let text_start = if soft.start <= p.x { 0 } else { soft.start.saturating_sub(p.x) };
-        let cd = self.cd;
+        let cd = self.cd.expect("iconv not initialized (1)");
         let line = &mut self.lines[p.y as u16 as usize];
         line.invalidated = true;
         let attr = unsafe { attr_ch(fg, bg, attr) };

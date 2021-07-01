@@ -4,7 +4,7 @@ use std::num::Wrapping;
 
 include!(concat!(env!("OUT_DIR"), "/curses_types.rs"));
 
-pub const ICONV_ERROR: iconv_t = (Wrapping::<iconv_t>(0) - Wrapping::<iconv_t>(1)).0;
+//pub const ICONV_ERROR: iconv_t = (Wrapping::<iconv_t>(0) - Wrapping::<iconv_t>(1)).0;
 
 pub const COLOR_BLACK: c_short = 0;
 pub const COLOR_RED: c_short = 1;
