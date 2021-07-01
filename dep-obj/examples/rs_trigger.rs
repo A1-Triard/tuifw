@@ -6,12 +6,12 @@
 #![feature(const_raw_ptr_deref)]
 
 mod circuit {
-    use dep_obj::dep_obj;
     use components_arena::{RawId, Component, ComponentId, Id, Arena, ComponentClassToken};
-    use std::fmt::Debug;
+    use dep_obj::dep_obj;
+    use downcast_rs::{Downcast, impl_downcast};
     use educe::Educe;
     use macro_attr_2018::macro_attr;
-    use downcast_rs::{Downcast, impl_downcast};
+    use std::fmt::Debug;
 
     pub trait ChipLegs: Downcast + Debug + Send + Sync { }
 
@@ -161,10 +161,11 @@ mod not_chip {
     impl ChipLegs for NotLegs { }
 }
 
-use dyn_context::{Context, ContextExt, free_lifetimes};
 use circuit::*;
-use or_chip::*;
+use dyn_context::{Context, ContextExt, free_lifetimes};
 use not_chip::*;
+use or_chip::*;
+use std::any::{Any, TypeId};
 
 struct TriggerChips {
     pub or_1: Chip,
@@ -180,7 +181,25 @@ free_lifetimes! {
     }
 }
 
-Context!(() struct TriggerContext { .. });
+impl Context for TriggerContext {
+    fn get_raw(&self, ty: TypeId) -> Option<&dyn Any> {
+        if ty == TypeId::of::<Circuit>() {
+            Some(self.circuit())
+        } else if ty == TypeId::of::<TriggerChips>() {
+            Some(self.chips())
+        } else {
+            None
+        }
+    }
+
+    fn get_mut_raw(&mut self, ty: TypeId) -> Option<&mut dyn Any> {
+        if ty == TypeId::of::<Circuit>() {
+            Some(self.circuit_mut())
+        } else {
+            None
+        }
+    }
+}
 
 fn main() {
     let mut circuit_token = CircuitToken::new().unwrap();
