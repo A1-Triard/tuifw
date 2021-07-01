@@ -1,5 +1,5 @@
 use libc::*;
-use std::mem::transmute;
+use std::mem::{MaybeUninit, transmute};
 
 include!(concat!(env!("OUT_DIR"), "/curses_types.rs"));
 
