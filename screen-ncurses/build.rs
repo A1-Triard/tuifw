@@ -35,6 +35,7 @@ fn generate_curses_types_rs(lib: &Library) {
 #include <iconv.h>
 #include <limits.h>
 #include <wchar.h>
+#define _XOPEN_SOURCE_EXTENDED 1
 #define NCURSES_WIDECHAR 1
 #include <curses.h>
 int main() {

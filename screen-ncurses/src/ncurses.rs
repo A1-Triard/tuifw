@@ -3,7 +3,7 @@ use std::mem::MaybeUninit;
 
 include!(concat!(env!("OUT_DIR"), "/curses_types.rs"));
 
-pub const ICONV_ERROR: iconv_t = -1 as iconv_t;
+pub const ICONV_ERROR: iconv_t = 0.overflowing_sub(1);
 
 pub const COLOR_BLACK: c_short = 0;
 pub const COLOR_RED: c_short = 1;

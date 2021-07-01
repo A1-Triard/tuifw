@@ -141,7 +141,7 @@ fn encode_char(cd: iconv_t, c: char) -> u8 {
     let mut buf = [0; 4];
     let c = c.encode_utf8(&mut buf);
     let mut c_len = c.len() as size_t;
-    let mut c_ptr = c.as_ptr() as *const c_char;
+    let mut c_ptr = c.as_ptr() as *const c_char as *mut c_char;
     let mut encoded = 0u8;
     let mut encoded_ptr = (&mut encoded) as *mut _ as *mut c_char;
     let mut encoded_len: size_t = 1;
@@ -159,7 +159,7 @@ fn encode_char(cd: iconv_t, c: char) -> u8 {
 }
 
 fn decode_char(dc: iconv_t, c: u8) -> char {
-    let mut c_ptr = &c as *const u8 as *const c_char;
+    let mut c_ptr = &c as *const u8 as *const c_char as *mut c_char;
     let mut c_len: size_t = 1;
     let mut buf = [0; 4];
     let mut buf_ptr = buf.as_mut_ptr() as *mut c_char;
