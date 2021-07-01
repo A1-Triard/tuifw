@@ -57,12 +57,6 @@ extern "C" {
 }
 
 extern "C" {
-    #[must_use]
-    pub fn iconv_open(src: *const c_char, dst: *const c_char) -> iconv_t;
-    #[must_use]
-    pub fn iconv_close(cd: iconv_t) -> c_int;
-    #[must_use]
-    pub fn iconv(cd: iconv_t, src: *mut *const c_char, scrleft: *mut size_t, dst: *mut *mut c_char, dstleft: *mut size_t) -> size_t;
     pub fn COLOR_PAIR(arg1: c_int) -> c_int;
     #[must_use]
     pub fn cbreak() -> c_int;
