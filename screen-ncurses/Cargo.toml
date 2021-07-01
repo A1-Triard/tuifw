@@ -13,12 +13,12 @@ repository = "https://github.com/A1-Triard/tuifw"
 
 [dependencies]
 tuifw-screen-base = { path = "../screen-base", version = "0.8.1" }
-libc = "0.2.27"
+libc = "0.2.97"
 unicode-width = "0.1.8"
-unicode-normalization = "0.1.13"
-unicode-segmentation = "1.6.0"
-either = "1.5.3"
+unicode-normalization = "0.1.19"
+unicode-segmentation = "1.7.1"
+either = "1.6.1"
 
 [build-dependencies]
-pkg-config = "0.3.18"
-cc = "1.0.58"
+pkg-config = "0.3.19"
+cc = "1.0.68"

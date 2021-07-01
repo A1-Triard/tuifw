@@ -28,7 +28,7 @@ fn generate_curses_types_rs(lib: &Library) {
 
     {
         let c_file_display = c_file.display();
-        let mut c_file = File::create(&c_file).unwrap_or_else(|_| panic!(format!("cannot create {}", c_file_display)));
+        let mut c_file = File::create(&c_file).unwrap_or_else(|_| panic!("cannot create {}", c_file_display));
         c_file.write_all(br##"
 #include <stdio.h>
 #include <stdalign.h>
@@ -44,7 +44,7 @@ int main() {
     printf("pub const CCHARW_MAX: usize = %d;\n", CCHARW_MAX);
     return 0;
 }
-"##).unwrap_or_else(|_| panic!(format!("cannot write {}", c_file_display)));
+"##).unwrap_or_else(|_| panic!("cannot write {}", c_file_display));
     }
 
     let mut build = cc::Build::new();
@@ -54,12 +54,12 @@ int main() {
     let mut compiler = build.try_get_compiler().unwrap().to_command();
     compiler.arg("-o").arg(&bin_file).arg(&c_file);
     let compiler_status = compiler.stdin(Stdio::null()).status()
-        .unwrap_or_else(|_| panic!(format!("cannot compile {}", c_file.display())));
+        .unwrap_or_else(|_| panic!("cannot compile {}", c_file.display()));
     if !compiler_status.success() {
         panic!("{} compilation failed with non-zero {}", c_file.display(), compiler_status);
     }
     let rs_file = File::create(&rs_file)
-        .unwrap_or_else(|_| panic!(format!("cannot create {}", rs_file.display())));
+        .unwrap_or_else(|_| panic!("cannot create {}", rs_file.display()));
     Command::new(&bin_file).stdin(Stdio::null()).stdout(rs_file).status()
-        .unwrap_or_else(|_| panic!(format!("{} failed", bin_file.display())));
+        .unwrap_or_else(|_| panic!("{} failed", bin_file.display()));
 }

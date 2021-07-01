@@ -28,6 +28,8 @@ impl Screen {
         s
     }
 
+    pub fn cursor(&self) -> Option<Point> { self.cursor }
+
     fn resize(&mut self, out_size: Vector) {
         self.buf.resize(out_size.rect_area() as usize, (' ', Color::White, None, Attr::empty()));
         self.out.resize(out_size.rect_area() as usize, (' ', Color::White, None, Attr::empty()));

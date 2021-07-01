@@ -1,8 +1,7 @@
-#![feature(const_fn)]
+#![feature(const_fn_trait_bound)]
 #![feature(const_maybe_uninit_as_ptr)]
 #![feature(const_ptr_offset_from)]
 #![feature(const_raw_ptr_deref)]
-#![feature(raw_ref_macros)]
 
 #![deny(warnings)]
 #![allow(clippy::collapsible_if)]

@@ -1,4 +1,3 @@
-#![feature(const_fn)]
 #![feature(const_panic)]
 #![feature(stmt_expr_attributes)]
 
@@ -134,7 +133,7 @@ impl Point {
 
 #[cfg(test)]
 impl Arbitrary for Point {
-    fn arbitrary<G: Gen>(g: &mut G) -> Self {
+    fn arbitrary(g: &mut Gen) -> Self {
         let a = <(_, _)>::arbitrary(g);
         Point { x: a.0, y: a.1 }
     }
@@ -218,7 +217,7 @@ impl Neg for Vector {
 
 #[cfg(test)]
 impl Arbitrary for Vector {
-    fn arbitrary<G: Gen>(g: &mut G) -> Self {
+    fn arbitrary(g: &mut Gen) -> Self {
         let a = <(_, _)>::arbitrary(g);
         Vector { x: a.0, y: a.1 }
     }
@@ -652,7 +651,7 @@ impl Rect {
 
 #[cfg(test)]
 impl Arbitrary for Rect {
-    fn arbitrary<G: Gen>(g: &mut G) -> Self {
+    fn arbitrary(g: &mut Gen) -> Self {
         let a = <(Point, Point)>::arbitrary(g);
         Rect::from_tl_br(a.0, a.1)
     }

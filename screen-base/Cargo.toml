@@ -13,11 +13,11 @@ repository = "https://github.com/A1-Triard/tuifw"
 
 [dependencies]
 enum-derive-2018 = { version = "1.0.1", default-features = false }
-macro-attr-2018 = "1.0.0"
+macro-attr-2018 = "1.1.0"
 bitflags = "1.2.1"
-either = { version = "1.5.3", default-features = false }
-num-traits = { version = "0.2.12", default-features = false }
+either = { version = "1.6.1", default-features = false }
+num-traits = { version = "0.2.14", default-features = false }
 
 [dev-dependencies]
-quickcheck = "0.9.2"
-quickcheck_macros = "0.9.1"
+quickcheck = "1.0.3"
+quickcheck_macros = "1.0.0"
