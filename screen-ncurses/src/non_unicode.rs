@@ -34,13 +34,13 @@ impl Screen {
         if no_null(initscr()).is_err() { return Err(io::ErrorKind::Other.into()); }
         let mut s = Screen {
             lines: Vec::with_capacity(max(0, min(LINES, i16::MAX as _)) as i16 as u16 as usize),
-            cd: -1,
-            dc: -1
+            cd: ICONV_ERROR,
+            dc: ICONV_ERROR
         };
         s.cd = iconv_open(nl_langinfo(CODESET), b"UTF-8\0".as_ptr() as _);
-        if s.cd == -1 { return Err(io::Error::last_os_error()); }
+        if s.cd == ICONV_ERROR { return Err(io::Error::last_os_error()); }
         s.dc = iconv_open(b"UTF-8\0".as_ptr() as _, nl_langinfo(CODESET));
-        if s.dc == -1 { return Err(io::Error::last_os_error()); }
+        if s.dc == ICONV_ERROR { return Err(io::Error::last_os_error()); }
         init_settings()?;
         s.resize()?;
         Ok(s)
@@ -66,10 +66,10 @@ impl Screen {
     }
 
     unsafe fn drop_raw(&mut self) -> io::Result<()> {
-        if self.cd != -1 && iconv_close(self.cd) == -1 {
+        if self.cd != ICONV_ERROR && iconv_close(self.cd) == -1 {
             return Err(io::Error::last_os_error());
         }
-        if self.dc != -1 && iconv_close(self.dc) == -1 {
+        if self.dc != ICONV_ERROR && iconv_close(self.dc) == -1 {
             return Err(io::Error::last_os_error());
         }
         no_err(endwin())?;
