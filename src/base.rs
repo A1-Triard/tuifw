@@ -41,7 +41,7 @@ macro_attr! {
         parent: Option<Widget>,
         last_child: Option<Widget>,
         next: Widget,
-        obj: Option<Box<dyn WidgetObj>>,
+        obj: Box<dyn WidgetObj>,
         attached: bool,
     }
 }
@@ -95,7 +95,7 @@ impl WidgetTree {
                 parent: None,
                 last_child: None,
                 next: Widget(root),
-                obj: Some(Box::new(Root::new_priv())),
+                obj: Box::new(Root::new_priv()),
                 attached: true,
             }, root));
             (root, move |view_tree| (view_tree, Widget(root)))
@@ -145,7 +145,7 @@ impl Widget {
             parent: None,
             last_child: None,
             next: Widget(widget),
-            obj: Some(Box::new(obj)),
+            obj: Box::new(obj),
             attached: false,
         }, Widget(widget)))
     }
@@ -245,16 +245,16 @@ impl Widget {
             node.view = Some(view);
             panic!("widget already loaded");
         }
-        let behavior = node.obj.as_ref().unwrap().behavior();
+        let behavior = node.obj.behavior();
         behavior.load(tree, self, view);
     }
 
     dep_obj! {
         pub dyn fn obj(self as this, tree: WidgetTree) -> WidgetObj {
             if mut {
-                tree.widget_arena[this.0].obj.as_mut().expect("root widget does not have obj")
+                &mut tree.widget_arena[this.0].obj
             } else {
-                tree.widget_arena[this.0].obj.as_ref().expect("root widget does not have obj")
+                &tree.widget_arena[this.0].obj
             }
         }
     }
