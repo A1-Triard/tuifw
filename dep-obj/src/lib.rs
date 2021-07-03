@@ -50,6 +50,8 @@ use dyn_context::{Context, ContextExt};
 use educe::Educe;
 use phantom_type::PhantomType;
 
+/// A type should satisfy this trait to be a dependency property type
+/// or a dependency vector item type.
 pub trait DepPropType: Clone + Debug + Send + Sync + 'static { }
 
 impl<PropType: Clone + Debug + Send + Sync + 'static> DepPropType for PropType { }
@@ -75,9 +77,9 @@ impl<OwnerId: ComponentId, PropType: DepPropType> DepPropEntry<OwnerId, PropType
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone)]
 pub enum DepVecChange<ItemType: DepPropType> {
-    Reset,
+    Reset(Vec<ItemType>),
     Inserted(Range<usize>),
     Removed(usize, Vec<ItemType>),
     Swapped(Range<usize>, Range<usize>),
@@ -113,6 +115,37 @@ impl<OwnerId: ComponentId, ArgsType> DepEventEntry<OwnerId, ArgsType> {
     }
 }
 
+/// A dependency type.
+/// Use the [`dep_type`] macro to create a type implementing this trait.
+///
+/// # Examples
+///
+/// ```rust
+/// # #![feature(const_maybe_uninit_as_ptr)]
+/// # #![feature(const_ptr_offset_from)]
+/// # #![feature(const_raw_ptr_deref)]
+/// # use components_arena::{Component, ComponentId, Id};
+/// # use dep_obj::dep_type;
+/// # use macro_attr_2018::macro_attr;
+/// #
+/// dep_type! {
+///     #[derive(Debug)]
+///     pub struct MyDepType become obj in MyDepTypeId {
+///         prop_1: bool = false,
+///         prop_2: i32 = 0,
+///     }
+/// }
+///
+/// macro_attr! {
+///     #[derive(Component!, Debug)]
+///     struct MyDepTypePrivateData { }
+/// }
+///
+/// macro_attr! {
+///     #[derive(ComponentId!, Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+///     pub struct MyDepTypeId(Id<MyDepTypePrivateData>);
+/// }
+/// ```
 pub trait DepType: Sized {
     type Id: ComponentId;
 
@@ -258,6 +291,9 @@ impl<Owner: DepType, PropType: DepPropType> AnySetter<Owner> for Setter<Owner, P
     }
 }
 
+/// A dictionary mapping a subset of target type properties to the values.
+/// Every dependency object can have an applied style at every moment.
+/// To switch an applied style, use the [`DepObjMut::apply_style`] function.
 #[derive(Educe)]
 #[educe(Debug, Clone, Default)]
 pub struct Style<Owner: DepType> {
@@ -549,8 +585,8 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
         let arena: &mut Arena = self.context.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = vec.entry_mut(obj);
-        entry_mut.items.clear();
-        let change = DepVecChange::Reset;
+        let old_items = replace(&mut entry_mut.items, Vec::new());
+        let change = DepVecChange::Reset(old_items);
         for on_changed in entry_mut.on_changed.clone() {
             on_changed(self.context, self.id, &change);
         }
@@ -1351,7 +1387,11 @@ mod test {
         TestObj1::new(&mut arena, id);
         assert!(id.obj1_ref(&arena).items(TestObj1::COLL).is_empty());
         let change = id.obj1_mut(&mut arena).push(TestObj1::COLL, 7);
-        assert_eq!(change, DepVecChange::Inserted(0 .. 1));
+        let change_match = match &change {
+            DepVecChange::Inserted(x) => *x == (0 .. 1),
+            _ => false,
+        };
+        assert!(change_match, "{:?}", change);
         assert_eq!(id.obj1_ref(&arena).items(TestObj1::COLL)[0], 7);
     }
 }

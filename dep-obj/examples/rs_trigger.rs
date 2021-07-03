@@ -89,8 +89,9 @@ mod or_chip {
     use dyn_context::{Context, ContextExt};
 
     dep_type! {
+        #[builder(access="legs", type=)]
         #[derive(Debug)]
-        pub struct OrLegs become legs in Chip {
+        pub struct OrLegs in Chip {
             in_1: bool = false,
             in_2: bool = false,
             out: bool = false,
