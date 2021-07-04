@@ -1,3 +1,9 @@
+use components_arena::{RawId, Component, Id, Arena, ComponentClassMutex, ComponentId};
+use dep_obj::{dep_obj, dep_type_with_builder, DepProp, DepPropType, DepObjBuilderCore};
+use downcast_rs::{Downcast, impl_downcast};
+use dyn_clone::{DynClone, clone_trait_object};
+use dyn_context::{Context, ContextExt};
+use macro_attr_2018::macro_attr;
 use std::any::{Any};
 use std::borrow::Cow;
 use std::cmp::{min, max};
@@ -5,14 +11,8 @@ use std::fmt::Debug;
 use std::iter::{self};
 use std::mem::{replace};
 use std::num::{NonZeroU16};
-use components_arena::{RawId, Component, Id, Arena, ComponentClassMutex, ComponentId};
-use dep_obj::{dep_obj, dep_type, DepProp, DepPropType, DepObjBuilderCore};
-use dyn_clone::{DynClone, clone_trait_object};
-use dyn_context::{Context, ContextExt};
-use downcast_rs::{Downcast, impl_downcast};
 use tuifw_screen_base::{Key, Event, Screen, Vector, Point, Rect, Attr, Color, HAlign, VAlign, Thickness};
 use tuifw_window::{RenderPort, WindowTree, Window};
-use macro_attr_2018::macro_attr;
 
 pub trait Layout: Downcast + Debug + Send + Sync { }
 
@@ -478,7 +478,7 @@ impl View {
     }
 
     dep_obj! {
-        pub dyn fn decorator(self as this, tree: ViewTree) -> Decorator {
+        pub fn decorator(self as this, tree: ViewTree) -> dyn Decorator {
             if mut {
                 tree.arena[this.0].decorator.as_mut().expect("Decorator missing")
             } else {
@@ -488,7 +488,7 @@ impl View {
     }
 
     dep_obj! {
-        pub dyn fn layout(self as this, tree: ViewTree) -> Layout {
+        pub fn layout(self as this, tree: ViewTree) -> dyn Layout {
             if mut {
                 tree.arena[this.0].layout.as_mut().expect("Layout missing")
             } else {
@@ -498,7 +498,7 @@ impl View {
     }
 
     dep_obj! {
-        pub dyn fn panel(self as this, tree: ViewTree) -> Panel {
+        pub fn panel(self as this, tree: ViewTree) -> dyn Panel {
             if mut {
                 tree.arena[this.0].panel.as_mut().expect("Panel missing")
             } else {
@@ -725,7 +725,7 @@ impl<'a> ViewBuilderRootDecoratorExt for ViewBuilder<'a> {
     }
 }
 
-dep_type! {
+dep_type_with_builder! {
     #[derive(Debug)]
     pub struct RootDecorator become decorator in View {
         fill: Cow<'static, str> = Cow::Borrowed(" ")
@@ -816,7 +816,7 @@ impl<'a> ViewBuilderViewBaseExt for ViewBuilder<'a> {
     }
 }
 
-dep_type! {
+dep_type_with_builder! {
     #[derive(Debug)]
     pub struct ViewBase become base in View {
         fg: Option<Color> = None,
@@ -880,7 +880,7 @@ impl<'a> ViewBuilderViewAlignExt for ViewBuilder<'a> {
     }
 }
 
-dep_type! {
+dep_type_with_builder! {
     #[derive(Debug)]
     pub struct ViewAlign become align in View {
         h_align: HAlign = HAlign::Center,

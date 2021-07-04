@@ -1,7 +1,7 @@
+use crate::view::{View, ViewTree, ViewBuilder, PanelTemplate, RootDecorator};
 use components_arena::{ComponentId, Id, Component, Arena, ComponentClassMutex};
 use core::hint::unreachable_unchecked;
-use crate::view::{View, ViewTree, ViewBuilder, RootDecorator, PanelTemplate};
-use dep_obj::{dep_type, dep_obj, Style, DepObjBuilderCore};
+use dep_obj::{dep_type, dep_obj, Style, DepObjBuilderCore, DepVecChange};
 use downcast_rs::{Downcast, impl_downcast};
 use dyn_clone::{DynClone, clone_trait_object};
 use dyn_context::{Context, ContextExt};
@@ -118,16 +118,30 @@ impl WidgetTree {
             let decorator_style = root.obj_ref(tree).get(Root::DECORATOR_STYLE).clone();
             root_view.decorator_mut(context).apply_style(decorator_style);
         });
-        /*
-        root.obj(&mut tree).on_vec_changed(Root::CHILDREN, |context, root, change| {
+        root.obj(&mut tree).on_vec_changed(Root::CHILDREN, |context, _root, change| {
             match change {
-                DepVecChange::Reset => {
-                    if let Some(last_child) = 
+                DepVecChange::Reset(old_items) => {
+                    let tree: &mut WidgetTree = context.get_mut();
+                    for old_item in old_items {
+                        old_item.detach(tree);
+                    }
+                    /*
+                    let root_view = tree.widget_arena[root.0].view.unwrap_or_else(|| unsafe { unreachable_unchecked() });
+                    while let Some(child) = root_view.last_child(&tree.view_tree) {
+                        child.drop(&mut tree.view_tree);
+                    }
+                    if let Some(last_child) = root.last_child(tree) {
+                        let mut child = last_child;
+                        loop {
+                            child = child.next(tree);
+                            root.
+                            if child == last_child { break; }
+                        }
+                    }*/
                 },
                 _ => {}
             }
         });
-        */
         tree
     }
 
@@ -199,10 +213,10 @@ impl Widget {
     pub fn parent(self, tree: &WidgetTree) -> Option<Widget> { tree.widget_arena[self.0].parent }
 
     pub fn self_and_parents<'a>(self, tree: &'a WidgetTree) -> impl Iterator<Item=Widget> + 'a {
-        let mut view = Some(self);
+        let mut widget = Some(self);
         iter::from_fn(move || {
-            let parent = view.and_then(|view| view.parent(tree));
-            replace(&mut view, parent)
+            let parent = widget.and_then(|view| view.parent(tree));
+            replace(&mut widget, parent)
         })
     }
 
@@ -212,10 +226,10 @@ impl Widget {
 
     pub fn children<'a>(self, tree: &'a WidgetTree) -> impl Iterator<Item=Widget> + 'a {
         let last_child = self.last_child(tree);
-        let mut view = last_child;
+        let mut widget = last_child;
         iter::from_fn(move || {
-            let item = view.map(|view| view.next(tree));
-            view = if item == last_child { None } else { item };
+            let item = widget.map(|widget| widget.next(tree));
+            widget = if item == last_child { None } else { item };
             item
         })
     }
@@ -250,7 +264,7 @@ impl Widget {
     }
 
     dep_obj! {
-        pub dyn fn obj(self as this, tree: WidgetTree) -> WidgetObj {
+        pub fn obj(self as this, tree: WidgetTree) -> dyn WidgetObj {
             if mut {
                 &mut tree.widget_arena[this.0].obj
             } else {
@@ -281,7 +295,7 @@ clone_trait_object!(WidgetTemplate);
 
 dep_type! {
     #[derive(Debug)]
-    pub struct Root become obj in Widget {
+    pub struct Root in Widget {
         panel_template: Option<Box<dyn PanelTemplate>> = None,
         decorator_style: Option<Style<RootDecorator>> = None,
         children [Widget],

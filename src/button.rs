@@ -10,7 +10,7 @@ use tuifw_screen_base::Side;
 
 dep_type! {
     #[derive(Debug)]
-    pub struct Button become obj in Widget {
+    pub struct Button in Widget {
         content: Option<Widget> = None,
     }
 }

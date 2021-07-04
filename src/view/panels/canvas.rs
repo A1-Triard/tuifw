@@ -1,9 +1,9 @@
+use crate::view::base::*;
+use components_arena::ComponentId;
+use dep_obj::{dep_type_with_builder, DepObjBuilderCore, Style};
+use dyn_context::{Context, ContextExt};
 use std::fmt::Debug;
 use tuifw_screen_base::{Vector, Point, Rect};
-use components_arena::ComponentId;
-use dep_obj::{dep_type, DepObjBuilderCore, Style};
-use dyn_context::{Context, ContextExt};
-use crate::view::base::*;
 
 pub trait ViewBuilderCanvasPanelExt {
     fn canvas_panel(
@@ -47,7 +47,7 @@ impl<'a> CanvasPanelBuilder<'a> {
     }
 }
 
-dep_type! {
+dep_type_with_builder! {
     #[derive(Debug)]
     pub struct CanvasLayout become layout in View {
         tl: Point = Point { x: 0, y: 0 },

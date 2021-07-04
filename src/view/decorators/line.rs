@@ -1,10 +1,10 @@
+use crate::view::base::*;
+use dep_obj::{dep_type_with_builder, DepObjBuilderCore};
+use dyn_context::{Context, ContextExt};
 use std::borrow::Cow;
 use std::fmt::Debug;
 use tuifw_screen_base::{Vector, Point, Rect, Orient};
 use tuifw_window::{RenderPort};
-use dep_obj::{dep_type, DepObjBuilderCore};
-use dyn_context::{Context, ContextExt};
-use crate::view::base::*;
 
 pub trait ViewBuilderLineDecoratorExt {
     fn line_decorator(
@@ -25,7 +25,7 @@ impl<'a> ViewBuilderLineDecoratorExt for ViewBuilder<'a> {
     }
 }
 
-dep_type! {
+dep_type_with_builder! {
     #[derive(Debug)]
     pub struct LineDecorator become decorator in View {
         orient: Orient = Orient::Hor,

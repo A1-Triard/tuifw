@@ -1,11 +1,11 @@
+use crate::view::base::*;
+use dep_obj::{dep_type_with_builder, DepObjBuilderCore};
+use dyn_context::{Context, ContextExt};
+use either::{Left, Right};
 use std::borrow::{Borrow, Cow};
 use std::fmt::Debug;
 use tuifw_screen_base::{Vector, Point, Rect};
 use tuifw_window::{RenderPort};
-use dep_obj::{dep_type, DepObjBuilderCore};
-use dyn_context::{Context, ContextExt};
-use either::{Left, Right};
-use crate::view::base::*;
 
 pub trait ViewBuilderBorderDecoratorExt {
     fn border_decorator(
@@ -26,7 +26,7 @@ impl<'a> ViewBuilderBorderDecoratorExt for ViewBuilder<'a> {
     }
 }
 
-dep_type! {
+dep_type_with_builder! {
     #[derive(Debug)]
     pub struct BorderDecorator become decorator in View {
         tl: Cow<'static, str> = Cow::Borrowed(""),

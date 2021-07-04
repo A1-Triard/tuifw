@@ -1,12 +1,12 @@
+use crate::view::base::*;
+use components_arena::ComponentId;
+use dep_obj::{dep_type_with_builder, DepObjBuilderCore};
+use dyn_context::{Context, ContextExt};
+use either::{Either, Left, Right};
 use std::cmp::{min, max};
 use std::fmt::Debug;
 use std::hint::unreachable_unchecked;
 use tuifw_screen_base::{Vector, Rect, Side, Orient, Thickness};
-use components_arena::ComponentId;
-use dep_obj::{dep_type, DepObjBuilderCore};
-use dyn_context::{Context, ContextExt};
-use either::{Either, Left, Right};
-use crate::view::base::*;
 
 pub trait ViewBuilderDockPanelExt {
     fn dock_panel(
@@ -48,7 +48,7 @@ impl<'a> DockPanelBuilder<'a> {
     }
 }
 
-dep_type! {
+dep_type_with_builder! {
     #[derive(Debug)]
     pub struct DockLayout become layout in View {
         dock: Either<f32, Side> = Either::Left(1.),
@@ -75,7 +75,7 @@ impl DockLayout {
 
 impl Layout for DockLayout { }
 
-dep_type! {
+dep_type_with_builder! {
     #[derive(Debug)]
     pub struct DockPanel become panel in View {
         base: Side = Side::Top,

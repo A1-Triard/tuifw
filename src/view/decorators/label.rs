@@ -1,13 +1,13 @@
+use crate::view::base::*;
+use dep_obj::{dep_type_with_builder, DepObjBuilderCore};
+use dyn_context::{Context, ContextExt};
 use std::borrow::{Borrow, Cow};
 use std::fmt::Debug;
 use std::num::NonZeroI16;
 use tuifw_screen_base::{Vector, Point, Rect};
 use tuifw_window::{RenderPort};
-use dep_obj::{dep_type, DepObjBuilderCore};
-use dyn_context::{Context, ContextExt};
-use crate::view::base::*;
-use unicode_width::UnicodeWidthChar;
 use unicode_segmentation::UnicodeSegmentation;
+use unicode_width::UnicodeWidthChar;
 
 pub trait ViewBuilderLabelDecoratorExt {
     fn label_decorator(
@@ -28,7 +28,7 @@ impl<'a> ViewBuilderLabelDecoratorExt for ViewBuilder<'a> {
     }
 }
 
-dep_type! {
+dep_type_with_builder! {
     #[derive(Debug)]
     pub struct LabelDecorator become decorator in View {
         text: Cow<'static, str> = Cow::Borrowed(""),
