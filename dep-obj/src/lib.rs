@@ -15,6 +15,106 @@
 extern crate core;
 extern crate alloc;
 
+#[cfg(docsrs)]
+pub mod example {
+    //! The [`dep_type`] and [`dep_obj`] macro expansion example.
+    //!
+    //! ```ignore
+    //! dep_type! {
+    //!     #[derive(Debug)]
+    //!     pub struct MyDepType in MyDepTypeId {
+    //!         prop_1: bool = false,
+    //!         prop_2: i32 = 10,
+    //!     }
+    //! }
+    //!
+    //! macro_attr! {
+    //!     #[derive(Component!, Debug)]
+    //!     struct MyDepTypePrivateData {
+    //!         dep_data: MyDepType,
+    //!     }
+    //! }
+    //!
+    //! macro_attr! {
+    //!     #[derive(ComponentId!, Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+    //!     pub struct MyDepTypeId(Id<MyDepTypePrivateData>);
+    //! }
+    //!
+    //! macro_attr! {
+    //!     #[derive(Context!, Debug)]
+    //!     pub struct MyApp {
+    //!         my_dep_types: Arena<MyDepTypePrivateData>,
+    //!     }
+    //! }
+    //!
+    //! impl MyDepTypeId {
+    //!     pub fn new(app: &mut MyApp) -> MyDepTypeId {
+    //!         app.my_dep_types.insert(|id| (MyDepTypePrivateData {
+    //!             dep_data: MyDepType::new_priv()
+    //!         }, MyDepTypeId(id)))
+    //!     }
+    //!
+    //!     dep_obj! {
+    //!         pub fn obj(self as this, app: MyApp) -> MyDepType {
+    //!             if mut {
+    //!                 &mut app.my_dep_types[this.0].dep_data
+    //!             } else {
+    //!                 &app.my_dep_types[this.0].dep_data
+    //!             }
+    //!         }
+    //!     }
+    //! }
+
+    use crate::{dep_obj, dep_type};
+    use components_arena::{Arena, Component, ComponentId, Id};
+    use dyn_context::Context;
+
+    dep_type! {
+        #[derive(Debug)]
+        pub struct MyDepType in MyDepTypeId {
+            prop_1: bool = false,
+            prop_2: i32 = 10,
+        }
+    }
+
+    #[derive(Debug)]
+    struct MyDepTypePrivateData {
+        dep_data: MyDepType,
+    }
+
+    Component!(() struct MyDepTypePrivateData { .. });
+
+    #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+    pub struct MyDepTypeId(Id<MyDepTypePrivateData>);
+
+    ComponentId!(() pub struct MyDepTypeId(Id<MyDepTypePrivateData>););
+
+    #[derive(Debug)]
+    pub struct MyApp {
+        my_dep_types: Arena<MyDepTypePrivateData>,
+    }
+
+    Context!(() pub struct MyApp { .. });
+
+    impl MyDepTypeId {
+        pub fn new(app: &mut MyApp) -> MyDepTypeId {
+            app.my_dep_types.insert(|id| (MyDepTypePrivateData {
+                dep_data: MyDepType::new_priv()
+            }, MyDepTypeId(id)))
+        }
+
+        dep_obj! {
+            pub fn obj(self as this, app: MyApp) -> MyDepType {
+                if mut {
+                    &mut app.my_dep_types[this.0].dep_data
+                } else {
+                    &app.my_dep_types[this.0].dep_data
+                }
+            }
+        }
+    }
+}
+
 #[doc(hidden)]
 pub use core::compile_error as std_compile_error;
 #[doc(hidden)]
@@ -191,106 +291,6 @@ pub trait DepType: Sized {
 
     #[doc(hidden)]
     fn style__(&mut self) -> &mut Option<Style<Self>>;
-}
-
-#[cfg(docsrs)]
-pub mod example {
-    //! The [`dep_type`] and [`dep_obj`] macro expansion example.
-    //!
-    //! ```ignore
-    //! dep_type! {
-    //!     #[derive(Debug)]
-    //!     pub struct MyDepType in MyDepTypeId {
-    //!         prop_1: bool = false,
-    //!         prop_2: i32 = 10,
-    //!     }
-    //! }
-    //!
-    //! macro_attr! {
-    //!     #[derive(Component!, Debug)]
-    //!     struct MyDepTypePrivateData {
-    //!         dep_data: MyDepType,
-    //!     }
-    //! }
-    //!
-    //! macro_attr! {
-    //!     #[derive(ComponentId!, Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
-    //!     pub struct MyDepTypeId(Id<MyDepTypePrivateData>);
-    //! }
-    //!
-    //! macro_attr! {
-    //!     #[derive(Context!, Debug)]
-    //!     pub struct MyApp {
-    //!         my_dep_types: Arena<MyDepTypePrivateData>,
-    //!     }
-    //! }
-    //!
-    //! impl MyDepTypeId {
-    //!     pub fn new(app: &mut MyApp) -> MyDepTypeId {
-    //!         app.my_dep_types.insert(|id| (MyDepTypePrivateData {
-    //!             dep_data: MyDepType::new_priv()
-    //!         }, MyDepTypeId(id)))
-    //!     }
-    //!
-    //!     dep_obj! {
-    //!         pub fn obj(self as this, app: MyApp) -> MyDepType {
-    //!             if mut {
-    //!                 &mut app.my_dep_types[this.0].dep_data
-    //!             } else {
-    //!                 &app.my_dep_types[this.0].dep_data
-    //!             }
-    //!         }
-    //!     }
-    //! }
-
-    use crate::{dep_obj, dep_type};
-    use components_arena::{Arena, Component, ComponentId, Id};
-    use dyn_context::Context;
-
-    dep_type! {
-        #[derive(Debug)]
-        pub struct MyDepType in MyDepTypeId {
-            prop_1: bool = false,
-            prop_2: i32 = 10,
-        }
-    }
-
-    #[derive(Debug)]
-    struct MyDepTypePrivateData {
-        dep_data: MyDepType,
-    }
-
-    Component!(() struct MyDepTypePrivateData { .. });
-
-    #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
-    pub struct MyDepTypeId(Id<MyDepTypePrivateData>);
-
-    ComponentId!(() pub struct MyDepTypeId(Id<MyDepTypePrivateData>););
-
-    #[derive(Debug)]
-    pub struct MyApp {
-        my_dep_types: Arena<MyDepTypePrivateData>,
-    }
-
-    Context!(() pub struct MyApp { .. });
-
-    impl MyDepTypeId {
-        pub fn new(app: &mut MyApp) -> MyDepTypeId {
-            app.my_dep_types.insert(|id| (MyDepTypePrivateData {
-                dep_data: MyDepType::new_priv()
-            }, MyDepTypeId(id)))
-        }
-
-        dep_obj! {
-            pub fn obj(self as this, app: MyApp) -> MyDepType {
-                if mut {
-                    &mut app.my_dep_types[this.0].dep_data
-                } else {
-                    &app.my_dep_types[this.0].dep_data
-                }
-            }
-        }
-    }
 }
 
 #[derive(Educe)]
