@@ -43,6 +43,22 @@ jobs:
       with:
         command: doc
         args: "--verbose"
+    - name: test --docsrs
+      uses: actions-rs/cargo@v1
+      with:
+        command: test
+        args: "--verbose --doc"
+      env:
+        RUSTFLAGS: "--cfg docsrs"
+        RUSTDOCFLAGS: "--cfg docsrs"
+    - name: --docsrs
+      uses: actions-rs/cargo@v1
+      with:
+        command: doc
+        args: "--verbose"
+      env:
+        RUSTFLAGS: "--cfg docsrs"
+        RUSTDOCFLAGS: "--cfg docsrs"
     - name: build --release
       uses: actions-rs/cargo@v1
       with:
