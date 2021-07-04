@@ -293,6 +293,7 @@ pub trait DepType: Sized {
     fn style__(&mut self) -> &mut Option<Style<Self>>;
 }
 
+/// A dependency property.
 #[derive(Educe)]
 #[educe(Debug, Clone, Copy)]
 pub struct DepProp<Owner: DepType, PropType: DepPropType> {
@@ -301,6 +302,8 @@ pub struct DepProp<Owner: DepType, PropType: DepPropType> {
 }
 
 impl<Owner: DepType, PropType: DepPropType> DepProp<Owner, PropType> {
+    /// Creates dependency property. The only safe way to call this function is through
+    /// the [`dep_type`] or the [`dep_type_with_builder`] macro using.
     pub const unsafe fn new(offset: usize) -> Self {
         DepProp { offset, _phantom: PhantomType::new() }
     }
