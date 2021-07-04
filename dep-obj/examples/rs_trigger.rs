@@ -54,7 +54,7 @@ mod circuit {
         }
 
         dep_obj! {
-            pub dyn fn legs(self as this, circuit: Circuit) -> ChipLegs {
+            pub fn legs(self as this, circuit: Circuit) -> dyn ChipLegs {
                 if mut { &mut circuit.arena[this.0].legs } else { &circuit.arena[this.0].legs }
             }
         }

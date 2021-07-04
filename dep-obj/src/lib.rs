@@ -194,8 +194,8 @@ pub trait DepType: Sized {
 }
 
 #[cfg(docsrs)]
-pub mod dep_type_example {
-    //! The [`dep_type`] macro expansion example.
+pub mod example {
+    //! The [`dep_type`] and [`dep_obj`] macro expansion example.
     //!
     //! ```ignore
     //! dep_type! {
@@ -244,7 +244,7 @@ pub mod dep_type_example {
     //! }
 
     use crate::{dep_obj, dep_type};
-    use components_arena::{Arena, Component, ComponentClassToken, ComponentId, Id};
+    use components_arena::{Arena, Component, ComponentId, Id};
     use dyn_context::Context;
 
     dep_type! {
@@ -1417,6 +1417,51 @@ macro_rules! dep_type_impl_raw {
 #[macro_export]
 macro_rules! dep_obj {
     (
+        $vis:vis fn $name:ident (self as $this:ident, $arena:ident : $Arena:ty) -> dyn $ty:tt {
+            if mut { $field_mut:expr } else { $field:expr }
+        }
+    ) => {
+        $crate::paste_paste! {
+            fn [< $name _get_obj_ref_priv >] <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
+                $arena: &'arena_lifetime $Arena,
+                $this: Self
+            ) -> &'arena_lifetime DepObjType {
+                $field.downcast_ref::<DepObjType>().expect("invalid cast")
+            }
+
+            fn [< $name _get_obj_mut_priv >] <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
+                $arena: &'arena_lifetime mut $Arena,
+                $this: Self
+            ) -> &'arena_lifetime mut DepObjType {
+                $field_mut.downcast_mut::<DepObjType>().expect("invalid cast")
+            }
+
+            #[allow(dead_code)]
+            $vis fn [< $name _ref >] <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
+                self,
+                $arena: &'arena_lifetime $Arena,
+            ) -> $crate::DepObjRef<'arena_lifetime, DepObjType, $Arena> {
+                $crate::DepObjRef::new($arena, self, Self:: [< $name _get_obj_ref_priv >] )
+            }
+
+            #[allow(dead_code)]
+            $vis fn [< $name _mut >] <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
+                self,
+                context: &'arena_lifetime mut dyn $crate::dyn_context_Context,
+            ) -> $crate::DepObjMut<'arena_lifetime, DepObjType, $Arena> {
+                $crate::DepObjMut::new(self, context, Self:: [< $name _get_obj_mut_priv >] )
+            }
+
+            #[allow(dead_code)]
+            $vis fn $name <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
+                self,
+                $arena: &'arena_lifetime mut $Arena,
+            ) -> $crate::DepObjRefMut<'arena_lifetime, DepObjType, $Arena> {
+                $crate::DepObjRefMut::new($arena, self, Self:: [< $name _get_obj_mut_priv >] )
+            }
+        }
+    };
+    (
         $vis:vis fn $name:ident (self as $this:ident, $arena:ident: $Arena:ty) -> $ty:ty {
             if mut { $field_mut:expr } else { $field:expr }
         }
@@ -1457,51 +1502,6 @@ macro_rules! dep_obj {
                 self,
                 $arena: &'arena_lifetime mut $Arena,
             ) -> $crate::DepObjRefMut<'arena_lifetime, $ty, $Arena> {
-                $crate::DepObjRefMut::new($arena, self, Self:: [< $name _get_obj_mut_priv >] )
-            }
-        }
-    };
-    (
-        $vis:vis dyn fn $name:ident (self as $this:ident, $arena:ident : $Arena:ty) -> $ty:tt {
-            if mut { $field_mut:expr } else { $field:expr }
-        }
-    ) => {
-        $crate::paste_paste! {
-            fn [< $name _get_obj_ref_priv >] <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
-                $arena: &'arena_lifetime $Arena,
-                $this: Self
-            ) -> &'arena_lifetime DepObjType {
-                $field.downcast_ref::<DepObjType>().expect("invalid cast")
-            }
-
-            fn [< $name _get_obj_mut_priv >] <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
-                $arena: &'arena_lifetime mut $Arena,
-                $this: Self
-            ) -> &'arena_lifetime mut DepObjType {
-                $field_mut.downcast_mut::<DepObjType>().expect("invalid cast")
-            }
-
-            #[allow(dead_code)]
-            $vis fn [< $name _ref >] <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
-                self,
-                $arena: &'arena_lifetime $Arena,
-            ) -> $crate::DepObjRef<'arena_lifetime, DepObjType, $Arena> {
-                $crate::DepObjRef::new($arena, self, Self:: [< $name _get_obj_ref_priv >] )
-            }
-
-            #[allow(dead_code)]
-            $vis fn [< $name _mut >] <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
-                self,
-                context: &'arena_lifetime mut dyn $crate::dyn_context_Context,
-            ) -> $crate::DepObjMut<'arena_lifetime, DepObjType, $Arena> {
-                $crate::DepObjMut::new(self, context, Self:: [< $name _get_obj_mut_priv >] )
-            }
-
-            #[allow(dead_code)]
-            $vis fn $name <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
-                self,
-                $arena: &'arena_lifetime mut $Arena,
-            ) -> $crate::DepObjRefMut<'arena_lifetime, DepObjType, $Arena> {
                 $crate::DepObjRefMut::new($arena, self, Self:: [< $name _get_obj_mut_priv >] )
             }
         }
