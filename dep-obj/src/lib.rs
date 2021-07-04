@@ -41,7 +41,7 @@ pub mod example {
     //! }
     //!
     //! macro_attr! {
-    //!     #[derive(Context!, Debug)]
+    //!     #[derive(State!, Debug)]
     //!     pub struct MyApp {
     //!         my_dep_types: Arena<MyDepTypePrivateData>,
     //!     }
@@ -67,7 +67,7 @@ pub mod example {
 
     use crate::{dep_obj, dep_type};
     use components_arena::{Arena, Component, ComponentId, Id};
-    use dyn_context::Context;
+    use dyn_context::State;
 
     dep_type! {
         #[derive(Debug)]
@@ -94,7 +94,7 @@ pub mod example {
         my_dep_types: Arena<MyDepTypePrivateData>,
     }
 
-    Context!(() pub struct MyApp { .. });
+    State!(() pub struct MyApp { .. });
 
     impl MyDepTypeId {
         pub fn new(app: &mut MyApp) -> MyDepTypeId {
@@ -128,7 +128,7 @@ pub use core::option::Option as std_option_Option;
 #[doc(hidden)]
 pub use core::stringify as std_stringify;
 #[doc(hidden)]
-pub use dyn_context::Context as dyn_context_Context;
+pub use dyn_context::State as dyn_context_State;
 #[doc(hidden)]
 pub use generics::concat as generics_concat;
 #[doc(hidden)]
@@ -146,8 +146,9 @@ use core::fmt::Debug;
 use core::mem::replace;
 use core::ops::Range;
 use dyn_clone::{DynClone, clone_trait_object};
-use dyn_context::{Context, ContextExt};
+use dyn_context::{State, StateExt};
 use educe::Educe;
+use macro_attr_2018::macro_attr;
 use phantom_type::PhantomType;
 
 /// A type should satisfy this trait to be a dependency property type
@@ -163,7 +164,7 @@ pub struct DepPropEntry<OwnerId: ComponentId, PropType: DepPropType> {
     style: Option<PropType>,
     local: Option<PropType>,
     #[educe(Debug(ignore))]
-    on_changed: Vec<fn(context: &mut dyn Context, id: OwnerId, old: &PropType)>,
+    on_changed: Vec<fn(state: &mut dyn State, id: OwnerId, old: &PropType)>,
 }
 
 impl<OwnerId: ComponentId, PropType: DepPropType> DepPropEntry<OwnerId, PropType> {
@@ -190,7 +191,7 @@ pub enum DepVecChange<ItemType: DepPropType> {
 pub struct DepVecEntry<OwnerId: ComponentId, ItemType: DepPropType> {
     items: Vec<ItemType>,
     #[educe(Debug(ignore))]
-    on_changed: Vec<fn(context: &mut dyn Context, id: OwnerId, change: &DepVecChange<ItemType>)>,
+    on_changed: Vec<fn(state: &mut dyn State, id: OwnerId, change: &DepVecChange<ItemType>)>,
 }
 
 impl<OwnerId: ComponentId, ItemType: DepPropType> DepVecEntry<OwnerId, ItemType> {
@@ -206,7 +207,7 @@ impl<OwnerId: ComponentId, ItemType: DepPropType> DepVecEntry<OwnerId, ItemType>
 #[educe(Debug)]
 pub struct DepEventEntry<OwnerId: ComponentId, ArgsType> {
     #[educe(Debug(ignore))]
-    on_raised: Vec<fn(context: &mut dyn Context, id: OwnerId, args: &mut ArgsType)>,
+    on_raised: Vec<fn(state: &mut dyn State, id: OwnerId, args: &mut ArgsType)>,
 }
 
 impl<OwnerId: ComponentId, ArgsType> DepEventEntry<OwnerId, ArgsType> {
@@ -227,7 +228,7 @@ impl<OwnerId: ComponentId, ArgsType> DepEventEntry<OwnerId, ArgsType> {
 /// # #![feature(const_raw_ptr_deref)]
 /// use components_arena::{Arena, Component, ComponentClassToken, ComponentId, Id};
 /// use dep_obj::{dep_obj, dep_type};
-/// use dyn_context::Context;
+/// use dyn_context::State;
 /// use macro_attr_2018::macro_attr;
 ///
 /// dep_type! {
@@ -251,7 +252,7 @@ impl<OwnerId: ComponentId, ArgsType> DepEventEntry<OwnerId, ArgsType> {
 /// }
 ///
 /// macro_attr! {
-///     #[derive(Context!, Debug)]
+///     #[derive(State!, Debug)]
 ///     pub struct MyApp {
 ///         my_dep_types: Arena<MyDepTypePrivateData>,
 ///     }
@@ -402,7 +403,7 @@ trait AnySetter<Owner: DepType>: Debug + DynClone + Send + Sync {
         &self,
         owner: &mut Owner,
         unapply: bool
-    ) -> Option<Box<dyn for<'a> FnOnce(&'a mut dyn Context, Owner::Id)>>;
+    ) -> Option<Box<dyn for<'a> FnOnce(&'a mut dyn State, Owner::Id)>>;
 }
 
 clone_trait_object!(<Owner: DepType> AnySetter<Owner>);
@@ -414,7 +415,7 @@ impl<Owner: DepType, PropType: DepPropType> AnySetter<Owner> for Setter<Owner, P
         &self,
         owner: &mut Owner,
         unapply: bool
-    ) -> Option<Box<dyn for<'a> FnOnce(&'a mut dyn Context, Owner::Id)>> {
+    ) -> Option<Box<dyn for<'a> FnOnce(&'a mut dyn State, Owner::Id)>> {
         let entry_mut = self.prop.entry_mut(owner);
         let on_changed = if entry_mut.local.is_some() {
             None
@@ -425,9 +426,9 @@ impl<Owner: DepType, PropType: DepPropType> AnySetter<Owner> for Setter<Owner, P
         let old = replace(&mut entry_mut.style, value);
         on_changed.map(|on_changed| {
             let old = old.unwrap_or_else(|| entry_mut.default.clone());
-            Box::new(move |context: &'_ mut dyn Context, id| {
+            Box::new(move |state: &'_ mut dyn State, id| {
                 for on_changed in on_changed {
-                    on_changed(context, id, &old);
+                    on_changed(state, id, &old);
                 }
             }) as _
         })
@@ -490,9 +491,33 @@ impl<Owner: DepType> Style<Owner> {
     }
 }
 
+macro_attr! {
+    #[derive(State!)]
+    pub struct Dispatcher {
+        queue: Vec<Box<dyn FnOnce(&mut dyn State)>>,
+    }
+}
+
+impl Dispatcher {
+    pub fn new() -> Dispatcher {
+        Dispatcher { queue: Vec::new() }
+    }
+
+    pub fn enqueue(&mut self, f: Box<dyn FnOnce(&mut dyn State)>) {
+        self.queue.push(f);
+    }
+
+    pub fn dispatch(&mut self, state: &mut dyn State) {
+        let queue = replace(&mut self.queue, Vec::new());
+        for item in queue {
+            item(state);
+        }
+    }
+}
+
 pub trait DepObjBuilderCore<OwnerId: ComponentId> {
-    fn context(&self) -> &dyn Context;
-    fn context_mut(&mut self) -> &mut dyn Context;
+    fn state(&self) -> &dyn State;
+    fn state_mut(&mut self) -> &mut dyn State;
     fn id(&self) -> OwnerId;
 }
 
@@ -543,7 +568,7 @@ impl<'a, Owner: DepType, Arena> DepObjRefMut<'a, Owner, Arena> {
         &mut self,
         prop: DepProp<Owner, PropType>,
         callback: fn(
-            context: &mut dyn Context,
+            state: &mut dyn State,
             id: Owner::Id,
             old: &PropType
         ),
@@ -557,7 +582,7 @@ impl<'a, Owner: DepType, Arena> DepObjRefMut<'a, Owner, Arena> {
         &mut self,
         event: DepEvent<Owner, ArgsType>,
         callback: fn(
-            context: &mut dyn Context,
+            state: &mut dyn State,
             id: Owner::Id,
             args: &mut ArgsType
         ),
@@ -571,7 +596,7 @@ impl<'a, Owner: DepType, Arena> DepObjRefMut<'a, Owner, Arena> {
         &mut self,
         vec: DepVec<Owner, ItemType>,
         callback: fn(
-            context: &mut dyn Context,
+            state: &mut dyn State,
             id: Owner::Id,
             change: &DepVecChange<ItemType>
         ),
@@ -584,17 +609,17 @@ impl<'a, Owner: DepType, Arena> DepObjRefMut<'a, Owner, Arena> {
 
 pub struct DepObjMut<'a, Owner: DepType, Arena> {
     id: Owner::Id,
-    context: &'a mut dyn Context,
+    state: &'a mut dyn State,
     get_obj_mut: for<'b> fn(arena: &'b mut Arena, id: Owner::Id) -> &'b mut Owner,
 }
 
 impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
     pub fn new(
         id: Owner::Id,
-        context: &'a mut dyn Context,
+        state: &'a mut dyn State,
         get_obj_mut: for<'b> fn(arena: &'b mut Arena, id: Owner::Id) -> &'b mut Owner,
     ) -> Self {
-        DepObjMut { id, context, get_obj_mut }
+        DepObjMut { id, state, get_obj_mut }
     }
 
     pub fn set_uncond<PropType: DepPropType>(
@@ -602,14 +627,14 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
         prop: DepProp<Owner, PropType>,
         value: PropType,
     ) -> PropType {
-        let arena: &mut Arena = self.context.get_mut();
+        let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = prop.entry_mut(obj);
         let old = entry_mut.local.replace(value).unwrap_or_else(||
             entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default).clone()
         );
         for on_changed in entry_mut.on_changed.clone() {
-            on_changed(self.context, self.id, &old);
+            on_changed(self.state, self.id, &old);
         }
         old
     }
@@ -618,12 +643,12 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
         &mut self,
         prop: DepProp<Owner, PropType>,
     ) -> Option<PropType> {
-        let arena: &mut Arena = self.context.get_mut();
+        let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = prop.entry_mut(obj);
         if let Some(old) = entry_mut.local.take() {
             for on_changed in entry_mut.on_changed.clone() {
-                on_changed(self.context, self.id, &old);
+                on_changed(self.state, self.id, &old);
             }
             Some(old)
         } else {
@@ -636,7 +661,7 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
         prop: DepProp<Owner, PropType>,
         value: PropType,
     ) -> Option<PropType> {
-        let arena: &mut Arena = self.context.get_mut();
+        let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = prop.entry_mut(obj);
         let old = entry_mut.local.as_ref()
@@ -648,7 +673,7 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
             entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default).clone()
         );
         for on_changed in entry_mut.on_changed.clone() {
-            on_changed(self.context, self.id, &old);
+            on_changed(self.state, self.id, &old);
         }
         Some(old)
     }
@@ -657,14 +682,14 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
         &mut self,
         prop: DepProp<Owner, PropType>,
     ) -> Option<PropType> {
-        let arena: &mut Arena = self.context.get_mut();
+        let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = prop.entry_mut(obj);
         if let Some(old) = entry_mut.local.take() {
             let new = entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default);
             if new == &old { return None; }
             for on_changed in entry_mut.on_changed.clone() {
-                on_changed(self.context, self.id, &old);
+                on_changed(self.state, self.id, &old);
             }
             Some(old)
         } else {
@@ -677,11 +702,11 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
         event: DepEvent<Owner, ArgsType>,
         args: &mut ArgsType,
     ) {
-        let arena: &mut Arena = self.context.get_mut();
+        let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry = event.entry(obj);
         for on_raised in entry.on_raised.clone() {
-            on_raised(self.context, self.id, args);
+            on_raised(self.state, self.id, args);
         }
     }
 
@@ -689,7 +714,7 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
         &mut self,
         style: Option<Style<Owner>>,
     ) -> Option<Style<Owner>> {
-        let arena: &mut Arena = self.context.get_mut();
+        let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let mut on_changed = Vec::new();
         let old = obj.style__().take();
@@ -716,7 +741,7 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
         }
         *obj.style__() = style;
         for on_changed in on_changed {
-            on_changed(self.context, self.id);
+            on_changed(self.state, self.id);
         }
         old
     }
@@ -725,13 +750,13 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
         &mut self,
         vec: DepVec<Owner, ItemType>,
     ) -> DepVecChange<ItemType> {
-        let arena: &mut Arena = self.context.get_mut();
+        let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = vec.entry_mut(obj);
         let old_items = replace(&mut entry_mut.items, Vec::new());
         let change = DepVecChange::Reset(old_items);
         for on_changed in entry_mut.on_changed.clone() {
-            on_changed(self.context, self.id, &change);
+            on_changed(self.state, self.id, &change);
         }
         change
     }
@@ -741,7 +766,7 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
         vec: DepVec<Owner, ItemType>,
         item: ItemType,
     ) -> DepVecChange<ItemType> {
-        let arena: &mut Arena = self.context.get_mut();
+        let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = vec.entry_mut(obj);
         entry_mut.items.push(item);
@@ -749,7 +774,7 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
             unsafe { entry_mut.items.len().unchecked_sub(1) } .. entry_mut.items.len()
         );
         for on_changed in entry_mut.on_changed.clone() {
-            on_changed(self.context, self.id, &change);
+            on_changed(self.state, self.id, &change);
         }
         change
     }
@@ -760,13 +785,13 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
         index: usize,
         item: ItemType
     ) -> DepVecChange<ItemType> {
-        let arena: &mut Arena = self.context.get_mut();
+        let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = vec.entry_mut(obj);
         entry_mut.items.insert(index, item);
         let change = DepVecChange::Inserted(index .. index + 1);
         for on_changed in entry_mut.on_changed.clone() {
-            on_changed(self.context, self.id, &change);
+            on_changed(self.state, self.id, &change);
         }
         change
     }
@@ -776,7 +801,7 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
         vec: DepVec<Owner, ItemType>,
         other: &mut Vec<ItemType>,
     ) -> DepVecChange<ItemType> {
-        let arena: &mut Arena = self.context.get_mut();
+        let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = vec.entry_mut(obj);
         let appended = other.len();
@@ -785,7 +810,7 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
             unsafe { entry_mut.items.len().unchecked_sub(appended) } .. entry_mut.items.len()
         );
         for on_changed in entry_mut.on_changed.clone() {
-            on_changed(self.context, self.id, &change);
+            on_changed(self.state, self.id, &change);
         }
         change
     }
@@ -1201,8 +1226,8 @@ macro_rules! dep_type_impl_raw {
 
                     $vis fn $field(mut self, value: $field_ty) -> Self {
                         let id = <$BuilderCore as $crate::DepObjBuilderCore<$Id>>::id(&self.core);
-                        let context = <$BuilderCore as $crate::DepObjBuilderCore<$Id>>::context_mut(&mut self.core);
-                        id. [< $obj _mut >] (context).set_uncond($name:: [< $field:upper >] , value);
+                        let state = <$BuilderCore as $crate::DepObjBuilderCore<$Id>>::state_mut(&mut self.core);
+                        id. [< $obj _mut >] (state).set_uncond($name:: [< $field:upper >] , value);
                         self
                     }
                 ]
@@ -1450,9 +1475,9 @@ macro_rules! dep_obj {
             #[allow(dead_code)]
             $vis fn [< $name _mut >] <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
                 self,
-                context: &'arena_lifetime mut dyn $crate::dyn_context_Context,
+                state: &'arena_lifetime mut dyn $crate::dyn_context_State,
             ) -> $crate::DepObjMut<'arena_lifetime, DepObjType, $Arena> {
-                $crate::DepObjMut::new(self, context, Self:: [< $name _get_obj_mut_priv >] )
+                $crate::DepObjMut::new(self, state, Self:: [< $name _get_obj_mut_priv >] )
             }
 
             #[allow(dead_code)]
@@ -1495,9 +1520,9 @@ macro_rules! dep_obj {
             #[allow(dead_code)]
             $vis fn [< $name _mut >] <'arena_lifetime>(
                 self,
-                context: &'arena_lifetime mut dyn $crate::dyn_context_Context,
+                state: &'arena_lifetime mut dyn $crate::dyn_context_State,
             ) -> $crate::DepObjMut<'arena_lifetime, $ty, $Arena> {
-                $crate::DepObjMut::new(self, context, Self:: [< $name _get_obj_mut_priv >] )
+                $crate::DepObjMut::new(self, state, Self:: [< $name _get_obj_mut_priv >] )
             }
 
             #[allow(dead_code)]
@@ -1516,7 +1541,7 @@ mod test {
     use super::*;
     use alloc::boxed::Box;
     use components_arena::{Arena, Id, ComponentId, Component, ComponentClassMutex};
-    use dyn_context::{Context, free_lifetimes, ContextRefMut};
+    use dyn_context::{State, free_lifetimes, StateRefMut};
     use educe::Educe;
     use macro_attr_2018::macro_attr;
 
@@ -1554,12 +1579,12 @@ mod test {
 
     impl<'a> DepObjBuilderCore<TestId> for TestIdBuilder<'a> {
         fn id(&self) -> TestId { self.id }
-        fn context(&self) -> &dyn Context { self.arena }
-        fn context_mut(&mut self) -> &mut dyn Context { self.arena }
+        fn state(&self) -> &dyn State { self.arena }
+        fn state_mut(&mut self) -> &mut dyn State { self.arena }
     }
 
     macro_attr! {
-        #[derive(Context!)]
+        #[derive(State!)]
         struct TestArena(Arena<TestNode>);
     }
 
@@ -1581,12 +1606,12 @@ mod test {
     }
 
     free_lifetimes! {
-        struct TestContext {
+        struct TestState {
             changed: 'changed mut u16,
         }
     }
     
-    Context!(() struct TestContext { .. });
+    State!(() struct TestState { .. });
 
     #[test]
     fn create_test_obj_1() {
@@ -1594,21 +1619,21 @@ mod test {
         let id = arena.0.insert(|id| (TestNode { obj1: None }, TestId(id)));
         TestObj1::new(&mut arena, id);
         let mut changed = 0;
-        TestContextBuilder { changed: &mut changed }.build_and_then(|context| {
-            context.merge_mut_and_then(|context| {
-                let arena = context.get_mut::<TestArena>();
+        TestStateBuilder { changed: &mut changed }.build_and_then(|state| {
+            state.merge_mut_and_then(|state| {
+                let arena = state.get_mut::<TestArena>();
                 let v = id.obj1_ref(arena).get(TestObj1::INT_VAL);
                 assert_eq!(v, &42);
-                id.obj1(arena).on_changed(TestObj1::INT_VAL, |context, _, _| {
-                    let test_context = context.get_mut::<TestContext>();
-                    *test_context.changed_mut() += 1;
+                id.obj1(arena).on_changed(TestObj1::INT_VAL, |state, _, _| {
+                    let test_state = state.get_mut::<TestState>();
+                    *test_state.changed_mut() += 1;
                 });
-                let test_context = context.get::<TestContext>();
-                assert_eq!(test_context.changed(), &0);
-                id.obj1_mut(context).set_uncond(TestObj1::INT_VAL, 43);
-                let test_context = context.get::<TestContext>();
-                assert_eq!(test_context.changed(), &1);
-                let arena = context.get::<TestArena>();
+                let test_state = state.get::<TestState>();
+                assert_eq!(test_state.changed(), &0);
+                id.obj1_mut(state).set_uncond(TestObj1::INT_VAL, 43);
+                let test_state = state.get::<TestState>();
+                assert_eq!(test_state.changed(), &1);
+                let arena = state.get::<TestArena>();
                 assert_eq!(id.obj1_ref(arena).get(TestObj1::INT_VAL), &43);
             }, &mut arena);
         });

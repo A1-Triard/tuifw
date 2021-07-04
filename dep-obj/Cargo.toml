@@ -18,9 +18,10 @@ rustdoc-args = ["--cfg", "docsrs"]
 [dependencies]
 components-arena = { version = "1.2.0", default-features = false }
 dyn-clone = "1.0.2"
-dyn-context = { version = "0.4.0", default-features = false }
+dyn-context = { version = "0.5.0", default-features = false }
 educe = "0.4.13"
 generics = "0.2.7"
+macro-attr-2018 = "1.1.0"
 memoffset = { version = "0.6.1", features = ["unstable_const"] }
 paste = "1.0.0"
 phantom-type = { version = "0.3.1", default-features = false }
@@ -28,4 +29,3 @@ phantom-type = { version = "0.3.1", default-features = false }
 [dev-dependencies]
 components-arena = "1.2.0"
 downcast-rs = "1.2.0"
-macro-attr-2018 = "1.1.0"
