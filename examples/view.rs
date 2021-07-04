@@ -1,7 +1,7 @@
 #![deny(warnings)]
-use std::borrow::Cow;
-use either::Right;
 use dyn_context::ContextExt;
+use either::Right;
+use std::borrow::Cow;
 use tuifw::{Key, Vector, Thickness, HAlign, VAlign, Point, Side, Rect};
 use tuifw::view::{View, ViewTree, ViewBase, ViewBuilderViewAlignExt};
 use tuifw::view::panels::{ViewBuilderCanvasPanelExt, CanvasLayout};

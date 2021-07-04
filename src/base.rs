@@ -60,7 +60,7 @@ pub struct WidgetTree {
     widget_arena: Arena<WidgetNode>,
     _model_arena: Arena<ModelNode>,
     view_tree: ViewTree,
-    _root: Widget,
+    root: Widget,
 }
 
 impl Context for WidgetTree {
@@ -104,7 +104,7 @@ impl WidgetTree {
             widget_arena,
             _model_arena: model_arena,
             view_tree,
-            _root: root,
+            root,
         };
         root.obj(&mut tree).on_changed(Root::PANEL_TEMPLATE, |context, root, _old| {
             let tree: &WidgetTree = context.get();
@@ -118,35 +118,49 @@ impl WidgetTree {
             let decorator_style = root.obj_ref(tree).get(Root::DECORATOR_STYLE).clone();
             root_view.decorator_mut(context).apply_style(decorator_style);
         });
-        root.obj(&mut tree).on_vec_changed(Root::CHILDREN, |context, _root, change| {
+        root.obj(&mut tree).on_vec_changed(Root::CHILDREN, |context, root, change| {
+            let tree: &mut WidgetTree = context.get_mut();
+            let root_view = unsafe { root.view(tree).unwrap_unchecked() };
             match change {
                 DepVecChange::Reset(old_items) => {
-                    let tree: &mut WidgetTree = context.get_mut();
                     for old_item in old_items {
                         old_item.detach(tree);
-                    }
-                    /*
-                    let root_view = tree.widget_arena[root.0].view.unwrap_or_else(|| unsafe { unreachable_unchecked() });
-                    while let Some(child) = root_view.last_child(&tree.view_tree) {
-                        child.drop(&mut tree.view_tree);
                     }
                     if let Some(last_child) = root.last_child(tree) {
                         let mut child = last_child;
                         loop {
                             child = child.next(tree);
-                            root.
+                            child.attach(tree, root);
+                            let view = View::new(&mut tree.view_tree, root_view, |view| { (child, view) });
+                            child.load(tree, view);
                             if child == last_child { break; }
                         }
-                    }*/
+                    }
                 },
-                _ => {}
+                DepVecChange::Inserted(indexes) => {
+                    for index in indexes.clone() {
+                        let child = root.obj_ref(tree).items(Root::CHILDREN)[index];
+                        child.attach(tree, root);
+                        let view = View::new(&mut tree.view_tree, root_view, |view| { (child, view) });
+                        child.load(tree, view);
+                    }
+                },
+                DepVecChange::Removed(_index, old_items) => {
+                    for old_item in old_items {
+                        old_item.detach(tree);
+                    }
+                },
+                DepVecChange::Swapped(_, _) => { },
             }
         });
         tree
     }
 
-    //pub fn update(context: &mut dyn Context, wait: bool) -> Result<bool, Box<dyn Any>> {
-    //}
+    pub fn root(&self) -> Widget { self.root }
+
+    pub fn update(context: &mut dyn Context, wait: bool) -> Result<bool, Box<dyn Any>> {
+        ViewTree::update(context, wait)
+    }
 }
 
 impl Widget {
@@ -209,6 +223,8 @@ impl Widget {
             panic!("widget already detached");
         }
     }
+
+    fn view(self, tree: &WidgetTree) -> Option<View> { tree.widget_arena[self.0].view }
 
     pub fn parent(self, tree: &WidgetTree) -> Option<Widget> { tree.widget_arena[self.0].parent }
 

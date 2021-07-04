@@ -1,6 +1,6 @@
 use crate::view::base::*;
 use components_arena::ComponentId;
-use dep_obj::{dep_type_with_builder, DepObjBuilderCore};
+use dep_obj::{dep_type_with_builder, DepObjBuilderCore, Style};
 use dyn_context::{Context, ContextExt};
 use either::{Either, Left, Right};
 use std::cmp::{min, max};
@@ -98,6 +98,19 @@ impl DockPanel {
 
 impl Panel for DockPanel {
     fn behavior(&self) -> &'static dyn PanelBehavior { &Self::BEHAVIOR }
+}
+
+impl PanelTemplate for Style<DockPanel> {
+    fn apply_panel(&self, context: &mut dyn Context, view: View) {
+        let tree: &mut ViewTree = context.get_mut();
+        DockPanel::new(tree, view);
+        view.panel_mut::<DockPanel>(context).apply_style(Some(self.clone()));
+    }
+
+    fn apply_layout(&self, context: &mut dyn Context, view: View) {
+        let tree: &mut ViewTree = context.get_mut();
+        DockLayout::new(tree, view);
+    }
 }
 
 struct DockPanelBehavior;
