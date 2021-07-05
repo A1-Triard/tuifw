@@ -1,6 +1,6 @@
 use crate::view::base::*;
 use dep_obj::{dep_type_with_builder, DepObjBuilderCore};
-use dyn_context::{Context, ContextExt};
+use dyn_context::{State, StateExt};
 use std::borrow::Cow;
 use std::fmt::Debug;
 use tuifw_screen_base::{Vector, Point, Rect, Orient};
@@ -19,7 +19,7 @@ impl<'a> ViewBuilderLineDecoratorExt for ViewBuilder<'a> {
         f: impl for<'b> FnOnce(LineDecoratorBuilder<'b>) -> LineDecoratorBuilder<'b>
     ) -> Self {
         let view = self.id();
-        let tree: &mut ViewTree = self.context_mut().get_mut();
+        let tree: &mut ViewTree = self.state_mut().get_mut();
         LineDecorator::new(tree, view);
         f(LineDecoratorBuilder::new_priv(self)).core_priv()
     }
@@ -54,24 +54,24 @@ impl LineDecorator {
         view.decorator(tree).on_changed(LineDecorator::FAR, Self::invalidate_far);
     }
 
-    fn invalidate_measure<T>(context: &mut dyn Context, view: View, _old: &T) {
-        let tree: &mut ViewTree = context.get_mut();
+    fn invalidate_measure<T>(state: &mut dyn State, view: View, _old: &T) {
+        let tree: &mut ViewTree = state.get_mut();
         view.invalidate_measure(tree);
     }
 
-    fn invalidate_near(context: &mut dyn Context, view: View, _old: &Cow<'static, str>) {
-        let tree: &mut ViewTree = context.get_mut();
+    fn invalidate_near(state: &mut dyn State, view: View, _old: &Cow<'static, str>) {
+        let tree: &mut ViewTree = state.get_mut();
         let invalidated = Rect { tl: Point { x: 0, y: 0 }, size: Vector { x: 1, y: 1 } };
         view.invalidate_rect(tree, invalidated).unwrap();
     }
 
-    fn invalidate_stroke(context: &mut dyn Context, view: View, _old: &Cow<'static, str>) {
-        let tree: &mut ViewTree = context.get_mut();
+    fn invalidate_stroke(state: &mut dyn State, view: View, _old: &Cow<'static, str>) {
+        let tree: &mut ViewTree = state.get_mut();
         view.invalidate_render(tree).unwrap();
     }
 
-    fn invalidate_far(context: &mut dyn Context, view: View, _old: &Cow<'static, str>) {
-        let tree: &mut ViewTree = context.get_mut();
+    fn invalidate_far(state: &mut dyn State, view: View, _old: &Cow<'static, str>) {
+        let tree: &mut ViewTree = state.get_mut();
         let &orient = view.decorator_ref(tree).get(LineDecorator::ORIENT);
         let size = view.render_bounds(tree).size;
         let invalidated = if orient == Orient::Vert {

@@ -4,7 +4,7 @@ use core::hint::unreachable_unchecked;
 use dep_obj::{dep_type, dep_obj, Style, DepObjBuilderCore, DepVecChange};
 use downcast_rs::{Downcast, impl_downcast};
 use dyn_clone::{DynClone, clone_trait_object};
-use dyn_context::{Context, ContextExt};
+use dyn_context::{State, StateExt};
 use macro_attr_2018::macro_attr;
 use std::any::{Any, TypeId};
 use std::fmt::Debug;
@@ -63,7 +63,7 @@ pub struct WidgetTree {
     root: Widget,
 }
 
-impl Context for WidgetTree {
+impl State for WidgetTree {
     fn get_raw(&self, ty: TypeId) -> Option<&dyn Any> {
         if ty == TypeId::of::<WidgetTree>() {
             Some(self)
@@ -106,21 +106,22 @@ impl WidgetTree {
             view_tree,
             root,
         };
-        root.obj(&mut tree).on_changed(Root::PANEL_TEMPLATE, |context, root, _old| {
-            let tree: &WidgetTree = context.get();
+        root.obj(&mut tree).on_changed(Root::PANEL_TEMPLATE, |state, root, _old| {
+            let tree: &WidgetTree = state.get();
             let root_view = tree.widget_arena[root.0].view.unwrap_or_else(|| unsafe { unreachable_unchecked() });
             let new = root.obj_ref(tree).get(Root::PANEL_TEMPLATE).clone();
-            new.map(|x| x.apply_panel(context, root_view));
+            new.map(|x| x.apply_panel(state, root_view));
         });
-        root.obj(&mut tree).on_changed(Root::DECORATOR_STYLE, |context, root, _old| {
-            let tree: &WidgetTree = context.get();
+        root.obj(&mut tree).on_changed(Root::DECORATOR_STYLE, |state, root, _old| {
+            let tree: &WidgetTree = state.get();
             let root_view = tree.widget_arena[root.0].view.unwrap_or_else(|| unsafe { unreachable_unchecked() });
             let decorator_style = root.obj_ref(tree).get(Root::DECORATOR_STYLE).clone();
-            root_view.decorator_mut(context).apply_style(decorator_style);
+            root_view.decorator_mut(state).apply_style(decorator_style);
         });
-        root.obj(&mut tree).on_vec_changed(Root::CHILDREN, |context, root, change| {
-            let tree: &mut WidgetTree = context.get_mut();
+        root.obj(&mut tree).on_vec_changed(Root::CHILDREN, |state, root, change| {
+            let tree: &mut WidgetTree = state.get_mut();
             let root_view = unsafe { root.view(tree).unwrap_unchecked() };
+            let panel_template = root.obj_ref(tree).get(Root::PANEL_TEMPLATE).clone();
             match change {
                 DepVecChange::Reset(old_items) => {
                     for old_item in old_items {
@@ -129,9 +130,12 @@ impl WidgetTree {
                     if let Some(last_child) = root.last_child(tree) {
                         let mut child = last_child;
                         loop {
+                            let tree: &mut WidgetTree = state.get_mut();
                             child = child.next(tree);
                             child.attach(tree, root);
                             let view = View::new(&mut tree.view_tree, root_view, |view| { (child, view) });
+                            panel_template.as_ref().map(|x| x.apply_layout(state, view));
+                            let tree: &mut WidgetTree = state.get_mut();
                             child.load(tree, view);
                             if child == last_child { break; }
                         }
@@ -139,9 +143,12 @@ impl WidgetTree {
                 },
                 DepVecChange::Inserted(indexes) => {
                     for index in indexes.clone() {
+                        let tree: &mut WidgetTree = state.get_mut();
                         let child = root.obj_ref(tree).items(Root::CHILDREN)[index];
                         child.attach(tree, root);
                         let view = View::new(&mut tree.view_tree, root_view, |view| { (child, view) });
+                        panel_template.as_ref().map(|x| x.apply_layout(state, view));
+                        let tree: &mut WidgetTree = state.get_mut();
                         child.load(tree, view);
                     }
                 },
@@ -158,8 +165,8 @@ impl WidgetTree {
 
     pub fn root(&self) -> Widget { self.root }
 
-    pub fn update(context: &mut dyn Context, wait: bool) -> Result<bool, Box<dyn Any>> {
-        ViewTree::update(context, wait)
+    pub fn update(state: &mut dyn State, wait: bool) -> Result<bool, Box<dyn Any>> {
+        ViewTree::update(state, wait)
     }
 }
 
@@ -297,14 +304,14 @@ pub trait ViewBuilderWidgetExt {
 impl<'a> ViewBuilderWidgetExt for ViewBuilder<'a> {
     fn widget(mut self, widget: Widget) -> Self {
         let view = self.id();
-        let tree: &mut WidgetTree = self.context_mut().get_mut();
+        let tree: &mut WidgetTree = self.state_mut().get_mut();
         widget.load(tree, view);
         self
     }
 }
 
 pub trait WidgetTemplate: Debug + DynClone + Send + Sync {
-    fn load(&self, context: &mut dyn Context) -> Widget;
+    fn load(&self, state: &mut dyn State) -> Widget;
 }
 
 clone_trait_object!(WidgetTemplate);

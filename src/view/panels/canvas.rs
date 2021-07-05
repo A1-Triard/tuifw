@@ -1,7 +1,7 @@
 use crate::view::base::*;
 use components_arena::ComponentId;
 use dep_obj::{dep_type_with_builder, DepObjBuilderCore, Style};
-use dyn_context::{Context, ContextExt};
+use dyn_context::{State, StateExt};
 use std::fmt::Debug;
 use tuifw_screen_base::{Vector, Point, Rect};
 
@@ -18,7 +18,7 @@ impl<'a> ViewBuilderCanvasPanelExt for ViewBuilder<'a> {
         f: impl for<'b> FnOnce(CanvasPanelBuilder<'b>) -> CanvasPanelBuilder<'b>
     ) -> Self {
         let view = self.id();
-        let tree: &mut ViewTree = self.context_mut().get_mut();
+        let tree: &mut ViewTree = self.state_mut().get_mut();
         CanvasPanel::new(tree, view);
         f(CanvasPanelBuilder(self)).0
     }
@@ -35,11 +35,11 @@ impl<'a> CanvasPanelBuilder<'a> {
         f: impl for<'b> FnOnce(ViewBuilder<'b>) -> ViewBuilder<'b>
     ) -> Self {
         let view = self.0.id();
-        let tree: &mut ViewTree = self.0.context_mut().get_mut();
+        let tree: &mut ViewTree = self.0.state_mut().get_mut();
         let child = View::new(tree, view, |child| (tag, child));
         storage.map(|x| x.replace(child));
         CanvasLayout::new(tree, child);
-        child.build(self.0.context_mut(), |child_builder| {
+        child.build(self.0.state_mut(), |child_builder| {
             let child_builder = layout(CanvasLayoutBuilder::new_priv(child_builder)).core_priv();
             f(child_builder)
         });
@@ -66,8 +66,8 @@ impl CanvasLayout {
         view.layout(tree).on_changed(CanvasLayout::TL, Self::invalidate_parent_arrange);
     }
 
-    fn invalidate_parent_arrange(context: &mut dyn Context, view: View, _old: &Point) {
-        let tree: &mut ViewTree = context.get_mut();
+    fn invalidate_parent_arrange(state: &mut dyn State, view: View, _old: &Point) {
+        let tree: &mut ViewTree = state.get_mut();
         view.parent(tree).map(|parent| parent.invalidate_arrange(tree));
     }
 }
@@ -78,15 +78,15 @@ impl Layout for CanvasLayout { }
 struct CanvasPanelTemplate(Style<CanvasLayout>);
 
 impl PanelTemplate for CanvasPanelTemplate {
-    fn apply_panel(&self, context: &mut dyn Context, view: View) {
-        let tree: &mut ViewTree = context.get_mut();
+    fn apply_panel(&self, state: &mut dyn State, view: View) {
+        let tree: &mut ViewTree = state.get_mut();
         CanvasPanel::new(tree, view);
     }
 
-    fn apply_layout(&self, context: &mut dyn Context, view: View) {
-        let tree: &mut ViewTree = context.get_mut();
+    fn apply_layout(&self, state: &mut dyn State, view: View) {
+        let tree: &mut ViewTree = state.get_mut();
         CanvasLayout::new(tree, view);
-        view.layout_mut(context).apply_style(Some(self.0.clone()));
+        view.layout_mut(state).apply_style(Some(self.0.clone()));
     }
 }
 

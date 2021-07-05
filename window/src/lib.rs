@@ -10,7 +10,7 @@ use std::hint::{unreachable_unchecked};
 use std::mem::replace;
 use std::ops::Range;
 use components_arena::{RawId, Component, Arena, Id, ComponentClassMutex, ComponentId};
-use dyn_context::Context;
+use dyn_context::State;
 use tuifw_screen_base::{Screen, Rect, Point, Vector, Attr, Color, Event};
 use educe::Educe;
 use macro_attr_2018::macro_attr;
@@ -251,7 +251,7 @@ pub struct WindowTree {
         tree: &WindowTree,
         window: Option<Window>,
         port: &mut RenderPort,
-        context: &mut dyn Context,
+        state: &mut dyn State,
     ),
     cursor: Option<Point>,
     screen_size: Vector,
@@ -264,7 +264,7 @@ impl WindowTree {
             tree: &WindowTree,
             window: Option<Window>,
             port: &mut RenderPort,
-            context: &mut dyn Context,
+            state: &mut dyn State,
         )
     ) -> Self {
         let mut arena = Arena::new(&mut WINDOW_NODE.lock().unwrap());
@@ -297,7 +297,7 @@ impl WindowTree {
         (invalidated, screen.size())
     }
 
-    fn render_window(&mut self, window: Id<WindowNode>, offset: Vector, render_context: &mut dyn Context) {
+    fn render_window(&mut self, window: Id<WindowNode>, offset: Vector, render_state: &mut dyn State) {
         let bounds = self.arena[window].bounds.offset(offset);
         let (invalidated, screen_size) = self.invalidated();
         if !rect_invalidated((invalidated, screen_size), bounds) { return; }
@@ -314,7 +314,7 @@ impl WindowTree {
             self,
             if window == self.root { None } else { Some(Window(window)) },
             &mut port,
-            render_context
+            render_state
         );
         self.screen.replace((port.screen, port.invalidated));
         self.cursor = port.cursor;
@@ -322,20 +322,20 @@ impl WindowTree {
             let mut child = last_child;
             loop {
                 child = self.arena[child].next;
-                self.render_window(child, offset, render_context);
+                self.render_window(child, offset, render_state);
                 if child == last_child { break; }
             }
         }
     }
 
-    pub fn update(&mut self, wait: bool, render_context: &mut dyn Context) -> Result<Option<Event>, Box<dyn Any>> {
+    pub fn update(&mut self, wait: bool, render_state: &mut dyn State) -> Result<Option<Event>, Box<dyn Any>> {
         if let Some(cursor) = self.cursor {
             let (invalidated, screen_size) = self.invalidated();
             if rect_invalidated((invalidated, screen_size), Rect { tl: cursor, size: Vector { x: 1, y: 1 } }) {
                 self.cursor = None;
             }
         }
-        self.render_window(self.root, Vector::null(), render_context);
+        self.render_window(self.root, Vector::null(), render_state);
         let (screen, invalidated) = self.screen.as_mut().expect("WindowTree is in invalid state");
         let event = screen.update(self.cursor, wait)?;
         if event == Some(Event::Resize) {
@@ -353,7 +353,7 @@ mod tests {
 
     #[test]
     fn window_tree_new_window() {
-        fn render(_: &WindowTree, _: Option<Window>, _: &mut RenderPort, _: &mut dyn Context) { }
+        fn render(_: &WindowTree, _: Option<Window>, _: &mut RenderPort, _: &mut dyn State) { }
         let screen = tuifw_screen_test::Screen::new(Vector::null());
         let screen = Box::new(screen) as _;
         let tree = &mut WindowTree::new(screen, render);
@@ -388,7 +388,7 @@ mod tests {
 
     #[test]
     fn drop_subtree() {
-        fn render(_: &WindowTree, _: Option<Window>, _: &mut RenderPort, _: &mut dyn Context) { }
+        fn render(_: &WindowTree, _: Option<Window>, _: &mut RenderPort, _: &mut dyn State) { }
         let screen = tuifw_screen_test::Screen::new(Vector::null());
         let screen = Box::new(screen) as _;
         let tree = &mut WindowTree::new(screen, render);

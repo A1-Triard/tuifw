@@ -1,7 +1,7 @@
 #![windows_subsystem = "windows"]
 #![deny(warnings)]
 
-use dyn_context::Context;
+use dyn_context::State;
 use tuifw_screen::{Point, Color, Attr, Vector, Event, Key, Rect, HAlign, VAlign, Thickness};
 use tuifw_window::{WindowTree, Window, RenderPort};
 
@@ -9,7 +9,7 @@ fn draw(
     _tree: &WindowTree,
     window: Option<Window>,
     port: &mut RenderPort,
-    _context: &mut dyn Context
+    _state: &mut dyn State
 ) {
     if window.is_none() {
         port.fill(|port, p| port.out(p, Color::Black, None, Attr::empty(), " "));

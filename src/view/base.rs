@@ -2,7 +2,7 @@ use components_arena::{RawId, Component, Id, Arena, ComponentClassMutex, Compone
 use dep_obj::{dep_obj, dep_type_with_builder, DepProp, DepPropType, DepObjBuilderCore};
 use downcast_rs::{Downcast, impl_downcast};
 use dyn_clone::{DynClone, clone_trait_object};
-use dyn_context::{Context, ContextExt};
+use dyn_context::{State, StateExt};
 use macro_attr_2018::macro_attr;
 use std::any::{Any};
 use std::borrow::Cow;
@@ -87,7 +87,7 @@ macro_attr! {
 static VIEW_NODE: ComponentClassMutex<ViewNode> = ComponentClassMutex::new();
 
 macro_attr! {
-    #[derive(Debug, Context!)]
+    #[derive(Debug, State!)]
     pub struct ViewTree {
         arena: Arena<ViewNode>,
         window_tree: Option<WindowTree>,
@@ -151,9 +151,9 @@ impl ViewTree {
 
     pub fn root(&self) -> View { self.root }
 
-    pub fn update(context: &mut dyn Context, wait: bool) -> Result<bool, Box<dyn Any>> {
-        Self::update_actual_focused(context);
-        let tree: &mut ViewTree = context.get_mut();
+    pub fn update(state: &mut dyn State, wait: bool) -> Result<bool, Box<dyn Any>> {
+        Self::update_actual_focused(state);
+        let tree: &mut ViewTree = state.get_mut();
         tree.root.measure(tree, (Some(tree.screen_size.x), Some(tree.screen_size.y)));
         tree.root.arrange(tree, Rect { tl: Point { x: 0, y: 0 }, size: tree.screen_size });
         let mut window_tree = tree.window_tree.take().expect("ViewTree is in invalid state");
@@ -166,35 +166,33 @@ impl ViewTree {
         tree.window_tree.replace(window_tree);
         let event = event?;
         if let Some(Event::Key(n, key)) = event {
-            let mut input = ViewInput { key: (n, key), handled: false };
-            let mut view = tree.actual_focused;
-            loop {
-                view.base_mut(context).raise(ViewBase::INPUT, &mut input);
-                if input.handled { break; }
-                let tree: &ViewTree = context.get();
+            fn on_input_raised(state: &mut dyn State, view: View, input: ViewInput) {
+                if input.handled { return; }
+                let tree: &ViewTree = state.get();
                 if let Some(parent) = view.parent(tree) {
-                    view = parent;
-                } else {
-                    break;
+                    parent.base_mut(state).raise_and_then(on_input_raised, ViewBase::INPUT, input);
                 }
             }
+            let input = ViewInput { key: (n, key), handled: false };
+            let view = tree.actual_focused;
+            view.base_mut(state).raise_and_then(on_input_raised, ViewBase::INPUT, input);
         }
-        let tree: &mut ViewTree = context.get_mut();
+        let tree: &mut ViewTree = state.get_mut();
         Ok(!tree.quit)
     }
 
     pub fn focused(&self) -> View { self.focused }
 
-    fn update_actual_focused(context: &mut dyn Context) {
-        let tree: &mut ViewTree = context.get_mut();
+    fn update_actual_focused(state: &mut dyn State) {
+        let tree: &mut ViewTree = state.get_mut();
         let focused = tree.focused;
         let actual_focused = tree.actual_focused;
         if focused == actual_focused { return; }
         tree.actual_focused = focused;
         let mut view = actual_focused;
         loop {
-            view.base_mut(context).raise(ViewBase::LOST_FOCUS, &mut ());
-            let tree: &ViewTree = context.get();
+            view.base_mut(state).raise(ViewBase::LOST_FOCUS, ());
+            let tree: &ViewTree = state.get();
             if let Some(parent) = view.parent(tree) {
                 view = parent;
             } else {
@@ -203,8 +201,8 @@ impl ViewTree {
         }
         let mut view = focused;
         loop {
-            view.base_mut(context).raise(ViewBase::GOT_FOCUS, &mut ());
-            let tree: &ViewTree = context.get();
+            view.base_mut(state).raise(ViewBase::GOT_FOCUS, ());
+            let tree: &ViewTree = state.get();
             if let Some(parent) = view.parent(tree) {
                 view = parent;
             } else {
@@ -218,22 +216,22 @@ fn render_view(
     tree: &WindowTree,
     window: Option<Window>,
     port: &mut RenderPort,
-    context: &mut dyn Context,
+    state: &mut dyn State,
 ) {
-    let view_tree: &mut ViewTree = context.get_mut();
+    let view_tree: &mut ViewTree = state.get_mut();
     let view: View = window.map(|window| window.tag(tree)).unwrap_or(view_tree.root);
     view_tree.arena[view.0].decorator.as_ref().unwrap().behavior().render(view, view_tree, port);
 }
 
 pub struct ViewBuilder<'a> {
     view: View,
-    context: &'a mut dyn Context,
+    state: &'a mut dyn State,
 }
 
 impl<'a> DepObjBuilderCore<View> for ViewBuilder<'a> {
     fn id(&self) -> View { self.view }
-    fn context(&self) -> &dyn Context { self.context }
-    fn context_mut(&mut self) -> &mut dyn Context { self.context }
+    fn state(&self) -> &dyn State { self.state }
+    fn state_mut(&mut self) -> &mut dyn State { self.state }
 }
 
 macro_attr! {
@@ -308,10 +306,10 @@ impl View {
 
     pub fn build<'a>(
         self,
-        context: &'a mut dyn Context,
+        state: &'a mut dyn State,
         f: impl FnOnce(ViewBuilder<'a>) -> ViewBuilder<'a>
     ) {
-        f(ViewBuilder { view: self, context });
+        f(ViewBuilder { view: self, state });
     }
 
     pub fn focus(self, tree: &mut ViewTree) -> View {
@@ -737,8 +735,8 @@ dep_type_with_builder! {
 impl RootDecorator {
     const BEHAVIOR: RootDecoratorBehavior = RootDecoratorBehavior;
 
-    fn invalidate_screen<T>(context: &mut dyn Context, _view: View, _old: &T) {
-        let tree: &mut ViewTree = context.get_mut();
+    fn invalidate_screen<T>(state: &mut dyn State, _view: View, _old: &T) {
+        let tree: &mut ViewTree = state.get_mut();
         tree.window_tree().invalidate_screen();
     }
 }
@@ -781,8 +779,8 @@ impl DecoratorBehavior for RootDecoratorBehavior {
 }
 
 pub trait PanelTemplate: Debug + DynClone + Send + Sync {
-    fn apply_panel(&self, context: &mut dyn Context, view: View);
-    fn apply_layout(&self, context: &mut dyn Context, view: View);
+    fn apply_panel(&self, state: &mut dyn State, view: View);
+    fn apply_layout(&self, state: &mut dyn State, view: View);
 }
 
 clone_trait_object!(PanelTemplate);
@@ -832,35 +830,35 @@ dep_type_with_builder! {
 
 impl ViewBase {
     fn on_inheritable_render_changed<T: DepPropType>(
-        context: &mut dyn Context,
+        state: &mut dyn State,
         view: View,
         prop: DepProp<Self, Option<T>>,
     ) {
-        let tree: &mut ViewTree = context.get_mut();
+        let tree: &mut ViewTree = state.get_mut();
         let _ = view.invalidate_render(tree);
         if let Some(last_child) = view.last_child(tree) {
             let mut child = last_child;
             loop {
-                let tree: &ViewTree = context.get();
+                let tree: &ViewTree = state.get();
                 child = child.next(tree);
                 if child.base_ref(tree).get(prop).is_none() {
-                    child.base_mut(context).set_uncond(prop, None);
+                    child.base_mut(state).set_uncond(prop, None);
                 }
                 if child == last_child { break; }
             }
         }
     }
 
-    fn on_fg_changed(context: &mut dyn Context, view: View, _old: &Option<Color>) {
-        Self::on_inheritable_render_changed(context, view, ViewBase::FG);
+    fn on_fg_changed(state: &mut dyn State, view: View, _old: &Option<Color>) {
+        Self::on_inheritable_render_changed(state, view, ViewBase::FG);
     }
 
-    fn on_bg_changed(context: &mut dyn Context, view: View, _old: &Option<Option<Color>>) {
-        Self::on_inheritable_render_changed(context, view, ViewBase::BG);
+    fn on_bg_changed(state: &mut dyn State, view: View, _old: &Option<Option<Color>>) {
+        Self::on_inheritable_render_changed(state, view, ViewBase::BG);
     }
 
-    fn on_attr_changed(context: &mut dyn Context, view: View, _old: &Option<Attr>) {
-        Self::on_inheritable_render_changed(context, view, ViewBase::ATTR);
+    fn on_attr_changed(state: &mut dyn State, view: View, _old: &Option<Attr>) {
+        Self::on_inheritable_render_changed(state, view, ViewBase::ATTR);
     }
 }
 
@@ -897,13 +895,13 @@ dep_type_with_builder! {
 }
 
 impl ViewAlign {
-    fn invalidate_measure<T>(context: &mut dyn Context, view: View, _old: &T) {
-        let tree: &mut ViewTree = context.get_mut();
+    fn invalidate_measure<T>(state: &mut dyn State, view: View, _old: &T) {
+        let tree: &mut ViewTree = state.get_mut();
         view.invalidate_measure(tree);
     }
 
-    fn invalidate_arrange<T>(context: &mut dyn Context, view: View, _old: &T) {
-        let tree: &mut ViewTree = context.get_mut();
+    fn invalidate_arrange<T>(state: &mut dyn State, view: View, _old: &T) {
+        let tree: &mut ViewTree = state.get_mut();
         view.invalidate_arrange(tree);
     }
 }

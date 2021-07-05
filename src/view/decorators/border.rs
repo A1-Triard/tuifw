@@ -1,6 +1,6 @@
 use crate::view::base::*;
 use dep_obj::{dep_type_with_builder, DepObjBuilderCore};
-use dyn_context::{Context, ContextExt};
+use dyn_context::{State, StateExt};
 use either::{Left, Right};
 use std::borrow::{Borrow, Cow};
 use std::fmt::Debug;
@@ -20,7 +20,7 @@ impl<'a> ViewBuilderBorderDecoratorExt for ViewBuilder<'a> {
         f: impl for<'b> FnOnce(BorderDecoratorBuilder<'b>) -> BorderDecoratorBuilder<'b>
     ) -> Self {
         let view = self.id();
-        let tree: &mut ViewTree = self.context_mut().get_mut();
+        let tree: &mut ViewTree = self.state_mut().get_mut();
         BorderDecorator::new(tree, view);
         f(BorderDecoratorBuilder::new_priv(self)).core_priv()
     }
@@ -61,16 +61,16 @@ impl BorderDecorator {
         view.decorator(tree).on_changed(BorderDecorator::B, Self::invalidate_b);
     }
 
-    fn invalidate_tl(context: &mut dyn Context, view: View, _old: &Cow<'static, str>) {
-        let tree: &mut ViewTree = context.get_mut();
+    fn invalidate_tl(state: &mut dyn State, view: View, _old: &Cow<'static, str>) {
+        let tree: &mut ViewTree = state.get_mut();
         view.invalidate_rect(tree, Rect {
             tl: Point { x: 0, y: 0 },
             size: Vector { x: 1, y: 1 }
         }).unwrap();
     }
 
-    fn invalidate_tr(context: &mut dyn Context, view: View, _old: &Cow<'static, str>) {
-        let tree: &mut ViewTree = context.get_mut();
+    fn invalidate_tr(state: &mut dyn State, view: View, _old: &Cow<'static, str>) {
+        let tree: &mut ViewTree = state.get_mut();
         let size = view.render_bounds(tree).size;
         view.invalidate_rect(tree, Rect {
             tl: Point { x: size.x.wrapping_sub(1), y: 0 },
@@ -78,8 +78,8 @@ impl BorderDecorator {
         }).unwrap();
     }
 
-    fn invalidate_bl(context: &mut dyn Context, view: View, _old: &Cow<'static, str>) {
-        let tree: &mut ViewTree = context.get_mut();
+    fn invalidate_bl(state: &mut dyn State, view: View, _old: &Cow<'static, str>) {
+        let tree: &mut ViewTree = state.get_mut();
         let size = view.render_bounds(tree).size;
         view.invalidate_rect(tree, Rect {
             tl: Point { x: 0, y: size.y.wrapping_sub(1) },
@@ -87,8 +87,8 @@ impl BorderDecorator {
         }).unwrap();
     }
 
-    fn invalidate_br(context: &mut dyn Context, view: View, _old: &Cow<'static, str>) {
-        let tree: &mut ViewTree = context.get_mut();
+    fn invalidate_br(state: &mut dyn State, view: View, _old: &Cow<'static, str>) {
+        let tree: &mut ViewTree = state.get_mut();
         let size = view.render_bounds(tree).size;
         view.invalidate_rect(tree, Rect {
             tl: Point { x: size.x.wrapping_sub(1), y: size.y.wrapping_sub(1) },
@@ -96,8 +96,8 @@ impl BorderDecorator {
         }).unwrap();
     }
 
-    fn invalidate_l(context: &mut dyn Context, view: View, _old: &Cow<'static, str>) {
-        let tree: &mut ViewTree = context.get_mut();
+    fn invalidate_l(state: &mut dyn State, view: View, _old: &Cow<'static, str>) {
+        let tree: &mut ViewTree = state.get_mut();
         let size = view.render_bounds(tree).size;
         view.invalidate_rect(tree, Rect {
             tl: Point { x: 0, y: 0 },
@@ -105,8 +105,8 @@ impl BorderDecorator {
         }).unwrap();
     }
 
-    fn invalidate_t(context: &mut dyn Context, view: View, _old: &Cow<'static, str>) {
-        let tree: &mut ViewTree = context.get_mut();
+    fn invalidate_t(state: &mut dyn State, view: View, _old: &Cow<'static, str>) {
+        let tree: &mut ViewTree = state.get_mut();
         let size = view.render_bounds(tree).size;
         view.invalidate_rect(tree, Rect {
             tl: Point { x: 0, y: 0 },
@@ -114,8 +114,8 @@ impl BorderDecorator {
         }).unwrap();
     }
 
-    fn invalidate_r(context: &mut dyn Context, view: View, _old: &Cow<'static, str>) {
-        let tree: &mut ViewTree = context.get_mut();
+    fn invalidate_r(state: &mut dyn State, view: View, _old: &Cow<'static, str>) {
+        let tree: &mut ViewTree = state.get_mut();
         let size = view.render_bounds(tree).size;
         view.invalidate_rect(tree, Rect {
             tl: Point { x: size.x.wrapping_sub(1), y: 0 },
@@ -123,8 +123,8 @@ impl BorderDecorator {
         }).unwrap();
     }
 
-    fn invalidate_b(context: &mut dyn Context, view: View, _old: &Cow<'static, str>) {
-        let tree: &mut ViewTree = context.get_mut();
+    fn invalidate_b(state: &mut dyn State, view: View, _old: &Cow<'static, str>) {
+        let tree: &mut ViewTree = state.get_mut();
         let size = view.render_bounds(tree).size;
         view.invalidate_rect(tree, Rect {
             tl: Point { x: 0, y: size.y.wrapping_sub(1) },

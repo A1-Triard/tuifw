@@ -1,6 +1,6 @@
 use crate::view::base::*;
 use dep_obj::{dep_type_with_builder, DepObjBuilderCore};
-use dyn_context::{Context, ContextExt};
+use dyn_context::{State, StateExt};
 use std::borrow::{Borrow, Cow};
 use std::fmt::Debug;
 use std::num::NonZeroI16;
@@ -22,7 +22,7 @@ impl<'a> ViewBuilderLabelDecoratorExt for ViewBuilder<'a> {
         f: impl for<'b> FnOnce(LabelDecoratorBuilder<'b>) -> LabelDecoratorBuilder<'b>
     ) -> Self {
         let view = self.id();
-        let tree: &mut ViewTree = self.context_mut().get_mut();
+        let tree: &mut ViewTree = self.state_mut().get_mut();
         LabelDecorator::new(tree, view);
         f(LabelDecoratorBuilder::new_priv(self)).core_priv()
     }
@@ -49,8 +49,8 @@ impl LabelDecorator {
         view.decorator(tree).on_changed(LabelDecorator::TEXT, Self::invalidate_measure);
     }
 
-    fn invalidate_measure<T>(context: &mut dyn Context, view: View, _old: &T) {
-        let tree: &mut ViewTree = context.get_mut();
+    fn invalidate_measure<T>(state: &mut dyn State, view: View, _old: &T) {
+        let tree: &mut ViewTree = state.get_mut();
         view.invalidate_measure(tree);
     }
 }

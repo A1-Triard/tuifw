@@ -1,7 +1,7 @@
 use crate::view::base::*;
 use components_arena::ComponentId;
 use dep_obj::{dep_type_with_builder, DepObjBuilderCore, Style};
-use dyn_context::{Context, ContextExt};
+use dyn_context::{State, StateExt};
 use either::{Either, Left, Right};
 use std::cmp::{min, max};
 use std::fmt::Debug;
@@ -21,7 +21,7 @@ impl<'a> ViewBuilderDockPanelExt for ViewBuilder<'a> {
         f: impl for<'b> FnOnce(DockPanelBuilder<'b>) -> DockPanelBuilder<'b>
     ) -> Self {
         let view = self.id();
-        let tree: &mut ViewTree = self.context_mut().get_mut();
+        let tree: &mut ViewTree = self.state_mut().get_mut();
         DockPanel::new(tree, view);
         f(DockPanelBuilder::new_priv(self)).core_priv()
     }
@@ -36,11 +36,11 @@ impl<'a> DockPanelBuilder<'a> {
         f: impl for<'b> FnOnce(ViewBuilder<'b>) -> ViewBuilder<'b>
     ) -> Self {
         let view = self.core_priv_ref().id();
-        let tree: &mut ViewTree = self.core_priv_mut().context_mut().get_mut();
+        let tree: &mut ViewTree = self.core_priv_mut().state_mut().get_mut();
         let child = View::new(tree, view, |child| (tag, child));
         storage.map(|x| x.replace(child));
         DockLayout::new(tree, child);
-        child.build(self.core_priv_mut().context_mut(), |child_builder| {
+        child.build(self.core_priv_mut().state_mut(), |child_builder| {
             let child_builder = layout(DockLayoutBuilder::new_priv(child_builder)).core_priv();
             f(child_builder)
         });
@@ -67,8 +67,8 @@ impl DockLayout {
         view.layout(tree).on_changed(DockLayout::DOCK, Self::invalidate_parent_measure);
     }
 
-    fn invalidate_parent_measure<T>(context: &mut dyn Context, view: View, _old: &T) {
-        let tree: &mut ViewTree = context.get_mut();
+    fn invalidate_parent_measure<T>(state: &mut dyn State, view: View, _old: &T) {
+        let tree: &mut ViewTree = state.get_mut();
         view.parent(tree).map(|parent| parent.invalidate_measure(tree));
     }
 }
@@ -101,14 +101,14 @@ impl Panel for DockPanel {
 }
 
 impl PanelTemplate for Style<DockPanel> {
-    fn apply_panel(&self, context: &mut dyn Context, view: View) {
-        let tree: &mut ViewTree = context.get_mut();
+    fn apply_panel(&self, state: &mut dyn State, view: View) {
+        let tree: &mut ViewTree = state.get_mut();
         DockPanel::new(tree, view);
-        view.panel_mut::<DockPanel>(context).apply_style(Some(self.clone()));
+        view.panel_mut::<DockPanel>(state).apply_style(Some(self.clone()));
     }
 
-    fn apply_layout(&self, context: &mut dyn Context, view: View) {
-        let tree: &mut ViewTree = context.get_mut();
+    fn apply_layout(&self, state: &mut dyn State, view: View) {
+        let tree: &mut ViewTree = state.get_mut();
         DockLayout::new(tree, view);
     }
 }

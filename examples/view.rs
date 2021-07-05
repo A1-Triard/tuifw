@@ -1,5 +1,5 @@
 #![deny(warnings)]
-use dyn_context::ContextExt;
+use dyn_context::StateExt;
 use either::Right;
 use std::borrow::Cow;
 use tuifw::{Key, Vector, Thickness, HAlign, VAlign, Point, Side, Rect};

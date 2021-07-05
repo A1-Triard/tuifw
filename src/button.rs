@@ -3,7 +3,7 @@ use crate::view::View;
 use crate::view::decorators::{ViewBuilderLabelDecoratorExt};
 use crate::view::panels::{ViewBuilderDockPanelExt};
 use dep_obj::{dep_type, Style};
-use dyn_context::{Context, ContextExt};
+use dyn_context::{State, StateExt};
 use either::Right;
 use std::borrow::Cow;
 use tuifw_screen_base::Side;
@@ -32,10 +32,10 @@ impl Button {
 struct ButtonTemplate(Style<Button>);
 
 impl WidgetTemplate for ButtonTemplate {
-    fn load(&self, context: &mut dyn Context) -> Widget {
-        let tree: &mut WidgetTree = context.get_mut();
+    fn load(&self, state: &mut dyn State) -> Widget {
+        let tree: &mut WidgetTree = state.get_mut();
         let widget = Button::new(tree);
-        widget.obj_mut(context).apply_style(Some(self.0.clone()));
+        widget.obj_mut(state).apply_style(Some(self.0.clone()));
         widget
     }
 }
