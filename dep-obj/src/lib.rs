@@ -517,23 +517,40 @@ macro_attr! {
     #[derive(State!)]
     pub struct Dispatcher {
         queue: Vec<Box<dyn FnOnce(&mut dyn State)>>,
+        empty_vec: Option<Vec<Box<dyn FnOnce(&mut dyn State)>>>,
     }
 }
 
 impl Dispatcher {
     pub fn new() -> Dispatcher {
-        Dispatcher { queue: Vec::new() }
+        Dispatcher { queue: Vec::new(), empty_vec: Some(Vec::new()) }
     }
 
     pub fn enqueue(&mut self, f: Box<dyn FnOnce(&mut dyn State)>) {
         self.queue.push(f);
     }
 
-    pub fn dispatch(state: &mut dyn State) {
+    pub fn dispatch(state: &mut dyn State) -> bool {
         let dispatcher: &mut Dispatcher = state.get_mut();
-        let queue = replace(&mut dispatcher.queue, Vec::new());
-        for item in queue {
-            item(state);
+        if let Some(empty_vec) = dispatcher.empty_vec.take() {
+            let mut queue = replace(&mut dispatcher.queue, empty_vec);
+            if queue.is_empty() {
+                dispatcher.empty_vec.replace(queue);
+                return false;
+            }
+            loop {
+                for item in queue.drain(..) {
+                    item(state);
+                }
+                let dispatcher: &mut Dispatcher = state.get_mut();
+                queue = replace(&mut dispatcher.queue, queue);
+                if queue.is_empty() {
+                    dispatcher.empty_vec.replace(queue);
+                    return true;
+                }
+            }
+        } else {
+            true
         }
     }
 }

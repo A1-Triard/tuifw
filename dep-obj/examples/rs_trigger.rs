@@ -242,19 +242,22 @@ fn main() {
         chips,
     };
     or_1.legs_mut(state).set_distinct(OrLegs::IN_1, true);
-    Dispatcher::dispatch(state);
-    or_1.legs_mut(state).set_distinct(OrLegs::IN_1, false);
-    Dispatcher::dispatch(state);
-    or_2.legs_mut(state).set_distinct(OrLegs::IN_1, true);
-    Dispatcher::dispatch(state);
-    or_2.legs_mut(state).set_distinct(OrLegs::IN_1, false);
-    Dispatcher::dispatch(state);
+    assert!(Dispatcher::dispatch(state));
     or_1.legs_mut(state).set_distinct(OrLegs::IN_1, true);
-    Dispatcher::dispatch(state);
+    assert!(!Dispatcher::dispatch(state));
     or_1.legs_mut(state).set_distinct(OrLegs::IN_1, false);
-    Dispatcher::dispatch(state);
+    assert!(Dispatcher::dispatch(state));
     or_2.legs_mut(state).set_distinct(OrLegs::IN_1, true);
-    Dispatcher::dispatch(state);
+    assert!(Dispatcher::dispatch(state));
     or_2.legs_mut(state).set_distinct(OrLegs::IN_1, false);
-    Dispatcher::dispatch(state);
+    assert!(Dispatcher::dispatch(state));
+    or_1.legs_mut(state).set_distinct(OrLegs::IN_1, true);
+    assert!(Dispatcher::dispatch(state));
+    or_1.legs_mut(state).set_distinct(OrLegs::IN_1, false);
+    assert!(Dispatcher::dispatch(state));
+    or_2.legs_mut(state).set_distinct(OrLegs::IN_1, true);
+    assert!(Dispatcher::dispatch(state));
+    or_2.legs_mut(state).set_distinct(OrLegs::IN_1, false);
+    assert!(Dispatcher::dispatch(state));
+    assert!(!Dispatcher::dispatch(state));
 }
