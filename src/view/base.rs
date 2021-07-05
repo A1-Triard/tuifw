@@ -152,6 +152,8 @@ impl ViewTree {
     pub fn root(&self) -> View { self.root }
 
     pub fn update(state: &mut dyn State, wait: bool) -> Result<bool, Box<dyn Any>> {
+        let tree: &ViewTree = state.get();
+        if tree.quit { return Ok(false); }
         Self::update_actual_focused(state);
         let tree: &mut ViewTree = state.get_mut();
         tree.root.measure(tree, (Some(tree.screen_size.x), Some(tree.screen_size.y)));
@@ -177,8 +179,7 @@ impl ViewTree {
             let view = tree.actual_focused;
             view.base_mut(state).raise_and_then(on_input_raised, ViewBase::INPUT, input);
         }
-        let tree: &mut ViewTree = state.get_mut();
-        Ok(!tree.quit)
+        Ok(true)
     }
 
     pub fn focused(&self) -> View { self.focused }

@@ -85,9 +85,10 @@ fn main() {
                     -Vector { x: 0, y: n.get() as i16 },
                 (n, Key::Down) | (n, Key::Char('j')) =>
                     Vector { x: 0, y: n.get() as i16 },
-                (_, Key::Escape) => return tree.quit(),
+                (_, Key::Escape) => { input.mark_as_handled(); return tree.quit(); },
                 _ => return,
             };
+            input.mark_as_handled();
             let tl = border.layout_ref(tree).get(CanvasLayout::TL).offset(d);
             border.layout_mut(state).set_distinct(CanvasLayout::TL, tl);
         });
