@@ -227,9 +227,10 @@ impl<OwnerId: ComponentId, ArgsType> DepEventEntry<OwnerId, ArgsType> {
 /// # #![feature(const_ptr_offset_from)]
 /// # #![feature(const_raw_ptr_deref)]
 /// use components_arena::{Arena, Component, ComponentClassToken, ComponentId, Id};
-/// use dep_obj::{dep_obj, dep_type};
+/// use dep_obj::{Dispatcher, dep_obj, dep_type};
 /// use dyn_context::State;
 /// use macro_attr_2018::macro_attr;
+/// use std::any::{Any, TypeId};
 ///
 /// dep_type! {
 ///     #[derive(Debug)]
@@ -251,10 +252,30 @@ impl<OwnerId: ComponentId, ArgsType> DepEventEntry<OwnerId, ArgsType> {
 ///     pub struct MyDepTypeId(Id<MyDepTypePrivateData>);
 /// }
 ///
-/// macro_attr! {
-///     #[derive(State!, Debug)]
-///     pub struct MyApp {
-///         my_dep_types: Arena<MyDepTypePrivateData>,
+/// pub struct MyApp {
+///     dispatcher: Dispatcher,
+///     my_dep_types: Arena<MyDepTypePrivateData>,
+/// }
+///
+/// impl State for MyApp {
+///     fn get_raw(&self, ty: TypeId) -> Option<&dyn Any> {
+///         if ty == TypeId::of::<Dispatcher>() {
+///             Some(&self.dispatcher)
+///         } else if ty == TypeId::of::<MyApp>() {
+///             Some(self)
+///         } else {
+///             None
+///         }
+///     }
+///
+///     fn get_mut_raw(&mut self, ty: TypeId) -> Option<&mut dyn Any> {
+///         if ty == TypeId::of::<Dispatcher>() {
+///             Some(&mut self.dispatcher)
+///         } else if ty == TypeId::of::<MyApp>() {
+///             Some(self)
+///         } else {
+///             None
+///         }
 ///     }
 /// }
 ///
@@ -279,6 +300,7 @@ impl<OwnerId: ComponentId, ArgsType> DepEventEntry<OwnerId, ArgsType> {
 /// fn main() {
 ///     let mut my_dep_types_token = ComponentClassToken::new().unwrap();
 ///     let mut app = MyApp {
+///         dispatcher: Dispatcher::new(),
 ///         my_dep_types: Arena::new(&mut my_dep_types_token),
 ///     };
 ///     let id = MyDepTypeId::new(&mut app);
@@ -507,8 +529,9 @@ impl Dispatcher {
         self.queue.push(f);
     }
 
-    pub fn dispatch(&mut self, state: &mut dyn State) {
-        let queue = replace(&mut self.queue, Vec::new());
+    pub fn dispatch(state: &mut dyn State) {
+        let dispatcher: &mut Dispatcher = state.get_mut();
+        let queue = replace(&mut dispatcher.queue, Vec::new());
         for item in queue {
             item(state);
         }
@@ -626,33 +649,61 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
         &mut self,
         prop: DepProp<Owner, PropType>,
         value: PropType,
-    ) -> PropType {
+    ) where Owner::Id: 'static {
+        self.set_uncond_and_then(|_, _, _| { }, prop, value);
+    }
+
+    pub fn set_uncond_and_then<PropType: DepPropType>(
+        &mut self,
+        f: impl FnOnce(&mut dyn State, Owner::Id, PropType) + 'static,
+        prop: DepProp<Owner, PropType>,
+        value: PropType
+    ) where Owner::Id: 'static {
         let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = prop.entry_mut(obj);
         let old = entry_mut.local.replace(value).unwrap_or_else(||
             entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default).clone()
         );
-        for on_changed in entry_mut.on_changed.clone() {
-            on_changed(self.state, self.id, &old);
-        }
-        old
+        let on_changed = entry_mut.on_changed.clone();
+        let dispatcher: &mut Dispatcher = self.state.get_mut();
+        let id = self.id;
+        dispatcher.enqueue(Box::new(move |state| {
+            for on_changed in on_changed {
+                on_changed(state, id, &old);
+            }
+            f(state, id, old);
+        }));
     }
 
     pub fn unset_uncond<PropType: DepPropType>(
         &mut self,
         prop: DepProp<Owner, PropType>,
-    ) -> Option<PropType> {
+    ) -> bool where Owner::Id: 'static {
+        self.unset_uncond_and_then(|_, _, _| { }, prop)
+    }
+
+    pub fn unset_uncond_and_then<PropType: DepPropType>(
+        &mut self,
+        f: impl FnOnce(&mut dyn State, Owner::Id, PropType) + 'static,
+        prop: DepProp<Owner, PropType>,
+    ) -> bool where Owner::Id: 'static {
         let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = prop.entry_mut(obj);
         if let Some(old) = entry_mut.local.take() {
-            for on_changed in entry_mut.on_changed.clone() {
-                on_changed(self.state, self.id, &old);
-            }
-            Some(old)
+            let on_changed = entry_mut.on_changed.clone();
+            let dispatcher: &mut Dispatcher = self.state.get_mut();
+            let id = self.id;
+            dispatcher.enqueue(Box::new(move |state| {
+                for on_changed in on_changed {
+                    on_changed(state, id, &old);
+                }
+                f(state, id, old);
+            }));
+            true
         } else {
-            None
+            false
         }
     }
 
@@ -660,7 +711,16 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
         &mut self,
         prop: DepProp<Owner, PropType>,
         value: PropType,
-    ) -> Option<PropType> {
+    ) -> bool where Owner::Id: 'static {
+        self.set_distinct_and_then(|_, _, _| { }, prop, value)
+    }
+
+    pub fn set_distinct_and_then<PropType: DepPropType + PartialEq>(
+        &mut self,
+        f: impl FnOnce(&mut dyn State, Owner::Id, PropType) + 'static,
+        prop: DepProp<Owner, PropType>,
+        value: PropType,
+    ) -> bool where Owner::Id: 'static {
         let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = prop.entry_mut(obj);
@@ -668,52 +728,87 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
             .or_else(|| entry_mut.style.as_ref())
             .unwrap_or_else(|| entry_mut.default)
         ;
-        if &value == old { return None; }
+        if &value == old { return false; }
         let old = entry_mut.local.replace(value).unwrap_or_else(||
             entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default).clone()
         );
-        for on_changed in entry_mut.on_changed.clone() {
-            on_changed(self.state, self.id, &old);
-        }
-        Some(old)
+        let on_changed = entry_mut.on_changed.clone();
+        let dispatcher: &mut Dispatcher = self.state.get_mut();
+        let id = self.id;
+        dispatcher.enqueue(Box::new(move |state| {
+            for on_changed in on_changed {
+                on_changed(state, id, &old);
+            }
+            f(state, id, old);
+        }));
+        true
     }
 
     pub fn unset_distinct<PropType: DepPropType + PartialEq>(
         &mut self,
         prop: DepProp<Owner, PropType>,
-    ) -> Option<PropType> {
+    ) -> bool where Owner::Id: 'static {
+        self.unset_distinct_and_then(|_, _, _| { }, prop)
+    }
+
+    pub fn unset_distinct_and_then<PropType: DepPropType + PartialEq>(
+        &mut self,
+        f: impl FnOnce(&mut dyn State, Owner::Id, PropType) + 'static,
+        prop: DepProp<Owner, PropType>,
+    ) -> bool where Owner::Id: 'static {
         let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = prop.entry_mut(obj);
         if let Some(old) = entry_mut.local.take() {
             let new = entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default);
-            if new == &old { return None; }
-            for on_changed in entry_mut.on_changed.clone() {
-                on_changed(self.state, self.id, &old);
-            }
-            Some(old)
+            if new == &old { return false; }
+            let on_changed = entry_mut.on_changed.clone();
+            let dispatcher: &mut Dispatcher = self.state.get_mut();
+            let id = self.id;
+            dispatcher.enqueue(Box::new(move |state| {
+                for on_changed in on_changed {
+                    on_changed(state, id, &old);
+                }
+                f(state, id, old);
+            }));
+            true
         } else {
-            None
+            false
         }
     }
 
-    pub fn raise<ArgsType>(
+    pub fn raise<ArgsType: 'static>(
         &mut self,
         event: DepEvent<Owner, ArgsType>,
-        args: &mut ArgsType,
-    ) {
+        args: ArgsType,
+    ) where Owner::Id: 'static {
+        self.raise_and_then(|_, _, _| { }, event, args);
+    }
+
+    pub fn raise_and_then<ArgsType: 'static>(
+        &mut self,
+        f: impl FnOnce(&mut dyn State, Owner::Id, ArgsType) + 'static,
+        event: DepEvent<Owner, ArgsType>,
+        mut args: ArgsType,
+    ) where Owner::Id: 'static {
         let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry = event.entry(obj);
-        for on_raised in entry.on_raised.clone() {
-            on_raised(self.state, self.id, args);
-        }
+        let on_raised = entry.on_raised.clone();
+        let dispatcher: &mut Dispatcher = self.state.get_mut();
+        let id = self.id;
+        dispatcher.enqueue(Box::new(move |state| {
+            for on_raised in on_raised {
+                on_raised(state, id, &mut args);
+            }
+            f(state, id, args)
+        }));
     }
 
     pub fn apply_style(
         &mut self,
         style: Option<Style<Owner>>,
-    ) -> Option<Style<Owner>> {
+    ) -> Option<Style<Owner>> where Owner::Id: 'static {
         let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let mut on_changed = Vec::new();
@@ -740,32 +835,58 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
             ;
         }
         *obj.style__() = style;
-        for on_changed in on_changed {
-            on_changed(self.state, self.id);
-        }
+        let dispatcher: &mut Dispatcher = self.state.get_mut();
+        let id = self.id;
+        dispatcher.enqueue(Box::new(move |state| {
+            for on_changed in on_changed {
+                on_changed(state, id);
+            }
+        }));
         old
     }
 
     pub fn clear<ItemType: DepPropType>(
         &mut self,
         vec: DepVec<Owner, ItemType>,
-    ) -> DepVecChange<ItemType> {
+    ) where Owner::Id: 'static {
+        self.clear_and_then(|_, _, _| { }, vec);
+    }
+
+    pub fn clear_and_then<ItemType: DepPropType>(
+        &mut self,
+        f: impl FnOnce(&mut dyn State, Owner::Id, DepVecChange<ItemType>) + 'static,
+        vec: DepVec<Owner, ItemType>,
+    ) where Owner::Id: 'static {
         let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = vec.entry_mut(obj);
         let old_items = replace(&mut entry_mut.items, Vec::new());
         let change = DepVecChange::Reset(old_items);
-        for on_changed in entry_mut.on_changed.clone() {
-            on_changed(self.state, self.id, &change);
-        }
-        change
+        let on_changed = entry_mut.on_changed.clone();
+        let dispatcher: &mut Dispatcher = self.state.get_mut();
+        let id = self.id;
+        dispatcher.enqueue(Box::new(move |state| {
+            for on_changed in on_changed {
+                on_changed(state, id, &change);
+            }
+            f(state, id, change);
+        }));
     }
 
     pub fn push<ItemType: DepPropType>(
         &mut self,
         vec: DepVec<Owner, ItemType>,
         item: ItemType,
-    ) -> DepVecChange<ItemType> {
+    ) where Owner::Id: 'static {
+        self.push_and_then(|_, _, _| { }, vec, item);
+    }
+
+    pub fn push_and_then<ItemType: DepPropType>(
+        &mut self,
+        f: impl FnOnce(&mut dyn State, Owner::Id, DepVecChange<ItemType>) + 'static,
+        vec: DepVec<Owner, ItemType>,
+        item: ItemType,
+    ) where Owner::Id: 'static {
         let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = vec.entry_mut(obj);
@@ -773,10 +894,15 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
         let change = DepVecChange::Inserted(
             unsafe { entry_mut.items.len().unchecked_sub(1) } .. entry_mut.items.len()
         );
-        for on_changed in entry_mut.on_changed.clone() {
-            on_changed(self.state, self.id, &change);
-        }
-        change
+        let on_changed = entry_mut.on_changed.clone();
+        let dispatcher: &mut Dispatcher = self.state.get_mut();
+        let id = self.id;
+        dispatcher.enqueue(Box::new(move |state| {
+            for on_changed in on_changed {
+                on_changed(state, id, &change);
+            }
+            f(state, id, change);
+        }));
     }
 
     pub fn insert<ItemType: DepPropType>(
@@ -784,23 +910,47 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
         vec: DepVec<Owner, ItemType>,
         index: usize,
         item: ItemType
-    ) -> DepVecChange<ItemType> {
+    ) where Owner::Id: 'static {
+        self.insert_and_then(|_, _, _| { }, vec, index, item);
+    }
+
+    pub fn insert_and_then<ItemType: DepPropType>(
+        &mut self,
+        f: impl FnOnce(&mut dyn State, Owner::Id, DepVecChange<ItemType>) + 'static,
+        vec: DepVec<Owner, ItemType>,
+        index: usize,
+        item: ItemType
+    ) where Owner::Id: 'static {
         let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = vec.entry_mut(obj);
         entry_mut.items.insert(index, item);
         let change = DepVecChange::Inserted(index .. index + 1);
-        for on_changed in entry_mut.on_changed.clone() {
-            on_changed(self.state, self.id, &change);
-        }
-        change
+        let on_changed = entry_mut.on_changed.clone();
+        let dispatcher: &mut Dispatcher = self.state.get_mut();
+        let id = self.id;
+        dispatcher.enqueue(Box::new(move |state| {
+            for on_changed in on_changed {
+                on_changed(state, id, &change);
+            }
+            f(state, id, change);
+        }));
     }
 
     pub fn append<ItemType: DepPropType>(
         &mut self,
         vec: DepVec<Owner, ItemType>,
         other: &mut Vec<ItemType>,
-    ) -> DepVecChange<ItemType> {
+    ) where Owner::Id: 'static {
+        self.append_and_then(|_, _, _| { }, vec, other);
+    }
+
+    pub fn append_and_then<ItemType: DepPropType>(
+        &mut self,
+        f: impl FnOnce(&mut dyn State, Owner::Id, DepVecChange<ItemType>) + 'static,
+        vec: DepVec<Owner, ItemType>,
+        other: &mut Vec<ItemType>,
+    ) where Owner::Id: 'static {
         let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = vec.entry_mut(obj);
@@ -809,10 +959,15 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
         let change = DepVecChange::Inserted(
             unsafe { entry_mut.items.len().unchecked_sub(appended) } .. entry_mut.items.len()
         );
-        for on_changed in entry_mut.on_changed.clone() {
-            on_changed(self.state, self.id, &change);
-        }
-        change
+        let on_changed = entry_mut.on_changed.clone();
+        let dispatcher: &mut Dispatcher = self.state.get_mut();
+        let id = self.id;
+        dispatcher.enqueue(Box::new(move |state| {
+            for on_changed in on_changed {
+                on_changed(state, id, &change);
+            }
+            f(state, id, change);
+        }));
     }
 }
 
@@ -1540,10 +1695,12 @@ macro_rules! dep_obj {
 mod test {
     use super::*;
     use alloc::boxed::Box;
+    use alloc::rc::Rc;
     use components_arena::{Arena, Id, ComponentId, Component, ComponentClassMutex};
     use dyn_context::{State, free_lifetimes, StateRefMut};
     use educe::Educe;
     use macro_attr_2018::macro_attr;
+    use core::cell::Cell;
 
     macro_attr! {
         #[derive(Debug, Component!)]
@@ -1574,13 +1731,13 @@ mod test {
 
     struct TestIdBuilder<'a> {
         id: TestId,
-        arena: &'a mut TestArena
+        state: &'a mut dyn State
     }
 
     impl<'a> DepObjBuilderCore<TestId> for TestIdBuilder<'a> {
         fn id(&self) -> TestId { self.id }
-        fn state(&self) -> &dyn State { self.arena }
-        fn state_mut(&mut self) -> &mut dyn State { self.arena }
+        fn state(&self) -> &dyn State { self.state }
+        fn state_mut(&mut self) -> &mut dyn State { self.state }
     }
 
     macro_attr! {
@@ -1615,71 +1772,88 @@ mod test {
 
     #[test]
     fn create_test_obj_1() {
+        let mut dispatcher = Dispatcher::new();
         let mut arena = TestArena(Arena::new(&mut TEST_NODE.lock().unwrap()));
         let id = arena.0.insert(|id| (TestNode { obj1: None }, TestId(id)));
         TestObj1::new(&mut arena, id);
         let mut changed = 0;
         TestStateBuilder { changed: &mut changed }.build_and_then(|state| {
             state.merge_mut_and_then(|state| {
-                let arena = state.get_mut::<TestArena>();
-                let v = id.obj1_ref(arena).get(TestObj1::INT_VAL);
-                assert_eq!(v, &42);
-                id.obj1(arena).on_changed(TestObj1::INT_VAL, |state, _, _| {
-                    let test_state = state.get_mut::<TestState>();
-                    *test_state.changed_mut() += 1;
-                });
-                let test_state = state.get::<TestState>();
-                assert_eq!(test_state.changed(), &0);
-                id.obj1_mut(state).set_uncond(TestObj1::INT_VAL, 43);
-                let test_state = state.get::<TestState>();
-                assert_eq!(test_state.changed(), &1);
-                let arena = state.get::<TestArena>();
-                assert_eq!(id.obj1_ref(arena).get(TestObj1::INT_VAL), &43);
+                state.merge_mut_and_then(|state| {
+                    let arena = state.get_mut::<TestArena>();
+                    let v = id.obj1_ref(arena).get(TestObj1::INT_VAL);
+                    assert_eq!(v, &42);
+                    id.obj1(arena).on_changed(TestObj1::INT_VAL, |state, _, _| {
+                        let test_state = state.get_mut::<TestState>();
+                        *test_state.changed_mut() += 1;
+                    });
+                    let test_state = state.get::<TestState>();
+                    assert_eq!(test_state.changed(), &0);
+                    id.obj1_mut(state).set_uncond(TestObj1::INT_VAL, 43);
+                    let test_state = state.get::<TestState>();
+                    assert_eq!(test_state.changed(), &0);
+                    Dispatcher::dispatch(state);
+                    let test_state = state.get::<TestState>();
+                    assert_eq!(test_state.changed(), &1);
+                    let arena = state.get::<TestArena>();
+                    assert_eq!(id.obj1_ref(arena).get(TestObj1::INT_VAL), &43);
+                }, &mut dispatcher);
             }, &mut arena);
         });
     }
 
     #[test]
     fn test_obj_1_style() {
+        let mut dispatcher = Dispatcher::new();
         let mut arena = TestArena(Arena::new(&mut TEST_NODE.lock().unwrap()));
         let id = arena.0.insert(|id| (TestNode { obj1: None }, TestId(id)));
         TestObj1::new(&mut arena, id);
         assert_eq!(id.obj1_ref(&arena).get(TestObj1::INT_VAL), &42);
         let mut style = Style::new();
         style.insert(TestObj1::INT_VAL, 43);
-        id.obj1_mut(&mut arena).apply_style(Some(style.clone()));
+        (&mut arena).merge_mut_and_then(|s| id.obj1_mut(s).apply_style(Some(style.clone())), &mut dispatcher);
         assert_eq!(id.obj1_ref(&arena).get(TestObj1::INT_VAL), &43);
-        id.obj1_mut(&mut arena).set_uncond(TestObj1::INT_VAL, 44);
+        (&mut arena).merge_mut_and_then(|s| id.obj1_mut(s).set_uncond(TestObj1::INT_VAL, 44), &mut dispatcher);
         assert_eq!(id.obj1_ref(&arena).get(TestObj1::INT_VAL), &44);
         style.insert(TestObj1::INT_VAL, 45);
-        id.obj1_mut(&mut arena).apply_style(Some(style));
+        (&mut arena).merge_mut_and_then(|s| id.obj1_mut(s).apply_style(Some(style)), &mut dispatcher);
         assert_eq!(id.obj1_ref(&arena).get(TestObj1::INT_VAL), &44);
-        id.obj1_mut(&mut arena).unset_uncond(TestObj1::INT_VAL);
+        (&mut arena).merge_mut_and_then(|s| id.obj1_mut(s).unset_uncond(TestObj1::INT_VAL), &mut dispatcher);
         assert_eq!(id.obj1_ref(&arena).get(TestObj1::INT_VAL), &45);
     }
 
     #[test]
     fn test_obj_1_builder() {
+        let mut dispatcher = Dispatcher::new();
         let mut arena = TestArena(Arena::new(&mut TEST_NODE.lock().unwrap()));
         let id = arena.0.insert(|id| (TestNode { obj1: None }, TestId(id)));
         TestObj1::new(&mut arena, id);
-        let builder = TestObj1Builder::new_priv(TestIdBuilder { id, arena: &mut arena });
-        builder.int_val(1);
+        (&mut arena).merge_mut_and_then(|state| {
+            let builder = TestObj1Builder::new_priv(TestIdBuilder { id, state });
+            builder.int_val(1);
+        }, &mut dispatcher);
         assert_eq!(id.obj1_ref(&arena).get(TestObj1::INT_VAL), &1);
     }
 
     #[test]
     fn test_obj_1_coll() {
+        let mut dispatcher = Dispatcher::new();
         let mut arena = TestArena(Arena::new(&mut TEST_NODE.lock().unwrap()));
         let id = arena.0.insert(|id| (TestNode { obj1: None }, TestId(id)));
         TestObj1::new(&mut arena, id);
         assert!(id.obj1_ref(&arena).items(TestObj1::COLL).is_empty());
-        let change = id.obj1_mut(&mut arena).push(TestObj1::COLL, 7);
-        let change_match = match &change {
-            DepVecChange::Inserted(x) => *x == (0 .. 1),
-            _ => false,
-        };
-        assert!(change_match, "{:?}", change);
+        let change_match = Rc::new(Cell::new(false));
+        let change_match_ref = change_match.clone();
+        (&mut arena).merge_mut_and_then(|state| {
+            id.obj1_mut(state).push_and_then(move |_, _, change| {
+                change_match_ref.set(match &change {
+                    DepVecChange::Inserted(x) => *x == (0 .. 1),
+                    _ => false,
+                });
+            }, TestObj1::COLL, 7);
+            Dispatcher::dispatch(state);
+        }, &mut dispatcher);
+        assert!(change_match.get());
         assert_eq!(id.obj1_ref(&arena).items(TestObj1::COLL)[0], 7);
     }
 }
