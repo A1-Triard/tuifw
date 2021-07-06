@@ -140,6 +140,8 @@ impl WidgetTree {
                             if child == last_child { break; }
                         }
                     }
+                    let tree: &mut WidgetTree = state.get_mut();
+                    root_view.invalidate_measure(&mut tree.view_tree);
                 },
                 DepVecChange::Inserted(indexes) => {
                     for index in indexes.clone() {
@@ -150,11 +152,15 @@ impl WidgetTree {
                         panel_template.as_ref().map(|x| x.apply_layout(state, view));
                         child.load(state, view);
                     }
+                    let tree: &mut WidgetTree = state.get_mut();
+                    root_view.invalidate_measure(&mut tree.view_tree);
                 },
                 DepVecChange::Removed(_index, old_items) => {
                     for old_item in old_items {
                         old_item.detach(tree);
                     }
+                    let tree: &mut WidgetTree = state.get_mut();
+                    root_view.invalidate_measure(&mut tree.view_tree);
                 },
                 DepVecChange::Swapped(_, _) => { },
             }

@@ -16,6 +16,7 @@ fn main() {
         let tree: &mut WidgetTree = state.get_mut();
         let button = Button::new(tree);
         root.obj_mut(state).push(Root::CHILDREN, button);
+        Dispatcher::dispatch(state);
         while WidgetTree::update(state, true).unwrap() {
             Dispatcher::dispatch(state);
         }

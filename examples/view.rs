@@ -93,6 +93,7 @@ fn main() {
             border.layout_mut(state).set_distinct(CanvasLayout::TL, tl);
         });
         border.focus(tree);
+        Dispatcher::dispatch(state);
         while ViewTree::update(state, true).unwrap() {
             Dispatcher::dispatch(state);
         }

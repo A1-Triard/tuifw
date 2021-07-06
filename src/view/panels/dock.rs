@@ -5,7 +5,6 @@ use dyn_context::{State, StateExt};
 use either::{Either, Left, Right};
 use std::cmp::{min, max};
 use std::fmt::Debug;
-use std::hint::unreachable_unchecked;
 use tuifw_screen_base::{Vector, Rect, Side, Orient, Thickness};
 
 pub trait ViewBuilderDockPanelExt {
@@ -148,7 +147,7 @@ impl PanelBehavior for DockPanelBehavior {
                     &Left(factor) => {
                         factor_sum += factor;
                         last_undocked_child = Some(child);
-                        continue;
+                        if child == last_child { break; } else { continue; }
                     }
                 };
                 let w = if dock == Side::Left || dock == Side::Right { None } else { size.0 };
@@ -181,9 +180,10 @@ impl PanelBehavior for DockPanelBehavior {
                 }
                 if child == last_child { break; }
             }
-            match orient.unwrap_or_else(|| unsafe { unreachable_unchecked() }) {
-                Orient::Hor => children_size.y = (children_size.y as u16).saturating_add(breadth) as i16,
-                Orient::Vert => children_size.x = (children_size.x as u16).saturating_add(breadth) as i16,
+            match orient {
+                Some(Orient::Hor) => children_size.y = (children_size.y as u16).saturating_add(breadth) as i16,
+                Some(Orient::Vert) => children_size.x = (children_size.x as u16).saturating_add(breadth) as i16,
+                None => { },
             }
             if let Some(last_undocked_child) = last_undocked_child {
                 let orient = match view.panel_ref(tree).get(DockPanel::BASE) {
@@ -270,7 +270,7 @@ impl PanelBehavior for DockPanelBehavior {
                     &Left(factor) => {
                         factor_sum += factor;
                         last_undocked_child = Some(child);
-                        continue;
+                        if child == last_child { break; } else { continue; }
                     }
                 };
                 let child_size = child.desired_size(tree);
