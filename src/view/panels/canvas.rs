@@ -75,7 +75,9 @@ impl CanvasLayout {
 impl Layout for CanvasLayout { }
 
 #[derive(Debug, Clone)]
-struct CanvasPanelTemplate(Style<CanvasLayout>);
+struct CanvasPanelTemplate {
+    layout: Style<CanvasLayout>,
+}
 
 impl PanelTemplate for CanvasPanelTemplate {
     fn apply_panel(&self, state: &mut dyn State, view: View) {
@@ -86,7 +88,7 @@ impl PanelTemplate for CanvasPanelTemplate {
     fn apply_layout(&self, state: &mut dyn State, view: View) {
         let tree: &mut ViewTree = state.get_mut();
         CanvasLayout::new(tree, view);
-        view.layout_mut(state).apply_style(Some(self.0.clone()));
+        view.layout_mut(state).apply_style(Some(self.layout.clone()));
     }
 }
 
@@ -104,8 +106,8 @@ impl CanvasPanel {
         view.set_panel(tree, CanvasPanel(()));
     }
 
-    pub fn template(layout_style: Style<CanvasLayout>) -> Box<dyn PanelTemplate> {
-        Box::new(CanvasPanelTemplate(layout_style))
+    pub fn template(layout: Style<CanvasLayout>) -> Box<dyn PanelTemplate> {
+        Box::new(CanvasPanelTemplate { layout })
     }
 }
 

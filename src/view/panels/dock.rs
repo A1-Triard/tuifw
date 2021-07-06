@@ -94,22 +94,33 @@ impl DockPanel {
     ) {
         view.set_panel(tree, DockPanel::new_priv());
     }
+
+    pub fn template(panel: Style<DockPanel>, layout: Style<DockLayout>) -> Box<dyn PanelTemplate> {
+        Box::new(DockPanelTemplate { panel, layout })
+    }
 }
 
 impl Panel for DockPanel {
     fn behavior(&self) -> &'static dyn PanelBehavior { &Self::BEHAVIOR }
 }
 
-impl PanelTemplate for Style<DockPanel> {
+#[derive(Debug, Clone)]
+struct DockPanelTemplate {
+    panel: Style<DockPanel>,
+    layout: Style<DockLayout>,
+}
+
+impl PanelTemplate for DockPanelTemplate {
     fn apply_panel(&self, state: &mut dyn State, view: View) {
         let tree: &mut ViewTree = state.get_mut();
         DockPanel::new(tree, view);
-        view.panel_mut::<DockPanel>(state).apply_style(Some(self.clone()));
+        view.panel_mut(state).apply_style(Some(self.panel.clone()));
     }
 
     fn apply_layout(&self, state: &mut dyn State, view: View) {
         let tree: &mut ViewTree = state.get_mut();
         DockLayout::new(tree, view);
+        view.layout_mut(state).apply_style(Some(self.layout.clone()));
     }
 }
 

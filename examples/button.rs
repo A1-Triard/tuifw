@@ -11,7 +11,8 @@ fn main() {
     (&mut tree).merge_mut_and_then(|state| {
         let tree: &WidgetTree = state.get();
         let root = tree.root();
-        root.obj_mut(state).set_uncond(Root::PANEL_TEMPLATE, Some(Box::new(<Style<DockPanel>>::new())));
+        let panel_template = DockPanel::template(Style::new(), Style::new());
+        root.obj_mut(state).set_uncond(Root::PANEL_TEMPLATE, Some(panel_template));
         let tree: &mut WidgetTree = state.get_mut();
         let button = Button::new(tree);
         root.obj_mut(state).push(Root::CHILDREN, button);
