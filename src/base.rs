@@ -135,8 +135,7 @@ impl WidgetTree {
                             child.attach(tree, root);
                             let view = View::new(&mut tree.view_tree, root_view, |view| { (child, view) });
                             panel_template.as_ref().map(|x| x.apply_layout(state, view));
-                            let tree: &mut WidgetTree = state.get_mut();
-                            child.load(tree, view);
+                            child.load(state, view);
                             if child == last_child { break; }
                         }
                     }
@@ -310,8 +309,7 @@ pub trait ViewBuilderWidgetExt {
 impl<'a> ViewBuilderWidgetExt for ViewBuilder<'a> {
     fn widget(mut self, widget: Widget) -> Self {
         let view = self.id();
-        let tree: &mut WidgetTree = self.state_mut().get_mut();
-        widget.load(tree, view);
+        widget.load(self.state_mut(), view);
         self
     }
 }

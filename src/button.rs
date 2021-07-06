@@ -20,7 +20,14 @@ impl Button {
 
     #[allow(clippy::new_ret_no_self)]
     pub fn new(tree: &mut WidgetTree) -> Widget {
-        Widget::new(tree, Button::new_priv())
+        let button = Widget::new(tree, Button::new_priv());
+        button.obj(tree).on_changed(Button::CONTENT, |state, button, old_value| {
+            let tree: &mut WidgetTree = state.get_mut();
+            old_value.map(|x| x.detach(tree));
+            let &new_value = button.obj_ref(tree).get(Button::CONTENT);
+            new_value.map(|x| x.attach(tree, button));
+        });
+        button
     }
 
     pub fn template(style: Style<Button>) -> Box<dyn WidgetTemplate> {
