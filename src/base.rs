@@ -13,7 +13,7 @@ use std::mem::replace;
 use tuifw_screen_base::Screen;
 
 pub trait WidgetBehavior {
-    fn load(&self, tree: &mut WidgetTree, widget: Widget, view: View);
+    fn load(&self, state: &mut dyn State, widget: Widget, view: View);
 }
 
 pub trait WidgetObj: Downcast + Debug + Send + Sync {
@@ -148,8 +148,7 @@ impl WidgetTree {
                         child.attach(tree, root);
                         let view = View::new(&mut tree.view_tree, root_view, |view| { (child, view) });
                         panel_template.as_ref().map(|x| x.apply_layout(state, view));
-                        let tree: &mut WidgetTree = state.get_mut();
-                        child.load(tree, view);
+                        child.load(state, view);
                     }
                 },
                 DepVecChange::Removed(_index, old_items) => {
@@ -270,7 +269,8 @@ impl Widget {
         }
     }
 
-    pub fn load(self, tree: &mut WidgetTree, view: View) {
+    pub fn load(self, state: &mut dyn State, view: View) {
+        let tree: &mut WidgetTree = state.get_mut();
         if view.tag::<Widget>(&tree.view_tree) != self {
             panic!("view/widget tag mismatch");
         }
@@ -283,7 +283,7 @@ impl Widget {
             panic!("widget already loaded");
         }
         let behavior = node.obj.behavior();
-        behavior.load(tree, self, view);
+        behavior.load(state, self, view);
     }
 
     dep_obj! {
@@ -328,7 +328,7 @@ dep_type! {
 struct RootBehavior;
 
 impl WidgetBehavior for RootBehavior {
-    fn load(&self, _tree: &mut WidgetTree, _widget: Widget, _view: View) {
+    fn load(&self, _state: &mut dyn State, _widget: Widget, _view: View) {
         panic!("root widget always loaded");
     }
 }

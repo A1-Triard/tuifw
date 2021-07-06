@@ -47,9 +47,10 @@ impl WidgetObj for Button {
 struct ButtonBehavior;
 
 impl WidgetBehavior for ButtonBehavior {
-    fn load(&self, tree: &mut WidgetTree, button: Widget, view: View) {
+    fn load(&self, state: &mut dyn State, button: Widget, view: View) {
+        let tree: &WidgetTree = state.get();
         let &content = button.obj_ref(tree).get(Button::CONTENT);
-        view.build(tree, |view| view
+        view.build(state, |view| view
             .dock_panel(|panel| {
                 let panel = panel
                     .child(None, button, |layout| layout.dock(Right(Side::Left)), |view| view
