@@ -148,7 +148,6 @@ use core::ops::Range;
 use dyn_clone::{DynClone, clone_trait_object};
 use dyn_context::{State, StateExt};
 use educe::Educe;
-use macro_attr_2018::macro_attr;
 use phantom_type::PhantomType;
 
 /// A type should satisfy this trait to be a dependency property type
@@ -513,48 +512,6 @@ impl<Owner: DepType> Style<Owner> {
     }
 }
 
-macro_attr! {
-    #[derive(State!)]
-    pub struct Dispatcher {
-        queue: Vec<Box<dyn FnOnce(&mut dyn State)>>,
-        empty_vec: Option<Vec<Box<dyn FnOnce(&mut dyn State)>>>,
-    }
-}
-
-impl Dispatcher {
-    pub fn new() -> Dispatcher {
-        Dispatcher { queue: Vec::new(), empty_vec: Some(Vec::new()) }
-    }
-
-    pub fn enqueue(&mut self, f: Box<dyn FnOnce(&mut dyn State)>) {
-        self.queue.push(f);
-    }
-
-    pub fn dispatch(state: &mut dyn State) -> bool {
-        let dispatcher: &mut Dispatcher = state.get_mut();
-        if let Some(empty_vec) = dispatcher.empty_vec.take() {
-            let mut queue = replace(&mut dispatcher.queue, empty_vec);
-            if queue.is_empty() {
-                dispatcher.empty_vec.replace(queue);
-                return false;
-            }
-            loop {
-                for item in queue.drain(..) {
-                    item(state);
-                }
-                let dispatcher: &mut Dispatcher = state.get_mut();
-                queue = replace(&mut dispatcher.queue, queue);
-                if queue.is_empty() {
-                    dispatcher.empty_vec.replace(queue);
-                    return true;
-                }
-            }
-        } else {
-            true
-        }
-    }
-}
-
 pub trait DepObjBuilderCore<OwnerId: ComponentId> {
     fn state(&self) -> &dyn State;
     fn state_mut(&mut self) -> &mut dyn State;
@@ -665,62 +622,34 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
     pub fn set_uncond<PropType: DepPropType>(
         &mut self,
         prop: DepProp<Owner, PropType>,
-        value: PropType,
-    ) where Owner::Id: 'static {
-        self.set_uncond_and_then(|_, _, _| { }, prop, value);
-    }
-
-    pub fn set_uncond_and_then<PropType: DepPropType>(
-        &mut self,
-        f: impl FnOnce(&mut dyn State, Owner::Id, PropType) + 'static,
-        prop: DepProp<Owner, PropType>,
         value: PropType
-    ) where Owner::Id: 'static {
+    ) -> PropType {
         let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = prop.entry_mut(obj);
         let old = entry_mut.local.replace(value).unwrap_or_else(||
             entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default).clone()
         );
-        let on_changed = entry_mut.on_changed.clone();
-        let dispatcher: &mut Dispatcher = self.state.get_mut();
-        let id = self.id;
-        dispatcher.enqueue(Box::new(move |state| {
-            for on_changed in on_changed {
-                on_changed(state, id, &old);
-            }
-            f(state, id, old);
-        }));
+        for on_changed in entry_mut.on_changed.clone() {
+            on_changed(self.state, self.id, &old);
+        }
+        old
     }
 
     pub fn unset_uncond<PropType: DepPropType>(
         &mut self,
         prop: DepProp<Owner, PropType>,
-    ) -> bool where Owner::Id: 'static {
-        self.unset_uncond_and_then(|_, _, _| { }, prop)
-    }
-
-    pub fn unset_uncond_and_then<PropType: DepPropType>(
-        &mut self,
-        f: impl FnOnce(&mut dyn State, Owner::Id, PropType) + 'static,
-        prop: DepProp<Owner, PropType>,
-    ) -> bool where Owner::Id: 'static {
+    ) -> Option<PropType> {
         let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = prop.entry_mut(obj);
         if let Some(old) = entry_mut.local.take() {
-            let on_changed = entry_mut.on_changed.clone();
-            let dispatcher: &mut Dispatcher = self.state.get_mut();
-            let id = self.id;
-            dispatcher.enqueue(Box::new(move |state| {
-                for on_changed in on_changed {
-                    on_changed(state, id, &old);
-                }
-                f(state, id, old);
-            }));
-            true
+            for on_changed in entry_mut.on_changed.clone() {
+                on_changed(self.state, self.id, &old);
+            }
+            Some(old)
         } else {
-            false
+            None
         }
     }
 
@@ -728,16 +657,7 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
         &mut self,
         prop: DepProp<Owner, PropType>,
         value: PropType,
-    ) -> bool where Owner::Id: 'static {
-        self.set_distinct_and_then(|_, _, _| { }, prop, value)
-    }
-
-    pub fn set_distinct_and_then<PropType: DepPropType + PartialEq>(
-        &mut self,
-        f: impl FnOnce(&mut dyn State, Owner::Id, PropType) + 'static,
-        prop: DepProp<Owner, PropType>,
-        value: PropType,
-    ) -> bool where Owner::Id: 'static {
+    ) -> Option<PropType> {
         let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = prop.entry_mut(obj);
@@ -745,87 +665,52 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
             .or_else(|| entry_mut.style.as_ref())
             .unwrap_or_else(|| entry_mut.default)
         ;
-        if &value == old { return false; }
+        if &value == old { return None; }
         let old = entry_mut.local.replace(value).unwrap_or_else(||
             entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default).clone()
         );
-        let on_changed = entry_mut.on_changed.clone();
-        let dispatcher: &mut Dispatcher = self.state.get_mut();
-        let id = self.id;
-        dispatcher.enqueue(Box::new(move |state| {
-            for on_changed in on_changed {
-                on_changed(state, id, &old);
-            }
-            f(state, id, old);
-        }));
-        true
+        for on_changed in entry_mut.on_changed.clone() {
+            on_changed(self.state, self.id, &old);
+        }
+        Some(old)
     }
 
     pub fn unset_distinct<PropType: DepPropType + PartialEq>(
         &mut self,
         prop: DepProp<Owner, PropType>,
-    ) -> bool where Owner::Id: 'static {
-        self.unset_distinct_and_then(|_, _, _| { }, prop)
-    }
-
-    pub fn unset_distinct_and_then<PropType: DepPropType + PartialEq>(
-        &mut self,
-        f: impl FnOnce(&mut dyn State, Owner::Id, PropType) + 'static,
-        prop: DepProp<Owner, PropType>,
-    ) -> bool where Owner::Id: 'static {
+    ) -> Option<PropType> {
         let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = prop.entry_mut(obj);
         if let Some(old) = entry_mut.local.take() {
             let new = entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default);
-            if new == &old { return false; }
-            let on_changed = entry_mut.on_changed.clone();
-            let dispatcher: &mut Dispatcher = self.state.get_mut();
-            let id = self.id;
-            dispatcher.enqueue(Box::new(move |state| {
-                for on_changed in on_changed {
-                    on_changed(state, id, &old);
-                }
-                f(state, id, old);
-            }));
-            true
+            if new == &old { return None; }
+            for on_changed in entry_mut.on_changed.clone() {
+                on_changed(self.state, self.id, &old);
+            }
+            Some(old)
         } else {
-            false
+            None
         }
     }
 
     pub fn raise<ArgsType: 'static>(
         &mut self,
         event: DepEvent<Owner, ArgsType>,
-        args: ArgsType,
-    ) where Owner::Id: 'static {
-        self.raise_and_then(|_, _, _| { }, event, args);
-    }
-
-    pub fn raise_and_then<ArgsType: 'static>(
-        &mut self,
-        f: impl FnOnce(&mut dyn State, Owner::Id, ArgsType) + 'static,
-        event: DepEvent<Owner, ArgsType>,
-        mut args: ArgsType,
-    ) where Owner::Id: 'static {
+        args: &mut ArgsType,
+    ) {
         let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry = event.entry(obj);
-        let on_raised = entry.on_raised.clone();
-        let dispatcher: &mut Dispatcher = self.state.get_mut();
-        let id = self.id;
-        dispatcher.enqueue(Box::new(move |state| {
-            for on_raised in on_raised {
-                on_raised(state, id, &mut args);
-            }
-            f(state, id, args)
-        }));
+        for on_raised in entry.on_raised.clone() {
+            on_raised(self.state, self.id, args);
+        }
     }
 
     pub fn apply_style(
         &mut self,
         style: Option<Style<Owner>>,
-    ) -> Option<Style<Owner>> where Owner::Id: 'static {
+    ) -> Option<Style<Owner>> {
         let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let mut on_changed = Vec::new();
@@ -852,58 +737,32 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
             ;
         }
         *obj.style__() = style;
-        let dispatcher: &mut Dispatcher = self.state.get_mut();
-        let id = self.id;
-        dispatcher.enqueue(Box::new(move |state| {
-            for on_changed in on_changed {
-                on_changed(state, id);
-            }
-        }));
+        for on_changed in on_changed {
+            on_changed(self.state, self.id);
+        }
         old
     }
 
     pub fn clear<ItemType: DepPropType>(
         &mut self,
         vec: DepVec<Owner, ItemType>,
-    ) where Owner::Id: 'static {
-        self.clear_and_then(|_, _, _| { }, vec);
-    }
-
-    pub fn clear_and_then<ItemType: DepPropType>(
-        &mut self,
-        f: impl FnOnce(&mut dyn State, Owner::Id, DepVecChange<ItemType>) + 'static,
-        vec: DepVec<Owner, ItemType>,
-    ) where Owner::Id: 'static {
+    ) -> DepVecChange<ItemType> {
         let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = vec.entry_mut(obj);
         let old_items = replace(&mut entry_mut.items, Vec::new());
         let change = DepVecChange::Reset(old_items);
-        let on_changed = entry_mut.on_changed.clone();
-        let dispatcher: &mut Dispatcher = self.state.get_mut();
-        let id = self.id;
-        dispatcher.enqueue(Box::new(move |state| {
-            for on_changed in on_changed {
-                on_changed(state, id, &change);
-            }
-            f(state, id, change);
-        }));
+        for on_changed in entry_mut.on_changed.clone() {
+            on_changed(self.state, self.id, &change);
+        }
+        change
     }
 
     pub fn push<ItemType: DepPropType>(
         &mut self,
         vec: DepVec<Owner, ItemType>,
         item: ItemType,
-    ) where Owner::Id: 'static {
-        self.push_and_then(|_, _, _| { }, vec, item);
-    }
-
-    pub fn push_and_then<ItemType: DepPropType>(
-        &mut self,
-        f: impl FnOnce(&mut dyn State, Owner::Id, DepVecChange<ItemType>) + 'static,
-        vec: DepVec<Owner, ItemType>,
-        item: ItemType,
-    ) where Owner::Id: 'static {
+    ) -> DepVecChange<ItemType> {
         let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = vec.entry_mut(obj);
@@ -911,15 +770,10 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
         let change = DepVecChange::Inserted(
             unsafe { entry_mut.items.len().unchecked_sub(1) } .. entry_mut.items.len()
         );
-        let on_changed = entry_mut.on_changed.clone();
-        let dispatcher: &mut Dispatcher = self.state.get_mut();
-        let id = self.id;
-        dispatcher.enqueue(Box::new(move |state| {
-            for on_changed in on_changed {
-                on_changed(state, id, &change);
-            }
-            f(state, id, change);
-        }));
+        for on_changed in entry_mut.on_changed.clone() {
+            on_changed(self.state, self.id, &change);
+        }
+        change
     }
 
     pub fn insert<ItemType: DepPropType>(
@@ -927,47 +781,23 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
         vec: DepVec<Owner, ItemType>,
         index: usize,
         item: ItemType
-    ) where Owner::Id: 'static {
-        self.insert_and_then(|_, _, _| { }, vec, index, item);
-    }
-
-    pub fn insert_and_then<ItemType: DepPropType>(
-        &mut self,
-        f: impl FnOnce(&mut dyn State, Owner::Id, DepVecChange<ItemType>) + 'static,
-        vec: DepVec<Owner, ItemType>,
-        index: usize,
-        item: ItemType
-    ) where Owner::Id: 'static {
+    ) -> DepVecChange<ItemType> {
         let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = vec.entry_mut(obj);
         entry_mut.items.insert(index, item);
         let change = DepVecChange::Inserted(index .. index + 1);
-        let on_changed = entry_mut.on_changed.clone();
-        let dispatcher: &mut Dispatcher = self.state.get_mut();
-        let id = self.id;
-        dispatcher.enqueue(Box::new(move |state| {
-            for on_changed in on_changed {
-                on_changed(state, id, &change);
-            }
-            f(state, id, change);
-        }));
+        for on_changed in entry_mut.on_changed.clone() {
+            on_changed(self.state, self.id, &change);
+        }
+        change
     }
 
     pub fn append<ItemType: DepPropType>(
         &mut self,
         vec: DepVec<Owner, ItemType>,
         other: &mut Vec<ItemType>,
-    ) where Owner::Id: 'static {
-        self.append_and_then(|_, _, _| { }, vec, other);
-    }
-
-    pub fn append_and_then<ItemType: DepPropType>(
-        &mut self,
-        f: impl FnOnce(&mut dyn State, Owner::Id, DepVecChange<ItemType>) + 'static,
-        vec: DepVec<Owner, ItemType>,
-        other: &mut Vec<ItemType>,
-    ) where Owner::Id: 'static {
+    ) -> DepVecChange<ItemType> {
         let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = vec.entry_mut(obj);
@@ -976,15 +806,10 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
         let change = DepVecChange::Inserted(
             unsafe { entry_mut.items.len().unchecked_sub(appended) } .. entry_mut.items.len()
         );
-        let on_changed = entry_mut.on_changed.clone();
-        let dispatcher: &mut Dispatcher = self.state.get_mut();
-        let id = self.id;
-        dispatcher.enqueue(Box::new(move |state| {
-            for on_changed in on_changed {
-                on_changed(state, id, &change);
-            }
-            f(state, id, change);
-        }));
+        for on_changed in entry_mut.on_changed.clone() {
+            on_changed(self.state, self.id, &change);
+        }
+        change
     }
 }
 

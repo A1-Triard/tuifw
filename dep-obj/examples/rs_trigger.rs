@@ -162,7 +162,6 @@ mod not_chip {
 }
 
 use circuit::*;
-use dep_obj::Dispatcher;
 use dyn_context::{State, StateExt};
 use not_chip::*;
 use or_chip::*;
@@ -176,16 +175,13 @@ struct TriggerChips {
 }
 
 struct TriggerState {
-    dispatcher: Dispatcher,
     circuit: Circuit,
     chips: TriggerChips,
 }
 
 impl State for TriggerState {
     fn get_raw(&self, ty: TypeId) -> Option<&dyn Any> {
-        if ty == TypeId::of::<Dispatcher>() {
-            Some(&self.dispatcher)
-        } else if ty == TypeId::of::<Circuit>() {
+        if ty == TypeId::of::<Circuit>() {
             Some(&self.circuit)
         } else if ty == TypeId::of::<TriggerChips>() {
             Some(&self.chips)
@@ -195,9 +191,7 @@ impl State for TriggerState {
     }
 
     fn get_mut_raw(&mut self, ty: TypeId) -> Option<&mut dyn Any> {
-        if ty == TypeId::of::<Dispatcher>() {
-            Some(&mut self.dispatcher)
-        } else if ty == TypeId::of::<Circuit>() {
+        if ty == TypeId::of::<Circuit>() {
             Some(&mut self.circuit)
         } else {
             None
@@ -237,27 +231,16 @@ fn main() {
     });
     let chips = TriggerChips { or_1, or_2, not_1, not_2 };
     let state = &mut TriggerState {
-        dispatcher: Dispatcher::new(),
         circuit,
         chips,
     };
     or_1.legs_mut(state).set_distinct(OrLegs::IN_1, true);
-    assert!(Dispatcher::dispatch(state));
     or_1.legs_mut(state).set_distinct(OrLegs::IN_1, true);
-    assert!(!Dispatcher::dispatch(state));
     or_1.legs_mut(state).set_distinct(OrLegs::IN_1, false);
-    assert!(Dispatcher::dispatch(state));
     or_2.legs_mut(state).set_distinct(OrLegs::IN_1, true);
-    assert!(Dispatcher::dispatch(state));
     or_2.legs_mut(state).set_distinct(OrLegs::IN_1, false);
-    assert!(Dispatcher::dispatch(state));
     or_1.legs_mut(state).set_distinct(OrLegs::IN_1, true);
-    assert!(Dispatcher::dispatch(state));
     or_1.legs_mut(state).set_distinct(OrLegs::IN_1, false);
-    assert!(Dispatcher::dispatch(state));
     or_2.legs_mut(state).set_distinct(OrLegs::IN_1, true);
-    assert!(Dispatcher::dispatch(state));
     or_2.legs_mut(state).set_distinct(OrLegs::IN_1, false);
-    assert!(Dispatcher::dispatch(state));
-    assert!(!Dispatcher::dispatch(state));
 }
