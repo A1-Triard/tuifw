@@ -213,18 +213,18 @@ fn main() {
         flows,
         chips: chips.clone(),
     };
-    let on_not_out_changed = |state: &mut dyn State, or: RawId, Just(out): Just<bool>| {
+    let not_out_to_or_in = |state: &mut dyn State, or: RawId, Just(out): Just<bool>| {
         let or = Chip::from_raw(or);
         or.legs(state).set_uncond(OrLegs::IN_2, out);
     };
-    let on_or_out_changed = |state: &mut dyn State, not: RawId, Just(out): Just<bool>| {
+    let or_out_to_not_out = |state: &mut dyn State, not: RawId, Just(out): Just<bool>| {
         let not = Chip::from_raw(not);
         not.legs(state).set_uncond(NotLegs::IN_, out);
     };
-    chips.not_1.legs(state).values(NotLegs::OUT).handle(state, chips.or_2, on_not_out_changed);
-    chips.not_2.legs(state).values(NotLegs::OUT).handle(state, chips.or_1, on_not_out_changed);
-    chips.or_1.legs(state).values(OrLegs::OUT).handle(state, chips.not_1, on_or_out_changed);
-    chips.or_2.legs(state).values(OrLegs::OUT).handle(state, chips.not_2, on_or_out_changed);
+    chips.not_1.legs(state).values(NotLegs::OUT).handle(state, chips.or_2, not_out_to_or_in);
+    chips.not_2.legs(state).values(NotLegs::OUT).handle(state, chips.or_1, not_out_to_or_in);
+    chips.or_1.legs(state).values(OrLegs::OUT).handle(state, chips.not_1, or_out_to_not_out);
+    chips.or_2.legs(state).values(OrLegs::OUT).handle(state, chips.not_2, or_out_to_not_out);
     chips.not_1.legs(state).changes(NotLegs::OUT).handle(state, (), |_, _, Just((old, new))| {
         let old = if old { "1" } else { "0" };
         let new = if new { "1" } else { "0" };
