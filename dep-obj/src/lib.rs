@@ -418,7 +418,7 @@ impl<Owner: DepType, PropType: Convenient> AnySetter<Owner> for Setter<Owner, Pr
 
 /// A dictionary mapping a subset of target type properties to the values.
 /// Every dependency object can have an applied style at every moment.
-/// To switch an applied style, use the [`DepObjMut::apply_style`] function.
+/// To switch an applied style, use the [`DepObj::apply_style`] function.
 #[derive(Educe)]
 #[educe(Debug, Clone, Default)]
 pub struct Style<Owner: DepType> {
@@ -555,7 +555,7 @@ impl<'a, Owner: DepType, Arena> DepObjRefMut<'a, Owner, Arena> {
 */
 
 struct DepPropFlowSource<'a, Owner: DepType, Arena, PropType: Convenient> {
-    obj: DepObjMut<'a, Owner, Arena>,
+    obj: DepObj<'a, Owner, Arena>,
     prop: DepProp<Owner, PropType>,
 }
 
@@ -583,19 +583,19 @@ impl<'a, Owner: DepType, Arena: 'static, PropType: Convenient> FlowSource for De
     }
 }
 
-pub struct DepObjMut<'a, Owner: DepType, Arena> {
+pub struct DepObj<'a, Owner: DepType, Arena> {
     id: Owner::Id,
     state: &'a mut dyn State,
     get_obj_mut: for<'b> fn(arena: &'b mut Arena, id: Owner::Id) -> &'b mut Owner,
 }
 
-impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
+impl<'a, Owner: DepType, Arena: 'static> DepObj<'a, Owner, Arena> {
     pub fn new(
         id: Owner::Id,
         state: &'a mut dyn State,
         get_obj_mut: for<'b> fn(arena: &'b mut Arena, id: Owner::Id) -> &'b mut Owner,
     ) -> Self {
-        DepObjMut { id, state, get_obj_mut }
+        DepObj { id, state, get_obj_mut }
     }
 
     pub fn values<PropType: Convenient>(
@@ -1424,7 +1424,7 @@ macro_rules! dep_obj {
         }
     ) => {
         $crate::paste_paste! {
-            fn [< $name _get_obj_mut_priv >] <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
+            fn [< $name _get_obj_priv >] <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
                 $arena: &'arena_lifetime mut $Arena,
                 $this: Self
             ) -> &'arena_lifetime mut DepObjType {
@@ -1435,8 +1435,8 @@ macro_rules! dep_obj {
             $vis fn $name <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
                 self,
                 state: &'arena_lifetime mut dyn $crate::dyn_context_State,
-            ) -> $crate::DepObjMut<'arena_lifetime, DepObjType, $Arena> {
-                $crate::DepObjMut::new(self, state, Self:: [< $name _get_obj_mut_priv >] )
+            ) -> $crate::DepObj<'arena_lifetime, DepObjType, $Arena> {
+                $crate::DepObj::new(self, state, Self:: [< $name _get_obj_priv >] )
             }
         }
     };
@@ -1446,7 +1446,7 @@ macro_rules! dep_obj {
         }
     ) => {
         $crate::paste_paste! {
-            fn [< $name _get_obj_mut_priv >] <'arena_lifetime>(
+            fn [< $name _get_obj_priv >] <'arena_lifetime>(
                 $arena: &'arena_lifetime mut $Arena,
                 $this: Self
             ) -> &'arena_lifetime mut $ty {
@@ -1457,8 +1457,8 @@ macro_rules! dep_obj {
             $vis fn $name <'arena_lifetime>(
                 self,
                 state: &'arena_lifetime mut dyn $crate::dyn_context_State,
-            ) -> $crate::DepObjMut<'arena_lifetime, $ty, $Arena> {
-                $crate::DepObjMut::new(self, state, Self:: [< $name _get_obj_mut_priv >] )
+            ) -> $crate::DepObj<'arena_lifetime, $ty, $Arena> {
+                $crate::DepObj::new(self, state, Self:: [< $name _get_obj_priv >] )
             }
         }
     };

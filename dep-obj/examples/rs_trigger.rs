@@ -97,14 +97,10 @@ mod or_chip {
     }
 
     impl OrLegs {
-        pub fn new(
-            state: &mut dyn State,
-        ) -> Chip {
+        pub fn new(state: &mut dyn State) -> Chip {
             let legs = Self::new_priv();
             let circuit: &mut Circuit = state.get_mut();
-            let chip = Chip::new(circuit, |chip| {
-                (Box::new(legs) as _, chip)
-            });
+            let chip = Chip::new(circuit, |chip| (Box::new(legs) as _, chip));
             let in_1 = chip.legs(state).values(OrLegs::IN_1);
             let in_2 = chip.legs(state).values(OrLegs::IN_2);
             in_1.zip(in_2, state).handle(state, chip, Self::update);
@@ -136,14 +132,10 @@ mod not_chip {
     }
 
     impl NotLegs {
-        pub fn new(
-            state: &mut dyn State,
-        ) -> Chip {
+        pub fn new(state: &mut dyn State) -> Chip {
             let circuit: &mut Circuit = state.get_mut();
             let legs = Self::new_priv();
-            let chip = Chip::new(circuit, |chip| {
-                (Box::new(legs) as _, chip)
-            });
+            let chip = Chip::new(circuit, |chip| (Box::new(legs) as _, chip));
             chip.legs(state).values(NotLegs::IN_).handle(state, chip, Self::update);
             chip
         }
