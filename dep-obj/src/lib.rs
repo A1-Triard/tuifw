@@ -479,26 +479,8 @@ pub trait DepObjBuilderCore<OwnerId: ComponentId> {
 }
 
 /*
-pub struct DepObjRef<'a, Owner: DepType, Arena> {
-    arena: &'a Arena,
-    id: Owner::Id,
-    get_obj: for<'b> fn(arena: &'b Arena, id: Owner::Id) -> &'b Owner,
-}
 
 impl<'a, Owner: DepType + 'static, Arena> DepObjRef<'a, Owner, Arena> {
-    pub fn new(
-        arena: &'a Arena,
-        id: Owner::Id,
-        get_obj: for<'b> fn(arena: &'b Arena, id: Owner::Id) -> &'b Owner,
-    ) -> Self {
-        DepObjRef { arena, id, get_obj }
-    }
-
-    pub fn get<PropType: Convenient>(&self, prop: DepProp<Owner, PropType>) -> &'a PropType {
-        let obj = (self.get_obj)(self.arena, self.id);
-        let entry = prop.entry(obj);
-        entry.local.as_ref().or_else(|| entry.style.as_ref()).unwrap_or_else(|| entry.default)
-    }
 
     pub fn items<ItemType: Convenient>(&self, vec: DepVec<Owner, ItemType>) -> &'a Vec<ItemType> {
         let obj = (self.get_obj)(self.arena, self.id);
@@ -507,37 +489,8 @@ impl<'a, Owner: DepType + 'static, Arena> DepObjRef<'a, Owner, Arena> {
     }
 }
 
-pub struct DepObjRefMut<'a, Owner: DepType, Arena> {
-    arena: &'a mut Arena,
-    id: Owner::Id,
-    get_obj_mut: for<'b> fn(arena: &'b mut Arena, id: Owner::Id) -> &'b mut Owner,
-}
 
 impl<'a, Owner: DepType, Arena> DepObjRefMut<'a, Owner, Arena> {
-    pub fn new(
-        arena: &'a mut Arena,
-        id: Owner::Id,
-        get_obj_mut: for<'b> fn(arena: &'b mut Arena, id: Owner::Id) -> &'b mut Owner,
-    ) -> Self {
-        DepObjRefMut { arena, id, get_obj_mut }
-    }
-
-
-
-    pub fn on<ArgsType>(
-        &mut self,
-        event: DepEvent<Owner, ArgsType>,
-        callback: fn(
-            state: &mut dyn State,
-            id: Owner::Id,
-            args: &mut ArgsType
-        ),
-    ) {
-        let obj = (self.get_obj_mut)(self.arena, self.id);
-        let entry_mut = event.entry_mut(obj);
-        entry_mut.on_raised.push(callback);
-    }
-
     pub fn on_vec_changed<ItemType: Convenient>(
         &mut self,
         vec: DepVec<Owner, ItemType>,
@@ -960,8 +913,8 @@ macro_rules! dep_type_with_builder_impl {
             invalid dep type definition, allowed form is\n\
             \n\
             $(#[$attr])* $vis struct $name $(<$generics> $(where $where_clause)?)? become $obj in $Id {\n\
-                $field_1_name $(: $field_1_type = $field_1_value | [$field_1_type] | yield $field_1_type),\n\
-                $field_2_name $(: $field_2_type = $field_2_value | [$field_2_type] | yield $field_2_type),\n\
+                $field_1_name $(: $field_1_type = $field_1_value | [$field_1_type]),\n\
+                $field_2_name $(: $field_2_type = $field_2_value | [$field_2_type]),\n\
                 ...\n\
             }\n\
             \n\
@@ -1051,8 +1004,8 @@ macro_rules! dep_type_with_builder_impl {
             invalid dep type definition, allowed form is\n\
             \n\
             $(#[$attr])* $vis struct $name $(<$generics> $(where $where_clause)?)? become $obj in $Id {\n\
-                $field_1_name $(: $field_1_type = $field_1_value | [$field_1_type] | yield $field_1_type),\n\
-                $field_2_name $(: $field_2_type = $field_2_value | [$field_2_type] | yield $field_2_type),\n\
+                $field_1_name $(: $field_1_type = $field_1_value | [$field_1_type]),\n\
+                $field_2_name $(: $field_2_type = $field_2_value | [$field_2_type]),\n\
                 ...\n\
             }\n\
             \n\
@@ -1127,8 +1080,8 @@ macro_rules! dep_type_impl {
             invalid dep type definition, allowed form is\n\
             \n\
             $(#[$attr])* $vis struct $name $(<$generics> $(where $where_clause)?)? in $Id {\n\
-                $field_1_name $(: $field_1_type = $field_1_value | [$field_1_type] | yield $field_1_type),\n\
-                $field_2_name $(: $field_2_type = $field_2_value | [$field_2_type] | yield $field_2_type),\n\
+                $field_1_name $(: $field_1_type = $field_1_value | [$field_1_type]),\n\
+                $field_2_name $(: $field_2_type = $field_2_value | [$field_2_type]),\n\
                 ...\n\
             }\n\
             \n\
@@ -1141,8 +1094,8 @@ macro_rules! dep_type_impl {
             invalid dep type definition, allowed form is\n\
             \n\
             $(#[$attr])* $vis struct $name $(<$generics> $(where $where_clause)?)? in $Id {\n\
-                $field_1_name $(: $field_1_type = $field_1_value | [$field_1_type] | yield $field_1_type),\n\
-                $field_2_name $(: $field_2_type = $field_2_value | [$field_2_type] | yield $field_2_type),\n\
+                $field_1_name $(: $field_1_type = $field_1_value | [$field_1_type]),\n\
+                $field_2_name $(: $field_2_type = $field_2_value | [$field_2_type]),\n\
                 ...\n\
             }\n\
             \n\
@@ -1269,54 +1222,6 @@ macro_rules! dep_type_impl_raw {
             [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
             [$($builder_methods:tt)*]
         )?]
-        [[$event:ident yield $event_args:ty] $($fields:tt)*]
-    ) => {
-        $crate::dep_type_impl_raw! {
-            @unroll_fields
-            [$([$attr])*] [$vis] [$name] [$obj] [$Id]
-            [$($g)*] [$($r)*] [$($w)*]
-            [
-                $($core_fields)*
-                $event: $crate::DepEventEntry<$Id, $event_args>,
-            ]
-            [
-                $($core_new)*
-                $event: $crate::DepEventEntry::new(),
-            ]
-            [
-                $($core_consts)*
-            ]
-            [
-                $($dep_props)*
-
-                $vis const [< $event:upper >] : $crate::DepEvent<Self, $event_args> = {
-                    unsafe { 
-                        let offset = $crate::memoffset_offset_of!( [< $name Core >] $($r)*, $event );
-                        $crate::DepEvent::new(offset)
-                    }
-                };
-            ]
-            [$(
-                [$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]
-                [
-                    $($builder_methods)*
-                ]
-            )?]
-            [$($fields)*]
-        }
-    };
-    (
-        @unroll_fields
-        [$([$attr:meta])*] [$vis:vis] [$name:ident] [$obj:ident] [$Id:ty]
-        [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
-        [$($core_fields:tt)*]
-        [$($core_new:tt)*]
-        [$($core_consts:tt)*]
-        [$($dep_props:tt)*]
-        [$(
-            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
-            [$($builder_methods:tt)*]
-        )?]
         [[$field:ident $delim:tt $field_ty:ty $(= $field_val:expr)?] $($fields:tt)*]
     ) => {
         $crate::std_compile_error!($crate::std_concat!("\
@@ -1327,9 +1232,8 @@ macro_rules! dep_type_impl_raw {
         "\
             \n\n\
             allowed forms are \
-            '$field_name : $field_type = $field_value', \
-            '$field_name [$field_type]', and \
-            '$field_name yield $field_type'\
+            '$field_name : $field_type = $field_value', and \
+            '$field_name [$field_type]'\
         "));
     };
     (
