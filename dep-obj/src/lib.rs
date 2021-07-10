@@ -192,14 +192,14 @@ pub enum DepVecChange<ItemType: Convenient> {
 pub struct DepVecEntry<ItemType: Convenient> {
     items: Vec<ItemType>,
     #[educe(Debug(ignore))]
-    _on_changed: Vec<(RawId, fn(state: &mut dyn State, handler_id: RawId, change: DepVecChange<ItemType>))>,
+    on_changed: Vec<(RawId, fn(state: &mut dyn State, handler_id: RawId, change: DepVecChange<ItemType>))>,
 }
 
 impl<ItemType: Convenient> DepVecEntry<ItemType> {
     pub const fn new() -> Self {
         DepVecEntry {
             items: Vec::new(),
-            _on_changed: Vec::new()
+            on_changed: Vec::new()
         }
     }
 }
@@ -352,7 +352,6 @@ impl<Owner: DepType, ItemType: Convenient> DepVec<Owner, ItemType> {
 
     pub fn offset(self) -> usize { self.offset }
 
-    /*
     fn entry(self, owner: &Owner) -> &DepVecEntry<ItemType> {
         unsafe {
             let entry = (owner as *const _ as usize).unchecked_add(self.offset);
@@ -367,7 +366,7 @@ impl<Owner: DepType, ItemType: Convenient> DepVec<Owner, ItemType> {
             let entry = entry as *mut DepVecEntry<ItemType>;
             &mut *entry
         }
-    }*/
+    }
 }
 
 #[derive(Educe)]
@@ -478,35 +477,6 @@ pub trait DepObjBuilderCore<OwnerId: ComponentId> {
     fn id(&self) -> OwnerId;
 }
 
-/*
-
-impl<'a, Owner: DepType + 'static, Arena> DepObjRef<'a, Owner, Arena> {
-
-    pub fn items<ItemType: Convenient>(&self, vec: DepVec<Owner, ItemType>) -> &'a Vec<ItemType> {
-        let obj = (self.get_obj)(self.arena, self.id);
-        let entry = vec.entry(obj);
-        &entry.items
-    }
-}
-
-
-impl<'a, Owner: DepType, Arena> DepObjRefMut<'a, Owner, Arena> {
-    pub fn on_vec_changed<ItemType: Convenient>(
-        &mut self,
-        vec: DepVec<Owner, ItemType>,
-        callback: fn(
-            state: &mut dyn State,
-            id: Owner::Id,
-            change: &DepVecChange<ItemType>
-        ),
-    ) {
-        let obj = (self.get_obj_mut)(self.arena, self.id);
-        let entry_mut = vec.entry_mut(obj);
-        entry_mut.on_changed.push(callback);
-    }
-}
-*/
-
 struct DepPropFlowSource<'a, Owner: DepType, Arena, PropType: Convenient> {
     obj: DepObj<'a, Owner, Arena>,
     prop: DepProp<Owner, PropType>,
@@ -531,6 +501,34 @@ impl<'a, Owner: DepType, Arena: 'static, PropType: Convenient> FlowSource for De
         let arena: &mut Arena = self.obj.state.get_mut();
         let obj = (self.obj.get_obj_mut)(arena, self.obj.id);
         let entry_mut = self.prop.entry_mut(obj);
+        entry_mut.on_changed.push((handler_id.into_raw(), handler));
+        res
+    }
+}
+
+struct DepVecFlowSource<'a, Owner: DepType, Arena, ItemType: Convenient> {
+    obj: DepObj<'a, Owner, Arena>,
+    vec: DepVec<Owner, ItemType>,
+}
+
+impl<'a, Owner: DepType, Arena: 'static, ItemType: Convenient> FlowSource for DepVecFlowSource<'a, Owner, Arena, ItemType> {
+    type Value = DepVecChange<ItemType>;
+
+    fn handle<Id:ComponentId, R>(
+        &mut self,
+        handler: impl FnOnce(
+            Self::Value,
+            &mut dyn State
+        ) -> (Id, fn(state: &mut dyn State, handler_id: RawId, value: Self::Value), R),
+    ) -> R {
+        let arena: &mut Arena = self.obj.state.get_mut();
+        let obj = (self.obj.get_obj_mut)(arena, self.obj.id);
+        let entry = self.vec.entry(obj);
+        let items = entry.items.clone();
+        let (handler_id, handler, res) = handler(DepVecChange::Reset(items), self.obj.state);
+        let arena: &mut Arena = self.obj.state.get_mut();
+        let obj = (self.obj.get_obj_mut)(arena, self.obj.id);
+        let entry_mut = self.vec.entry_mut(obj);
         entry_mut.on_changed.push((handler_id.into_raw(), handler));
         res
     }
@@ -564,6 +562,14 @@ impl<'a, Owner: DepType, Arena: 'static> DepObj<'a, Owner, Arena> {
         prop: DepProp<Owner, PropType>,
     ) -> Flow<Just<(PropType, PropType)>> {
         let mut source = DepPropFlowSource { obj: self, prop };
+        Flow::new(&mut source)
+    }
+
+    pub fn vec_changes<ItemType: Convenient>(
+        self,
+        vec: DepVec<Owner, ItemType>,
+    ) -> Flow<Just<DepVecChange<ItemType>>> {
+        let mut source = DepVecFlowSource { obj: self, vec };
         Flow::new(&mut source)
     }
 
@@ -671,27 +677,25 @@ impl<'a, Owner: DepType, Arena: 'static> DepObj<'a, Owner, Arena> {
         old
     }
 
-    /*
     pub fn clear<ItemType: Convenient>(
         &mut self,
         vec: DepVec<Owner, ItemType>,
-    ) -> DepVecChange<ItemType> {
+    ) {
         let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = vec.entry_mut(obj);
         let old_items = replace(&mut entry_mut.items, Vec::new());
         let change = DepVecChange::Reset(old_items);
-        for on_changed in entry_mut.on_changed.clone() {
-            on_changed(self.state, self.id, &change);
+        for (handler_id, handler) in entry_mut.on_changed.clone() {
+            handler(self.state, handler_id, change.clone());
         }
-        change
     }
 
     pub fn push<ItemType: Convenient>(
         &mut self,
         vec: DepVec<Owner, ItemType>,
         item: ItemType,
-    ) -> DepVecChange<ItemType> {
+    ) {
         let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = vec.entry_mut(obj);
@@ -699,10 +703,9 @@ impl<'a, Owner: DepType, Arena: 'static> DepObj<'a, Owner, Arena> {
         let change = DepVecChange::Inserted(
             unsafe { entry_mut.items.len().unchecked_sub(1) } .. entry_mut.items.len()
         );
-        for on_changed in entry_mut.on_changed.clone() {
-            on_changed(self.state, self.id, &change);
+        for (handler_id, handler) in entry_mut.on_changed.clone() {
+            handler(self.state, handler_id, change.clone());
         }
-        change
     }
 
     pub fn insert<ItemType: Convenient>(
@@ -710,23 +713,22 @@ impl<'a, Owner: DepType, Arena: 'static> DepObj<'a, Owner, Arena> {
         vec: DepVec<Owner, ItemType>,
         index: usize,
         item: ItemType
-    ) -> DepVecChange<ItemType> {
+    ) {
         let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = vec.entry_mut(obj);
         entry_mut.items.insert(index, item);
         let change = DepVecChange::Inserted(index .. index + 1);
-        for on_changed in entry_mut.on_changed.clone() {
-            on_changed(self.state, self.id, &change);
+        for (handler_id, handler) in entry_mut.on_changed.clone() {
+            handler(self.state, handler_id, change.clone());
         }
-        change
     }
 
     pub fn append<ItemType: Convenient>(
         &mut self,
         vec: DepVec<Owner, ItemType>,
         other: &mut Vec<ItemType>,
-    ) -> DepVecChange<ItemType> {
+    ) {
         let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = vec.entry_mut(obj);
@@ -735,12 +737,10 @@ impl<'a, Owner: DepType, Arena: 'static> DepObj<'a, Owner, Arena> {
         let change = DepVecChange::Inserted(
             unsafe { entry_mut.items.len().unchecked_sub(appended) } .. entry_mut.items.len()
         );
-        for on_changed in entry_mut.on_changed.clone() {
-            on_changed(self.state, self.id, &change);
+        for (handler_id, handler) in entry_mut.on_changed.clone() {
+            handler(self.state, handler_id, change.clone());
         }
-        change
     }
-     */
 }
 
 #[macro_export]
