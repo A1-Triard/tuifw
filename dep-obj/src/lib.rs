@@ -790,7 +790,6 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
      */
 }
 
-/*
 #[macro_export]
 macro_rules! dep_type_with_builder {
     (
@@ -1425,26 +1424,11 @@ macro_rules! dep_obj {
         }
     ) => {
         $crate::paste_paste! {
-            fn [< $name _get_obj_ref_priv >] <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
-                $arena: &'arena_lifetime $Arena,
-                $this: Self
-            ) -> &'arena_lifetime DepObjType {
-                $field.downcast_ref::<DepObjType>().expect("invalid cast")
-            }
-
             fn [< $name _get_obj_mut_priv >] <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
                 $arena: &'arena_lifetime mut $Arena,
                 $this: Self
             ) -> &'arena_lifetime mut DepObjType {
                 $field_mut.downcast_mut::<DepObjType>().expect("invalid cast")
-            }
-
-            #[allow(dead_code)]
-            $vis fn [< $name _ref >] <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
-                self,
-                $arena: &'arena_lifetime $Arena,
-            ) -> $crate::DepObjRef<'arena_lifetime, DepObjType, $Arena> {
-                $crate::DepObjRef::new($arena, self, Self:: [< $name _get_obj_ref_priv >] )
             }
 
             #[allow(dead_code)]
@@ -1454,14 +1438,6 @@ macro_rules! dep_obj {
             ) -> $crate::DepObjMut<'arena_lifetime, DepObjType, $Arena> {
                 $crate::DepObjMut::new(self, state, Self:: [< $name _get_obj_mut_priv >] )
             }
-
-            #[allow(dead_code)]
-            $vis fn [< $name _todo >] <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
-                self,
-                $arena: &'arena_lifetime mut $Arena,
-            ) -> $crate::DepObjRefMut<'arena_lifetime, DepObjType, $Arena> {
-                $crate::DepObjRefMut::new($arena, self, Self:: [< $name _get_obj_mut_priv >] )
-            }
         }
     };
     (
@@ -1470,13 +1446,6 @@ macro_rules! dep_obj {
         }
     ) => {
         $crate::paste_paste! {
-            fn [< $name _get_obj_ref_priv >] <'arena_lifetime>(
-                $arena: &'arena_lifetime $Arena,
-                $this: Self
-            ) -> &'arena_lifetime $ty {
-                $field
-            }
-
             fn [< $name _get_obj_mut_priv >] <'arena_lifetime>(
                 $arena: &'arena_lifetime mut $Arena,
                 $this: Self
@@ -1485,32 +1454,17 @@ macro_rules! dep_obj {
             }
 
             #[allow(dead_code)]
-            $vis fn [< $name _ref >] <'arena_lifetime>(
-                self,
-                $arena: &'arena_lifetime $Arena,
-            ) -> $crate::DepObjRef<'arena_lifetime, $ty, $Arena> {
-                $crate::DepObjRef::new($arena, self, Self:: [< $name _get_obj_ref_priv >] )
-            }
-
-            #[allow(dead_code)]
-            $vis fn [< $name _mut >] <'arena_lifetime>(
+            $vis fn $name <'arena_lifetime>(
                 self,
                 state: &'arena_lifetime mut dyn $crate::dyn_context_State,
             ) -> $crate::DepObjMut<'arena_lifetime, $ty, $Arena> {
                 $crate::DepObjMut::new(self, state, Self:: [< $name _get_obj_mut_priv >] )
             }
-
-            #[allow(dead_code)]
-            $vis fn $name <'arena_lifetime>(
-                self,
-                $arena: &'arena_lifetime mut $Arena,
-            ) -> $crate::DepObjRefMut<'arena_lifetime, $ty, $Arena> {
-                $crate::DepObjRefMut::new($arena, self, Self:: [< $name _get_obj_mut_priv >] )
-            }
         }
     };
 }
 
+/*
 #[cfg(test)]
 mod test {
     use super::*;

@@ -1,7 +1,7 @@
 use crate::base::Convenient;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
-use components_arena::{Component, ComponentId, Id, Arena, RawId};
+use components_arena::{Component, ComponentId, Id, Arena, RawId, ComponentClassToken};
 use core::fmt::Debug;
 use downcast_rs::{Downcast, impl_downcast};
 use dyn_context::{State, StateExt};
@@ -79,6 +79,12 @@ macro_attr! {
     struct FlowBox(Box<dyn FlowDataBase>);
 }
 
+pub struct FlowsToken(ComponentClassToken<FlowBox>);
+
+impl FlowsToken {
+    pub fn new() -> Option<Self> { ComponentClassToken::new().map(FlowsToken) }
+}
+
 macro_attr! {
     #[derive(Educe, ComponentId!)]
     #[educe(Debug, Eq, PartialEq, Copy, Clone, Ord, PartialOrd, Hash)]
@@ -88,6 +94,10 @@ macro_attr! {
 macro_attr! {
     #[derive(Debug, State!)]
     pub struct Flows(Arena<FlowBox>);
+}
+
+impl Flows {
+    pub fn new(token: &mut FlowsToken) -> Self { Flows(Arena::new(&mut token.0)) }
 }
 
 fn handle_base<T: Convenient>(state: &mut dyn State, id: RawId, value: T) {
@@ -112,7 +122,7 @@ fn handle_new_through<T: Convenient, I: Convenient, R: Convenient>(
     handle_base(state, id, Just(value).into().into());
 }
 
-fn handle_merge_fst<T: Convenient, X: Convenient, R: Convenient>(
+fn handle_zip_fst<T: Convenient, X: Convenient, R: Convenient>(
     state: &mut dyn State,
     id: RawId,
     value: Just<T>
@@ -123,7 +133,7 @@ fn handle_merge_fst<T: Convenient, X: Convenient, R: Convenient>(
     handle_base(state, id, Just((value.0, snd)).into());
 }
 
-fn handle_merge_snd<T: Convenient, X: Convenient, R: Convenient>(
+fn handle_zip_snd<T: Convenient, X: Convenient, R: Convenient>(
     state: &mut dyn State,
     id: RawId,
     value: Just<X>
@@ -134,7 +144,7 @@ fn handle_merge_snd<T: Convenient, X: Convenient, R: Convenient>(
     handle_base(state, id, Just((fst, value.0)).into());
 }
 
-fn handle_merge_through_fst<T: Convenient, X: Convenient, I: Convenient, R: Convenient>(
+fn handle_zip_through_fst<T: Convenient, X: Convenient, I: Convenient, R: Convenient>(
     state: &mut dyn State,
     id: RawId,
     value: Just<T>
@@ -146,7 +156,7 @@ fn handle_merge_through_fst<T: Convenient, X: Convenient, I: Convenient, R: Conv
     handle_base::<R>(state, id, Just((value.0, snd)).into().into());
 }
 
-fn handle_merge_through_snd<T: Convenient, X: Convenient, I: Convenient, R: Convenient>(
+fn handle_zip_through_snd<T: Convenient, X: Convenient, I: Convenient, R: Convenient>(
     state: &mut dyn State,
     id: RawId,
     value: Just<X>
@@ -159,7 +169,7 @@ fn handle_merge_through_snd<T: Convenient, X: Convenient, I: Convenient, R: Conv
 }
 
 impl<T: Convenient> Flow<T> {
-    pub fn handle<Id: ComponentId, R>(
+    pub fn handle_raw<Id: ComponentId, R>(
         self,
         state: &mut dyn State,
         handler: impl FnOnce(T, &mut dyn State) -> (Id, fn(state: &mut dyn State, handler_id: RawId, value: T), R),
@@ -171,6 +181,18 @@ impl<T: Convenient> Flow<T> {
         let flow = flows.0[self.0].0.downcast_mut::<FlowData<T>>().unwrap();
         flow.handlers.push((handler_id.into_raw(), handler));
         res
+    }
+
+    pub fn handle<Id: ComponentId>(
+        self,
+        state: &mut dyn State,
+        handler_id: Id,
+        handler: fn(state: &mut dyn State, handler_id: RawId, value: T),
+    ) {
+        let value = self.handle_raw(state, |value, _state| {
+            (handler_id, handler, value)
+        });
+        handler(state, handler_id.into_raw(), value);
     }
 
     pub fn new<S: FlowSource>(source: &mut S) -> Flow<T> where Just<S::Value>: Into<T> {
@@ -196,37 +218,37 @@ impl<T: Convenient> Flow<T> {
 }
 
 impl<T: Convenient> Flow<Just<T>> {
-    pub fn merge<X: Convenient, R: Convenient>(
+    pub fn zip<X: Convenient, R: Convenient>(
         self,
         other: Flow<Just<X>>,
         state: &mut dyn State
     ) -> Flow<R> where Just<(T, X)>: Into<R>, R: Into<Just<(T, X)>> {
-        self.handle(state, |fst, state| {
-            let id = other.handle(state, |snd, state| {
+        self.handle_raw(state, |fst, state| {
+            let id = other.handle_raw(state, |snd, state| {
                 let value: R = Just((fst.0, snd.0)).into();
                 let flows: &mut Flows = state.get_mut();
                 let id = flows.0.insert(|id| (FlowBox(Box::new(FlowData { value, handlers: Vec::new() })), id));
-                (id, handle_merge_snd, Flow(id, PhantomType::new()))
+                (id, handle_zip_snd, Flow(id, PhantomType::new()))
             });
-            (id, handle_merge_fst, id)
+            (id, handle_zip_fst, id)
         })
     }
 
-    pub fn merge_through<X: Convenient, I: Convenient, R: Convenient>(
+    pub fn zip_through<X: Convenient, I: Convenient, R: Convenient>(
         self,
         _through: Through<I>,
         other: Flow<Just<X>>,
         state: &mut dyn State
     ) -> Flow<R> where Just<(T, X)>: Into<I>, I: Into<R>, R: Into<I>, I: Into<Just<(T, X)>> {
-        self.handle(state, |fst, state| {
-            let id = other.handle(state, |snd, state| {
+        self.handle_raw(state, |fst, state| {
+            let id = other.handle_raw(state, |snd, state| {
                 let value: I = Just((fst.0, snd.0)).into();
                 let value: R = value.into();
                 let flows: &mut Flows = state.get_mut();
                 let id = flows.0.insert(|id| (FlowBox(Box::new(FlowData { value, handlers: Vec::new() })), id));
-                (id, handle_merge_through_snd::<T, X, I, R>, Flow(id, PhantomType::new()))
+                (id, handle_zip_through_snd::<T, X, I, R>, Flow(id, PhantomType::new()))
             });
-            (id, handle_merge_through_fst::<T, X, I, R>, id)
+            (id, handle_zip_through_fst::<T, X, I, R>, id)
         })
     }
 }
