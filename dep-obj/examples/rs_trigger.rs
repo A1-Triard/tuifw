@@ -84,8 +84,8 @@ mod circuit {
 
 mod or_chip {
     use crate::circuit::*;
-    use components_arena::ComponentId;
-    use dep_obj::dep_type;
+    use components_arena::{ComponentId, RawId};
+    use dep_obj::{FlowExt, dep_type};
     use dyn_context::{State, StateExt};
 
     dep_type! {
@@ -99,20 +99,21 @@ mod or_chip {
 
     impl OrLegs {
         pub fn new<Tag: ComponentId, T>(
-            circuit: &mut Circuit,
+            state: &mut dyn State,
             tag: impl FnOnce(Chip) -> (Tag, T)
         ) -> T {
             let legs = Self::new_priv();
+            let circuit: &mut Circuit = state.get_mut();
             let (chip, result) = Chip::new(circuit, |chip| {
                 let (tag, result) = tag(chip);
                 (Box::new(legs) as _, tag, (chip, result))
             });
-            chip.legs(circuit).on_changed(OrLegs::IN_1, Self::update);
-            chip.legs(circuit).on_changed(OrLegs::IN_2, Self::update);
+            chip.legs(state).value(OrLegs::IN_1).handle(chip, Self::update);
+            chip.legs(state).value(OrLegs::IN_2).handle(chip, Self::update);
             result
         }
 
-        fn update(state: &mut dyn State, chip: Chip, _old: &bool) {
+        fn update(state: &mut dyn State, chip: RawId, (_, value): (bool, bool)) {
             let circuit: &Circuit = state.get();
             let in_1 = *chip.legs_ref(circuit).get(OrLegs::IN_1);
             let in_2 = *chip.legs_ref(circuit).get(OrLegs::IN_2);
@@ -125,7 +126,7 @@ mod or_chip {
 
 mod not_chip {
     use crate::circuit::*;
-    use components_arena::ComponentId;
+    use components_arena::{ComponentId, RawId};
     use dep_obj::dep_type;
     use dyn_context::{State, StateExt};
 
@@ -147,11 +148,11 @@ mod not_chip {
                 let (tag, result) = tag(chip);
                 (Box::new(legs) as _, tag, (chip, result))
             });
-            chip.legs(circuit).on_changed(NotLegs::IN_, Self::update);
+            chip.legs(circuit).on_changed(NotLegs::IN_, Self::update, ().into_raw());
             result
         }
 
-        fn update(state: &mut dyn State, chip: Chip, _old: &bool) {
+        fn update(state: &mut dyn State, chip: Chip, _old: &bool, _: RawId) {
             let circuit: &Circuit = state.get();
             let in_ = *chip.legs_ref(circuit).get(NotLegs::IN_);
             chip.legs_mut(state).set_distinct(NotLegs::OUT, !in_);
@@ -166,6 +167,7 @@ use dyn_context::{State, StateExt};
 use not_chip::*;
 use or_chip::*;
 use std::any::{Any, TypeId};
+use components_arena::ComponentId;
 
 struct TriggerChips {
     pub or_1: Chip,
@@ -206,29 +208,29 @@ fn main() {
     let not_2 = NotLegs::new(&mut circuit, |chip| (2usize, chip));
     let or_1 = OrLegs::new(&mut circuit, |chip| (1usize, chip));
     let or_2 = OrLegs::new(&mut circuit, |chip| (2usize, chip));
-    let on_not_out_changed = |state: &mut dyn State, not: Chip, _old: &_| {
+    let on_not_out_changed = |state: &mut dyn State, not: Chip, _old: &_, _: _| {
         let circuit: &Circuit = state.get();
         let chips: &TriggerChips = state.get();
         let or = if not.tag::<usize>(circuit) == 1 { chips.or_2 } else { chips.or_1 };
         let &out = not.legs_ref(circuit).get(NotLegs::OUT);
         or.legs_mut(state).set_uncond(OrLegs::IN_2, out);
     };
-    let on_or_out_changed = |state: &mut dyn State, or: Chip, _old: &_| {
+    let on_or_out_changed = |state: &mut dyn State, or: Chip, _old: &_, _: _| {
         let circuit: &Circuit = state.get();
         let chips: &TriggerChips = state.get();
         let not = if or.tag::<usize>(circuit) == 1 { chips.not_1 } else { chips.not_2 };
         let &out = or.legs_ref(circuit).get(OrLegs::OUT);
         not.legs_mut(state).set_uncond(NotLegs::IN_, out);
     };
-    not_1.legs(&mut circuit).on_changed(NotLegs::OUT, on_not_out_changed);
-    not_2.legs(&mut circuit).on_changed(NotLegs::OUT, on_not_out_changed);
-    or_1.legs(&mut circuit).on_changed(OrLegs::OUT, on_or_out_changed);
-    or_2.legs(&mut circuit).on_changed(OrLegs::OUT, on_or_out_changed);
-    not_1.legs(&mut circuit).on_changed(NotLegs::OUT, |state, not_1, _old| {
+    not_1.legs(&mut circuit).on_changed(NotLegs::OUT, on_not_out_changed, ().into_raw());
+    not_2.legs(&mut circuit).on_changed(NotLegs::OUT, on_not_out_changed, ().into_raw());
+    or_1.legs(&mut circuit).on_changed(OrLegs::OUT, on_or_out_changed, ().into_raw());
+    or_2.legs(&mut circuit).on_changed(OrLegs::OUT, on_or_out_changed, ().into_raw());
+    not_1.legs(&mut circuit).on_changed(NotLegs::OUT, |state, not_1, _old, _| {
         let circuit: &Circuit = state.get();
         let &out = not_1.legs_ref(circuit).get(NotLegs::OUT);
         println!("{}", if out { "0 -> 1" } else { "1 -> 0" });
-    });
+    }, ().into_raw());
     let chips = TriggerChips { or_1, or_2, not_1, not_2 };
     let state = &mut TriggerState {
         circuit,

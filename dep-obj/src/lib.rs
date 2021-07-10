@@ -15,6 +15,11 @@
 extern crate core;
 extern crate alloc;
 
+mod base;
+pub use base::*;
+
+pub mod flow;
+
 #[cfg(docsrs)]
 pub mod example {
     //! The [`dep_type`] and [`dep_obj`] macro expansion example.
@@ -138,35 +143,32 @@ pub use memoffset::offset_of as memoffset_offset_of;
 #[doc(hidden)]
 pub use paste::paste as paste_paste;
 
+use crate::flow::{Flow, FlowSource, Just, Through, Snd};
 use alloc::boxed::Box;
 use alloc::collections::TryReserveError;
 use alloc::vec::Vec;
-use components_arena::ComponentId;
+use components_arena::{ComponentId, RawId};
 use core::fmt::Debug;
 use core::mem::replace;
 use core::ops::Range;
+//use downcast_rs::{Downcast, impl_downcast};
 use dyn_clone::{DynClone, clone_trait_object};
 use dyn_context::{State, StateExt};
 use educe::Educe;
+//use macro_attr_2018::macro_attr;
 use phantom_type::PhantomType;
-
-/// A type should satisfy this trait to be a dependency property type
-/// or a dependency vector item type.
-pub trait DepPropType: Clone + Debug + Send + Sync + 'static { }
-
-impl<PropType: Clone + Debug + Send + Sync + 'static> DepPropType for PropType { }
 
 #[derive(Educe)]
 #[educe(Debug)]
-pub struct DepPropEntry<OwnerId: ComponentId, PropType: DepPropType> {
+pub struct DepPropEntry<PropType: Convenient> {
     default: &'static PropType,
     style: Option<PropType>,
     local: Option<PropType>,
     #[educe(Debug(ignore))]
-    on_changed: Vec<fn(state: &mut dyn State, id: OwnerId, old: &PropType)>,
+    on_changed: Vec<(RawId, fn(state: &mut dyn State, handler_id: RawId, old_new: (PropType, PropType)))>,
 }
 
-impl<OwnerId: ComponentId, PropType: DepPropType> DepPropEntry<OwnerId, PropType> {
+impl<PropType: Convenient> DepPropEntry<PropType> {
     pub const fn new(default: &'static PropType) -> Self {
         DepPropEntry {
             default,
@@ -178,7 +180,7 @@ impl<OwnerId: ComponentId, PropType: DepPropType> DepPropEntry<OwnerId, PropType
 }
 
 #[derive(Debug, Clone)]
-pub enum DepVecChange<ItemType: DepPropType> {
+pub enum DepVecChange<ItemType: Convenient> {
     Reset(Vec<ItemType>),
     Inserted(Range<usize>),
     Removed(usize, Vec<ItemType>),
@@ -187,31 +189,18 @@ pub enum DepVecChange<ItemType: DepPropType> {
 
 #[derive(Educe)]
 #[educe(Debug)]
-pub struct DepVecEntry<OwnerId: ComponentId, ItemType: DepPropType> {
+pub struct DepVecEntry<ItemType: Convenient> {
     items: Vec<ItemType>,
     #[educe(Debug(ignore))]
-    on_changed: Vec<fn(state: &mut dyn State, id: OwnerId, change: &DepVecChange<ItemType>)>,
+    _on_changed: Vec<(RawId, fn(state: &mut dyn State, handler_id: RawId, change: DepVecChange<ItemType>))>,
 }
 
-impl<OwnerId: ComponentId, ItemType: DepPropType> DepVecEntry<OwnerId, ItemType> {
+impl<ItemType: Convenient> DepVecEntry<ItemType> {
     pub const fn new() -> Self {
         DepVecEntry {
             items: Vec::new(),
-            on_changed: Vec::new()
+            _on_changed: Vec::new()
         }
-    }
-}
-
-#[derive(Educe)]
-#[educe(Debug)]
-pub struct DepEventEntry<OwnerId: ComponentId, ArgsType> {
-    #[educe(Debug(ignore))]
-    on_raised: Vec<fn(state: &mut dyn State, id: OwnerId, args: &mut ArgsType)>,
-}
-
-impl<OwnerId: ComponentId, ArgsType> DepEventEntry<OwnerId, ArgsType> {
-    pub const fn new() -> Self {
-        DepEventEntry { on_raised: Vec::new() }
     }
 }
 
@@ -318,12 +307,12 @@ pub trait DepType: Sized {
 /// A dependency property.
 #[derive(Educe)]
 #[educe(Debug, Clone, Copy)]
-pub struct DepProp<Owner: DepType, PropType: DepPropType> {
+pub struct DepProp<Owner: DepType, PropType: Convenient> {
     offset: usize,
     _phantom: PhantomType<(Owner, PropType)>
 }
 
-impl<Owner: DepType, PropType: DepPropType> DepProp<Owner, PropType> {
+impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
     /// Creates dependency property. The only safe way to call this function is through
     /// the [`dep_type`] or the [`dep_type_with_builder`] macro using.
     pub const unsafe fn new(offset: usize) -> Self {
@@ -332,18 +321,18 @@ impl<Owner: DepType, PropType: DepPropType> DepProp<Owner, PropType> {
 
     pub fn offset(self) -> usize { self.offset }
 
-    fn entry(self, owner: &Owner) -> &DepPropEntry<Owner::Id, PropType> {
+    fn entry(self, owner: &Owner) -> &DepPropEntry<PropType> {
         unsafe {
             let entry = (owner as *const _ as usize).unchecked_add(self.offset);
-            let entry = entry as *const DepPropEntry<Owner::Id, PropType>;
+            let entry = entry as *const DepPropEntry<PropType>;
             &*entry
         }
     }
 
-    fn entry_mut(self, owner: &mut Owner) -> &mut DepPropEntry<Owner::Id, PropType> {
+    fn entry_mut(self, owner: &mut Owner) -> &mut DepPropEntry<PropType> {
         unsafe {
             let entry = (owner as *mut _ as usize).unchecked_add(self.offset);
-            let entry = entry as *mut DepPropEntry<Owner::Id, PropType>;
+            let entry = entry as *mut DepPropEntry<PropType>;
             &mut *entry
         }
     }
@@ -351,69 +340,39 @@ impl<Owner: DepType, PropType: DepPropType> DepProp<Owner, PropType> {
 
 #[derive(Educe)]
 #[educe(Debug, Clone, Copy)]
-pub struct DepVec<Owner: DepType, ItemType: DepPropType> {
+pub struct DepVec<Owner: DepType, ItemType: Convenient> {
     offset: usize,
     _phantom: PhantomType<(Owner, ItemType)>
 }
 
-impl<Owner: DepType, ItemType: DepPropType> DepVec<Owner, ItemType> {
+impl<Owner: DepType, ItemType: Convenient> DepVec<Owner, ItemType> {
     pub const unsafe fn new(offset: usize) -> Self {
         DepVec { offset, _phantom: PhantomType::new() }
     }
 
     pub fn offset(self) -> usize { self.offset }
 
-    fn entry(self, owner: &Owner) -> &DepVecEntry<Owner::Id, ItemType> {
+    /*
+    fn entry(self, owner: &Owner) -> &DepVecEntry<ItemType> {
         unsafe {
             let entry = (owner as *const _ as usize).unchecked_add(self.offset);
-            let entry = entry as *const DepVecEntry<Owner::Id, ItemType>;
+            let entry = entry as *const DepVecEntry<ItemType>;
             &*entry
         }
     }
 
-    fn entry_mut(self, owner: &mut Owner) -> &mut DepVecEntry<Owner::Id, ItemType> {
+    fn entry_mut(self, owner: &mut Owner) -> &mut DepVecEntry<ItemType> {
         unsafe {
             let entry = (owner as *mut _ as usize).unchecked_add(self.offset);
-            let entry = entry as *mut DepVecEntry<Owner::Id, ItemType>;
+            let entry = entry as *mut DepVecEntry<ItemType>;
             &mut *entry
         }
-    }
-}
-
-#[derive(Educe)]
-#[educe(Debug, Clone, Copy)]
-pub struct DepEvent<Owner: DepType, ArgsType> {
-    offset: usize,
-    _phantom: PhantomType<(Owner, ArgsType)>
-}
-
-impl<Owner: DepType, ArgsType> DepEvent<Owner, ArgsType> {
-    pub const unsafe fn new(offset: usize) -> Self {
-        DepEvent { offset, _phantom: PhantomType::new() }
-    }
-
-    pub fn offset(self) -> usize { self.offset }
-
-    fn entry(self, owner: &Owner) -> &DepEventEntry<Owner::Id, ArgsType> {
-        unsafe {
-            let entry = (owner as *const _ as usize).unchecked_add(self.offset);
-            let entry = entry as *const DepEventEntry<Owner::Id, ArgsType>;
-            &*entry
-        }
-    }
-
-    fn entry_mut(self, owner: &mut Owner) -> &mut DepEventEntry<Owner::Id, ArgsType> {
-        unsafe {
-            let entry = (owner as *mut _ as usize).unchecked_add(self.offset);
-            let entry = entry as *mut DepEventEntry<Owner::Id, ArgsType>;
-            &mut *entry
-        }
-    }
+    }*/
 }
 
 #[derive(Educe)]
 #[educe(Debug, Clone)]
-struct Setter<Owner: DepType, PropType: DepPropType> {
+struct Setter<Owner: DepType, PropType: Convenient> {
     prop: DepProp<Owner, PropType>,
     value: PropType,
 }
@@ -424,19 +383,19 @@ trait AnySetter<Owner: DepType>: Debug + DynClone + Send + Sync {
         &self,
         owner: &mut Owner,
         unapply: bool
-    ) -> Option<Box<dyn for<'a> FnOnce(&'a mut dyn State, Owner::Id)>>;
+    ) -> Option<Box<dyn for<'a> FnOnce(&'a mut dyn State)>>;
 }
 
 clone_trait_object!(<Owner: DepType> AnySetter<Owner>);
 
-impl<Owner: DepType, PropType: DepPropType> AnySetter<Owner> for Setter<Owner, PropType> where Owner::Id: 'static {
+impl<Owner: DepType, PropType: Convenient> AnySetter<Owner> for Setter<Owner, PropType> where Owner::Id: 'static {
     fn prop_offset(&self) -> usize { self.prop.offset }
 
     fn un_apply(
         &self,
         owner: &mut Owner,
         unapply: bool
-    ) -> Option<Box<dyn for<'a> FnOnce(&'a mut dyn State, Owner::Id)>> {
+    ) -> Option<Box<dyn for<'a> FnOnce(&'a mut dyn State)>> {
         let entry_mut = self.prop.entry_mut(owner);
         let on_changed = if entry_mut.local.is_some() {
             None
@@ -444,12 +403,13 @@ impl<Owner: DepType, PropType: DepPropType> AnySetter<Owner> for Setter<Owner, P
             Some(entry_mut.on_changed.clone())
         };
         let value = if unapply { None } else { Some(self.value.clone()) };
-        let old = replace(&mut entry_mut.style, value);
+        let old = replace(&mut entry_mut.style, value.clone());
         on_changed.map(|on_changed| {
             let old = old.unwrap_or_else(|| entry_mut.default.clone());
-            Box::new(move |state: &'_ mut dyn State, id| {
-                for on_changed in on_changed {
-                    on_changed(state, id, &old);
+            let value = value.unwrap_or_else(|| entry_mut.default.clone());
+            Box::new(move |state: &'_ mut dyn State| {
+                for (handler_id, handler) in on_changed {
+                    handler(state, handler_id, (old.clone(), value.clone()));
                 }
             }) as _
         })
@@ -474,11 +434,11 @@ impl<Owner: DepType> Style<Owner> {
 
     pub fn clear(&mut self) { self.setters.clear(); }
 
-    pub fn contains_prop<PropType: DepPropType>(&self, prop: DepProp<Owner, PropType>) -> bool {
+    pub fn contains_prop<PropType: Convenient>(&self, prop: DepProp<Owner, PropType>) -> bool {
         self.setters.binary_search_by_key(&prop.offset, |x| x.prop_offset()).is_ok()
     }
 
-    pub fn insert<PropType: DepPropType>(
+    pub fn insert<PropType: Convenient>(
         &mut self,
         prop: DepProp<Owner, PropType>,
         value: PropType
@@ -494,7 +454,7 @@ impl<Owner: DepType> Style<Owner> {
 
     pub fn len(&self) -> usize { self.setters.len() }
 
-    pub fn remove<PropType: DepPropType>(&mut self, prop: DepProp<Owner, PropType>) -> bool {
+    pub fn remove<PropType: Convenient>(&mut self, prop: DepProp<Owner, PropType>) -> bool {
         match self.setters.binary_search_by_key(&prop.offset, |x| x.prop_offset()) {
             Ok(index) => { self.setters.remove(index); true }
             Err(_) => false
@@ -518,6 +478,7 @@ pub trait DepObjBuilderCore<OwnerId: ComponentId> {
     fn id(&self) -> OwnerId;
 }
 
+/*
 pub struct DepObjRef<'a, Owner: DepType, Arena> {
     arena: &'a Arena,
     id: Owner::Id,
@@ -533,13 +494,13 @@ impl<'a, Owner: DepType + 'static, Arena> DepObjRef<'a, Owner, Arena> {
         DepObjRef { arena, id, get_obj }
     }
 
-    pub fn get<PropType: DepPropType>(&self, prop: DepProp<Owner, PropType>) -> &'a PropType {
+    pub fn get<PropType: Convenient>(&self, prop: DepProp<Owner, PropType>) -> &'a PropType {
         let obj = (self.get_obj)(self.arena, self.id);
         let entry = prop.entry(obj);
         entry.local.as_ref().or_else(|| entry.style.as_ref()).unwrap_or_else(|| entry.default)
     }
 
-    pub fn items<ItemType: DepPropType>(&self, vec: DepVec<Owner, ItemType>) -> &'a Vec<ItemType> {
+    pub fn items<ItemType: Convenient>(&self, vec: DepVec<Owner, ItemType>) -> &'a Vec<ItemType> {
         let obj = (self.get_obj)(self.arena, self.id);
         let entry = vec.entry(obj);
         &entry.items
@@ -561,19 +522,7 @@ impl<'a, Owner: DepType, Arena> DepObjRefMut<'a, Owner, Arena> {
         DepObjRefMut { arena, id, get_obj_mut }
     }
 
-    pub fn on_changed<PropType: DepPropType>(
-        &mut self,
-        prop: DepProp<Owner, PropType>,
-        callback: fn(
-            state: &mut dyn State,
-            id: Owner::Id,
-            old: &PropType
-        ),
-    ) {
-        let obj = (self.get_obj_mut)(self.arena, self.id);
-        let entry_mut = prop.entry_mut(obj);
-        entry_mut.on_changed.push(callback);
-    }
+
 
     pub fn on<ArgsType>(
         &mut self,
@@ -589,7 +538,7 @@ impl<'a, Owner: DepType, Arena> DepObjRefMut<'a, Owner, Arena> {
         entry_mut.on_raised.push(callback);
     }
 
-    pub fn on_vec_changed<ItemType: DepPropType>(
+    pub fn on_vec_changed<ItemType: Convenient>(
         &mut self,
         vec: DepVec<Owner, ItemType>,
         callback: fn(
@@ -601,6 +550,36 @@ impl<'a, Owner: DepType, Arena> DepObjRefMut<'a, Owner, Arena> {
         let obj = (self.get_obj_mut)(self.arena, self.id);
         let entry_mut = vec.entry_mut(obj);
         entry_mut.on_changed.push(callback);
+    }
+}
+*/
+
+struct DepPropFlowSource<'a, Owner: DepType, Arena, PropType: Convenient> {
+    obj: DepObjMut<'a, Owner, Arena>,
+    prop: DepProp<Owner, PropType>,
+}
+
+impl<'a, Owner: DepType, Arena: 'static, PropType: Convenient> FlowSource for DepPropFlowSource<'a, Owner, Arena, PropType> {
+    type Value = (PropType, PropType);
+
+    fn handle<Id:ComponentId, R>(
+        &mut self,
+        handler: impl FnOnce(
+            Self::Value,
+            &mut dyn State
+        ) -> (Id, fn(state: &mut dyn State, handler_id: RawId, value: Self::Value), R),
+    ) -> R {
+        let arena: &mut Arena = self.obj.state.get_mut();
+        let obj = (self.obj.get_obj_mut)(arena, self.obj.id);
+        let entry = self.prop.entry(obj);
+        let old = entry.default.clone();
+        let new = entry.local.as_ref().or_else(|| entry.style.as_ref()).unwrap_or_else(|| entry.default).clone();
+        let (handler_id, handler, res) = handler((old, new), self.obj.state);
+        let arena: &mut Arena = self.obj.state.get_mut();
+        let obj = (self.obj.get_obj_mut)(arena, self.obj.id);
+        let entry_mut = self.prop.entry_mut(obj);
+        entry_mut.on_changed.push((handler_id.into_raw(), handler));
+        res
     }
 }
 
@@ -619,45 +598,58 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
         DepObjMut { id, state, get_obj_mut }
     }
 
-    pub fn set_uncond<PropType: DepPropType>(
+    pub fn values<PropType: Convenient>(
+        self,
+        prop: DepProp<Owner, PropType>,
+    ) -> Flow<Just<PropType>> {
+        let mut source = DepPropFlowSource { obj: self, prop };
+        Flow::new_through(<Through<Snd<PropType>>>::new(), &mut source)
+    }
+
+    pub fn changes<PropType: Convenient>(
+        self,
+        prop: DepProp<Owner, PropType>,
+    ) -> Flow<Just<(PropType, PropType)>> {
+        let mut source = DepPropFlowSource { obj: self, prop };
+        Flow::new(&mut source)
+    }
+
+    pub fn set_uncond<PropType: Convenient>(
         &mut self,
         prop: DepProp<Owner, PropType>,
         value: PropType
-    ) -> PropType {
+    ) {
         let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = prop.entry_mut(obj);
-        let old = entry_mut.local.replace(value).unwrap_or_else(||
+        let old = entry_mut.local.replace(value.clone()).unwrap_or_else(||
             entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default).clone()
         );
-        for on_changed in entry_mut.on_changed.clone() {
-            on_changed(self.state, self.id, &old);
+        for (hanlder_id, handler) in entry_mut.on_changed.clone() {
+            handler(self.state, hanlder_id, (old.clone(), value.clone()));
         }
-        old
     }
 
-    pub fn unset_uncond<PropType: DepPropType>(
+    pub fn unset_uncond<PropType: Convenient>(
         &mut self,
         prop: DepProp<Owner, PropType>,
-    ) -> Option<PropType> {
+    ) {
         let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = prop.entry_mut(obj);
         if let Some(old) = entry_mut.local.take() {
-            for on_changed in entry_mut.on_changed.clone() {
-                on_changed(self.state, self.id, &old);
+            let default = entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default).clone();
+            for (handler_id, handler) in entry_mut.on_changed.clone() {
+                handler(self.state, handler_id, (old.clone(), default.clone()));
             }
-            Some(old)
-        } else {
-            None
         }
     }
 
-    pub fn set_distinct<PropType: DepPropType + PartialEq>(
+    pub fn set_distinct<PropType: Convenient + PartialEq>(
         &mut self,
         prop: DepProp<Owner, PropType>,
         value: PropType,
-    ) -> Option<PropType> {
+    ) {
         let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = prop.entry_mut(obj);
@@ -665,45 +657,28 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
             .or_else(|| entry_mut.style.as_ref())
             .unwrap_or_else(|| entry_mut.default)
         ;
-        if &value == old { return None; }
-        let old = entry_mut.local.replace(value).unwrap_or_else(||
+        if &value == old { return; }
+        let old = entry_mut.local.replace(value.clone()).unwrap_or_else(||
             entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default).clone()
         );
-        for on_changed in entry_mut.on_changed.clone() {
-            on_changed(self.state, self.id, &old);
+        for (handler_id, handler) in entry_mut.on_changed.clone() {
+            handler(self.state, handler_id, (old.clone(), value.clone()));
         }
-        Some(old)
     }
 
-    pub fn unset_distinct<PropType: DepPropType + PartialEq>(
+    pub fn unset_distinct<PropType: Convenient + PartialEq>(
         &mut self,
         prop: DepProp<Owner, PropType>,
-    ) -> Option<PropType> {
+    ) {
         let arena: &mut Arena = self.state.get_mut();
         let obj = (self.get_obj_mut)(arena, self.id);
         let entry_mut = prop.entry_mut(obj);
         if let Some(old) = entry_mut.local.take() {
-            let new = entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default);
-            if new == &old { return None; }
-            for on_changed in entry_mut.on_changed.clone() {
-                on_changed(self.state, self.id, &old);
+            let new = entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default).clone();
+            if new == old { return; }
+            for (handler_id, handler) in entry_mut.on_changed.clone() {
+                handler(self.state, handler_id, (old.clone(), new.clone()));
             }
-            Some(old)
-        } else {
-            None
-        }
-    }
-
-    pub fn raise<ArgsType: 'static>(
-        &mut self,
-        event: DepEvent<Owner, ArgsType>,
-        args: &mut ArgsType,
-    ) {
-        let arena: &mut Arena = self.state.get_mut();
-        let obj = (self.get_obj_mut)(arena, self.id);
-        let entry = event.entry(obj);
-        for on_raised in entry.on_raised.clone() {
-            on_raised(self.state, self.id, args);
         }
     }
 
@@ -738,12 +713,13 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
         }
         *obj.style__() = style;
         for on_changed in on_changed {
-            on_changed(self.state, self.id);
+            on_changed(self.state);
         }
         old
     }
 
-    pub fn clear<ItemType: DepPropType>(
+    /*
+    pub fn clear<ItemType: Convenient>(
         &mut self,
         vec: DepVec<Owner, ItemType>,
     ) -> DepVecChange<ItemType> {
@@ -758,7 +734,7 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
         change
     }
 
-    pub fn push<ItemType: DepPropType>(
+    pub fn push<ItemType: Convenient>(
         &mut self,
         vec: DepVec<Owner, ItemType>,
         item: ItemType,
@@ -776,7 +752,7 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
         change
     }
 
-    pub fn insert<ItemType: DepPropType>(
+    pub fn insert<ItemType: Convenient>(
         &mut self,
         vec: DepVec<Owner, ItemType>,
         index: usize,
@@ -793,7 +769,7 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
         change
     }
 
-    pub fn append<ItemType: DepPropType>(
+    pub fn append<ItemType: Convenient>(
         &mut self,
         vec: DepVec<Owner, ItemType>,
         other: &mut Vec<ItemType>,
@@ -811,8 +787,10 @@ impl<'a, Owner: DepType, Arena: 'static> DepObjMut<'a, Owner, Arena> {
         }
         change
     }
+     */
 }
 
+/*
 #[macro_export]
 macro_rules! dep_type_with_builder {
     (
@@ -1196,7 +1174,7 @@ macro_rules! dep_type_impl_raw {
             [$($g)*] [$($r)*] [$($w)*]
             [
                 $($core_fields)*
-                $field: $crate::DepPropEntry<$Id, $field_ty>,
+                $field: $crate::DepPropEntry<$field_ty>,
             ]
             [
                 $($core_new)*
@@ -1470,7 +1448,7 @@ macro_rules! dep_obj {
             }
 
             #[allow(dead_code)]
-            $vis fn [< $name _mut >] <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
+            $vis fn $name <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
                 self,
                 state: &'arena_lifetime mut dyn $crate::dyn_context_State,
             ) -> $crate::DepObjMut<'arena_lifetime, DepObjType, $Arena> {
@@ -1478,7 +1456,7 @@ macro_rules! dep_obj {
             }
 
             #[allow(dead_code)]
-            $vis fn $name <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
+            $vis fn [< $name _todo >] <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
                 self,
                 $arena: &'arena_lifetime mut $Arena,
             ) -> $crate::DepObjRefMut<'arena_lifetime, DepObjType, $Arena> {
@@ -1699,3 +1677,4 @@ mod test {
         assert_eq!(id.obj1_ref(&arena).items(TestObj1::COLL)[0], 7);
     }
 }
+*/
