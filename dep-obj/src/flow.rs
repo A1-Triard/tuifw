@@ -195,6 +195,10 @@ impl<T: Convenient> Flow<T> {
         handler(state, handler_id.into_raw(), value);
     }
 
+    pub fn drop(self, flows: &mut Flows) {
+        flows.0.remove(self.0);
+    }
+
     pub fn new<S: FlowSource>(source: &mut S) -> Flow<T> where Just<S::Value>: Into<T> {
         source.handle(|value, state| {
             let value = Just(value).into();

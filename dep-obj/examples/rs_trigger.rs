@@ -231,7 +231,6 @@ fn main() {
         println!("{} -> {}", old, new);
     });
     chips.or_1.legs(state).set_distinct(OrLegs::IN_1, true);
-    chips.or_1.legs(state).set_distinct(OrLegs::IN_1, true);
     chips.or_1.legs(state).set_distinct(OrLegs::IN_1, false);
     chips.or_2.legs(state).set_distinct(OrLegs::IN_1, true);
     chips.or_2.legs(state).set_distinct(OrLegs::IN_1, false);
