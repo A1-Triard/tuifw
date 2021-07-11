@@ -17,7 +17,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
 default = ["std"]
-std = ["components-arena/std", "components-arena/nightly", "phantom-type/std"]
+std = ["components-arena/std", "phantom-type/std"]
 
 [dependencies]
 components-arena = { version = "1.2.0", default-features = false, features = ["nightly"] }

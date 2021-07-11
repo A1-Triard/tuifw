@@ -1,7 +1,9 @@
 use crate::base::*;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
-use components_arena::{Component, ComponentId, Id, Arena, RawId, ComponentClassToken, ComponentClassMutex};
+use components_arena::{Component, ComponentId, Id, Arena, RawId, ComponentClassToken};
+#[cfg(feature="std")]
+use components_arena::{ComponentClassMutex};
 use core::fmt::Debug;
 use downcast_rs::{Downcast, impl_downcast};
 use dyn_context::{State, StateExt};
