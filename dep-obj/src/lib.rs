@@ -10,8 +10,8 @@
 
 #![deny(warnings)]
 
-#![cfg_attr(not(test), no_std)]
-#[cfg(test)]
+#![cfg_attr(not(feature="std"), no_std)]
+#[cfg(feature="std")]
 extern crate core;
 extern crate alloc;
 

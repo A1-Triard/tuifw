@@ -1,7 +1,7 @@
 use crate::base::Convenient;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
-use components_arena::{Component, ComponentId, Id, Arena, RawId, ComponentClassToken};
+use components_arena::{Component, ComponentId, Id, Arena, RawId, ComponentClassToken, ComponentClassMutex};
 use core::fmt::Debug;
 use downcast_rs::{Downcast, impl_downcast};
 use dyn_context::{State, StateExt};
@@ -83,6 +83,14 @@ pub struct FlowsToken(ComponentClassToken<FlowBox>);
 
 impl FlowsToken {
     pub fn new() -> Option<Self> { ComponentClassToken::new().map(FlowsToken) }
+}
+
+#[cfg(feature="std")]
+pub struct FlowsMutex(ComponentClassMutex<FlowBox>);
+
+#[cfg(feature="std")]
+impl FlowsMutex {
+    pub const fn new() -> Self { FlowsMutex(ComponentClassMutex::new()) }
 }
 
 macro_attr! {
