@@ -143,7 +143,7 @@ pub use memoffset::offset_of as memoffset_offset_of;
 #[doc(hidden)]
 pub use paste::paste as paste_paste;
 
-use crate::flow::{Flow, FlowSource, Just, Through, Snd};
+use crate::flow::{Flow, FlowSource, Just, Through, Snd, RemovedInserted};
 use alloc::boxed::Box;
 use alloc::collections::TryReserveError;
 use alloc::vec::Vec;
@@ -568,6 +568,10 @@ pub struct DepObjVec<'a, 'b, Owner: DepType, Arena, ItemType: Convenient> {
 impl<'a, 'b, Owner: DepType, Arena: 'static, ItemType: Convenient> DepObjVec<'a, 'b, Owner, Arena, ItemType> {
     pub fn changes(&mut self) -> Flow<Just<(VecChange<ItemType>, Vec<ItemType>)>> {
         Flow::new(self)
+    }
+
+    pub fn removed_inserted_items(&mut self) -> Flow<Just<(Vec<ItemType>, Vec<ItemType>)>> {
+        Flow::new_through(<Through<RemovedInserted<ItemType>>>::new(), self)
     }
 
     pub fn clear(&mut self) {

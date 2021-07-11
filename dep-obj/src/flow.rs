@@ -1,4 +1,4 @@
-use crate::base::Convenient;
+use crate::base::*;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use components_arena::{Component, ComponentId, Id, Arena, RawId, ComponentClassToken, ComponentClassMutex};
@@ -8,6 +8,32 @@ use dyn_context::{State, StateExt};
 use educe::Educe;
 use macro_attr_2018::macro_attr;
 use phantom_type::PhantomType;
+
+#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
+pub struct RemovedInserted<T: Convenient>(pub Vec<T>, pub Vec<T>);
+
+impl<T: Convenient> From<Just<(VecChange<T>, Vec<T>)>> for RemovedInserted<T> {
+    fn from(Just((change, vec)): Just<(VecChange<T>, Vec<T>)>) -> RemovedInserted<T> {
+        match change {
+            VecChange::Reset(old) => RemovedInserted(old, vec),
+            VecChange::Removed(_, old) => RemovedInserted(old, Vec::new()),
+            VecChange::Inserted(range) => RemovedInserted(Vec::new(), Vec::from(&vec[range])),
+            VecChange::Swapped(_, _) => RemovedInserted(Vec::new(), Vec::new()),
+        }
+    }
+}
+
+impl<T: Convenient> From<Just<(Vec<T>, Vec<T>)>> for RemovedInserted<T> {
+    fn from(Just((removed, inserted)): Just<(Vec<T>, Vec<T>)>) -> RemovedInserted<T> {
+        RemovedInserted(removed, inserted)
+    }
+}
+
+impl<T: Convenient> From<RemovedInserted<T>> for Just<(Vec<T>, Vec<T>)> {
+    fn from(RemovedInserted(removed, inserted): RemovedInserted<T>) -> Just<(Vec<T>, Vec<T>)> {
+        Just((removed, inserted))
+    }
+}
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct Fst<T: Convenient>(pub T);
