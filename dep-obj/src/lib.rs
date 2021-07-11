@@ -205,8 +205,9 @@ impl<ItemType: Convenient> DepVecEntry<ItemType> {
 /// # #![feature(const_ptr_offset_from)]
 /// # #![feature(const_raw_ptr_deref)]
 /// use components_arena::{Arena, Component, ComponentClassToken, ComponentId, Id};
-/// use dep_obj::{Dispatcher, dep_obj, dep_type};
-/// use dyn_context::State;
+/// use dep_obj::{dep_obj, dep_type};
+/// use dep_obj::flow::{Flows, FlowsToken, Just};
+/// use dyn_context::{State, StateExt};
 /// use macro_attr_2018::macro_attr;
 /// use std::any::{Any, TypeId};
 ///
@@ -231,14 +232,15 @@ impl<ItemType: Convenient> DepVecEntry<ItemType> {
 /// }
 ///
 /// pub struct MyApp {
-///     dispatcher: Dispatcher,
+///     flows: Flows,
 ///     my_dep_types: Arena<MyDepTypePrivateData>,
+///     res: i32,
 /// }
 ///
 /// impl State for MyApp {
 ///     fn get_raw(&self, ty: TypeId) -> Option<&dyn Any> {
-///         if ty == TypeId::of::<Dispatcher>() {
-///             Some(&self.dispatcher)
+///         if ty == TypeId::of::<Flows>() {
+///             Some(&self.flows)
 ///         } else if ty == TypeId::of::<MyApp>() {
 ///             Some(self)
 ///         } else {
@@ -247,8 +249,8 @@ impl<ItemType: Convenient> DepVecEntry<ItemType> {
 ///     }
 ///
 ///     fn get_mut_raw(&mut self, ty: TypeId) -> Option<&mut dyn Any> {
-///         if ty == TypeId::of::<Dispatcher>() {
-///             Some(&mut self.dispatcher)
+///         if ty == TypeId::of::<Flows>() {
+///             Some(&mut self.flows)
 ///         } else if ty == TypeId::of::<MyApp>() {
 ///             Some(self)
 ///         } else {
@@ -277,14 +279,20 @@ impl<ItemType: Convenient> DepVecEntry<ItemType> {
 ///
 /// fn main() {
 ///     let mut my_dep_types_token = ComponentClassToken::new().unwrap();
+///     let mut flows_token = FlowsToken::new().unwrap();
 ///     let mut app = MyApp {
-///         dispatcher: Dispatcher::new(),
+///         flows: Flows::new(&mut flows_token),
 ///         my_dep_types: Arena::new(&mut my_dep_types_token),
+///         res: 0,
 ///     };
 ///     let id = MyDepTypeId::new(&mut app);
-///     assert_eq!(id.obj_ref(&app).get(MyDepType::PROP_2), &10);
-///     id.obj_mut(&mut app).set_distinct(MyDepType::PROP_2, 5);
-///     assert_eq!(id.obj_ref(&app).get(MyDepType::PROP_2), &5);
+///     id.obj(&mut app).prop(MyDepType::PROP_2).values().handle(&mut app, (), |state, _, Just(value)| {
+///         let app: &mut MyApp = state.get_mut();
+///         app.res = value;
+///     });
+///     assert_eq!(app.res, 10);
+///     id.obj(&mut app).prop(MyDepType::PROP_2).set_distinct(5);
+///     assert_eq!(app.res, 5);
 /// }
 /// ```
 pub trait DepType: Sized {
