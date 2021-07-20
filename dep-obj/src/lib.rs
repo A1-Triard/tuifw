@@ -1157,7 +1157,7 @@ macro_rules! dep_type_impl_raw {
             [$($g)*] [$($r)*] [$($w)*]
             [
                 $($core_fields)*
-                $field: $crate::DepVecEntry<$Id, $field_ty>,
+                $field: $crate::DepVecEntry<$field_ty>,
             ]
             [
                 $($core_new)*
