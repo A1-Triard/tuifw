@@ -9,6 +9,7 @@ use downcast_rs::{Downcast, impl_downcast};
 use dyn_context::{State, StateExt};
 use educe::Educe;
 use macro_attr_2018::macro_attr;
+#[cfg(feature="std")]
 use newtype_derive_2018::NewtypeDeref;
 use phantom_type::PhantomType;
 

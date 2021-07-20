@@ -146,6 +146,7 @@ pub use paste::paste as paste_paste;
 use crate::flow::{Flow, FlowSource, Just, Through, Snd, RemovedInserted};
 use alloc::boxed::Box;
 use alloc::collections::TryReserveError;
+use alloc::vec;
 use alloc::vec::Vec;
 use components_arena::{ComponentId, RawId};
 use core::fmt::Debug;
