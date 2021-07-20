@@ -6,11 +6,10 @@
 #![feature(const_raw_ptr_deref)]
 
 mod circuit {
-    use components_arena::{Component, ComponentId, Id, Arena, ComponentClassToken};
+    use components_arena::{Component, NewtypeComponentId, Id, Arena, ComponentClassToken};
     use dep_obj::dep_obj;
     use downcast_rs::{Downcast, impl_downcast};
     use dyn_context::State;
-    use educe::Educe;
     use macro_attr_2018::macro_attr;
     use std::fmt::Debug;
 
@@ -19,8 +18,7 @@ mod circuit {
     impl_downcast!(ChipLegs);
 
     macro_attr! {
-        #[derive(Component!)]
-        #[derive(Debug)]
+        #[derive(Debug, Component!)]
         struct ChipNode {
             chip: Chip,
             legs: Box<dyn ChipLegs>,
@@ -28,9 +26,7 @@ mod circuit {
     }
 
     macro_attr! {
-        #[derive(ComponentId!)]
-        #[derive(Educe)]
-        #[educe(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+        #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd, NewtypeComponentId!)]
         pub struct Chip(Id<ChipNode>);
     }
 

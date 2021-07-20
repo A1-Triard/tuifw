@@ -41,7 +41,7 @@ pub mod example {
     //! }
     //!
     //! macro_attr! {
-    //!     #[derive(ComponentId!, Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+    //!     #[derive(NewtypeComponentId!, Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
     //!     pub struct MyDepTypeId(Id<MyDepTypePrivateData>);
     //! }
     //!
@@ -92,7 +92,7 @@ pub mod example {
     #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
     pub struct MyDepTypeId(Id<MyDepTypePrivateData>);
 
-    ComponentId!(() pub struct MyDepTypeId(Id<MyDepTypePrivateData>););
+    NewtypeComponentId!(() pub struct MyDepTypeId(Id<MyDepTypePrivateData>););
 
     #[derive(Debug)]
     pub struct MyApp {
@@ -204,7 +204,7 @@ impl<ItemType: Convenient> DepVecEntry<ItemType> {
 /// # #![feature(const_maybe_uninit_as_ptr)]
 /// # #![feature(const_ptr_offset_from)]
 /// # #![feature(const_raw_ptr_deref)]
-/// use components_arena::{Arena, Component, ComponentClassToken, ComponentId, Id};
+/// use components_arena::{Arena, Component, ComponentClassToken, NewtypeComponentId, Id};
 /// use dep_obj::{dep_obj, dep_type};
 /// use dep_obj::flow::{Flows, FlowsToken, Just};
 /// use dyn_context::{State, StateExt};
@@ -227,7 +227,7 @@ impl<ItemType: Convenient> DepVecEntry<ItemType> {
 /// }
 ///
 /// macro_attr! {
-///     #[derive(ComponentId!, Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+///     #[derive(NewtypeComponentId!, Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 ///     pub struct MyDepTypeId(Id<MyDepTypePrivateData>);
 /// }
 ///

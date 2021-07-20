@@ -1,7 +1,7 @@
 use crate::base::*;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
-use components_arena::{Component, ComponentId, Id, Arena, RawId, ComponentClassToken};
+use components_arena::{Component, ComponentId, Id, Arena, RawId, ComponentClassToken, NewtypeComponentId};
 #[cfg(feature="std")]
 use components_arena::{ComponentClassMutex};
 use core::fmt::Debug;
@@ -9,6 +9,7 @@ use downcast_rs::{Downcast, impl_downcast};
 use dyn_context::{State, StateExt};
 use educe::Educe;
 use macro_attr_2018::macro_attr;
+use newtype_derive_2018::NewtypeDeref;
 use phantom_type::PhantomType;
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
@@ -103,18 +104,27 @@ struct FlowData<T: Convenient> {
 impl<T: Convenient> FlowDataBase for FlowData<T> { }
 
 macro_attr! {
+    #[doc(hidden)]
     #[derive(Debug, Component!)]
-    struct FlowBox(Box<dyn FlowDataBase>);
+    pub struct FlowBox(Box<dyn FlowDataBase>);
 }
 
+#[derive(Debug)]
 pub struct FlowsToken(ComponentClassToken<FlowBox>);
 
 impl FlowsToken {
     pub fn new() -> Option<Self> { ComponentClassToken::new().map(FlowsToken) }
 }
 
+impl From<ComponentClassToken<FlowBox>> for FlowsToken {
+    fn from(t: ComponentClassToken<FlowBox>) -> FlowsToken { FlowsToken(t) }
+}
+
 #[cfg(feature="std")]
-pub struct FlowsMutex(ComponentClassMutex<FlowBox>);
+macro_attr! {
+    #[derive(Debug, NewtypeDeref!)]
+    pub struct FlowsMutex(ComponentClassMutex<FlowBox, FlowsToken>);
+}
 
 #[cfg(feature="std")]
 impl FlowsMutex {
@@ -122,7 +132,7 @@ impl FlowsMutex {
 }
 
 macro_attr! {
-    #[derive(Educe, ComponentId!)]
+    #[derive(Educe, NewtypeComponentId!)]
     #[educe(Debug, Eq, PartialEq, Copy, Clone, Ord, PartialOrd, Hash)]
     pub struct Flow<T: Convenient>(Id<FlowBox>, PhantomType<T>);
 }
