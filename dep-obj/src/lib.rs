@@ -71,7 +71,7 @@ pub mod example {
     //! }
 
     use crate::{dep_obj, dep_type};
-    use components_arena::{Arena, Component, ComponentId, Id};
+    use components_arena::{Arena, Component, NewtypeComponentId, Id};
     use dyn_context::State;
 
     dep_type! {
