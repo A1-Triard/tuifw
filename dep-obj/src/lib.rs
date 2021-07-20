@@ -619,6 +619,18 @@ impl<'a, 'b, Owner: DepType, Arena: 'static, ItemType: Convenient> DepObjVec<'a,
         }
     }
 
+    pub fn remove(&mut self, index: usize) {
+        let arena: &mut Arena = self.obj.state.get_mut();
+        let obj = (self.obj.get_obj_mut)(arena, self.obj.id);
+        let entry_mut = self.vec.entry_mut(obj);
+        let item = entry_mut.items.remove(index);
+        let change = VecChange::Removed(index, vec![item]);
+        let vec = entry_mut.items.clone();
+        for (handler_id, handler) in entry_mut.on_changed.clone() {
+            handler(self.obj.state, handler_id, (change.clone(), vec.clone()));
+        }
+    }
+
     pub fn append(&mut self, other: &mut Vec<ItemType>) {
         let arena: &mut Arena = self.obj.state.get_mut();
         let obj = (self.obj.get_obj_mut)(arena, self.obj.id);
