@@ -60,12 +60,8 @@ pub mod example {
     //!     }
     //!
     //!     dep_obj! {
-    //!         pub fn obj(self as this, app: MyApp) -> MyDepType {
-    //!             if mut {
-    //!                 &mut app.my_dep_types[this.0].dep_data
-    //!             } else {
-    //!                 &app.my_dep_types[this.0].dep_data
-    //!             }
+    //!         pub fn obj(self as this, app: MyApp) -> &mut MyDepType {
+    //!             &mut app.my_dep_types[this.0].dep_data
     //!         }
     //!     }
     //! }
@@ -109,12 +105,8 @@ pub mod example {
         }
 
         dep_obj! {
-            pub fn obj(self as this, app: MyApp) -> MyDepType {
-                if mut {
-                    &mut app.my_dep_types[this.0].dep_data
-                } else {
-                    &app.my_dep_types[this.0].dep_data
-                }
+            pub fn obj(self as this, app: MyApp) -> &mut MyDepType {
+                &mut app.my_dep_types[this.0].dep_data
             }
         }
     }
@@ -268,12 +260,8 @@ impl<ItemType: Convenient> DepVecEntry<ItemType> {
 ///     }
 ///
 ///     dep_obj! {
-///         pub fn obj(self as this, app: MyApp) -> MyDepType {
-///             if mut {
-///                 &mut app.my_dep_types[this.0].dep_data
-///             } else {
-///                 &app.my_dep_types[this.0].dep_data
-///             }
+///         pub fn obj(self as this, app: MyApp) -> &mut MyDepType {
+///             &mut app.my_dep_types[this.0].dep_data
 ///         }
 ///     }
 /// }
