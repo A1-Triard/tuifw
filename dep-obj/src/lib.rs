@@ -1130,7 +1130,7 @@ macro_rules! dep_type_impl_raw {
                     $vis fn $field(mut self, value: $field_ty) -> Self {
                         let id = <$BuilderCore as $crate::DepObjBuilderCore<$Id>>::id(&self.core);
                         let state = <$BuilderCore as $crate::DepObjBuilderCore<$Id>>::state_mut(&mut self.core);
-                        id. $obj (state).set_uncond($name:: [< $field:upper >] , value);
+                        id. $obj (state).prop($name:: [< $field:upper >] ).set_uncond(value);
                         self
                     }
                 ]
