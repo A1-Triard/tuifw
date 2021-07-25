@@ -45,8 +45,8 @@ impl Item {
     }
 
     dep_obj! {
-        fn props(self as this, game: Game) -> ItemProps {
-            if mut { &mut game.items[this.0].props } else { &game.items[this.0].props }
+        fn props(self as this, game: Game) -> &mut ItemProps {
+            &mut game.items[this.0].props
         }
     }
 }
@@ -89,8 +89,8 @@ impl Npc {
     }
 
     dep_obj! {
-        fn props(self as this, game: Game) -> NpcProps {
-            if mut { &mut game.npcs[this.0].props } else { &game.npcs[this.0].props }
+        fn props(self as this, game: Game) -> &mut NpcProps {
+            &mut game.npcs[this.0].props
         }
     }
 }

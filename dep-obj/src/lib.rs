@@ -521,7 +521,7 @@ impl<'a, 'b, Owner: DepType, Arena: 'static, PropType: Convenient> DepObjProp<'a
         let old = entry_mut.local.as_ref()
             .or_else(|| entry_mut.style.as_ref())
             .unwrap_or_else(|| entry_mut.default)
-            ;
+        ;
         if &value == old { return; }
         let old = entry_mut.local.replace(value.clone()).unwrap_or_else(||
             entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default).clone()
@@ -1142,7 +1142,7 @@ macro_rules! dep_type_impl_raw {
                     $vis fn $field(mut self, value: $field_ty) -> Self {
                         let id = <$BuilderCore as $crate::DepObjBuilderCore<$Id>>::id(&self.core);
                         let state = <$BuilderCore as $crate::DepObjBuilderCore<$Id>>::state_mut(&mut self.core);
-                        id. [< $obj _mut >] (state).set_uncond($name:: [< $field:upper >] , value);
+                        id. $obj (state).set_uncond($name:: [< $field:upper >] , value);
                         self
                     }
                 ]
@@ -1311,8 +1311,8 @@ macro_rules! dep_type_impl_raw {
 #[macro_export]
 macro_rules! dep_obj {
     (
-        $vis:vis fn $name:ident (self as $this:ident, $arena:ident : $Arena:ty) -> dyn $ty:tt {
-            if mut { $field_mut:expr } else { $field:expr }
+        $vis:vis fn $name:ident (self as $this:ident, $arena:ident : $Arena:ty) -> &mut dyn $ty:tt {
+            $field_mut:expr
         }
     ) => {
         $crate::paste_paste! {
@@ -1333,8 +1333,8 @@ macro_rules! dep_obj {
         }
     };
     (
-        $vis:vis fn $name:ident (self as $this:ident, $arena:ident: $Arena:ty) -> $ty:ty {
-            if mut { $field_mut:expr } else { $field:expr }
+        $vis:vis fn $name:ident (self as $this:ident, $arena:ident: $Arena:ty) -> &mut $ty:ty {
+            $field_mut:expr
         }
     ) => {
         $crate::paste_paste! {
