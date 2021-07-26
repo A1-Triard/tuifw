@@ -71,7 +71,7 @@ pub mod example {
 
     use crate::{dep_obj, dep_type};
     use components_arena::{Arena, Component, NewtypeComponentId, Id};
-    use dyn_context::State;
+    use dyn_context::SelfState;
 
     dep_type! {
         #[derive(Debug)]
@@ -98,7 +98,7 @@ pub mod example {
         my_dep_types: Arena<MyDepTypePrivateData>,
     }
 
-    State!(() pub struct MyApp { .. });
+    impl SelfState for MyApp { }
 
     impl MyDepTypeId {
         pub fn new(app: &mut MyApp) -> MyDepTypeId {
