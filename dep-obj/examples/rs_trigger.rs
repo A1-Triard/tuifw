@@ -9,7 +9,7 @@ mod circuit {
     use components_arena::{Component, NewtypeComponentId, Id, Arena, ComponentClassToken};
     use dep_obj::dep_obj;
     use downcast_rs::{Downcast, impl_downcast};
-    use dyn_context::State;
+    use dyn_context::{SelfState};
     use macro_attr_2018::macro_attr;
     use std::fmt::Debug;
 
@@ -52,12 +52,12 @@ mod circuit {
         }
     }
 
-    macro_attr! {
-        #[derive(Debug, State!)]
-        pub struct Circuit {
-            arena: Arena<ChipNode>,
-        }
+    #[derive(Debug)]
+    pub struct Circuit {
+        arena: Arena<ChipNode>,
     }
+
+    impl SelfState for Circuit { }
 
     impl Circuit {
         pub fn new(token: &mut CircuitToken) -> Self {

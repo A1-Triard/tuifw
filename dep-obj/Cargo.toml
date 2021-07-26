@@ -1,7 +1,7 @@
 [package]
 edition = "2018"
 name = "dep-obj"
-version = "0.16.0"
+version = "0.17.0"
 authors = ["warlock <internalmike@gmail.com>"]
 description = "Dependency object: effective reactive heterogeneous container."
 readme = "README.md"
@@ -23,7 +23,7 @@ std = ["components-arena/std", "phantom-type/std"]
 components-arena = { version = "1.3.1", default-features = false, features = ["nightly"] }
 downcast-rs = "1.2.0"
 dyn-clone = "1.0.2"
-dyn-context = "0.6.1"
+dyn-context = "0.7.0"
 educe = "0.4.13"
 generics = "0.3.1"
 macro-attr-2018 = "1.1.1"
