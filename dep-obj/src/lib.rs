@@ -142,7 +142,7 @@ use alloc::boxed::Box;
 use alloc::collections::TryReserveError;
 use alloc::vec;
 use alloc::vec::Vec;
-use components_arena::{ComponentId, RawId, Arena, Id};
+use components_arena::{ComponentId, Arena, Id};
 use core::fmt::Debug;
 use core::mem::{replace, transmute};
 use dyn_clone::{DynClone, clone_trait_object};
@@ -315,6 +315,111 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
             &mut *entry
         }
     }
+
+    fn as_global<Arena>(self, obj: &DepObj<Owner, Arena>) -> Global {
+        Global {
+            id: obj.id.into_raw(),
+            a: obj.get_obj_mut as usize,
+            b: self.offset
+        }
+    }
+
+    unsafe fn from_global<Arena>(global: Global, state: &mut dyn State) -> (Self, DepObj<Owner, Arena>) {
+        let get_obj_mut: for<'b> fn(arena: &'b mut Arena, id: Owner::Id) -> &'b mut Owner = transmute(global.a);
+        let id = Owner::Id::from_raw(global.id);
+        let arena: &mut Arena = state.get_mut();
+        let obj = get_obj_mut(arena, id);
+        let prop: DepProp<Owner, PropType> = DepProp::new(global.b);
+        (prop, obj)
+    }
+
+    pub fn set_uncond<Arena>(self, obj: &mut DepObj<Owner, Arena>, value: PropType) {
+        let arena: &mut Arena = obj.state.get_mut();
+        let obj = (obj.get_obj_mut)(arena, self.obj.id);
+        let entry_mut = self.entry_mut(obj);
+        let old = entry_mut.local.replace(value.clone()).unwrap_or_else(||
+            entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default).clone()
+        );
+        for binding::Handler { target_id, execute } in entry_mut.handlers.items().clone().into_values() {
+            execute(obj.state, target_id, (old.clone(), value.clone()));
+        }
+    }
+
+    pub fn unset_uncond<Arena>(self, obj: &mut DepObj<Owner, Arena>) {
+        let arena: &mut Arena = obj.state.get_mut();
+        let obj = (obj.get_obj_mut)(arena, self.obj.id);
+        let entry_mut = self.entry_mut(obj);
+        if let Some(old) = entry_mut.local.take() {
+            let default = entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default).clone();
+            for binding::Handler { target_id, execute } in entry_mut.handlers.items().clone().into_values() {
+                execute(obj.state, target_id, (old.clone(), default.clone()));
+            }
+        }
+    }
+
+    pub fn set_distinct<Arena>(self, obj: &mut DepObj<Owner, Arena>, value: PropType) where PropType: PartialEq {
+        let arena: &mut Arena = obj.state.get_mut();
+        let obj = (obj.get_obj_mut)(arena, self.obj.id);
+        let entry_mut = self.prop.entry_mut(obj);
+        let old = entry_mut.local.as_ref()
+            .or_else(|| entry_mut.style.as_ref())
+            .unwrap_or_else(|| entry_mut.default)
+            ;
+        if &value == old { return; }
+        let old = entry_mut.local.replace(value.clone()).unwrap_or_else(||
+            entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default).clone()
+        );
+        for binding::Handler { target_id, execute } in entry_mut.handlers.items().clone().into_values() {
+            execute(obj.state, target_id, (old.clone(), value.clone()));
+        }
+    }
+
+    pub fn unset_distinct<Arena>(self, obj: &mut DepObj<Owner, Arena>) where PropType: PartialEq {
+        let arena: &mut Arena = obj.state.get_mut();
+        let obj = (obj.get_obj_mut)(arena, self.obj.id);
+        let entry_mut = self.entry_mut(obj);
+        if let Some(old) = entry_mut.local.take() {
+            let new = entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default).clone();
+            if new == old { return; }
+            for binding::Handler { target_id, execute } in entry_mut.handlers.items().clone().into_values() {
+                execute(obj.state, target_id, (old.clone(), new.clone()));
+            }
+        }
+    }
+
+    pub fn bind_distinct<Arena>(
+        self,
+        obj: &mut DepObj<Owner, Arena>,
+        binding: Box<dyn Binding<Value=PropType>>
+    ) where PropType: PartialEq {
+        let arena: &mut Arena = self.obj.state.get_mut();
+        let obj = (self.obj.get_obj_mut)(arena, self.obj.id);
+        let entry_mut = self.prop.entry_mut(obj);
+        if let Some(binding) = entry_mut.binding.replace(binding.clone()) {
+            binding.stop(self.obj.state);
+        }
+        let target = self.prop.as_global(obj);
+        binding.handle(self.obj.state, target, set_distinct);
+    }
+}
+
+unsafe fn set_distinct<Owner: DepType, Arena: 'static, PropType: Convenient + PartialEq>(
+    state: &mut dyn State,
+    source: Global,
+    value: PropType
+) {
+    let (prop, mut obj) = DepProp::from_global(source, state);
+    prop.set_distinct(&mut obj, value);
+}
+
+unsafe fn unhandle<Owner: DepType, Arena: 'static, PropType: Convenient>(
+    state: &mut dyn State,
+    source: Global,
+    handler_id: Id<binding::Handler<(PropType, PropType)>>
+) {
+    let (prop, mut obj) = DepProp::from_global(source, state);
+    let entry = prop.entry_mut(&mut obj);
+    entry.handlers.remove(handler_id);
 }
 
 #[derive(Educe)]
@@ -451,88 +556,6 @@ pub trait DepObjBuilderCore<OwnerId: ComponentId> {
     fn id(&self) -> OwnerId;
 }
 
-pub struct DepObjProp<'a, 'b, Owner: DepType, Arena, PropType: Convenient> {
-    obj: &'b mut DepObj<'a, Owner, Arena>,
-    prop: DepProp<Owner, PropType>,
-}
-
-impl<'a, 'b, Owner: DepType, Arena: 'static, PropType: Convenient> DepObjProp<'a, 'b, Owner, Arena, PropType> {
-    pub fn set_uncond(&mut self, value: PropType) {
-        let arena: &mut Arena = self.obj.state.get_mut();
-        let obj = (self.obj.get_obj_mut)(arena, self.obj.id);
-        let entry_mut = self.prop.entry_mut(obj);
-        let old = entry_mut.local.replace(value.clone()).unwrap_or_else(||
-            entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default).clone()
-        );
-        for binding::Handler { target_id, execute } in entry_mut.handlers.items().clone().into_values() {
-            execute(self.obj.state, target_id, (old.clone(), value.clone()));
-        }
-    }
-
-    pub fn unset_uncond(&mut self) {
-        let arena: &mut Arena = self.obj.state.get_mut();
-        let obj = (self.obj.get_obj_mut)(arena, self.obj.id);
-        let entry_mut = self.prop.entry_mut(obj);
-        if let Some(old) = entry_mut.local.take() {
-            let default = entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default).clone();
-            for binding::Handler { target_id, execute } in entry_mut.handlers.items().clone().into_values() {
-                execute(self.obj.state, target_id, (old.clone(), default.clone()));
-            }
-        }
-    }
-
-    pub fn set_distinct(&mut self, value: PropType) where PropType: PartialEq {
-        let arena: &mut Arena = self.obj.state.get_mut();
-        let obj = (self.obj.get_obj_mut)(arena, self.obj.id);
-        let entry_mut = self.prop.entry_mut(obj);
-        let old = entry_mut.local.as_ref()
-            .or_else(|| entry_mut.style.as_ref())
-            .unwrap_or_else(|| entry_mut.default)
-        ;
-        if &value == old { return; }
-        let old = entry_mut.local.replace(value.clone()).unwrap_or_else(||
-            entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default).clone()
-        );
-        for binding::Handler { target_id, execute } in entry_mut.handlers.items().clone().into_values() {
-            execute(self.obj.state, target_id, (old.clone(), value.clone()));
-        }
-    }
-
-    pub fn bind_distinct(&mut self, binding: Box<dyn Binding<Value=PropType>>) where PropType: PartialEq {
-        let arena: &mut Arena = self.obj.state.get_mut();
-        let obj = (self.obj.get_obj_mut)(arena, self.obj.id);
-        let entry_mut = self.prop.entry_mut(obj);
-        ifentry_mut.binding.replace(binding)
-    }
-
-    pub fn unset_distinct(&mut self) where PropType: PartialEq {
-        let arena: &mut Arena = self.obj.state.get_mut();
-        let obj = (self.obj.get_obj_mut)(arena, self.obj.id);
-        let entry_mut = self.prop.entry_mut(obj);
-        if let Some(old) = entry_mut.local.take() {
-            let new = entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default).clone();
-            if new == old { return; }
-            for binding::Handler { target_id, execute } in entry_mut.handlers.items().clone().into_values() {
-                execute(self.obj.state, target_id, (old.clone(), new.clone()));
-            }
-        }
-    }
-}
-
-unsafe fn unhandle<Owner: DepType, Arena: 'static, PropType: Convenient>(
-    state: &mut dyn State,
-    source_id: RawId,
-    source_data: (usize, usize),
-    handler_id: Id<binding::Handler<(PropType, PropType)>>
-) {
-    let get_obj_mut: for<'b> fn(arena: &'b mut Arena, id: Owner::Id) -> &'b mut Owner = transmute(source_data.0);
-    let id = Owner::Id::from_raw(source_id);
-    let prop: DepProp<Owner, PropType> = DepProp::new(source_data.1);
-    let arena: &mut Arena = state.get_mut();
-    let obj = get_obj_mut(arena, id);
-    let entry = prop.entry_mut(obj);
-    entry.handlers.remove(handler_id);
-}
 
 impl<'a, 'b, Owner: DepType, Arena: 'static, PropType: Convenient> binding::Source for DepObjProp<'a, 'b, Owner, Arena, PropType> {
     type Value = (PropType, PropType);
@@ -545,11 +568,7 @@ impl<'a, 'b, Owner: DepType, Arena: 'static, PropType: Convenient> binding::Sour
         let new = entry.local.as_ref().or_else(|| entry.style.as_ref()).unwrap_or_else(|| entry.default).clone();
         let handler_id = entry.handlers.insert(|handler_id| (handler, handler_id));
         let source = binding::HandledSource {
-            source_id: self.obj.id.into_raw(),
-            source_data: (
-                self.obj.get_obj_mut as usize,
-                self.prop.offset
-            ),
+            source: self.obj.prop_as_global(self.prop),
             handler_id,
             value: (old, new),
             unhandle: unhandle::<Owner, Arena, PropType>
@@ -672,6 +691,7 @@ impl<'a, Owner: DepType, Arena: 'static> DepObj<'a, Owner, Arena> {
     pub fn prop<'b, PropType: Convenient>(&'b mut self, prop: DepProp<Owner, PropType>) -> DepObjProp<'a, 'b, Owner, Arena, PropType> {
         DepObjProp { obj: self, prop }
     }
+
 
     pub fn vec<'b, ItemType: Convenient>(&'b mut self, vec: DepVec<Owner, ItemType>) -> DepObjVec<'a, 'b, Owner, Arena, ItemType> {
         DepObjVec { obj: self, vec }

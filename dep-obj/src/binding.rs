@@ -1,13 +1,21 @@
 use crate::base::*;
 use alloc::boxed::Box;
-use alloc::vec::Vec;
 use components_arena::{Component, ComponentId, Id, Arena, RawId, NewtypeComponentId};
 use core::fmt::Debug;
 use downcast_rs::{Downcast, impl_downcast};
+use dyn_clone::{DynClone, clone_trait_object};
 use dyn_context::{SelfState, State, StateExt};
 use educe::Educe;
 use macro_attr_2018::macro_attr;
 use phantom_type::PhantomType;
+
+#[derive(Educe)]
+#[educe(Debug, Clone)]
+pub struct GlobalHandler<T: Convenient> {
+    pub target: Global,
+    #[educe(Debug(ignore))]
+    pub execute: unsafe fn(state: &mut dyn State, target: Global, value: T),
+}
 
 macro_attr! {
     #[derive(Educe, Component!(class=HandlerComponent))]
@@ -22,11 +30,10 @@ macro_attr! {
 #[derive(Educe)]
 #[educe(Debug)]
 pub struct HandledSource<T: Convenient> {
-    pub source_id: RawId,
-    pub source_data: (usize, usize),
+    pub source: Global,
     pub handler_id: Id<Handler<T>>,
     #[educe(Debug(ignore))]
-    pub unhandle: unsafe fn(state: &mut dyn State, source_id: RawId, source_data: (usize, usize), handler_id: Id<Handler<T>>),
+    pub unhandle: unsafe fn(state: &mut dyn State, source: Global, handler_id: Id<Handler<T>>),
     pub value: T,
 }
 
@@ -53,7 +60,7 @@ macro_rules! binding_n {
                 )+
                 #[educe(Debug(ignore))]
                 map: fn( $( [< S $i >] ),+ ) -> T,
-                handlers: Vec<Handler<T>>,
+                handler: Option<GlobalHandler<T>>,
             }
 
             impl<
@@ -84,7 +91,7 @@ macro_rules! binding_n {
                                 [< source_ $i >] : None,
                             )+
                             map,
-                            handlers: Vec::new(),
+                            handler: None,
                         };
                         (BoxedBindingNode(Box::new(node)), id)
                     });
@@ -100,35 +107,12 @@ macro_rules! binding_n {
                         let bindings: &mut Bindings = state.get_mut();
                         let node = bindings.0[self.0].0.downcast_mut::< [< Binding $n Node >] <$( [< S $j >] ),+ , T>>().unwrap();
                         if let Some(source) = node. [< source_ $i >] .replace(source) {
-                            unsafe { (source.unhandle)(state, source.source_id, source.source_data, source.handler_id); }
+                            unsafe { (source.unhandle)(state, source.source, source.handler_id); }
                         }
-                        self.knoke_handlers(state);
+                        self.knoke_handler(state);
                     }
                 )+
 
-                pub fn handle<Id: ComponentId>(
-                    self,
-                    state: &mut dyn State,
-                    target_id: Id,
-                    execute: fn(state: &mut dyn State, target_id: RawId, value: T),
-                ) {
-                    self.handle_raw(state, target_id.into_raw(), execute);
-                }
-
-                pub fn handle_raw(
-                    self,
-                    state: &mut dyn State,
-                    target_id: RawId,
-                    execute: fn(state: &mut dyn State, target_id: RawId, value: T),
-                ) {
-                    let handler = Handler { target_id, execute };
-                    let bindings: &mut Bindings = state.get_mut();
-                    let node = bindings.0[self.0].0.downcast_mut::< [< Binding $n Node >] <$( [< S $i >] ),+ , T>>().unwrap();
-                    node.handlers.push(handler.clone());
-                    if let Some(value) = self.get_value(bindings) {
-                        (handler.execute)(state, handler.target_id, value);
-                    }
-                }
 
                 fn get_value(self, bindings: &Bindings) -> Option<T> {
                     let node = bindings.0[self.0].0.downcast_ref::< [< Binding $n Node >] <$( [< S $i >] ),+ , T>>().unwrap();
@@ -143,12 +127,12 @@ macro_rules! binding_n {
                     Some((node.map)($( [< value_ $i >] ),+))
                 }
 
-                fn knoke_handlers(self, state: &mut dyn State) {
+                fn knoke_handler(self, state: &mut dyn State) {
                     let bindings: &Bindings = state.get();
                     if let Some(value) = self.get_value(bindings) {
                         let node = bindings.0[self.0].0.downcast_ref::< [< Binding $n Node >] <$( [< S $i >] ),+ , T>>().unwrap();
-                        for handler in node.handlers.clone() {
-                            (handler.execute)(state, handler.target_id, value.clone());
+                        if let Some(handler) = node.handler.clone() {
+                            unsafe { (handler.execute)(state, handler.target, value); }
                         }
                     }
                 }
@@ -160,13 +144,28 @@ macro_rules! binding_n {
             > Binding for [< Binding $n >] <$( [< S $i >] , )+ T> {
                 type Value = T;
 
-                fn drop(&self, state: &mut dyn State) {
+                fn handle(
+                    &self,
+                    state: &mut dyn State,
+                    target: Global,
+                    execute: unsafe fn(state: &mut dyn State, target: Global, value: T),
+                ) {
+                    let handler = GlobalHandler { target, execute };
+                    let bindings: &mut Bindings = state.get_mut();
+                    let node = bindings.0[self.0].0.downcast_mut::< [< Binding $n Node >] <$( [< S $i >] ),+ , T>>().unwrap();
+                    node.handler = Some(handler.clone());
+                    if let Some(value) = self.get_value(bindings) {
+                        unsafe { (handler.execute)(state, handler.target, value); }
+                    }
+                }
+
+                fn stop(&self, state: &mut dyn State) {
                     let bindings: &mut Bindings = state.get_mut();
                     let node = bindings.0.remove(self.0);
                     let mut node = node.0.downcast::< [< Binding $n Node >] <$( [< S $i >] ),+ , T>>().unwrap();
                     $(
                         if let Some(source) = node. [< source_ $i >] .take() {
-                            unsafe { (source.unhandle)(state, source.source_id, source.source_data, source.handler_id); }
+                            unsafe { (source.unhandle)(state, source.source, source.handler_id); }
                         }
                     )+
                 }
@@ -193,9 +192,9 @@ macro_rules! binding_n {
                             return;
                         }
                     )+
-                    let value = (node.map)($( [< value_ $j >] ),+);
-                    for handler in node.handlers.clone() {
-                        (handler.execute)(state, handler.target_id, value.clone());
+                    if let Some(handler) = node.handler.clone() {
+                        let value = (node.map)($( [< value_ $j >] ),+);
+                        unsafe { (handler.execute)(state, handler.target, value); }
                     }
                 }
             )+
@@ -245,8 +244,17 @@ pub trait Source {
     fn handle(&mut self, handler: Handler<Self::Value>) -> (HandledSource<Self::Value>, &mut dyn State);
 }
 
-pub trait Binding: Debug {
+pub trait Binding: Debug + DynClone + Send + Sync {
     type Value: Convenient;
 
-    fn drop(&self, state: &mut dyn State);
+    fn handle(
+        &self,
+        state: &mut dyn State,
+        target: Global,
+        execute: unsafe fn(state: &mut dyn State, target: Global, value: Self::Value),
+    );
+
+    fn stop(&self, state: &mut dyn State);
 }
+
+clone_trait_object!(<Value: Convenient> Binding<Value=Value>);
