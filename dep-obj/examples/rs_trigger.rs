@@ -6,7 +6,7 @@
 #![feature(const_raw_ptr_deref)]
 
 mod circuit {
-    use components_arena::{Component, NewtypeComponentId, Id, Arena, ComponentClassToken};
+    use components_arena::{Component, NewtypeComponentId, Id, Arena};
     use dep_obj::dep_obj;
     use downcast_rs::{Downcast, impl_downcast};
     use dyn_context::{SelfState};
@@ -60,27 +60,15 @@ mod circuit {
     impl SelfState for Circuit { }
 
     impl Circuit {
-        pub fn new(token: &mut CircuitToken) -> Self {
-            Circuit {
-                arena: Arena::new(&mut token.0)
-            }
-        }
-    }
-
-    pub struct CircuitToken(ComponentClassToken<ChipNode>);
-
-    impl CircuitToken {
-        pub fn new() -> Option<Self> {
-            ComponentClassToken::new().map(CircuitToken)
-        }
+        pub fn new() -> Self { Circuit { arena: Arena::new() } }
     }
 }
 
 mod or_chip {
     use crate::circuit::*;
-    use components_arena::{ComponentId, RawId};
+    use components_arena::{ComponentId};
     use dep_obj::{dep_type};
-    use dep_obj::flow::{Just};
+    use dep_obj::binding::{Flows, Flow2};
     use dyn_context::{State, StateExt};
 
     dep_type! {
@@ -97,15 +85,15 @@ mod or_chip {
             let legs = Self::new_priv();
             let circuit: &mut Circuit = state.get_mut();
             let chip = Chip::new(circuit, |chip| (Box::new(legs) as _, chip));
-            let in_1 = chip.legs(state).prop(OrLegs::IN_1).values();
-            let in_2 = chip.legs(state).prop(OrLegs::IN_2).values();
-            in_1.zip(in_2, state).handle(state, chip, Self::update);
+            let flows: &mut Flows = state.get_mut();
+            let flow = Flow2::new(flows, |(_, in_1), (_, in_2)| in_1 | in_2);
+            flow.set_source_1(&mut chip.legs(state).prop(OrLegs::IN_1));
+            flow.set_source_2(&mut chip.legs(state).prop(OrLegs::IN_2));
+            flow.handle(state, chip, |state, chip, out| {
+                let chip = Chip::from_raw(chip);
+                chip.legs(state).prop(OrLegs::OUT).set_distinct(out);
+            });
             chip
-        }
-
-        fn update(state: &mut dyn State, chip: RawId, Just((in_1, in_2)): Just<(bool, bool)>) {
-            let chip = Chip::from_raw(chip);
-            chip.legs(state).prop(OrLegs::OUT).set_distinct(in_1 | in_2);
         }
     }
 
@@ -114,9 +102,9 @@ mod or_chip {
 
 mod not_chip {
     use crate::circuit::*;
-    use components_arena::{ComponentId, RawId};
+    use components_arena::{ComponentId};
     use dep_obj::dep_type;
-    use dep_obj::flow::Just;
+    use dep_obj::binding::{Flows, Flow1};
     use dyn_context::{State, StateExt};
 
     dep_type! {
@@ -132,13 +120,14 @@ mod not_chip {
             let circuit: &mut Circuit = state.get_mut();
             let legs = Self::new_priv();
             let chip = Chip::new(circuit, |chip| (Box::new(legs) as _, chip));
-            chip.legs(state).prop(NotLegs::IN_).values().handle(state, chip, Self::update);
+            let flows: &mut Flows = state.get_mut();
+            let flow = Flow1::new(flows, |(_, in_1): (bool, bool)| !in_1);
+            flow.set_source_1(&mut chip.legs(state).prop(NotLegs::IN_));
+            flow.handle(state, chip, |state, chip, out| {
+                let chip = Chip::from_raw(chip);
+                chip.legs(state).prop(NotLegs::OUT).set_distinct(out);
+            });
             chip
-        }
-
-        fn update(state: &mut dyn State, chip: RawId, Just(in_): Just<bool>) {
-            let chip = Chip::from_raw(chip);
-            chip.legs(state).prop(NotLegs::OUT).set_distinct(!in_);
         }
     }
 
@@ -147,7 +136,7 @@ mod not_chip {
 
 use circuit::*;
 use components_arena::{ComponentId, RawId};
-use dep_obj::flow::{Flows, FlowsToken, Just};
+use dep_obj::binding::{Flows};
 use dyn_context::{State, StateRefMut};
 use not_chip::*;
 use or_chip::*;
@@ -193,10 +182,8 @@ impl State for TriggerState {
 }
 
 fn main() {
-    let mut circuit_token = CircuitToken::new().unwrap();
-    let mut circuit = Circuit::new(&mut circuit_token);
-    let mut flows_token = FlowsToken::new().unwrap();
-    let mut flows = Flows::new(&mut flows_token);
+    let mut circuit = Circuit::new();
+    let mut flows = Flows::new();
     let chips = (&mut circuit).merge_mut_and_then(|state| {
         let not_1 = NotLegs::new(state);
         let not_2 = NotLegs::new(state);
@@ -209,11 +196,11 @@ fn main() {
         flows,
         chips: chips.clone(),
     };
-    let not_out_to_or_in = |state: &mut dyn State, or: RawId, Just(out): Just<bool>| {
+    let not_out_to_or_in = |state: &mut dyn State, or: RawId, out: bool| {
         let or = Chip::from_raw(or);
         or.legs(state).prop(OrLegs::IN_2).set_uncond(out);
     };
-    let or_out_to_not_out = |state: &mut dyn State, not: RawId, Just(out): Just<bool>| {
+    let or_out_to_not_out = |state: &mut dyn State, not: RawId, out: bool| {
         let not = Chip::from_raw(not);
         not.legs(state).prop(NotLegs::IN_).set_uncond(out);
     };
@@ -221,7 +208,7 @@ fn main() {
     chips.not_2.legs(state).prop(NotLegs::OUT).values().handle(state, chips.or_1, not_out_to_or_in);
     chips.or_1.legs(state).prop(OrLegs::OUT).values().handle(state, chips.not_1, or_out_to_not_out);
     chips.or_2.legs(state).prop(OrLegs::OUT).values().handle(state, chips.not_2, or_out_to_not_out);
-    chips.not_1.legs(state).prop(NotLegs::OUT).changes().handle(state, (), |_, _, Just((old, new))| {
+    chips.not_1.legs(state).prop(NotLegs::OUT).changes().handle(state, (), |_, _, (old, new)| {
         let old = if old { "1" } else { "0" };
         let new = if new { "1" } else { "0" };
         println!("{} -> {}", old, new);
