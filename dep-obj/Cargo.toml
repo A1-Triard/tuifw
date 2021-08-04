@@ -16,7 +16,7 @@ rustc-args = ["--cfg", "docsrs"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-components-arena = { version = "2.1.0" }
+components-arena = { version = "2.1.1" }
 downcast-rs = "1.2.0"
 dyn-clone = "1.0.2"
 dyn-context = "0.7.0"
