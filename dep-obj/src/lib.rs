@@ -508,6 +508,10 @@ impl<Owner: DepType, ItemType: Convenient> DepVec<Owner, ItemType> {
             handler.0.execute(state, (change.clone(), vec.clone()));
         }
     }
+
+    pub fn source(self, obj: Glob<Owner::Id, Owner>) -> DepVecSource<Owner, ItemType> {
+        DepVecSource { obj, vec: self }
+    }
 }
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
