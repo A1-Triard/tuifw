@@ -1,7 +1,9 @@
 use alloc::vec::Vec;
-use components_arena::{ComponentId, RawId};
+use components_arena::ComponentId;
 use core::fmt::Debug;
 use core::ops::Range;
+use dyn_context::State;
+use educe::Educe;
 
 /// A type should satisfy this trait to be a dependency property type,
 /// a dependency vector item type, or a flow data type.
@@ -9,23 +11,12 @@ pub trait Convenient: Clone + Debug + Send + Sync + 'static { }
 
 impl<T: Clone + Debug + Send + Sync + 'static> Convenient for T { }
 
-#[derive(Debug, Clone, Copy)]
-pub struct Global {
-    pub id: RawId,
-    pub a: usize,
-    pub b: usize,
-}
-
-impl Default for Global {
-    fn default() -> Self {
-        Global { id: ().into_raw(), a: 0, b: 0 }
-    }
-}
-
-impl<Id: ComponentId> From<Id> for Global {
-    fn from(id: Id) -> Self {
-        Global { id: id.into_raw(), a: 0, b: 0 }
-    }
+#[derive(Educe)]
+#[educe(Debug, Clone, Copy)]
+pub struct Glob<Id: ComponentId, Obj> {
+    pub id: Id,
+    #[educe(Debug(ignore))]
+    pub get_obj_mut: for<'a> fn(state: &'a mut dyn State, id: Id) -> &'a mut Obj,
 }
 
 #[derive(Debug, Clone)]

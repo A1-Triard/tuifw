@@ -13,7 +13,7 @@ mod circuit {
     use macro_attr_2018::macro_attr;
     use std::fmt::Debug;
 
-    pub trait ChipLegs: Downcast + Debug + Send + Sync { }
+    pub trait ChipLegs: Downcast + Debug { }
 
     impl_downcast!(ChipLegs);
 
@@ -86,9 +86,9 @@ mod or_chip {
             let chip = Chip::new(circuit, |chip| (Box::new(legs) as _, chip));
             let bindings: &mut Bindings = state.get_mut();
             let binding = Binding2::new(bindings, |(_, in_1), (_, in_2)| in_1 | in_2);
-            binding.set_source_1(&mut OrLegs::IN_1.source(&mut chip.legs(state)));
-            binding.set_source_2(&mut OrLegs::IN_2.source(&mut chip.legs(state)));
-            OrLegs::OUT.bind_distinct(&mut chip.legs(state), Box::new(binding));
+            binding.set_source_1(state, &mut OrLegs::IN_1.source(chip.legs()));
+            binding.set_source_2(state, &mut OrLegs::IN_2.source(chip.legs()));
+            OrLegs::OUT.bind_distinct(state, chip.legs(), binding);
             chip
         }
     }
@@ -117,8 +117,8 @@ mod not_chip {
             let chip = Chip::new(circuit, |chip| (Box::new(legs) as _, chip));
             let bindings: &mut Bindings = state.get_mut();
             let binding = Binding1::new(bindings, |(_, in_1): (bool, bool)| !in_1);
-            binding.set_source_1(&mut NotLegs::IN_.source(&mut chip.legs(state)));
-            NotLegs::OUT.bind_distinct(&mut chip.legs(state), Box::new(binding));
+            binding.set_source_1(state, &mut NotLegs::IN_.source(chip.legs()));
+            NotLegs::OUT.bind_distinct(state, chip.legs(), binding);
             chip
         }
     }
@@ -127,12 +127,11 @@ mod not_chip {
 }
 
 use circuit::*;
-use dep_obj::binding::{Binding, Binding1, Bindings};
+use dep_obj::binding::{Binding1, Bindings};
 use dyn_context::{State, StateRefMut};
 use not_chip::*;
 use or_chip::*;
 use std::any::{Any, TypeId};
-use dep_obj::Global;
 
 #[derive(Debug, Clone)]
 struct TriggerChips {
@@ -189,31 +188,31 @@ fn main() {
         chips: chips.clone(),
     };
     let not_1_out_to_or_2_in = Binding1::new(&mut state.bindings, |(_, value)| value);
-    not_1_out_to_or_2_in.set_source_1(&mut NotLegs::OUT.source(&mut chips.not_1.legs(state)));
-    OrLegs::IN_2.bind_uncond(&mut chips.or_2.legs(state), Box::new(not_1_out_to_or_2_in));
+    not_1_out_to_or_2_in.set_source_1(state, &mut NotLegs::OUT.source(chips.not_1.legs()));
+    OrLegs::IN_2.bind_uncond(state, chips.or_2.legs(), not_1_out_to_or_2_in);
     let not_2_out_to_or_1_in = Binding1::new(&mut state.bindings, |(_, value)| value);
-    not_2_out_to_or_1_in.set_source_1(&mut NotLegs::OUT.source(&mut chips.not_2.legs(state)));
-    OrLegs::IN_2.bind_uncond(&mut chips.or_1.legs(state), Box::new(not_2_out_to_or_1_in));
+    not_2_out_to_or_1_in.set_source_1(state, &mut NotLegs::OUT.source(chips.not_2.legs()));
+    OrLegs::IN_2.bind_uncond(state, chips.or_1.legs(), not_2_out_to_or_1_in);
     let or_1_out_to_not_1_in = Binding1::new(&mut state.bindings, |(_, value)| value);
-    or_1_out_to_not_1_in.set_source_1(&mut OrLegs::OUT.source(&mut chips.or_1.legs(state)));
-    NotLegs::IN_.bind_uncond(&mut chips.not_1.legs(state), Box::new(or_1_out_to_not_1_in));
+    or_1_out_to_not_1_in.set_source_1(state, &mut OrLegs::OUT.source(chips.or_1.legs()));
+    NotLegs::IN_.bind_uncond(state, chips.not_1.legs(), or_1_out_to_not_1_in);
     let or_2_out_to_not_2_in = Binding1::new(&mut state.bindings, |(_, value)| value);
-    or_2_out_to_not_2_in.set_source_1(&mut OrLegs::OUT.source(&mut chips.or_2.legs(state)));
-    NotLegs::IN_.bind_uncond(&mut chips.not_2.legs(state), Box::new(or_2_out_to_not_2_in));
+    or_2_out_to_not_2_in.set_source_1(state, &mut OrLegs::OUT.source(chips.or_2.legs()));
+    NotLegs::IN_.bind_uncond(state, chips.not_2.legs(), or_2_out_to_not_2_in);
 
     let print_out = Binding1::new(&mut state.bindings, |x| x);
-    print_out.set_source_1(&mut NotLegs::OUT.source(&mut chips.not_2.legs(state)));
-    print_out.handle(state, Global::default(), |_, _, (old, new)| {
+    print_out.set_source_1(state, &mut NotLegs::OUT.source(chips.not_2.legs()));
+    print_out.handle_fn(state, (), |_, _, (old, new)| {
         let old = if old { "1" } else { "0" };
         let new = if new { "1" } else { "0" };
         println!("{} -> {}", old, new);
     });
-    OrLegs::IN_1.set_distinct(&mut chips.or_1.legs(state), true);
-    OrLegs::IN_1.set_distinct(&mut chips.or_1.legs(state), false);
-    OrLegs::IN_1.set_distinct(&mut chips.or_2.legs(state), true);
-    OrLegs::IN_1.set_distinct(&mut chips.or_2.legs(state), false);
-    OrLegs::IN_1.set_distinct(&mut chips.or_1.legs(state), true);
-    OrLegs::IN_1.set_distinct(&mut chips.or_1.legs(state), false);
-    OrLegs::IN_1.set_distinct(&mut chips.or_2.legs(state), true);
-    OrLegs::IN_1.set_distinct(&mut chips.or_2.legs(state), false);
+    OrLegs::IN_1.set_distinct(state, chips.or_1.legs(), true);
+    OrLegs::IN_1.set_distinct(state, chips.or_1.legs(), false);
+    OrLegs::IN_1.set_distinct(state, chips.or_2.legs(), true);
+    OrLegs::IN_1.set_distinct(state, chips.or_2.legs(), false);
+    OrLegs::IN_1.set_distinct(state, chips.or_1.legs(), true);
+    OrLegs::IN_1.set_distinct(state, chips.or_1.legs(), false);
+    OrLegs::IN_1.set_distinct(state, chips.or_2.legs(), true);
+    OrLegs::IN_1.set_distinct(state, chips.or_2.legs(), false);
 }
