@@ -214,9 +214,9 @@ impl<ItemType: Convenient> DepVecEntry<ItemType> {
 /// # #![feature(const_maybe_uninit_as_ptr)]
 /// # #![feature(const_ptr_offset_from)]
 /// # #![feature(const_raw_ptr_deref)]
-/// use components_arena::{Arena, Component, ComponentClassToken, NewtypeComponentId, Id};
+/// use components_arena::{Arena, Component, NewtypeComponentId, Id};
 /// use dep_obj::{dep_obj, dep_type};
-/// use dep_obj::binding::{Flows, FlowsToken, Just};
+/// use dep_obj::binding::{Bindings, Binding1};
 /// use dyn_context::{State, StateExt};
 /// use macro_attr_2018::macro_attr;
 /// use std::any::{Any, TypeId};
@@ -242,15 +242,15 @@ impl<ItemType: Convenient> DepVecEntry<ItemType> {
 /// }
 ///
 /// pub struct MyApp {
-///     flows: Flows,
+///     bindings: Bindings,
 ///     my_dep_types: Arena<MyDepTypePrivateData>,
 ///     res: i32,
 /// }
 ///
 /// impl State for MyApp {
 ///     fn get_raw(&self, ty: TypeId) -> Option<&dyn Any> {
-///         if ty == TypeId::of::<Flows>() {
-///             Some(&self.flows)
+///         if ty == TypeId::of::<Bindings>() {
+///             Some(&self.bindings)
 ///         } else if ty == TypeId::of::<MyApp>() {
 ///             Some(self)
 ///         } else {
@@ -259,8 +259,8 @@ impl<ItemType: Convenient> DepVecEntry<ItemType> {
 ///     }
 ///
 ///     fn get_mut_raw(&mut self, ty: TypeId) -> Option<&mut dyn Any> {
-///         if ty == TypeId::of::<Flows>() {
-///             Some(&mut self.flows)
+///         if ty == TypeId::of::<Bindings>() {
+///             Some(&mut self.bindings)
 ///         } else if ty == TypeId::of::<MyApp>() {
 ///             Some(self)
 ///         } else {
@@ -284,20 +284,20 @@ impl<ItemType: Convenient> DepVecEntry<ItemType> {
 /// }
 ///
 /// fn main() {
-///     let mut my_dep_types_token = ComponentClassToken::new().unwrap();
-///     let mut flows_token = FlowsToken::new().unwrap();
-///     let mut app = MyApp {
-///         flows: Flows::new(&mut flows_token),
-///         my_dep_types: Arena::new(&mut my_dep_types_token),
+///     let app = &mut MyApp {
+///         bindings: Bindings::new(),
+///         my_dep_types: Arena::new(),
 ///         res: 0,
 ///     };
-///     let id = MyDepTypeId::new(&mut app);
-///     id.obj(&mut app).prop(MyDepType::PROP_2).values().handle(&mut app, (), |state, _, Just(value)| {
-///         let app: &mut MyApp = state.get_mut();
+///     let id = MyDepTypeId::new(app);
+///     let res = Binding1::new(&mut app.bindings, |(_, x)| Some(x));
+///     res.set_source_1(app, &mut MyDepType::PROP_2.source(id.obj()));
+///     res.handle_fn(app, (), |app, (), value| {
+///         let app: &mut MyApp = app.get_mut();
 ///         app.res = value;
 ///     });
 ///     assert_eq!(app.res, 10);
-///     id.obj(&mut app).prop(MyDepType::PROP_2).set_distinct(5);
+///     MyDepType::PROP_2.set_distinct(app, id.obj(), 5);
 ///     assert_eq!(app.res, 5);
 /// }
 /// ```
