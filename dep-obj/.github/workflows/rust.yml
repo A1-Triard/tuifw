@@ -16,7 +16,6 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
         rust: [nightly]
-        features: ["", "--features=std"]
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v2
@@ -28,25 +27,22 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: build
-        args: "--verbose --no-default-features ${{ matrix.features }}"
+        args: "--verbose"
     - name: test --tests
       uses: actions-rs/cargo@v1
       with:
         command: test
         args: "--verbose --tests"
-      if: "${{ matrix.features == '--features=std' }}"
     - name: test --doc
       uses: actions-rs/cargo@v1
       with:
         command: test
         args: "--verbose --doc"
-      if: "${{ matrix.features == '--features=std' }}"
     - name: doc
       uses: actions-rs/cargo@v1
       with:
         command: doc
         args: "--verbose"
-      if: "${{ matrix.features == '--features=std' }}"
     - name: test --docsrs
       uses: actions-rs/cargo@v1
       with:
@@ -55,7 +51,6 @@ jobs:
       env:
         RUSTFLAGS: "--cfg docsrs"
         RUSTDOCFLAGS: "--cfg docsrs"
-      if: "${{ matrix.features == '--features=std' }}"
     - name: --docsrs
       uses: actions-rs/cargo@v1
       with:
@@ -64,15 +59,18 @@ jobs:
       env:
         RUSTFLAGS: "--cfg docsrs"
         RUSTDOCFLAGS: "--cfg docsrs"
-      if: "${{ matrix.features == '--features=std' }}"
     - name: build --release
       uses: actions-rs/cargo@v1
       with:
         command: build
-        args: "--verbose --release --no-default-features ${{ matrix.features }}"
+        args: "--verbose --release"
     - name: test --example rs_trigger
       uses: actions-rs/cargo@v1
       with:
         command: test
         args: "--verbose --example rs_trigger"
-      if: "${{ matrix.features == '--features=std' }}"
+    - name: test --example inventory
+      uses: actions-rs/cargo@v1
+      with:
+        command: test
+        args: "--verbose --example inventory"
