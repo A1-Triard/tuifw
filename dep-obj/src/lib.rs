@@ -570,7 +570,7 @@ impl<Owner: DepType, PropType: Convenient> AnySetter<Owner> for Setter<Owner, Pr
 
 /// A dictionary mapping a subset of target type properties to the values.
 /// Every dependency object can have an applied style at every moment.
-/// To switch an applied style, use the [`DepObj::apply_style`] function.
+/// To switch an applied style, use the [`OptionStyleExt::apply`] function.
 #[derive(Educe)]
 #[educe(Debug, Clone, Default)]
 pub struct Style<Owner: DepType> {
