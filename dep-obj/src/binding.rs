@@ -115,6 +115,12 @@ impl<T: Convenient> Binding<T> {
         node.sources.unhandle(state);
     }
 
+    pub fn get_value(self, state: &dyn State) -> Option<T> {
+        let bindings: &Bindings = state.get();
+        let node = bindings.0[self.0].0.downcast_ref::<BindingNode<T>>().unwrap();
+        node.sources.get_value()
+    }
+
     fn knoke_handler(self, state: &mut dyn State) {
         let bindings: &Bindings = state.get();
         let node = bindings.0[self.0].0.downcast_ref::<BindingNode<T>>().unwrap();
@@ -222,6 +228,10 @@ macro_rules! binding_n {
                     execute: fn(state: &mut dyn State, context: Context, value: T)
                 ) {
                     Binding::from(self).handle_fn(state, context, execute);
+                }
+
+                pub fn get_value(self, state: &dyn State) -> Option<T> {
+                    Binding::from(self).get_value(state)
                 }
 
                 $(
