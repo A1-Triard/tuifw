@@ -148,7 +148,7 @@ macro_rules! binding_n {
                     [< source_ $i >] : Option<HandledSource< [< S $i >] >>,
                 )+
                 #[educe(Debug(ignore))]
-                map: fn( $( [< S $i >] ),+ ) -> T,
+                filter_map: fn( $( [< S $i >] ),+ ) -> Option<T>,
             }
 
             impl<
@@ -174,7 +174,7 @@ macro_rules! binding_n {
                             return None;
                         }
                     )+
-                    Some((self.map)($( [< value_ $i >] ),+))
+                    (self.filter_map)($( [< value_ $i >] ),+)
                 }
             }
 
@@ -193,14 +193,14 @@ macro_rules! binding_n {
             > [< Binding $n >] < $( [< S $i >] , )+ T> {
                 pub fn new(
                     bindings: &mut Bindings,
-                    map: fn( $( [< S $i >] ),+ ) -> T
+                    filter_map: fn( $( [< S $i >] ),+ ) -> Option<T>
                 ) -> Self {
                     let id = bindings.0.insert(|id| {
                         let sources: [< Binding $n NodeSources >] <$( [< S $i >] ),+ , T> = [< Binding $n NodeSources >] {
                             $(
                                 [< source_ $i >] : None,
                             )+
-                            map,
+                            filter_map,
                         };
                         let node: BindingNode<T> = BindingNode {
                             sources: Box::new(sources),
