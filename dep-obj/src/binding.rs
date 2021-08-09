@@ -64,6 +64,12 @@ impl Bindings {
     pub const fn new() -> Self { Bindings(Arena::new()) }
 }
 
+impl Drop for Bindings {
+    fn drop(&mut self) {
+        debug_assert!(self.0.items().is_empty(), "there are non-dropped bindings");
+    }
+}
+
 trait AnyBindingNodeSources: Debug + Downcast {
     type Value: Convenient;
     fn unhandle(&mut self, state: &mut dyn State);
