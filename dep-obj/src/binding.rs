@@ -236,6 +236,10 @@ macro_rules! binding_n {
                     Binding::from(self).handle_fn(state, context, execute);
                 }
 
+                pub fn drop_binding(self, state: &mut dyn State) {
+                    Binding::from(self).drop_binding(state);
+                }
+
                 pub fn get_value(self, state: &dyn State) -> Option<T> {
                     Binding::from(self).get_value(state)
                 }

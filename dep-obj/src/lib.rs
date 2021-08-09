@@ -298,6 +298,7 @@ impl<ItemType: Convenient> DepVecEntry<ItemType> {
 ///     assert_eq!(app.res, 10);
 ///     MyDepType::PROP_2.set_distinct(app, id.obj(), 5);
 ///     assert_eq!(app.res, 5);
+///     res.drop_binding(app);
 /// }
 /// ```
 pub trait DepType: Sized {
