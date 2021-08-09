@@ -4,7 +4,6 @@
 #![feature(const_mut_refs)]
 #![feature(const_ptr_offset_from)]
 #![feature(const_raw_ptr_deref)]
-#![feature(shrink_to)]
 #![feature(try_reserve)]
 #![feature(unchecked_math)]
 
