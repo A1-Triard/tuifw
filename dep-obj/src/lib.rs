@@ -287,7 +287,7 @@ impl<ItemType: Convenient> DepVecEntry<ItemType> {
 /// use components_arena::{Arena, Component, NewtypeComponentId, Id};
 /// use dep_obj::{dep_obj, dep_type};
 /// use dep_obj::binding::{Bindings, Binding1};
-/// use dyn_context::{State, StateExt};
+/// use dyn_context::state::{State, StateExt};
 /// use macro_attr_2018::macro_attr;
 /// use std::any::{Any, TypeId};
 ///
@@ -347,6 +347,12 @@ impl<ItemType: Convenient> DepVecEntry<ItemType> {
 ///         }, MyDepTypeId(id)))
 ///     }
 ///
+///     pub fn drop_my_dep_type(self, state: &mut dyn State) {
+///         self.drop_bindings_priv(state);
+///         let app: &mut MyApp = state.get_mut();
+///         app.my_dep_types.remove(self.0);
+///     }
+///
 ///     dep_obj! {
 ///         pub fn obj(self as this, app: MyApp) -> MyDepType {
 ///             if mut {
@@ -374,6 +380,7 @@ impl<ItemType: Convenient> DepVecEntry<ItemType> {
 ///     assert_eq!(app.res, 10);
 ///     MyDepType::PROP_2.set_distinct(app, id.obj(), 5);
 ///     assert_eq!(app.res, 5);
+///     id.drop_my_dep_type(app);
 ///     res.drop_binding(app);
 /// }
 /// ```
