@@ -11,6 +11,8 @@
 #![doc(test(attr(deny(warnings))))]
 #![doc(test(attr(allow(dead_code))))]
 #![doc(test(attr(allow(unused_variables))))]
+#![allow(clippy::option_map_unit_fn)]
+#![allow(clippy::type_complexity)]
 
 #![no_std]
 
@@ -154,7 +156,7 @@ pub use core::default::Default as std_default_Default;
 #[doc(hidden)]
 pub use core::fmt::Debug as std_fmt_Debug;
 #[doc(hidden)]
-pub use core::mem::replace as std_mem_replace;
+pub use core::mem::take as std_mem_take;
 #[doc(hidden)]
 pub use core::option::Option as std_option_Option;
 #[doc(hidden)]
@@ -172,15 +174,15 @@ pub use memoffset::offset_of as memoffset_offset_of;
 #[doc(hidden)]
 pub use paste::paste as paste_paste;
 
-use crate::binding::{AnyBinding, Binding, Target, Handler, Source, HandledSource, HandlerId, AnyHandler};
+use crate::binding::{AnyBinding, AnyHandler, Binding, HandledSource, Handler, HandlerId, Source, Target};
 use alloc::boxed::Box;
 use alloc::collections::TryReserveError;
 use alloc::vec;
 use alloc::vec::Vec;
-use components_arena::{Component, ComponentId, Arena, Id};
+use components_arena::{Arena, Component, ComponentId, Id};
 use core::any::{Any, TypeId};
 use core::fmt::Debug;
-use core::mem::replace;
+use core::mem::{replace, take};
 use core::ops::{Deref, DerefMut};
 use dyn_clone::{DynClone, clone_trait_object};
 use dyn_context::state::State;
@@ -221,7 +223,7 @@ impl<'a, Id: ComponentId, Obj> DerefMut for GlobMut<'a, Id, Obj> {
 }
 
 impl<Id: ComponentId, Obj> Glob<Id, Obj> {
-    pub fn get_mut<'a>(self, state: &'a mut dyn State) -> GlobMut<'a, Id, Obj> {
+    pub fn get_mut(self, state: &mut dyn State) -> GlobMut<Id, Obj> {
         let arena = (self.descriptor)().arena;
         GlobMut {
             arena: state.get_mut_raw(arena).unwrap_or_else(|| panic!("{:?} required", arena)),
@@ -256,7 +258,7 @@ impl<PropType: Convenient> DepPropEntry<PropType> {
     }
 
     pub fn take_all_handlers(&mut self, handlers: &mut Vec<Box<dyn AnyHandler>>) {
-        handlers.extend(replace(&mut self.handlers, Arena::new()).into_items().into_values().map(|x| x.0.into_any()));
+        handlers.extend(take(&mut self.handlers).into_items().into_values().map(|x| x.0.into_any()));
     }
 
     pub fn binding(&self) -> Option<Binding<PropType>> {
@@ -281,8 +283,8 @@ impl<ItemType: Convenient> DepVecEntry<ItemType> {
     }
 
     pub fn take_all_handlers(&mut self, handlers: &mut Vec<Box<dyn AnyHandler>>) {
-        handlers.extend(replace(&mut self.removed_items_handlers, Arena::new()).into_items().into_values().map(|x| x.0.into_any()));
-        handlers.extend(replace(&mut self.inserted_items_handlers, Arena::new()).into_items().into_values().map(|x| x.0.into_any()));
+        handlers.extend(take(&mut self.removed_items_handlers).into_items().into_values().map(|x| x.0.into_any()));
+        handlers.extend(take(&mut self.inserted_items_handlers).into_items().into_values().map(|x| x.0.into_any()));
     }
 }
 
@@ -441,7 +443,7 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         let mut obj_mut = obj.get_mut(state);
         let entry_mut = self.entry_mut(&mut obj_mut);
         let old = entry_mut.local.replace(value.clone()).unwrap_or_else(||
-            entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default).clone()
+            entry_mut.style.as_ref().unwrap_or(entry_mut.default).clone()
         );
         let handlers = entry_mut.handlers.items().clone().into_values();
         for handler in handlers {
@@ -453,7 +455,7 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         let mut obj_mut = obj.get_mut(state);
         let entry_mut = self.entry_mut(&mut obj_mut);
         if let Some(old) = entry_mut.local.take() {
-            let default = entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default).clone();
+            let default = entry_mut.style.as_ref().unwrap_or(entry_mut.default).clone();
             let handlers = entry_mut.handlers.items().clone().into_values();
             for handler in handlers {
                 handler.0.execute(state, (old.clone(), default.clone()));
@@ -466,11 +468,11 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         let entry_mut = self.entry_mut(&mut obj_mut);
         let old = entry_mut.local.as_ref()
             .or_else(|| entry_mut.style.as_ref())
-            .unwrap_or_else(|| entry_mut.default)
+            .unwrap_or(entry_mut.default)
             ;
         if &value == old { return; }
         let old = entry_mut.local.replace(value.clone()).unwrap_or_else(||
-            entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default).clone());
+            entry_mut.style.as_ref().unwrap_or(entry_mut.default).clone());
         let handlers = entry_mut.handlers.items().clone().into_values();
         for handler in handlers {
             handler.0.execute(state, (old.clone(), value.clone()));
@@ -481,7 +483,7 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         let mut obj_mut = obj.get_mut(state);
         let entry_mut = self.entry_mut(&mut obj_mut);
         if let Some(old) = entry_mut.local.take() {
-            let new = entry_mut.style.as_ref().unwrap_or_else(|| entry_mut.default).clone();
+            let new = entry_mut.style.as_ref().unwrap_or(entry_mut.default).clone();
             if new == old { return; }
             let handlers = entry_mut.handlers.items().clone().into_values();
             for handler in handlers {
@@ -602,7 +604,7 @@ impl<Owner: DepType, ItemType: Convenient> DepVec<Owner, ItemType> {
     pub fn clear(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>) {
         let mut obj_mut = obj.get_mut(state);
         let entry_mut = self.entry_mut(&mut obj_mut);
-        let items = replace(&mut entry_mut.items, Vec::new());
+        let items = take(&mut entry_mut.items);
         let handlers = entry_mut.removed_items_handlers.items().clone().into_values();
         for handler in handlers {
             handler.0.execute(state, items.clone());
@@ -849,7 +851,7 @@ impl<Owner: DepType + 'static, PropType: Convenient> Source<(PropType, PropType)
         let mut obj = self.obj.get_mut(state);
         let entry = self.prop.entry_mut(&mut obj);
         let old = entry.default.clone();
-        let new = entry.local.as_ref().or_else(|| entry.style.as_ref()).unwrap_or_else(|| entry.default).clone();
+        let new = entry.local.as_ref().or_else(|| entry.style.as_ref()).unwrap_or(entry.default).clone();
         let handler_id = entry.handlers.insert(|handler_id| (BoxedHandler(handler), handler_id));
         HandledSource {
             handler_id: Box::new(DepPropHandledSource { handler_id, obj: self.obj, prop: self.prop }),
@@ -1489,7 +1491,7 @@ macro_rules! dep_type_impl_raw {
                 }
 
                 fn dep_type_core_take_added_bindings_and_collect_all(&mut self) -> $crate::std_vec_Vec<$crate::binding::AnyBinding> {
-                    let mut $bindings = $crate::std_mem_replace(&mut self.dep_type_core_added_bindings, $crate::std_vec_Vec::new());
+                    let mut $bindings = $crate::std_mem_take(&mut self.dep_type_core_added_bindings);
                     let $this = self;
                     $($core_bindings)*
                     $bindings
