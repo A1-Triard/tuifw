@@ -20,7 +20,6 @@ mod circuit {
     macro_attr! {
         #[derive(Debug, Component!)]
         struct ChipNode {
-            chip: Chip,
             legs: Box<dyn ChipLegs>,
         }
     }
@@ -38,7 +37,7 @@ mod circuit {
             let circuit: &mut Circuit = state.get_mut();
             circuit.arena.insert(|chip| {
                 let (legs,  result) = legs(Chip(chip));
-                (ChipNode { chip: Chip(chip), legs }, result)
+                (ChipNode { legs }, result)
             })
         }
 
@@ -206,7 +205,7 @@ fn main() {
 
     let print_out = Binding1::new(state, |x| Some(x));
     print_out.set_source_1(state, &mut NotLegs::OUT.source(chips.not_2.legs()));
-    print_out.set_target_fn(state, (), |_, _, (old, new)| {
+    print_out.set_target_fn(state, (), |_, (), (old, new)| {
         let old = if old { "1" } else { "0" };
         let new = if new { "1" } else { "0" };
         println!("{} -> {}", old, new);

@@ -165,7 +165,7 @@ fn main() {
     let shield = Item::new(game);
     ItemProps::NAME.set_uncond(game, shield.props(), Cow::Borrowed("Shield"));
     for item in [sword, shield] {
-        let log = Binding2::new(game, |(old, new), (_, name)| if old == new { None} else { Some((new, name)) });
+        let log = Binding2::new(game, |(old, new), (_, name)| if old == new { None } else { Some((new, name)) });
         log.set_source_1(game, &mut ItemProps::EQUIPPED.source(item.props()));
         log.set_source_2(game, &mut ItemProps::NAME.source(item.props()));
         log.set_target_fn(game, (), |game, (), (equipped, name)| {
