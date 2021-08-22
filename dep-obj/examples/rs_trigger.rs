@@ -7,13 +7,13 @@
 
 mod circuit {
     use components_arena::{Component, NewtypeComponentId, Id, Arena};
-    use dep_obj::dep_obj;
+    use dep_obj::{dep_obj, DepType};
     use downcast_rs::{Downcast, impl_downcast};
-    use dyn_context::{SelfState};
+    use dyn_context::state::{State, SelfState, StateExt};
     use macro_attr_2018::macro_attr;
     use std::fmt::Debug;
 
-    pub trait ChipLegs: Downcast + Debug { }
+    pub trait ChipLegs: Downcast + DepType<Id=Chip> { }
 
     impl_downcast!(ChipLegs);
 
@@ -32,22 +32,29 @@ mod circuit {
 
     impl Chip {
         pub fn new<T>(
-            circuit: &mut Circuit,
+            state: &mut dyn State,
             legs: impl FnOnce(Chip) -> (Box<dyn ChipLegs>, T)
         ) -> T {
+            let circuit: &mut Circuit = state.get_mut();
             circuit.arena.insert(|chip| {
                 let (legs,  result) = legs(Chip(chip));
                 (ChipNode { chip: Chip(chip), legs }, result)
             })
         }
 
-        pub fn drop(self, circuit: &mut Circuit) {
+        pub fn drop_chip(self, state: &mut dyn State) {
+            self.drop_bindings_priv(state);
+            let circuit: &mut Circuit = state.get_mut();
             circuit.arena.remove(self.0);
         }
 
         dep_obj! {
-            pub fn legs(self as this, circuit: Circuit) -> &mut dyn ChipLegs {
-                &mut circuit.arena[this.0].legs
+            pub fn legs(self as this, circuit: Circuit) -> trait ChipLegs {
+                if mut {
+                    &mut circuit.arena[this.0].legs
+                } else {
+                    &circuit.arena[this.0].legs
+                }
             }
         }
     }
@@ -67,8 +74,8 @@ mod circuit {
 mod or_chip {
     use crate::circuit::*;
     use dep_obj::{dep_type};
-    use dep_obj::binding::{Bindings, Binding2};
-    use dyn_context::{State, StateExt};
+    use dep_obj::binding::Binding2;
+    use dyn_context::state::State;
 
     dep_type! {
         #[derive(Debug)]
@@ -82,10 +89,8 @@ mod or_chip {
     impl OrLegs {
         pub fn new(state: &mut dyn State) -> Chip {
             let legs = Self::new_priv();
-            let circuit: &mut Circuit = state.get_mut();
-            let chip = Chip::new(circuit, |chip| (Box::new(legs) as _, chip));
-            let bindings: &mut Bindings = state.get_mut();
-            let binding = Binding2::new(bindings, |(_, in_1), (_, in_2)| Some(in_1 | in_2));
+            let chip = Chip::new(state, |chip| (Box::new(legs) as _, chip));
+            let binding = Binding2::new(state, |(_, in_1), (_, in_2)| Some(in_1 | in_2));
             binding.set_source_1(state, &mut OrLegs::IN_1.source(chip.legs()));
             binding.set_source_2(state, &mut OrLegs::IN_2.source(chip.legs()));
             OrLegs::OUT.bind_distinct(state, chip.legs(), binding);
@@ -99,8 +104,8 @@ mod or_chip {
 mod not_chip {
     use crate::circuit::*;
     use dep_obj::dep_type;
-    use dep_obj::binding::{Bindings, Binding1};
-    use dyn_context::{State, StateExt};
+    use dep_obj::binding::Binding1;
+    use dyn_context::state::State;
 
     dep_type! {
         #[derive(Debug)]
@@ -112,11 +117,9 @@ mod not_chip {
 
     impl NotLegs {
         pub fn new(state: &mut dyn State) -> Chip {
-            let circuit: &mut Circuit = state.get_mut();
             let legs = Self::new_priv();
-            let chip = Chip::new(circuit, |chip| (Box::new(legs) as _, chip));
-            let bindings: &mut Bindings = state.get_mut();
-            let binding = Binding1::new(bindings, |(_, in_1): (bool, bool)| Some(!in_1));
+            let chip = Chip::new(state, |chip| (Box::new(legs) as _, chip));
+            let binding = Binding1::new(state, |(_, in_1): (bool, bool)| Some(!in_1));
             binding.set_source_1(state, &mut NotLegs::IN_.source(chip.legs()));
             NotLegs::OUT.bind_distinct(state, chip.legs(), binding);
             chip
@@ -128,7 +131,7 @@ mod not_chip {
 
 use circuit::*;
 use dep_obj::binding::{Binding1, Bindings};
-use dyn_context::{State, StateRefMut};
+use dyn_context::state::{State, StateRefMut};
 use not_chip::*;
 use or_chip::*;
 use std::any::{Any, TypeId};
@@ -187,22 +190,23 @@ fn main() {
         bindings,
         chips: chips.clone(),
     };
-    let not_1_out_to_or_2_in = Binding1::new(&mut state.bindings, |(_, value)| Some(value));
+
+    let not_1_out_to_or_2_in = Binding1::new(state, |(_, value)| Some(value));
     not_1_out_to_or_2_in.set_source_1(state, &mut NotLegs::OUT.source(chips.not_1.legs()));
     OrLegs::IN_2.bind_uncond(state, chips.or_2.legs(), not_1_out_to_or_2_in);
-    let not_2_out_to_or_1_in = Binding1::new(&mut state.bindings, |(_, value)| Some(value));
+    let not_2_out_to_or_1_in = Binding1::new(state, |(_, value)| Some(value));
     not_2_out_to_or_1_in.set_source_1(state, &mut NotLegs::OUT.source(chips.not_2.legs()));
     OrLegs::IN_2.bind_uncond(state, chips.or_1.legs(), not_2_out_to_or_1_in);
-    let or_1_out_to_not_1_in = Binding1::new(&mut state.bindings, |(_, value)| Some(value));
+    let or_1_out_to_not_1_in = Binding1::new(state, |(_, value)| Some(value));
     or_1_out_to_not_1_in.set_source_1(state, &mut OrLegs::OUT.source(chips.or_1.legs()));
     NotLegs::IN_.bind_uncond(state, chips.not_1.legs(), or_1_out_to_not_1_in);
-    let or_2_out_to_not_2_in = Binding1::new(&mut state.bindings, |(_, value)| Some(value));
+    let or_2_out_to_not_2_in = Binding1::new(state, |(_, value)| Some(value));
     or_2_out_to_not_2_in.set_source_1(state, &mut OrLegs::OUT.source(chips.or_2.legs()));
     NotLegs::IN_.bind_uncond(state, chips.not_2.legs(), or_2_out_to_not_2_in);
 
-    let print_out = Binding1::new(&mut state.bindings, |x| Some(x));
+    let print_out = Binding1::new(state, |x| Some(x));
     print_out.set_source_1(state, &mut NotLegs::OUT.source(chips.not_2.legs()));
-    print_out.handle_fn(state, (), |_, _, (old, new)| {
+    print_out.set_target_fn(state, (), |_, _, (old, new)| {
         let old = if old { "1" } else { "0" };
         let new = if new { "1" } else { "0" };
         println!("{} -> {}", old, new);
@@ -215,4 +219,10 @@ fn main() {
     OrLegs::IN_1.set_distinct(state, chips.or_1.legs(), false);
     OrLegs::IN_1.set_distinct(state, chips.or_2.legs(), true);
     OrLegs::IN_1.set_distinct(state, chips.or_2.legs(), false);
+
+    print_out.drop_binding(state);
+    chips.or_1.drop_chip(state);
+    chips.or_2.drop_chip(state);
+    chips.not_2.drop_chip(state);
+    chips.not_1.drop_chip(state);
 }

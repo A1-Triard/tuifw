@@ -4,12 +4,24 @@ use components_arena::{Component, ComponentId, Id, Arena, RawId, NewtypeComponen
 use core::fmt::Debug;
 use downcast_rs::{Downcast, impl_downcast};
 use dyn_clone::{DynClone, clone_trait_object};
-use dyn_context::{SelfState, State, StateExt};
+use dyn_context::state::{SelfState, State, StateExt};
 use educe::Educe;
 use macro_attr_2018::macro_attr;
 use phantom_type::PhantomType;
 
+pub trait Target<T: Convenient>: Debug + DynClone {
+    fn execute(&self, state: &mut dyn State, value: T);
+    fn clear(&self, state: &mut dyn State);
+}
+
+clone_trait_object!(<T: Convenient> Target<T>);
+
+pub trait AnyHandler: Debug {
+    fn clear(&self, state: &mut dyn State);
+}
+
 pub trait Handler<T: Convenient>: Debug + DynClone {
+    fn into_any(self: Box<Self>) -> Box<dyn AnyHandler>;
     fn execute(&self, state: &mut dyn State, value: T);
 }
 
@@ -17,16 +29,18 @@ clone_trait_object!(<T: Convenient> Handler<T>);
 
 #[derive(Educe)]
 #[educe(Debug, Clone)]
-pub struct HandlerFn<Context: Debug + Clone, T: Convenient> {
+pub struct FnTarget<Context: Debug + Clone, T: Convenient> {
     context: Context,
     #[educe(Debug(ignore))]
     execute: fn(state: &mut dyn State, context: Context, value: T)
 }
 
-impl<Context: Debug + Clone, T: Convenient> Handler<T> for HandlerFn<Context, T> {
+impl<Context: Debug + Clone, T: Convenient> Target<T> for FnTarget<Context, T> {
     fn execute(&self, state: &mut dyn State, value: T) {
         (self.execute)(state, self.context.clone(), value);
     }
+
+    fn clear(&self, _state: &mut dyn State) { }
 }
 
 pub trait Source<T: Convenient>: Debug {
@@ -44,7 +58,7 @@ pub struct HandledSource<T: Convenient> {
 }
 
 trait AnyBindingNode: Debug + Downcast {
-    fn unhandle_sources(&mut self, state: &mut dyn State);
+    fn unhandle_sources_and_clear_target(&mut self, state: &mut dyn State);
 }
 
 impl_downcast!(AnyBindingNode);
@@ -82,12 +96,27 @@ impl_downcast!(AnyBindingNodeSources assoc Value where Value: Convenient);
 #[educe(Debug)]
 struct BindingNode<T: Convenient> {
     sources: Box<dyn AnyBindingNodeSources<Value=T>>,
-    handler: Option<Box<dyn Handler<T>>>,
+    target: Option<Box<dyn Target<T>>>,
 }
 
 impl<T: Convenient> AnyBindingNode for BindingNode<T> {
-    fn unhandle_sources(&mut self, state: &mut dyn State) {
+    fn unhandle_sources_and_clear_target(&mut self, state: &mut dyn State) {
         self.sources.unhandle(state);
+        self.target.as_ref().map(|x| x.clear(state));
+    }
+}
+
+macro_attr! {
+    #[derive(Educe, NewtypeComponentId!)]
+    #[educe(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
+    pub struct AnyBinding(Id<BoxedBindingNode>);
+}
+
+impl AnyBinding {
+    pub fn drop_binding(self, state: &mut dyn State) {
+        let bindings: &mut Bindings = state.get_mut();
+        let mut node = bindings.0.remove(self.0);
+        node.0.unhandle_sources_and_clear_target(state);
     }
 }
 
@@ -98,27 +127,27 @@ macro_attr! {
 }
 
 impl<T: Convenient> Binding<T> {
-    pub fn handle(self, state: &mut dyn State, handler: Box<dyn Handler<T>>) {
+    pub fn set_target(self, state: &mut dyn State, target: Box<dyn Target<T>>) {
         let bindings: &mut Bindings = state.get_mut();
         let node = bindings.0[self.0].0.downcast_mut::<BindingNode<T>>().unwrap();
-        node.handler = Some(handler.clone());
-        self.knoke_handler(state);
+        node.target = Some(target);
+        self.knoke_target(state);
     }
 
-    pub fn handle_fn<Context: Debug + Clone + 'static>(
+    pub fn set_target_fn<Context: Debug + Clone + 'static>(
         self,
         state: &mut dyn State,
         context: Context,
         execute: fn(state: &mut dyn State, context: Context, value: T)
     ) {
-        self.handle(state, Box::new(HandlerFn { context, execute }));
+        self.set_target(state, Box::new(FnTarget { context, execute }));
     }
 
     pub fn drop_binding(self, state: &mut dyn State) {
         let bindings: &mut Bindings = state.get_mut();
         let node = bindings.0.remove(self.0);
         let mut node = node.0.downcast::<BindingNode<T>>().unwrap();
-        node.sources.unhandle(state);
+        node.unhandle_sources_and_clear_target(state);
     }
 
     pub fn get_value(self, state: &dyn State) -> Option<T> {
@@ -127,14 +156,20 @@ impl<T: Convenient> Binding<T> {
         node.sources.get_value()
     }
 
-    fn knoke_handler(self, state: &mut dyn State) {
+    fn knoke_target(self, state: &mut dyn State) {
         let bindings: &Bindings = state.get();
         let node = bindings.0[self.0].0.downcast_ref::<BindingNode<T>>().unwrap();
         if let Some(value) = node.sources.get_value() {
-            if let Some(handler) = node.handler.clone() {
-                handler.execute(state, value);
+            if let Some(target) = node.target.clone() {
+                target.execute(state, value);
             }
         }
+    }
+}
+
+impl<T: Convenient> From<Binding<T>> for AnyBinding {
+    fn from(v: Binding<T>) -> AnyBinding {
+        AnyBinding(v.0)
     }
 }
 
@@ -204,9 +239,10 @@ macro_rules! binding_n {
                 T: Convenient
             > [< Binding $n >] < $( [< S $i >] , )+ T> {
                 pub fn new(
-                    bindings: &mut Bindings,
+                    state: &mut dyn State,
                     filter_map: fn( $( [< S $i >] ),+ ) -> Option<T>
                 ) -> Self {
+                    let bindings: &mut Bindings = state.get_mut();
                     let id = bindings.0.insert(|id| {
                         let sources: [< Binding $n NodeSources >] <$( [< S $i >] ),+ , T> = [< Binding $n NodeSources >] {
                             $(
@@ -216,24 +252,24 @@ macro_rules! binding_n {
                         };
                         let node: BindingNode<T> = BindingNode {
                             sources: Box::new(sources),
-                            handler: None,
+                            target: None,
                         };
                         (BoxedBindingNode(Box::new(node)), id)
                     });
                     [< Binding $n >] (id, PhantomType::new())
                 }
 
-                pub fn handle(self, state: &mut dyn State, handler: Box<dyn Handler<T>>) {
-                    Binding::from(self).handle(state, handler);
+                pub fn set_target(self, state: &mut dyn State, target: Box<dyn Target<T>>) {
+                    Binding::from(self).set_target(state, target);
                 }
 
-                pub fn handle_fn<Context: Debug + Clone + 'static>(
+                pub fn set_target_fn<Context: Debug + Clone + 'static>(
                     self,
                     state: &mut dyn State,
                     context: Context,
                     execute: fn(state: &mut dyn State, context: Context, value: T)
                 ) {
-                    Binding::from(self).handle_fn(state, context, execute);
+                    Binding::from(self).set_target_fn(state, context, execute);
                 }
 
                 pub fn drop_binding(self, state: &mut dyn State) {
@@ -260,7 +296,7 @@ macro_rules! binding_n {
                         if let Some(source) = sources. [< source_ $i >] .replace(source) {
                             source.handler_id.unhandle(state);
                         }
-                        Binding::from(self).knoke_handler(state);
+                        Binding::from(self).knoke_target(state);
                     }
                 )+
             }
@@ -271,6 +307,15 @@ macro_rules! binding_n {
             > From< [< Binding $n >] < $( [< S $i >] , )+ T> > for Binding<T> {
                 fn from(v: [< Binding $n >] < $( [< S $i >] , )+ T> ) -> Binding<T> {
                     Binding(v.0, PhantomType::new())
+                }
+            }
+
+            impl<
+                $( [< S $i >] : Convenient, )+
+                T: Convenient
+            > From< [< Binding $n >] < $( [< S $i >] , )+ T> > for AnyBinding {
+                fn from(v: [< Binding $n >] < $( [< S $i >] , )+ T> ) -> AnyBinding {
+                    AnyBinding(v.0)
                 }
             }
 
@@ -287,14 +332,31 @@ macro_rules! binding_n {
                 impl<
                     $( [< S $j >] : Convenient, )+
                     T: Convenient
+                > AnyHandler for [< Binding $n Source $i Handler >] < $( [< S $j >] , )+ T >  {
+                    fn clear(&self, state: &mut dyn State) {
+                        let binding: [< Binding $n >] <$( [< S $j >] ),+ , T> = [< Binding $n >] ::from_raw(self.binding);
+                        let bindings: &mut Bindings = state.get_mut();
+                        let node = bindings.0[binding.0].0.downcast_mut::<BindingNode<T>>().unwrap();
+                        let sources = node.sources.downcast_mut::< [< Binding $n NodeSources >] <$( [< S $j >] ),+ , T>>().unwrap();
+                        sources. [< source_ $i >] .take();
+                    }
+                }
+
+                impl<
+                    $( [< S $j >] : Convenient, )+
+                    T: Convenient
                 > Handler< [< S $i >] > for [< Binding $n Source $i Handler >] < $( [< S $j >] , )+ T >  {
+                    fn into_any(self: Box<Self>) -> Box<dyn AnyHandler> {
+                        self
+                    }
+
                     fn execute(&self, state: &mut dyn State, value: [< S $i >] ) {
                         let binding: [< Binding $n >] <$( [< S $j >] ),+ , T> = [< Binding $n >] ::from_raw(self.binding);
                         let bindings: &mut Bindings = state.get_mut();
                         let node = bindings.0[binding.0].0.downcast_mut::<BindingNode<T>>().unwrap();
                         let sources = node.sources.downcast_mut::< [< Binding $n NodeSources >] <$( [< S $j >] ),+ , T>>().unwrap();
                         sources. [< source_ $i >] .as_mut().unwrap().value = value.clone();
-                        Binding::from(binding).knoke_handler(state);
+                        Binding::from(binding).knoke_target(state);
                     }
                 }
             )+
@@ -318,4 +380,3 @@ binding_n!(13; 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13);
 binding_n!(14; 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14);
 binding_n!(15; 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
 binding_n!(16; 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
-

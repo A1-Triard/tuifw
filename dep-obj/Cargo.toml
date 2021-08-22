@@ -16,10 +16,10 @@ rustc-args = ["--cfg", "docsrs"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-components-arena = "2.1.3"
+components-arena = "2.1.4"
 downcast-rs = "1.2.0"
 dyn-clone = "1.0.2"
-dyn-context = "0.7.0"
+dyn-context = "0.10.0"
 educe = "0.4.13"
 generics = "0.3.2"
 macro-attr-2018 = "1.1.1"
