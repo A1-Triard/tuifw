@@ -267,6 +267,11 @@ impl<ItemType: Convenient> DepVecEntry<ItemType> {
             inserted_items_handlers: Arena::new(),
         }
     }
+
+    pub fn take_all_handlers(&mut self, handlers: &mut Vec<Box<dyn AnyHandler>>) {
+        handlers.extend(replace(&mut self.removed_items_handlers, Arena::new()).into_items().into_values().map(|x| x.0.into_any()));
+        handlers.extend(replace(&mut self.inserted_items_handlers, Arena::new()).into_items().into_values().map(|x| x.0.into_any()));
+    }
 }
 
 /// A dependency type.
@@ -1380,12 +1385,10 @@ macro_rules! dep_type_impl_raw {
             ]
             [
                 $($core_bindings)*
-
-                // < $name $($r)* > :: [< $field:upper >] .collect_binding($this, &mut $bindings);
             ]
             [
                 $($core_handlers)*
-                //$this . $field .take_all_handlers(&mut $handlers);
+                $this . $field .take_all_handlers(&mut $handlers);
             ]
             [$(
                 [$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]
