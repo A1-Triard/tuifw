@@ -40,6 +40,12 @@ impl Item {
         game.items.insert(|id| (ItemData { props: ItemProps::new_priv() }, Item(id)))
     }
 
+    fn drop_item(self, state: &mut dyn State) {
+        self.drop_bindings_priv(state);
+        let game: &mut Game = state.get_mut();
+        game.items.remove(self.0);
+    }
+
     dep_obj! {
         fn props(self as this, game: Game) -> ItemProps {
             if mut {
@@ -81,6 +87,7 @@ impl Npc {
                 ItemProps::EQUIPPED.set_distinct(state, item.props(), false);
             }
         });
+        npc.props().add_binding(state, removed_items_binding.into());
         let inserted_items_binding = Binding1::new(state, |x| Some(x));
         inserted_items_binding.set_source_1(state, &mut NpcProps::EQUIPPED_ITEMS.inserted_items_source(npc.props()));
         inserted_items_binding.set_target_fn(state, (), |state, (), items| {
@@ -88,7 +95,14 @@ impl Npc {
                 ItemProps::EQUIPPED.set_distinct(state, item.props(), true);
             }
         });
+        npc.props().add_binding(state, inserted_items_binding.into());
         npc
+    }
+
+    fn drop_npc(self, state: &mut dyn State) {
+        self.drop_bindings_priv(state);
+        let game: &mut Game = state.get_mut();
+        game.npcs.remove(self.0);
     }
 
     dep_obj! {
@@ -158,6 +172,7 @@ fn main() {
             let game: &mut Game = game.get_mut();
             writeln!(&mut game.log, "{} {}.", name, if equipped { "equipped" } else { "unequipped" }).unwrap();
         });
+        item.props().add_binding(game, log.into());
     }
     NpcProps::EQUIPPED_ITEMS.push(game, npc.props(), sword);
     NpcProps::EQUIPPED_ITEMS.push(game, npc.props(), shield);
@@ -167,4 +182,7 @@ fn main() {
         Shield equipped.\n\
         Sword unequipped.\n\
     ");
+    npc.drop_npc(game);
+    sword.drop_item(game);
+    shield.drop_item(game);
 }

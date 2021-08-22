@@ -142,6 +142,8 @@ pub use core::default::Default as std_default_Default;
 #[doc(hidden)]
 pub use core::fmt::Debug as std_fmt_Debug;
 #[doc(hidden)]
+pub use core::mem::replace as std_mem_replace;
+#[doc(hidden)]
 pub use core::option::Option as std_option_Option;
 #[doc(hidden)]
 pub use core::stringify as std_stringify;
@@ -374,13 +376,16 @@ pub trait DepType: Debug {
     type Id: ComponentId;
 
     #[doc(hidden)]
+    fn style__(&mut self) -> &mut Option<Style<Self>> where Self: Sized;
+
+    #[doc(hidden)]
+    fn add_binding__(&mut self, binding: AnyBinding);
+
+    #[doc(hidden)]
     fn take_all_handlers__(&mut self) -> Vec<Box<dyn AnyHandler>>;
 
     #[doc(hidden)]
-    fn bindings__(&self) -> Vec<AnyBinding>;
-
-    #[doc(hidden)]
-    fn style__(&mut self) -> &mut Option<Style<Self>> where Self: Sized;
+    fn take_added_bindings_and_collect_all__(&mut self) -> Vec<AnyBinding>;
 }
 
 /// A dependency property.
@@ -626,6 +631,13 @@ impl<Owner: DepType, ItemType: Convenient> DepVec<Owner, ItemType> {
 
     pub fn removed_items_source(self, obj: Glob<Owner::Id, Owner>) -> DepVecRemovedItemSource<Owner, ItemType> {
         DepVecRemovedItemSource { obj, vec: self }
+    }
+}
+
+impl<Owner: DepType> Glob<Owner::Id, Owner> {
+    pub fn add_binding(self, state: &mut dyn State, binding: AnyBinding) {
+        let mut obj_mut = self.get_mut(state);
+        obj_mut.add_binding__(binding);
     }
 }
 
@@ -1432,6 +1444,7 @@ macro_rules! dep_type_impl_raw {
             #[derive($crate::std_fmt_Debug)]
             struct [< $name Core >] $($g)* $($w)* {
                 dep_type_core_style: $crate::std_option_Option<$crate::Style<$name $($r)*>>,
+                dep_type_core_added_bindings: $crate::std_vec_Vec<$crate::binding::AnyBinding>,
                 $($core_fields)*
             }
 
@@ -1439,6 +1452,7 @@ macro_rules! dep_type_impl_raw {
                 const fn new() -> Self {
                     Self {
                         dep_type_core_style: $crate::std_option_Option::None,
+                        dep_type_core_added_bindings: $crate::std_vec_Vec::new(),
                         $($core_new)*
                     }
                 }
@@ -1452,8 +1466,8 @@ macro_rules! dep_type_impl_raw {
                     $handlers
                 }
 
-                fn dep_type_core_bindings(&self) -> $crate::std_vec_Vec<$crate::binding::AnyBinding> {
-                    let mut $bindings = $crate::std_vec_Vec::new();
+                fn dep_type_core_take_added_bindings_and_collect_all(&mut self) -> $crate::std_vec_Vec<$crate::binding::AnyBinding> {
+                    let mut $bindings = $crate::std_mem_replace(&mut self.dep_type_core_added_bindings, $crate::std_vec_Vec::new());
                     let $this = self;
                     $($core_bindings)*
                     $bindings
@@ -1491,8 +1505,13 @@ macro_rules! dep_type_impl_raw {
                 }
 
                 #[doc(hidden)]
-                fn bindings__(&self) -> $crate::std_vec_Vec<$crate::binding::AnyBinding> {
-                    self.core.dep_type_core_bindings()
+                fn take_added_bindings_and_collect_all__(&mut self) -> $crate::std_vec_Vec<$crate::binding::AnyBinding> {
+                    self.core.dep_type_core_take_added_bindings_and_collect_all()
+                }
+
+                #[doc(hidden)]
+                fn add_binding__(&mut self, binding: $crate::binding::AnyBinding) {
+                    self.core.dep_type_core_added_bindings.push(binding);
                 }
             }
 
@@ -1543,7 +1562,7 @@ macro_rules! dep_obj {
                 let $this = self;
                 let $arena: &mut $Arena = <dyn $crate::dyn_context_state_State as $crate::dyn_context_state_StateExt>::get_mut(state);
                 let handlers = <$(dyn $tr)? $($ty)? as $crate::DepType>::take_all_handlers__($field_mut);
-                let bindings = <$(dyn $tr)? $($ty)? as $crate::DepType>::bindings__($field);
+                let bindings = <$(dyn $tr)? $($ty)? as $crate::DepType>::take_added_bindings_and_collect_all__($field_mut);
                 for handler in handlers {
                     handler.clear(state);
                 }

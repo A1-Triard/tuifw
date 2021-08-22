@@ -80,7 +80,7 @@ impl Bindings {
 
 impl Drop for Bindings {
     fn drop(&mut self) {
-        debug_assert!(self.0.items().is_empty(), "there are non-dropped bindings");
+        debug_assert!(self.0.items().is_empty(), "there are non-dropped bindings (count: {})", self.0.items().len());
     }
 }
 
