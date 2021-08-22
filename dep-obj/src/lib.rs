@@ -1542,8 +1542,8 @@ macro_rules! dep_obj {
             $(
                 let $this = self;
                 let $arena: &mut $Arena = <dyn $crate::dyn_context_state_State as $crate::dyn_context_state_StateExt>::get_mut(state);
-                let handlers = ($field_mut).take_all_handlers__();
-                let bindings = ($field_mut).bindings__();
+                let handlers = <$(dyn $tr)? $($ty)? as $crate::DepType>::take_all_handlers__($field_mut);
+                let bindings = <$(dyn $tr)? $($ty)? as $crate::DepType>::bindings__($field);
                 for handler in handlers {
                     handler.clear(state);
                 }

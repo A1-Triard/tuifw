@@ -51,9 +51,9 @@ mod circuit {
         dep_obj! {
             pub fn legs(self as this, circuit: Circuit) -> trait ChipLegs {
                 if mut {
-                    &mut circuit.arena[this.0].legs
+                    circuit.arena[this.0].legs.as_mut()
                 } else {
-                    &circuit.arena[this.0].legs
+                    circuit.arena[this.0].legs.as_ref()
                 }
             }
         }
