@@ -61,6 +61,12 @@ pub mod example {
     //!         }, MyDepTypeId(id)))
     //!     }
     //!
+    //!     pub fn drop_my_dep_type(self, state: &mut dyn State) {
+    //!         self.drop_bindings_priv(state);
+    //!         let app: &mut MyApp = state.get_mut();
+    //!         app.my_dep_types.remove(self.0);
+    //!     }
+    //!
     //!     dep_obj! {
     //!         pub fn obj(self as this, app: MyApp) -> MyDepType {
     //!             if mut {
@@ -73,8 +79,8 @@ pub mod example {
     //! }
 
     use crate::{dep_obj, dep_type};
-    use components_arena::{Arena, Component, NewtypeComponentId, Id};
-    use dyn_context::SelfState;
+    use components_arena::{Arena, Component, Id, NewtypeComponentId};
+    use dyn_context::state::{SelfState, State, StateExt};
 
     dep_type! {
         #[derive(Debug)]
@@ -109,6 +115,12 @@ pub mod example {
             app.my_dep_types.insert(|id| (MyDepTypePrivateData {
                 dep_data: MyDepType::new_priv()
             }, MyDepTypeId(id)))
+        }
+
+        pub fn drop_my_dep_type(self, state: &mut dyn State) {
+            self.drop_bindings_priv(state);
+            let app: &mut MyApp = state.get_mut();
+            app.my_dep_types.remove(self.0);
         }
 
         dep_obj! {
@@ -1469,7 +1481,7 @@ macro_rules! dep_type_impl_raw {
 
                 $($core_consts)*
 
-                fn dep_type_core_take_all_handlers(&mut self) -> $crate::std_vec_Vec<$crate::std_boxed_Box<$crate::binding::AnyHandler>> {
+                fn dep_type_core_take_all_handlers(&mut self) -> $crate::std_vec_Vec<$crate::std_boxed_Box<dyn $crate::binding::AnyHandler>> {
                     let mut $handlers = $crate::std_vec_Vec::new();
                     let $this = self;
                     $($core_handlers)*
@@ -1510,7 +1522,7 @@ macro_rules! dep_type_impl_raw {
                 }
 
                 #[doc(hidden)]
-                fn take_all_handlers__(&mut self) -> $crate::std_vec_Vec<$crate::std_boxed_Box<$crate::binding::AnyHandler>> {
+                fn take_all_handlers__(&mut self) -> $crate::std_vec_Vec<$crate::std_boxed_Box<dyn $crate::binding::AnyHandler>> {
                     self.core.dep_type_core_take_all_handlers()
                 }
 
