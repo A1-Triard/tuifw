@@ -20,7 +20,7 @@ pub trait AnyHandler: Debug {
     fn clear(&self, state: &mut dyn State);
 }
 
-pub trait Handler<T: Convenient>: Debug + DynClone {
+pub trait Handler<T: Convenient>: Debug + DynClone + Send + Sync {
     fn into_any(self: Box<Self>) -> Box<dyn AnyHandler>;
     fn execute(&self, state: &mut dyn State, value: T);
 }
