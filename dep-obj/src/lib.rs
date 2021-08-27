@@ -665,6 +665,42 @@ impl<Owner: DepType> Glob<Owner::Id, Owner> {
         let mut obj_mut = self.get_mut(state);
         obj_mut.add_binding__(binding);
     }
+
+    pub fn apply_style(
+        self,
+        state: &mut dyn State,
+        style: Option<Style<Owner>>,
+    ) -> Option<Style<Owner>> {
+        let mut on_changed = Vec::new();
+        let obj = &mut self.get_mut(state);
+        let old = obj.style__().take();
+        if let Some(old) = old.as_ref() {
+            old.setters
+                .iter()
+                .filter(|setter| style.as_ref().map_or(
+                    true,
+                    |new| new.setters.binary_search_by_key(
+                        &setter.prop_offset(),
+                        |x| x.prop_offset()
+                    ).is_err()
+                ))
+                .filter_map(|setter| setter.un_apply(obj, true))
+                .for_each(|x| on_changed.push(x))
+            ;
+        }
+        if let Some(new) = style.as_ref() {
+            new.setters
+                .iter()
+                .filter_map(|setter| setter.un_apply(obj, false))
+                .for_each(|x| on_changed.push(x))
+            ;
+        }
+        *obj.style__() = style;
+        for on_changed in on_changed {
+            on_changed(state);
+        }
+        old
+    }
 }
 
 #[derive(Educe)]
@@ -715,9 +751,9 @@ impl<Owner: DepType, PropType: Convenient> AnySetter<Owner> for Setter<Owner, Pr
     }
 }
 
-/// A dictionary mstateing a subset of target type properties to the values.
-/// Every dependency object can have an statelied style at every moment.
-/// To switch an statelied style, use the [`OptionStyleExt::apply`] function.
+/// A dictionary mapping a subset of target type properties to the values.
+/// Every dependency object can have an applied style at every moment.
+/// To switch an applied style, use the [`Glob::apply_style`] function.
 #[derive(Educe)]
 #[educe(Debug, Clone, Default)]
 pub struct Style<Owner: DepType> {
@@ -768,52 +804,6 @@ impl<Owner: DepType> Style<Owner> {
 
     pub fn try_reserve(&mut self, additional: usize) -> Result<(), TryReserveError> {
         self.setters.try_reserve(additional)
-    }
-}
-
-pub trait OptionStyleExt<Owner: DepType> {
-    fn apply(
-        self,
-        state: &mut dyn State,
-        obj: Glob<Owner::Id, Owner>,
-    ) -> Option<Style<Owner>>;
-}
-
-impl<Owner: DepType> OptionStyleExt<Owner> for Option<Style<Owner>> {
-    fn apply(
-        self,
-        state: &mut dyn State,
-        obj: Glob<Owner::Id, Owner>,
-    ) -> Option<Style<Owner>> {
-        let mut on_changed = Vec::new();
-        let obj = &mut obj.get_mut(state);
-        let old = obj.style__().take();
-        if let Some(old) = old.as_ref() {
-            old.setters
-                .iter()
-                .filter(|setter| self.as_ref().map_or(
-                    true,
-                    |new| new.setters.binary_search_by_key(
-                        &setter.prop_offset(),
-                        |x| x.prop_offset()
-                    ).is_err()
-                ))
-                .filter_map(|setter| setter.un_apply(obj, true))
-                .for_each(|x| on_changed.push(x))
-            ;
-        }
-        if let Some(new) = self.as_ref() {
-            new.setters
-                .iter()
-                .filter_map(|setter| setter.un_apply(obj, false))
-                .for_each(|x| on_changed.push(x))
-            ;
-        }
-        *obj.style__() = self;
-        for on_changed in on_changed {
-            on_changed(state);
-        }
-        old
     }
 }
 
