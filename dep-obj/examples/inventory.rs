@@ -6,7 +6,7 @@
 #![feature(const_raw_ptr_deref)]
 
 use components_arena::{Arena, Component, NewtypeComponentId, Id};
-use dep_obj::{dep_type, dep_obj};
+use dep_obj::{DepObjBuilderCore, dep_obj, dep_type, dep_type_with_builder};
 use macro_attr_2018::macro_attr;
 use dep_obj::binding::{Bindings, Binding1, Binding2};
 use dyn_context::state::{State, StateExt};
@@ -26,11 +26,40 @@ macro_attr! {
     struct Item(Id<ItemData>);
 }
 
-dep_type! {
+dep_type_with_builder! {
     #[derive(Debug)]
-    struct ItemProps in Item {
+    struct ItemProps become props in Item {
         name: Cow<'static, str> = Cow::Borrowed(""),
         equipped: bool = false,
+    }
+
+    type BuilderCore<'a> = ItemBuilder<'a>;
+}
+
+struct ItemBuilder<'a> {
+    item: Item,
+    state: &'a mut dyn State,
+}
+
+impl<'a> DepObjBuilderCore<Item> for ItemBuilder<'a> {
+    fn id(&self) -> Item { self.item }
+    fn state(&self) -> &dyn State { self.state }
+    fn state_mut(&mut self) -> &mut dyn State { self.state }
+}
+
+trait ItemBuilderPropsExt {
+    fn props(
+        self,
+        f: impl for<'a> FnOnce(ItemPropsBuilder<'a>) -> ItemPropsBuilder<'a>
+    ) -> Self;
+}
+
+impl<'a> ItemBuilderPropsExt for ItemBuilder<'a> {
+    fn props(
+        self,
+        f: impl for<'b> FnOnce(ItemPropsBuilder<'b>) -> ItemPropsBuilder<'b>
+    ) -> Self {
+        f(ItemPropsBuilder::new_priv(self)).core_priv()
     }
 }
 
@@ -44,6 +73,14 @@ impl Item {
         self.drop_bindings_priv(state);
         let game: &mut Game = state.get_mut();
         game.items.remove(self.0);
+    }
+
+    fn build<'a>(
+        self,
+        state: &'a mut dyn State,
+        f: impl FnOnce(ItemBuilder<'a>) -> ItemBuilder<'a>
+    ) {
+        f(ItemBuilder { item: self, state });
     }
 
     dep_obj! {
@@ -161,7 +198,11 @@ fn main() {
     let game = &mut Game::new();
     let npc = Npc::new(game);
     let sword = Item::new(game);
-    ItemProps::NAME.set_uncond(game, sword.props(), Cow::Borrowed("Sword"));
+    sword.build(game, |sword| sword
+        .props(|props| props
+            .name(Cow::Borrowed("Sword"))
+        )
+    );
     let shield = Item::new(game);
     ItemProps::NAME.set_uncond(game, shield.props(), Cow::Borrowed("Shield"));
     for item in [sword, shield] {
