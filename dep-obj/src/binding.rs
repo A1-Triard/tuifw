@@ -29,7 +29,7 @@ clone_trait_object!(<T: Convenient> Handler<T>);
 
 #[derive(Educe)]
 #[educe(Debug, Clone)]
-pub struct FnTarget<Context: Debug + Clone, T: Convenient> {
+struct FnTarget<Context: Debug + Clone, T: Convenient> {
     context: Context,
     #[educe(Debug(ignore))]
     execute: fn(state: &mut dyn State, context: Context, value: T)
