@@ -177,42 +177,43 @@ impl<T: Convenient> From<Binding<T>> for AnyBinding {
 }
 
 macro_rules! binding_n {
-    ($n:tt; $($i:tt),+ $(,)?) => {
-        binding_n! { @unwrap [] [$n] [$($i)+] [$($i)+] }
+    ($n:tt; $($i:tt),* $(,)?) => {
+        binding_n! { @unwrap [] [$n] [$($i)*] [$($i)*] }
     };
-    (@unwrap [$($r:tt)*] [$n:tt] [] [$($j:tt)+]) => {
+    (@unwrap [$($r:tt)*] [$n:tt] [] [$($j:tt)*]) => {
         binding_n! { @done [$n] $($r)* }
     };
-    (@unwrap [$($r:tt)*] [$n:tt] [$i0:tt $($i:tt)*] [$($j:tt)+]) => {
-        binding_n! { @unwrap [$($r)* [$i0 $($j)+]] [$n] [$($i)*] [$($j)+] }
+    (@unwrap [$($r:tt)*] [$n:tt] [$i0:tt $($i:tt)*] [$($j:tt)*]) => {
+        binding_n! { @unwrap [$($r)* [$i0 $($j)+]] [$n] [$($i)*] [$($j)*] }
     };
     (@unwrap $($x:tt)*) => {
         compile_error!(stringify! { $($x)* });
     };
-    (@done [$n:tt] $([$i:tt $($j:tt)+])+) => {
+    (@done [$n:tt] $([$i:tt $($j:tt)*])*) => {
         $crate::paste_paste! {
             #[derive(Educe)]
             #[educe(Debug)]
-            struct [< Binding $n NodeSources >] < $( [< S $i >] : Convenient, )+ T: Convenient> {
+            struct [< Binding $n NodeSources >] < $( [< S $i >] : Convenient, )* T: Convenient> {
                 $(
                     [< source_ $i >] : Option<HandledSource< [< S $i >] >>,
-                )+
+                )*
                 #[educe(Debug(ignore))]
-                filter_map: fn( $( [< S $i >] ),+ ) -> Option<T>,
+                filter_map: fn( $( [< S $i >] ),* ) -> Option<T>,
             }
 
             impl<
-                $( [< S $i >] : Convenient, )+
+                $( [< S $i >] : Convenient, )*
                 T: Convenient
-            > AnyBindingNodeSources for [< Binding $n NodeSources >] <$( [< S $i >] , )+ T> {
+            > AnyBindingNodeSources for [< Binding $n NodeSources >] <$( [< S $i >] , )* T> {
                 type Value = T;
 
+                #[allow(unused_variables)]
                 fn unhandle(&mut self, state: &mut dyn State) {
                     $(
                         if let Some(source) = self. [< source_ $i >] .take() {
                             source.handler_id.unhandle(state);
                         }
-                    )+
+                    )*
                 }
 
                 fn get_value(&self) -> Option<T> {
@@ -223,34 +224,34 @@ macro_rules! binding_n {
                         } else {
                             return None;
                         }
-                    )+
-                    (self.filter_map)($( [< value_ $i >] ),+)
+                    )*
+                    (self.filter_map)($( [< value_ $i >] ),*)
                 }
             }
 
             macro_attr! {
                 #[derive(Educe, NewtypeComponentId!)]
                 #[educe(Debug, Eq, PartialEq, Copy, Clone, Ord, PartialOrd, Hash)]
-                pub struct [< Binding $n >] < $( [< S $i >] : Convenient, )+ T: Convenient>(
+                pub struct [< Binding $n >] < $( [< S $i >] : Convenient, )* T: Convenient>(
                     Id<BoxedBindingNode>,
-                    PhantomType<($( [< S $i >] ),+ , T)>
+                    PhantomType<(($( [< S $i >] ,)* ), T)>
                 );
             }
 
             impl<
-                $( [< S $i >] : Convenient, )+
+                $( [< S $i >] : Convenient, )*
                 T: Convenient
-            > [< Binding $n >] < $( [< S $i >] , )+ T> {
+            > [< Binding $n >] < $( [< S $i >] , )* T> {
                 pub fn new(
                     state: &mut dyn State,
-                    filter_map: fn( $( [< S $i >] ),+ ) -> Option<T>
+                    filter_map: fn( $( [< S $i >] ),* ) -> Option<T>
                 ) -> Self {
                     let bindings: &mut Bindings = state.get_mut();
                     let id = bindings.0.insert(|id| {
-                        let sources: [< Binding $n NodeSources >] <$( [< S $i >] ),+ , T> = [< Binding $n NodeSources >] {
+                        let sources: [< Binding $n NodeSources >] <$( [< S $i >] ,)* T> = [< Binding $n NodeSources >] {
                             $(
                                 [< source_ $i >] : None,
-                            )+
+                            )*
                             filter_map,
                         };
                         let node: BindingNode<T> = BindingNode {
@@ -285,7 +286,7 @@ macro_rules! binding_n {
 
                 $(
                     pub fn [< set_source_ $i >] (self, state: &mut dyn State, source: &mut dyn Source< [< S $i >] >) {
-                        let handler: [< Binding $n Source $i Handler >] ::<$( [< S $j >] ),+ , T>  = [< Binding $n Source $i Handler >] {
+                        let handler: [< Binding $n Source $i Handler >] ::<$( [< S $j >] ),* , T>  = [< Binding $n Source $i Handler >] {
                             binding: self.into_raw(),
                             phantom: PhantomType::new()
                         };
@@ -295,29 +296,29 @@ macro_rules! binding_n {
                         );
                         let bindings: &mut Bindings = state.get_mut();
                         let node = bindings.0[self.0].0.downcast_mut::<BindingNode<T>>().unwrap();
-                        let sources = node.sources.downcast_mut::< [< Binding $n NodeSources >] <$( [< S $j >] ),+ , T>>().unwrap();
+                        let sources = node.sources.downcast_mut::< [< Binding $n NodeSources >] <$( [< S $j >] ),* , T>>().unwrap();
                         if let Some(source) = sources. [< source_ $i >] .replace(source) {
                             source.handler_id.unhandle(state);
                         }
                         Binding::from(self).knoke_target(state);
                     }
-                )+
+                )*
             }
 
             impl<
-                $( [< S $i >] : Convenient, )+
+                $( [< S $i >] : Convenient, )*
                 T: Convenient
-            > From< [< Binding $n >] < $( [< S $i >] , )+ T> > for Binding<T> {
-                fn from(v: [< Binding $n >] < $( [< S $i >] , )+ T> ) -> Binding<T> {
+            > From< [< Binding $n >] < $( [< S $i >] , )* T> > for Binding<T> {
+                fn from(v: [< Binding $n >] < $( [< S $i >] , )* T> ) -> Binding<T> {
                     Binding(v.0, PhantomType::new())
                 }
             }
 
             impl<
-                $( [< S $i >] : Convenient, )+
+                $( [< S $i >] : Convenient, )*
                 T: Convenient
-            > From< [< Binding $n >] < $( [< S $i >] , )+ T> > for AnyBinding {
-                fn from(v: [< Binding $n >] < $( [< S $i >] , )+ T> ) -> AnyBinding {
+            > From< [< Binding $n >] < $( [< S $i >] , )* T> > for AnyBinding {
+                fn from(v: [< Binding $n >] < $( [< S $i >] , )* T> ) -> AnyBinding {
                     AnyBinding(v.0)
                 }
             }
@@ -325,48 +326,49 @@ macro_rules! binding_n {
             $(
                 #[derive(Debug, Clone)]
                 struct [< Binding $n Source $i Handler >] <
-                    $( [< S $j >] : Convenient, )+
+                    $( [< S $j >] : Convenient, )*
                     T: Convenient
                 > {
                     binding: RawId,
-                    phantom: PhantomType<($( [< S $j >] ),+ , T)>
+                    phantom: PhantomType<($( [< S $j >] ),* , T)>
                 }
 
                 impl<
-                    $( [< S $j >] : Convenient, )+
+                    $( [< S $j >] : Convenient, )*
                     T: Convenient
-                > AnyHandler for [< Binding $n Source $i Handler >] < $( [< S $j >] , )+ T >  {
+                > AnyHandler for [< Binding $n Source $i Handler >] < $( [< S $j >] , )* T >  {
                     fn clear(&self, state: &mut dyn State) {
-                        let binding: [< Binding $n >] <$( [< S $j >] ),+ , T> = [< Binding $n >] ::from_raw(self.binding);
+                        let binding: [< Binding $n >] <$( [< S $j >] ),* , T> = [< Binding $n >] ::from_raw(self.binding);
                         let bindings: &mut Bindings = state.get_mut();
                         let node = bindings.0[binding.0].0.downcast_mut::<BindingNode<T>>().unwrap();
-                        let sources = node.sources.downcast_mut::< [< Binding $n NodeSources >] <$( [< S $j >] ),+ , T>>().unwrap();
+                        let sources = node.sources.downcast_mut::< [< Binding $n NodeSources >] <$( [< S $j >] ),* , T>>().unwrap();
                         sources. [< source_ $i >] .take();
                     }
                 }
 
                 impl<
-                    $( [< S $j >] : Convenient, )+
+                    $( [< S $j >] : Convenient, )*
                     T: Convenient
-                > Handler< [< S $i >] > for [< Binding $n Source $i Handler >] < $( [< S $j >] , )+ T >  {
+                > Handler< [< S $i >] > for [< Binding $n Source $i Handler >] < $( [< S $j >] , )* T >  {
                     fn into_any(self: Box<Self>) -> Box<dyn AnyHandler> {
                         self
                     }
 
                     fn execute(&self, state: &mut dyn State, value: [< S $i >] ) {
-                        let binding: [< Binding $n >] <$( [< S $j >] ),+ , T> = [< Binding $n >] ::from_raw(self.binding);
+                        let binding: [< Binding $n >] <$( [< S $j >] ),* , T> = [< Binding $n >] ::from_raw(self.binding);
                         let bindings: &mut Bindings = state.get_mut();
                         let node = bindings.0[binding.0].0.downcast_mut::<BindingNode<T>>().unwrap();
-                        let sources = node.sources.downcast_mut::< [< Binding $n NodeSources >] <$( [< S $j >] ),+ , T>>().unwrap();
+                        let sources = node.sources.downcast_mut::< [< Binding $n NodeSources >] <$( [< S $j >] ),* , T>>().unwrap();
                         sources. [< source_ $i >] .as_mut().unwrap().value = value.clone();
                         Binding::from(binding).knoke_target(state);
                     }
                 }
-            )+
+            )*
         }
     };
 }
 
+binding_n!(0;);
 binding_n!(1; 1);
 binding_n!(2; 1, 2);
 binding_n!(3; 1, 2, 3);
