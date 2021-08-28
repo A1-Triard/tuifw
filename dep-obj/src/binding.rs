@@ -7,6 +7,7 @@ use dyn_clone::{DynClone, clone_trait_object};
 use dyn_context::state::{SelfState, State, StateExt};
 use educe::Educe;
 use macro_attr_2018::macro_attr;
+use panicking::panicking;
 use phantom_type::PhantomType;
 
 pub trait Target<T: Convenient>: Debug + DynClone {
@@ -80,7 +81,9 @@ impl Bindings {
 
 impl Drop for Bindings {
     fn drop(&mut self) {
-        debug_assert!(self.0.items().is_empty(), "there are non-dropped bindings (count: {})", self.0.items().len());
+        if !panicking() {
+            debug_assert!(self.0.items().is_empty(), "there are non-dropped bindings (count: {})", self.0.items().len());
+        }
     }
 }
 
