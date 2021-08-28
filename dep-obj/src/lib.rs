@@ -807,7 +807,7 @@ impl<Owner: DepType> Style<Owner> {
     }
 }
 
-pub trait DepObjBuilderCore<OwnerId: ComponentId> {
+pub trait DepObjBaseBuilder<OwnerId: ComponentId> {
     fn state(&self) -> &dyn State;
     fn state_mut(&mut self) -> &mut dyn State;
     fn id(&self) -> OwnerId;
@@ -935,35 +935,35 @@ macro_rules! dep_type_with_builder {
 #[macro_export]
 macro_rules! dep_type_with_builder_impl {
     (
-        type BuilderCore $($token:tt)*
+        type BaseBuilder $($token:tt)*
     ) => {
         $crate::generics_parse! {
             $crate::dep_type_with_builder_impl {
-                @type BuilderCore
+                @type BaseBuilder
             }
         }
         $($token)*
     };
     (
-        @type BuilderCore
+        @type BaseBuilder
         [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
-        = $BuilderCore:ty;
+        = $BaseBuilder:ty;
 
         $(#[$attr:meta])* $vis:vis struct $name:ident $($body:tt)*
     ) => {
         $crate::generics_parse! {
             $crate::dep_type_with_builder_impl {
                 @struct
-                [[$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]]
+                [[$BaseBuilder] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]]
                 [$([$attr])*] [$vis] [$name]
             }
             $($body)*
         }
     };
     (
-        @type BuilderCore
+        @type BaseBuilder
         [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
-        = $BuilderCore:ty;
+        = $BaseBuilder:ty;
 
         $($token:tt)*
     ) => {
@@ -974,13 +974,13 @@ macro_rules! dep_type_with_builder_impl {
         ");
     };
     (
-        @type BuilderCore
+        @type BaseBuilder
         [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
         $($token:tt)*
     ) => {
         $crate::std_compile_error!("\
-            invalid dep type builder core definition; allowed form is \
-            'type BuilderCore $(<$generics> $($where_clause)?)? = $builder_core_type;\
+            invalid dep type base builder definition; allowed form is \
+            'type BaseBuilder $(<$generics> $($where_clause)?)? = $base_builder_type;\
         ");
     };
     (
@@ -997,7 +997,7 @@ macro_rules! dep_type_with_builder_impl {
     };
     (
         @struct
-        [[$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]]
+        [[$BaseBuilder:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]]
         [$([$attr:meta])*] [$vis:vis] [$name:ident]
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         become $obj:ident in $Id:ty
@@ -1009,13 +1009,13 @@ macro_rules! dep_type_with_builder_impl {
             @concat_generics
             [$([$attr])*] [$vis] [$name] [$obj] [$Id]
             [$($g)*] [$($r)*] [$($w)*]
-            [[$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]]
+            [[$BaseBuilder] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]]
             [$($([$field $delim $($field_ty $(= $field_val)?)?])+)?]
         }
     };
     (
         @struct
-        [[$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]]
+        [[$BaseBuilder:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]]
         [$([$attr:meta])*] [$vis:vis] [$name:ident]
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         become $obj:ident in $Id:ty
@@ -1036,11 +1036,11 @@ macro_rules! dep_type_with_builder_impl {
             $($($field:ident $delim:tt $($field_ty:ty $(= $field_val:expr)?)?),+ $(,)?)?
         }
 
-        type BuilderCore $($token:tt)*
+        type BaseBuilder $($token:tt)*
     ) => {
         $crate::generics_parse! {
             $crate::dep_type_with_builder_impl {
-                @type BuilderCore after
+                @type BaseBuilder after
                 [$([$attr])*] [$vis] [$name] [$obj] [$Id]
                 [$($g)*] [$($r)*] [$($w)*]
                 [$($([$field $delim $($field_ty $(= $field_val)?)?])+)?]
@@ -1059,9 +1059,9 @@ macro_rules! dep_type_with_builder_impl {
         }
     ) => {
         $crate::std_compile_error!("\
-            missing dep type builder core definition; add the definition in the following form \
+            missing dep type base builder definition; add the definition in the following form \
             before or after dep type definition: \
-            'type BuilderCore $(<$generics> $($where_clause)?)? = $builder_core_type;\
+            'type BaseBuilder $(<$generics> $($where_clause)?)? = $base_builder_type;\
         ");
     };
     (
@@ -1077,13 +1077,13 @@ macro_rules! dep_type_with_builder_impl {
         $($token:tt)*
     ) => {
         $crate::std_compile_error!("\
-            invalid dep type builder core definition; allowed form is \
-            'type BuilderCore $(<$generics> $(where $where_clause)?)? = $builder_core_type;
+            invalid dep type base builder definition; allowed form is \
+            'type BaseBuilder $(<$generics> $(where $where_clause)?)? = $base_builder_type;
         ");
     };
     (
         @struct
-        [$([$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*])?]
+        [$([$BaseBuilder:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*])?]
         [$([$attr:meta])*] [$vis:vis] [$name:ident]
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         $($token:tt)*
@@ -1100,35 +1100,35 @@ macro_rules! dep_type_with_builder_impl {
         ");
     };
     (
-        @type BuilderCore after
+        @type BaseBuilder after
         [$([$attr:meta])*] [$vis:vis] [$name:ident] [$obj:ident] [$Id:ty]
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         [$($([$field:ident $delim:tt $($field_ty:ty $(= $field_val:expr)?)?])+)?]
         [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
-        = $BuilderCore:ty;
+        = $BaseBuilder:ty;
     ) => {
         $crate::dep_type_with_builder_impl! {
             @concat_generics
             [$([$attr])*] [$vis] [$name] [$obj] [$Id]
             [$($g)*] [$($r)*] [$($w)*]
-            [[$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]]
+            [[$BaseBuilder] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]]
             [$($([$field $delim $($field_ty $(= $field_val)?)?])+)?]
         }
     };
     (
-        @type BuilderCore after
+        @type BaseBuilder after
         [$([$attr:meta])*] [$vis:vis] [$name:ident] [$obj:ident] [$Id:ty]
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         [$($([$field:ident $delim:tt $($field_ty:ty $(= $field_val:expr)?)?])+)?]
         [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
-        = $BuilderCore:ty;
+        = $BaseBuilder:ty;
 
         $($token:tt)*
     ) => {
-        $crate::std_compile_error!("unexpected extra tokens after dep type builder core definition");
+        $crate::std_compile_error!("unexpected extra tokens after dep type base builder definition");
     };
     (
-        @type BuilderCore after
+        @type BaseBuilder after
         [$([$attr:meta])*] [$vis:vis] [$name:ident] [$obj:ident] [$Id:ty]
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         [$($([$field:ident $delim:tt $($field_ty:ty $(= $field_val:expr)?)?])+)?]
@@ -1136,21 +1136,21 @@ macro_rules! dep_type_with_builder_impl {
         $($token:tt)*
     ) => {
         $crate::std_compile_error!("\
-            invalid dep type builder core definition; allowed form is \
-            'type BuilderCore $(<$generics> $(where $where_clause)?)? = $builder_core_type;
+            invalid dep type base builder definition; allowed form is \
+            'type BaseBuilder $(<$generics> $(where $where_clause)?)? = $base_builder_type;
         ");
     };
     (
         @concat_generics
         [$([$attr:meta])*] [$vis:vis] [$name:ident] [$obj:ident] [$Id:ty]
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
-        [[$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]]
+        [[$BaseBuilder:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]]
         [$([$field:ident $delim:tt $($field_ty:ty $(= $field_val:expr)?)?])*]
     ) => {
         $crate::generics_concat! {
             $crate::dep_type_with_builder_impl {
                 @concat_generics_done
-                [$BuilderCore]
+                [$BaseBuilder]
                 [$([$attr])*] [$vis] [$name] [$obj] [$Id]
                 [$($g)*] [$($r)*] [$($w)*]
                 [$([$field $delim $($field_ty $(= $field_val)?)?])*]
@@ -1161,7 +1161,7 @@ macro_rules! dep_type_with_builder_impl {
     };
     (
         @concat_generics_done
-        [$BuilderCore:ty]
+        [$BaseBuilder:ty]
         [$([$attr:meta])*] [$vis:vis] [$name:ident] [$obj:ident] [$Id:ty]
         [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
         [$([$field:ident $delim:tt $($field_ty:ty $(= $field_val:expr)?)?])*]
@@ -1172,7 +1172,7 @@ macro_rules! dep_type_with_builder_impl {
             [$([$attr])*] [$vis] [$name] [$obj] [$Id] [state] [this] [bindings] [handlers]
             [$($g)*] [$($r)*] [$($w)*]
             [] [] [] [] [] []
-            [[$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*] []]
+            [[$BaseBuilder] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*] []]
             [$([$field $delim $($field_ty $(= $field_val)?)?])*]
         }
     };
@@ -1296,7 +1296,7 @@ macro_rules! dep_type_impl_raw {
         [$($core_bindings:tt)*]
         [$($core_handlers:tt)*]
         [$(
-            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
+            [$BaseBuilder:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
             [$($builder_methods:tt)*]
         )?]
         [[$field:ident : $field_ty:ty = $field_val:expr] $($fields:tt)*]
@@ -1338,13 +1338,13 @@ macro_rules! dep_type_impl_raw {
                 $this . $field .take_all_handlers(&mut $handlers);
             ]
             [$(
-                [$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]
+                [$BaseBuilder] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]
                 [
                     $($builder_methods)*
 
                     $vis fn $field(mut self, value: $field_ty) -> Self {
-                        let id = <$BuilderCore as $crate::DepObjBuilderCore<$Id>>::id(&self.core);
-                        let state = <$BuilderCore as $crate::DepObjBuilderCore<$Id>>::state_mut(&mut self.core);
+                        let id = <$BaseBuilder as $crate::DepObjBaseBuilder<$Id>>::id(&self.base);
+                        let state = <$BaseBuilder as $crate::DepObjBaseBuilder<$Id>>::state_mut(&mut self.base);
                         $name:: [< $field:upper >] .set_uncond(state, id.$obj(), value);
                         self
                     }
@@ -1364,7 +1364,7 @@ macro_rules! dep_type_impl_raw {
         [$($core_bindings:tt)*]
         [$($core_handlers:tt)*]
         [$(
-            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
+            [$BaseBuilder:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
             [$($builder_methods:tt)*]
         )?]
         [[$field:ident [$field_ty:ty]] $($fields:tt)*]
@@ -1402,7 +1402,7 @@ macro_rules! dep_type_impl_raw {
                 $this . $field .take_all_handlers(&mut $handlers);
             ]
             [$(
-                [$BuilderCore] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]
+                [$BaseBuilder] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]
                 [
                     $($builder_methods)*
                 ]
@@ -1421,7 +1421,7 @@ macro_rules! dep_type_impl_raw {
         [$($core_bindings:tt)*]
         [$($core_handlers:tt)*]
         [$(
-            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
+            [$BaseBuilder:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
             [$($builder_methods:tt)*]
         )?]
         [[$field:ident $delim:tt $field_ty:ty $(= $field_val:expr)?] $($fields:tt)*]
@@ -1449,7 +1449,7 @@ macro_rules! dep_type_impl_raw {
         [$($core_bindings:tt)*]
         [$($core_handlers:tt)*]
         [$(
-            [$BuilderCore:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
+            [$BaseBuilder:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
             [$($builder_methods:tt)*]
         )?]
         []
@@ -1531,22 +1531,22 @@ macro_rules! dep_type_impl_raw {
 
             $(
                 $vis struct [< $name Builder >] $($bc_g)* $($bc_w)* {
-                    core: $BuilderCore,
+                    base: $BaseBuilder,
                 }
 
                 impl $($bc_g)* [< $name Builder >] $($bc_r)* $($bc_w)* {
-                    fn new_priv(core: $BuilderCore) -> Self {
-                        Self { core }
+                    fn new_priv(base: $BaseBuilder) -> Self {
+                        Self { base }
                     }
 
                     #[allow(dead_code)]
-                    fn core_priv(self) -> $BuilderCore { self.core }
+                    fn base_priv(self) -> $BaseBuilder { self.base }
 
                     #[allow(dead_code)]
-                    fn core_priv_ref(&self) -> &$BuilderCore { &self.core }
+                    fn base_priv_ref(&self) -> &$BaseBuilder { &self.base }
 
                     #[allow(dead_code)]
-                    fn core_priv_mut(&mut self) -> &mut $BuilderCore { &mut self.core }
+                    fn base_priv_mut(&mut self) -> &mut $BaseBuilder { &mut self.base }
 
                     $($builder_methods)*
                 }

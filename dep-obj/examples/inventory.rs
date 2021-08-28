@@ -6,7 +6,7 @@
 #![feature(const_raw_ptr_deref)]
 
 use components_arena::{Arena, Component, NewtypeComponentId, Id};
-use dep_obj::{DepObjBuilderCore, dep_obj, dep_type, dep_type_with_builder};
+use dep_obj::{DepObjBaseBuilder, dep_obj, dep_type, dep_type_with_builder};
 use macro_attr_2018::macro_attr;
 use dep_obj::binding::{Bindings, Binding1, Binding2};
 use dyn_context::state::{State, StateExt};
@@ -33,7 +33,7 @@ dep_type_with_builder! {
         equipped: bool = false,
     }
 
-    type BuilderCore<'a> = ItemBuilder<'a>;
+    type BaseBuilder<'a> = ItemBuilder<'a>;
 }
 
 struct ItemBuilder<'a> {
@@ -41,25 +41,18 @@ struct ItemBuilder<'a> {
     state: &'a mut dyn State,
 }
 
-impl<'a> DepObjBuilderCore<Item> for ItemBuilder<'a> {
+impl<'a> DepObjBaseBuilder<Item> for ItemBuilder<'a> {
     fn id(&self) -> Item { self.item }
     fn state(&self) -> &dyn State { self.state }
     fn state_mut(&mut self) -> &mut dyn State { self.state }
 }
 
-trait ItemBuilderPropsExt {
-    fn props(
-        self,
-        f: impl for<'a> FnOnce(ItemPropsBuilder<'a>) -> ItemPropsBuilder<'a>
-    ) -> Self;
-}
-
-impl<'a> ItemBuilderPropsExt for ItemBuilder<'a> {
+impl<'a> ItemBuilder<'a> {
     fn props(
         self,
         f: impl for<'b> FnOnce(ItemPropsBuilder<'b>) -> ItemPropsBuilder<'b>
     ) -> Self {
-        f(ItemPropsBuilder::new_priv(self)).core_priv()
+        f(ItemPropsBuilder::new_priv(self)).base_priv()
     }
 }
 
