@@ -32,6 +32,7 @@ educe = "0.4.18"
 either = "1.6.1"
 enum-derive-2018 = "1.0.1"
 macro-attr-2018 = "1.1.1"
+panicking = "0.0.1"
 tuifw-screen-base = { path = "screen-base", version = "0.8.1" }
 tuifw-window = { path = "window", version = "0.8.1" }
 unicode-segmentation = "1.7.1"

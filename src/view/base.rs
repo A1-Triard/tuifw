@@ -248,7 +248,11 @@ impl ViewTree {
                     v_align: v_align.into(),
                 });
             }
-            decorator_behavior.init_bindings(root, state)
+            let decorator_bindings = decorator_behavior.init_bindings(root, state);
+            {
+                let tree: &mut ViewTree = state.get_mut();
+                tree.0.get_mut().arena[root.0].decorator_bindings = Some(decorator_bindings);
+            }
         }, &mut tree);
         result(tree)
     }
