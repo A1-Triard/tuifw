@@ -2,6 +2,10 @@
 #![feature(stmt_expr_attributes)]
 
 #![deny(warnings)]
+#![doc(test(attr(deny(warnings))))]
+#![doc(test(attr(allow(dead_code))))]
+#![doc(test(attr(allow(unused_variables))))]
+
 #![allow(clippy::collapsible_if)]
 #![allow(clippy::many_single_char_names)]
 #![allow(clippy::too_many_arguments)]

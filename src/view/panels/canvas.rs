@@ -1,9 +1,10 @@
 use crate::view::base::*;
 use components_arena::ComponentId;
-use dep_obj::{dep_type_with_builder, DepObjBuilderCore, Style};
-use dyn_context::{State, StateExt};
+use dep_obj::{DepObjBaseBuilder, Style, dep_type, dep_type_with_builder};
+use dep_obj::binding::{Binding, Binding1};
+use dyn_context::state::{State, StateExt};
 use std::fmt::Debug;
-use tuifw_screen_base::{Vector, Point, Rect};
+use tuifw_screen_base::{Point, Rect, Vector};
 
 pub trait ViewBuilderCanvasPanelExt {
     fn canvas_panel(
@@ -18,8 +19,7 @@ impl<'a> ViewBuilderCanvasPanelExt for ViewBuilder<'a> {
         f: impl for<'b> FnOnce(CanvasPanelBuilder<'b>) -> CanvasPanelBuilder<'b>
     ) -> Self {
         let view = self.id();
-        let tree: &mut ViewTree = self.state_mut().get_mut();
-        CanvasPanel::new(tree, view);
+        CanvasPanel::new(self.state_mut(), view);
         f(CanvasPanelBuilder(self)).0
     }
 }
@@ -35,12 +35,11 @@ impl<'a> CanvasPanelBuilder<'a> {
         f: impl for<'b> FnOnce(ViewBuilder<'b>) -> ViewBuilder<'b>
     ) -> Self {
         let view = self.0.id();
-        let tree: &mut ViewTree = self.0.state_mut().get_mut();
-        let child = View::new(tree, view, |child| (tag, child));
+        let child = View::new(self.0.state_mut(), view, |child| (tag, child));
         storage.map(|x| x.replace(child));
-        CanvasLayout::new(tree, child);
+        CanvasLayout::new(self.0.state_mut(), child);
         child.build(self.0.state_mut(), |child_builder| {
-            let child_builder = layout(CanvasLayoutBuilder::new_priv(child_builder)).core_priv();
+            let child_builder = layout(CanvasLayoutBuilder::new_priv(child_builder)).base_priv();
             f(child_builder)
         });
         self
@@ -53,26 +52,52 @@ dep_type_with_builder! {
         tl: Point = Point { x: 0, y: 0 },
     }
 
-    type BuilderCore<'a> = ViewBuilder<'a>;
+    type BaseBuilder<'a> = ViewBuilder<'a>;
 }
 
 impl CanvasLayout {
+    const BEHAVIOR: CanvasLayoutBehavior = CanvasLayoutBehavior;
+
     #[allow(clippy::new_ret_no_self)]
     pub fn new(
-        tree: &mut ViewTree,
+        state: &mut dyn State,
         view: View,
     ) {
-        view.set_layout(tree, CanvasLayout::new_priv());
-        view.layout(tree).on_changed(CanvasLayout::TL, Self::invalidate_parent_arrange);
-    }
-
-    fn invalidate_parent_arrange(state: &mut dyn State, view: View, _old: &Point) {
-        let tree: &mut ViewTree = state.get_mut();
-        view.parent(tree).map(|parent| parent.invalidate_arrange(tree));
+        view.set_layout(state, CanvasLayout::new_priv());
     }
 }
 
-impl Layout for CanvasLayout { }
+impl Layout for CanvasLayout {
+    fn behavior(&self) -> &'static dyn LayoutBehavior { &Self::BEHAVIOR }
+}
+
+struct CanvasLayoutBehavior;
+
+impl LayoutBehavior for CanvasLayoutBehavior {
+    fn init_bindings(&self, view: View, state: &mut dyn State) -> Box<dyn LayoutBindings> {
+        let tl = Binding1::new(state, |(_, tl)| Some(tl));
+        tl.set_source_1(state, &mut CanvasLayout::TL.source(view.layout()));
+        tl.set_target_fn(state, view, |state, view, _| {
+            let tree: &ViewTree = state.get();
+            view.parent(tree).map(|parent| parent.invalidate_arrange(state)).expect("invalidate_arrange failed");
+        });
+        Box::new(CanvasLayoutBindings {
+            tl: tl.into()
+        })
+    }
+
+    fn drop_bindings(&self, _view: View, state: &mut dyn State, bindings: Box<dyn LayoutBindings>) {
+        let bindings = bindings.downcast::<CanvasLayoutBindings>().unwrap();
+        bindings.tl.drop_binding(state);
+    }
+}
+
+#[derive(Debug)]
+struct CanvasLayoutBindings {
+    tl: Binding<Point>,
+}
+
+impl LayoutBindings for CanvasLayoutBindings { }
 
 #[derive(Debug, Clone)]
 struct CanvasPanelTemplate {
@@ -81,29 +106,29 @@ struct CanvasPanelTemplate {
 
 impl PanelTemplate for CanvasPanelTemplate {
     fn apply_panel(&self, state: &mut dyn State, view: View) {
-        let tree: &mut ViewTree = state.get_mut();
-        CanvasPanel::new(tree, view);
+        CanvasPanel::new(state, view);
     }
 
     fn apply_layout(&self, state: &mut dyn State, view: View) {
-        let tree: &mut ViewTree = state.get_mut();
-        CanvasLayout::new(tree, view);
-        view.layout_mut(state).apply_style(Some(self.layout.clone()));
+        CanvasLayout::new(state, view);
+        view.layout().apply_style(state, Some(self.layout.clone()));
     }
 }
 
-#[derive(Debug)]
-pub struct CanvasPanel(());
+dep_type! {
+    #[derive(Debug)]
+    pub struct CanvasPanel in View { }
+}
 
 impl CanvasPanel {
     const BEHAVIOR: CanvasPanelBehavior = CanvasPanelBehavior;
 
     #[allow(clippy::new_ret_no_self)]
     pub fn new(
-        tree: &mut ViewTree,
+        state: &mut dyn State,
         view: View,
     ) {
-        view.set_panel(tree, CanvasPanel(()));
+        view.set_panel(state, CanvasPanel::new_priv());
     }
 
     pub fn template(layout: Style<CanvasLayout>) -> Box<dyn PanelTemplate> {
@@ -115,20 +140,27 @@ impl Panel for CanvasPanel {
     fn behavior(&self) -> &'static dyn PanelBehavior { &Self::BEHAVIOR }
 }
 
+#[derive(Debug)]
+struct CanvasPanelBindings;
+
+impl PanelBindings for CanvasPanelBindings { }
+
 struct CanvasPanelBehavior;
 
 impl PanelBehavior for CanvasPanelBehavior {
     fn children_desired_size(
         &self,
         view: View,
-        tree: &mut ViewTree,
+        state: &mut dyn State,
         children_measure_size: (Option<i16>, Option<i16>)
     ) -> Vector {
+        let tree: &ViewTree = state.get();
         if let Some(last_child) = view.last_child(tree) {
             let mut child = last_child;
             loop {
+                let tree: &ViewTree = state.get();
                 child = child.next(tree);
-                child.measure(tree, (None, None));
+                child.measure(state, (None, None));
                 if child == last_child { break; }
             }
         }
@@ -138,17 +170,20 @@ impl PanelBehavior for CanvasPanelBehavior {
     fn children_render_bounds(
         &self,
         view: View,
-        tree: &mut ViewTree,
+        state: &mut dyn State,
         children_arrange_bounds: Rect
     ) -> Rect {
+        let tree: &ViewTree = state.get();
         if let Some(last_child) = view.last_child(tree) {
             let mut child = last_child;
             loop {
+                let tree: &ViewTree = state.get();
                 child = child.next(tree);
-                let child_offset = child.layout_ref(tree).get(CanvasLayout::TL)
-                    .offset_from(Point { x: 0, y: 0 });
+                let child_offset = child.layout_bindings(tree).downcast_ref::<CanvasLayoutBindings>().unwrap().tl
+                    .get_value(state).map_or_else(Vector::null, |x| x.offset_from(Point { x: 0, y: 0 }));
+                let tree: &ViewTree = state.get();
                 let child_size = child.desired_size(tree);
-                child.arrange(tree, Rect {
+                child.arrange(state, Rect {
                     tl: children_arrange_bounds.tl.offset(child_offset),
                     size: child_size
                 });
@@ -157,4 +192,10 @@ impl PanelBehavior for CanvasPanelBehavior {
         }
         children_arrange_bounds
     }
+
+    fn init_bindings(&self, _view: View, _state: &mut dyn State) -> Box<dyn PanelBindings> {
+        Box::new(CanvasPanelBindings)
+    }
+
+    fn drop_bindings(&self, _view: View, _state: &mut dyn State, _bindings: Box<dyn PanelBindings>) { }
 }

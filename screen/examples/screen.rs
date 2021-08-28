@@ -1,4 +1,5 @@
 #![windows_subsystem = "windows"]
+
 #![deny(warnings)]
 
 use std::cmp::{min, max};

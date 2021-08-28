@@ -5,6 +5,10 @@
 #![feature(option_result_unwrap_unchecked)]
 
 #![deny(warnings)]
+#![doc(test(attr(deny(warnings))))]
+#![doc(test(attr(allow(dead_code))))]
+#![doc(test(attr(allow(unused_variables))))]
+
 #![allow(clippy::collapsible_if)]
 #![allow(clippy::many_single_char_names)]
 #![allow(clippy::unit_arg)]
@@ -13,12 +17,3 @@
 pub use tuifw_screen_base::*;
 
 pub mod view;
-
-mod base;
-pub use base::*;
-
-mod button;
-pub use button::*;
-
-mod label;
-pub use label::*;

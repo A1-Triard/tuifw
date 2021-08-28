@@ -1,19 +1,23 @@
-#![deny(warnings)]
 #![feature(never_type)]
+
+#![deny(warnings)]
+#![doc(test(attr(deny(warnings))))]
+#![doc(test(attr(allow(dead_code))))]
+#![doc(test(attr(allow(unused_variables))))]
 #![allow(clippy::collapsible_if)]
 #![allow(clippy::type_complexity)]
 #![allow(clippy::blocks_in_if_conditions)]
 
-use std::any::Any;
-use std::cmp::{min, max};
-use std::hint::{unreachable_unchecked};
-use std::mem::replace;
-use std::ops::Range;
-use components_arena::{RawId, Component, Arena, Id, ComponentClassMutex, ComponentId};
-use dyn_context::State;
-use tuifw_screen_base::{Screen, Rect, Point, Vector, Attr, Color, Event};
+use components_arena::{Arena, Component, ComponentId, Id, NewtypeComponentId, RawId};
+use dyn_context::state::State;
 use educe::Educe;
 use macro_attr_2018::macro_attr;
+use std::any::Any;
+use std::cmp::{max, min};
+use std::hint::unreachable_unchecked;
+use std::mem::replace;
+use std::ops::Range;
+use tuifw_screen_base::{Attr, Color, Event, Point, Rect, Screen, Vector};
 
 fn invalidate_rect(invalidated: (&mut Vec<Range<i16>>, Vector), rect: Rect) {
     debug_assert_eq!(invalidated.0.len(), invalidated.1.y as u16 as usize);
@@ -126,8 +130,6 @@ macro_attr! {
     }
 }
 
-static WINDOW_NODE: ComponentClassMutex<WindowNode> = ComponentClassMutex::new();
-
 fn offset_from_root(mut window: Id<WindowNode>, tree: &WindowTree) -> Vector {
     let mut offset = Vector::null();
     loop {
@@ -142,7 +144,7 @@ fn offset_from_root(mut window: Id<WindowNode>, tree: &WindowTree) -> Vector {
 }
 
 macro_attr! {
-    #[derive(ComponentId!)]
+    #[derive(NewtypeComponentId!)]
     #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
     pub struct Window(Id<WindowNode>);
 }
@@ -267,7 +269,7 @@ impl WindowTree {
             state: &mut dyn State,
         )
     ) -> Self {
-        let mut arena = Arena::new(&mut WINDOW_NODE.lock().unwrap());
+        let mut arena = Arena::new();
         let root = arena.insert(|window| (WindowNode {
             parent: None,
             next: window,
@@ -395,6 +397,6 @@ mod tests {
         let w = Window::new(tree, None, Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() }, |id| ((), id));
         let _ = Window::new(tree, Some(w), Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() }, |id| ((), id));
         w.drop(tree);
-        assert_eq!(tree.arena.len(), 1);
+        assert_eq!(tree.arena.items().len(), 1);
      }
 }

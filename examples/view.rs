@@ -1,11 +1,11 @@
 #![deny(warnings)]
-use dep_obj::Dispatcher;
-use dyn_context::{State, StateExt, StateRefMut};
+use dep_obj::binding::Bindings;
+use dyn_context::state::{State, StateExt, StateRefMut};
 use either::Right;
 use std::borrow::Cow;
-use tuifw::{Key, Vector, Thickness, HAlign, VAlign, Point, Side, Rect};
-use tuifw::view::{View, ViewTree, ViewBase, ViewBuilderViewAlignExt};
-use tuifw::view::panels::{ViewBuilderCanvasPanelExt, CanvasLayout};
+use tuifw::{Vector, Thickness, HAlign, VAlign, Point, Side, Rect};
+use tuifw::view::{View, ViewTree, ViewBuilderViewAlignExt};
+use tuifw::view::panels::{ViewBuilderCanvasPanelExt};
 use tuifw::view::panels::{ViewBuilderDockPanelExt};
 use tuifw::view::decorators::{ViewBuilderBorderDecoratorExt};
 use tuifw::view::decorators::{ViewBuilderLabelDecoratorExt};
@@ -69,11 +69,12 @@ fn main() {
     let screen = unsafe { tuifw_screen::init() }.unwrap();
     let padding = Thickness::align(Vector { x: 13, y: 7 }, screen.size(), HAlign::Center, VAlign::Center);
     let bounds = padding.shrink_rect(Rect { tl: Point { x: 0, y: 0 }, size: screen.size() });
-    let tree = &mut ViewTree::new(screen, |_| ((), |tree| tree));
-    let dispatcher = &mut Dispatcher::new();
+    let bindings = &mut Bindings::new();
+    let tree = &mut ViewTree::new(screen, bindings, |_| ((), |tree| tree));
     tree.merge_mut_and_then(|state| {
         let border = build(state, bounds);
         let tree: &mut ViewTree = state.get_mut();
+        /*
         border.base(tree).on(ViewBase::INPUT, |state, border, input| {
             let tree: &mut ViewTree = state.get_mut();
             let d = match input.key() {
@@ -92,11 +93,9 @@ fn main() {
             let tl = border.layout_ref(tree).get(CanvasLayout::TL).offset(d);
             border.layout_mut(state).set_distinct(CanvasLayout::TL, tl);
         });
+
+         */
         border.focus(tree);
-        Dispatcher::dispatch(state);
-        while ViewTree::update(state, true).unwrap() {
-            Dispatcher::dispatch(state);
-        }
-        while Dispatcher::dispatch(state) { }
-    }, dispatcher);
+        while ViewTree::update(state, true).unwrap() { }
+    }, bindings);
 }

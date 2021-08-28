@@ -1,11 +1,12 @@
 use crate::view::base::*;
 use components_arena::ComponentId;
-use dep_obj::{dep_type_with_builder, DepObjBuilderCore, Style};
-use dyn_context::{State, StateExt};
+use dep_obj::{DepObjBaseBuilder, Style, dep_type_with_builder};
+use dep_obj::binding::{Binding, Binding1};
+use dyn_context::state::{State, StateExt};
 use either::{Either, Left, Right};
-use std::cmp::{min, max};
+use std::cmp::{max, min};
 use std::fmt::Debug;
-use tuifw_screen_base::{Vector, Rect, Side, Orient, Thickness};
+use tuifw_screen_base::{Orient, Rect, Side, Thickness, Vector};
 
 pub trait ViewBuilderDockPanelExt {
     fn dock_panel(
@@ -20,9 +21,8 @@ impl<'a> ViewBuilderDockPanelExt for ViewBuilder<'a> {
         f: impl for<'b> FnOnce(DockPanelBuilder<'b>) -> DockPanelBuilder<'b>
     ) -> Self {
         let view = self.id();
-        let tree: &mut ViewTree = self.state_mut().get_mut();
-        DockPanel::new(tree, view);
-        f(DockPanelBuilder::new_priv(self)).core_priv()
+        DockPanel::new(self.state_mut(), view);
+        f(DockPanelBuilder::new_priv(self)).base_priv()
     }
 }
 
@@ -34,13 +34,12 @@ impl<'a> DockPanelBuilder<'a> {
         layout: impl for<'b> FnOnce(DockLayoutBuilder<'b>) -> DockLayoutBuilder<'b>,
         f: impl for<'b> FnOnce(ViewBuilder<'b>) -> ViewBuilder<'b>
     ) -> Self {
-        let view = self.core_priv_ref().id();
-        let tree: &mut ViewTree = self.core_priv_mut().state_mut().get_mut();
-        let child = View::new(tree, view, |child| (tag, child));
+        let view = self.base_priv_ref().id();
+        let child = View::new(self.base_priv_mut().state_mut(), view, |child| (tag, child));
         storage.map(|x| x.replace(child));
-        DockLayout::new(tree, child);
-        child.build(self.core_priv_mut().state_mut(), |child_builder| {
-            let child_builder = layout(DockLayoutBuilder::new_priv(child_builder)).core_priv();
+        DockLayout::new(self.base_priv_mut().state_mut(), child);
+        child.build(self.base_priv_mut().state_mut(), |child_builder| {
+            let child_builder = layout(DockLayoutBuilder::new_priv(child_builder)).base_priv();
             f(child_builder)
         });
         self
@@ -53,26 +52,52 @@ dep_type_with_builder! {
         dock: Either<f32, Side> = Either::Left(1.),
     }
 
-    type BuilderCore<'a> = ViewBuilder<'a>;
+    type BaseBuilder<'a> = ViewBuilder<'a>;
 }
 
 impl DockLayout {
+    const BEHAVIOR: DockLayoutBehavior = DockLayoutBehavior;
+
     #[allow(clippy::new_ret_no_self)]
     pub fn new(
-        tree: &mut ViewTree,
+        state: &mut dyn State,
         view: View,
     ) {
-        view.set_layout(tree, DockLayout::new_priv());
-        view.layout(tree).on_changed(DockLayout::DOCK, Self::invalidate_parent_measure);
-    }
-
-    fn invalidate_parent_measure<T>(state: &mut dyn State, view: View, _old: &T) {
-        let tree: &mut ViewTree = state.get_mut();
-        view.parent(tree).map(|parent| parent.invalidate_measure(tree));
+        view.set_layout(state, DockLayout::new_priv());
     }
 }
 
-impl Layout for DockLayout { }
+impl Layout for DockLayout {
+    fn behavior(&self) -> &'static dyn LayoutBehavior { &Self::BEHAVIOR }
+}
+
+struct DockLayoutBehavior;
+
+impl LayoutBehavior for DockLayoutBehavior {
+    fn init_bindings(&self, view: View, state: &mut dyn State) -> Box<dyn LayoutBindings> {
+        let dock = Binding1::new(state, |(_, dock)| Some(dock));
+        dock.set_source_1(state, &mut DockLayout::DOCK.source(view.layout()));
+        dock.set_target_fn(state, view, |state, view, _| {
+            let tree: &ViewTree = state.get();
+            view.parent(tree).map(|parent| parent.invalidate_measure(state)).expect("invalidate_measure failed");
+        });
+        Box::new(DockLayoutBindings {
+            dock: dock.into()
+        })
+    }
+
+    fn drop_bindings(&self, _view: View, state: &mut dyn State, bindings: Box<dyn LayoutBindings>) {
+        let bindings = bindings.downcast::<DockLayoutBindings>().unwrap();
+        bindings.dock.drop_binding(state);
+    }
+}
+
+#[derive(Debug)]
+struct DockLayoutBindings {
+    dock: Binding<Either<f32, Side>>
+}
+
+impl LayoutBindings for DockLayoutBindings { }
 
 dep_type_with_builder! {
     #[derive(Debug)]
@@ -80,7 +105,7 @@ dep_type_with_builder! {
         base: Side = Side::Top,
     }
 
-    type BuilderCore<'a> = ViewBuilder<'a>;
+    type BaseBuilder<'a> = ViewBuilder<'a>;
 }
 
 impl DockPanel {
@@ -88,10 +113,10 @@ impl DockPanel {
 
     #[allow(clippy::new_ret_no_self)]
     pub fn new(
-        tree: &mut ViewTree,
+        state: &mut dyn State,
         view: View,
     ) {
-        view.set_panel(tree, DockPanel::new_priv());
+        view.set_panel(state, DockPanel::new_priv());
     }
 
     pub fn template(panel: Style<DockPanel>, layout: Style<DockLayout>) -> Box<dyn PanelTemplate> {
@@ -111,17 +136,22 @@ struct DockPanelTemplate {
 
 impl PanelTemplate for DockPanelTemplate {
     fn apply_panel(&self, state: &mut dyn State, view: View) {
-        let tree: &mut ViewTree = state.get_mut();
-        DockPanel::new(tree, view);
-        view.panel_mut(state).apply_style(Some(self.panel.clone()));
+        DockPanel::new(state, view);
+        view.panel().apply_style(state, Some(self.panel.clone()));
     }
 
     fn apply_layout(&self, state: &mut dyn State, view: View) {
-        let tree: &mut ViewTree = state.get_mut();
-        DockLayout::new(tree, view);
-        view.layout_mut(state).apply_style(Some(self.layout.clone()));
+        DockLayout::new(state, view);
+        view.layout().apply_style(state, Some(self.layout.clone()));
     }
 }
+
+#[derive(Debug)]
+struct DockPanelBindings {
+    base: Binding<Side>,
+}
+
+impl PanelBindings for DockPanelBindings { }
 
 struct DockPanelBehavior;
 
@@ -129,9 +159,10 @@ impl PanelBehavior for DockPanelBehavior {
     fn children_desired_size(
         &self,
         view: View,
-        tree: &mut ViewTree,
+        state: &mut dyn State,
         children_measure_size: (Option<i16>, Option<i16>)
     ) -> Vector {
+        let tree: &ViewTree = state.get();
         let mut children_size = Vector::null();
         if let Some(last_child) = view.last_child(tree) {
             let mut size = children_measure_size;
@@ -141,10 +172,13 @@ impl PanelBehavior for DockPanelBehavior {
             let mut breadth = 0;
             let mut child = last_child;
             loop {
+                let tree: &ViewTree = state.get();
                 child = child.next(tree);
-                let dock = match child.layout_ref(tree).get(DockLayout::DOCK) {
-                    &Right(dock) => dock,
-                    &Left(factor) => {
+                let dock = child.layout_bindings(tree).downcast_ref::<DockLayoutBindings>().unwrap().dock;
+                let dock = dock.get_value(state).unwrap_or(Either::Left(1.));
+                let dock = match dock {
+                    Right(dock) => dock,
+                    Left(factor) => {
                         factor_sum += factor;
                         last_undocked_child = Some(child);
                         if child == last_child { break; } else { continue; }
@@ -152,7 +186,8 @@ impl PanelBehavior for DockPanelBehavior {
                 };
                 let w = if dock == Side::Left || dock == Side::Right { None } else { size.0 };
                 let h = if dock == Side::Top || dock == Side::Bottom { None } else { size.1 };
-                child.measure(tree, (w, h));
+                child.measure(state, (w, h));
+                let tree: &ViewTree = state.get();
                 let child_size = child.desired_size(tree);
                 let (child_orient, child_breadth) = match dock {
                     Side::Left | Side::Right => {
@@ -186,7 +221,10 @@ impl PanelBehavior for DockPanelBehavior {
                 None => { },
             }
             if let Some(last_undocked_child) = last_undocked_child {
-                let orient = match view.panel_ref(tree).get(DockPanel::BASE) {
+                let tree: &ViewTree = state.get();
+                let base = view.panel_bindings(tree).downcast_ref::<DockPanelBindings>().unwrap().base
+                    .get_value(state).unwrap_or(Side::Top);
+                let orient = match base {
                     Side::Left | Side::Right => Orient::Hor,
                     Side::Top | Side::Bottom => Orient::Vert
                 };
@@ -195,10 +233,13 @@ impl PanelBehavior for DockPanelBehavior {
                 let mut size = (size.0.map(|w| (w, w)), size.1.map(|h| (h, h)));
                 let mut child = last_child;
                 loop {
+                    let tree: &ViewTree = state.get();
                     child = child.next(tree);
-                    let factor = match child.layout_ref(tree).get(DockLayout::DOCK) {
-                        &Right(_) => continue,
-                        &Left(factor) => factor
+                    let dock = child.layout_bindings(tree).downcast_ref::<DockLayoutBindings>().unwrap().dock
+                        .get_value(state).unwrap_or(Either::Left(1.));
+                    let factor = match dock {
+                        Right(_) => continue,
+                        Left(factor) => factor
                     };
                     let child_size = match orient {
                         Orient::Hor => {
@@ -222,7 +263,8 @@ impl PanelBehavior for DockPanelBehavior {
                             (size.0.map(|x| x.0), child_h)
                         },
                     };
-                    child.measure(tree, child_size);
+                    child.measure(state, child_size);
+                    let tree: &ViewTree = state.get();
                     let child_size = child.desired_size(tree);
                     match orient {
                         Orient::Hor => {
@@ -254,9 +296,10 @@ impl PanelBehavior for DockPanelBehavior {
     fn children_render_bounds(
         &self,
         view: View,
-        tree: &mut ViewTree,
+        state: &mut dyn State,
         children_arrange_bounds: Rect
     ) -> Rect {
+        let tree: &ViewTree = state.get();
         let mut children_rect = Rect { tl: children_arrange_bounds.tl, size: Vector::null() };
         if let Some(last_child) = view.last_child(tree) {
             let mut last_undocked_child = None;
@@ -264,15 +307,19 @@ impl PanelBehavior for DockPanelBehavior {
             let mut factor_sum = 0.;
             let mut child = last_child;
             loop {
+                let tree: &ViewTree = state.get();
                 child = child.next(tree);
-                let dock = match child.layout_ref(tree).get(DockLayout::DOCK) {
-                    &Right(dock) => dock,
-                    &Left(factor) => {
+                let dock = child.layout_bindings(tree).downcast_ref::<DockLayoutBindings>().unwrap().dock;
+                let dock = dock.get_value(state).unwrap_or(Either::Left(1.));
+                let dock = match dock {
+                    Right(dock) => dock,
+                    Left(factor) => {
                         factor_sum += factor;
                         last_undocked_child = Some(child);
                         if child == last_child { break; } else { continue; }
                     }
                 };
+                let tree: &ViewTree = state.get();
                 let child_size = child.desired_size(tree);
                 let child_size = match dock {
                     Side::Left => Vector { x: child_size.x, y: bounds.h() },
@@ -286,7 +333,7 @@ impl PanelBehavior for DockPanelBehavior {
                     Side::Bottom => bounds.bl().offset(-Vector { y: child_size.y, x: 0 }),
                 };
                 let child_rect = Rect { tl: child_tl, size: child_size };
-                child.arrange(tree, child_rect);
+                child.arrange(state, child_rect);
                 children_rect = children_rect.union_intersect(child_rect, children_arrange_bounds);
                 let d = match dock {
                     Side::Left => unsafe { Thickness::new_unchecked(
@@ -308,13 +355,18 @@ impl PanelBehavior for DockPanelBehavior {
             if let Some(last_undocked_child) = last_undocked_child {
                 children_rect = children_arrange_bounds;
                 let base_bounds = bounds;
-                let &dock = view.panel_ref(tree).get(DockPanel::BASE);
+                let tree: &ViewTree = state.get();
+                let dock = view.panel_bindings(tree).downcast_ref::<DockPanelBindings>().unwrap().base;
+                let dock = dock.get_value(state).unwrap_or(Side::Top);
                 let mut child = last_child;
                 loop {
+                    let tree: &ViewTree = state.get();
                     child = child.next(tree);
-                    let factor = match child.layout_ref(tree).get(DockLayout::DOCK) {
-                        &Right(_) => continue,
-                        &Left(factor) => factor
+                    let factor = child.layout_bindings(tree).downcast_ref::<DockLayoutBindings>().unwrap().dock
+                        .get_value(state).unwrap_or(Either::Left(1.));
+                    let factor = match factor {
+                        Right(_) => continue,
+                        Left(factor) => factor
                     };
                     let child_size = if child == last_undocked_child {
                         bounds.size
@@ -332,7 +384,7 @@ impl PanelBehavior for DockPanelBehavior {
                         Side::Bottom => bounds.bl().offset(-Vector { y: child_size.y, x: 0 }),
                     };
                     let child_rect = Rect { tl: child_tl, size: child_size };
-                    child.arrange(tree, child_rect);
+                    child.arrange(state, child_rect);
                     let d = match dock {
                         Side::Left => unsafe { Thickness::new_unchecked(
                             min(child_rect.w() as u16, bounds.w() as u16) as u32 as i32, 0, 0, 0
@@ -353,6 +405,22 @@ impl PanelBehavior for DockPanelBehavior {
             }
         }
         children_rect
+    }
+
+    fn init_bindings(&self, view: View, state: &mut dyn State) -> Box<dyn PanelBindings> {
+        let base = Binding1::new(state, |(_, base)| Some(base));
+        base.set_source_1(state, &mut DockPanel::BASE.source(view.panel()));
+        base.set_target_fn(state, view, |state, view, _| {
+            view.invalidate_measure(state);
+        });
+        Box::new(DockPanelBindings {
+            base: base.into()
+        })
+    }
+
+    fn drop_bindings(&self, _view: View, state: &mut dyn State, bindings: Box<dyn PanelBindings>) {
+        let bindings = bindings.downcast::<DockPanelBindings>().unwrap();
+        bindings.base.drop_binding(state);
     }
 }
 

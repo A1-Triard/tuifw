@@ -1,9 +1,10 @@
 #![windows_subsystem = "windows"]
+
 #![deny(warnings)]
 
-use dyn_context::State;
-use tuifw_screen::{Point, Color, Attr, Vector, Event, Key, Rect, HAlign, VAlign, Thickness};
-use tuifw_window::{WindowTree, Window, RenderPort};
+use dyn_context::state::State;
+use tuifw_screen::{Attr, Color, Event, HAlign, Key, Point, Rect, Thickness, VAlign, Vector};
+use tuifw_window::{RenderPort, Window, WindowTree};
 
 fn draw(
     _tree: &WindowTree,
