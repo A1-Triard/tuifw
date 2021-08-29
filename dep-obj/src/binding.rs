@@ -44,8 +44,19 @@ pub trait Handler<T: Convenient>: Debug + DynClone + Send + Sync {
 
 clone_trait_object!(<T: Convenient> Handler<T>);
 
+pub trait SyncHandler<T>: Debug + DynClone + Send + Sync {
+    fn into_any(self: Box<Self>) -> Box<dyn AnyHandler>;
+    fn execute(&self, state: &mut dyn State, value: &mut T);
+}
+
+clone_trait_object!(<T> SyncHandler<T>);
+
 pub trait Source<T: Convenient>: Debug {
     fn handle(&self, state: &mut dyn State, handler: Box<dyn Handler<T>>) -> HandledSource<T>;
+}
+
+pub trait SyncSource<T>: Debug {
+    fn handle(&self, state: &mut dyn State, handler: Box<dyn SyncHandler<T>>) -> HandledSyncSource<T>;
 }
 
 pub trait HandlerId: Debug {
@@ -56,6 +67,14 @@ pub trait HandlerId: Debug {
 pub struct HandledSource<T: Convenient> {
     pub handler_id: Box<dyn HandlerId>,
     pub value: T,
+}
+
+#[derive(Educe)]
+#[educe(Debug)]
+pub struct HandledSyncSource<'a, T> {
+    pub handler_id: Box<dyn HandlerId>,
+    #[educe(Debug(ignore))]
+    pub value: Option<&'a mut T>,
 }
 
 trait AnyBindingNode: Debug + Downcast {
@@ -363,6 +382,252 @@ macro_rules! binding_n {
                     }
                 }
             )*
+
+            fn [< knoke_target_y_ $n >] < $( [< S $i >] : Convenient, )* Y: 'static, T: Convenient>(binding: Id<BoxedBindingNode>, state: &mut dyn State, sync_value: &mut Y) {
+                let bindings: &Bindings = state.get();
+                let node = bindings.0[binding].0.downcast_ref::<BindingNode<T>>().unwrap();
+                let sources = node.sources.downcast_ref::< [< BindingY $n NodeSources >] <$( [< S $i >] ,)* Y, T>>().unwrap();
+                if let Some(value) = sources.get_value_priv(sync_value) {
+                    if let Some(target) = node.target.clone() {
+                        target.execute(state, value);
+                    }
+                }
+            }
+
+            #[derive(Educe)]
+            #[educe(Debug)]
+            struct [< BindingY $n NodeSources >] < $( [< S $i >] : Convenient, )* Y, T: Convenient> {
+                $(
+                    [< source_ $i >] : Option<HandledSource< [< S $i >] >>,
+                )*
+                sync_source: Option<Box<dyn HandlerId>>,
+                #[educe(Debug(ignore))]
+                filter_map: fn( $( [< S $i >] ,)* &mut Y) -> Option<T>,
+            }
+
+            impl<
+                $( [< S $i >] : Convenient, )*
+                Y: 'static, T: Convenient
+            > [< BindingY $n NodeSources >] <$( [< S $i >] , )* Y, T> {
+                fn get_value_priv(&self, sync_value: &mut Y) -> Option<T> {
+                    $(
+                        let [< value_ $i >] ;
+                        if let Some(source) = self. [< source_ $i >] .as_ref() {
+                            [< value_ $i >] = source.value.clone();
+                        } else {
+                            return None;
+                        }
+                    )*
+                    (self.filter_map)($( [< value_ $i >] ,)* sync_value)
+                }
+
+            }
+
+            impl<
+                $( [< S $i >] : Convenient, )*
+                Y: 'static, T: Convenient
+            > AnyBindingNodeSources for [< BindingY $n NodeSources >] <$( [< S $i >] , )* Y, T> {
+                type Value = T;
+
+                #[allow(unused_variables)]
+                fn unhandle(&mut self, state: &mut dyn State) {
+                    $(
+                        if let Some(source) = self. [< source_ $i >] .take() {
+                            source.handler_id.unhandle(state);
+                        }
+                    )*
+                    if let Some(sync_source) = self.sync_source.take() {
+                        sync_source.unhandle(state);
+                    }
+                }
+
+                fn get_value(&self) -> Option<T> { None }
+            }
+
+            macro_attr! {
+                #[derive(Educe, NewtypeComponentId!)]
+                #[educe(Debug, Eq, PartialEq, Copy, Clone, Ord, PartialOrd, Hash)]
+                pub struct [< BindingY $n >] < $( [< S $i >] : Convenient, )* Y, T: Convenient>(
+                    Id<BoxedBindingNode>,
+                    PhantomType<(($( [< S $i >] ,)* ), Y, T)>
+                );
+            }
+
+            impl<
+                $( [< S $i >] : Convenient, )*
+                Y: 'static, T: Convenient
+            > [< BindingY $n >] < $( [< S $i >] , )* Y, T> {
+                pub fn new(
+                    state: &mut dyn State,
+                    filter_map: fn( $( [< S $i >] ,)* &mut Y) -> Option<T>
+                ) -> Self {
+                    let bindings: &mut Bindings = state.get_mut();
+                    let id = bindings.0.insert(|id| {
+                        let sources: [< BindingY $n NodeSources >] <$( [< S $i >] ,)* Y, T> = [< BindingY $n NodeSources >] {
+                            $(
+                                [< source_ $i >] : None,
+                            )*
+                            sync_source: None,
+                            filter_map,
+                        };
+                        let node: BindingNode<T> = BindingNode {
+                            sources: Box::new(sources),
+                            target: None,
+                        };
+                        (BoxedBindingNode(Box::new(node)), id)
+                    });
+                    [< BindingY $n >] (id, PhantomType::new())
+                }
+
+                pub fn set_target(self, state: &mut dyn State, target: Box<dyn Target<T>>) {
+                    Binding::from(self).set_target(state, target);
+                }
+
+                pub fn set_target_fn<Context: Debug + Clone + 'static>(
+                    self,
+                    state: &mut dyn State,
+                    context: Context,
+                    execute: fn(state: &mut dyn State, context: Context, value: T)
+                ) {
+                    Binding::from(self).set_target_fn(state, context, execute);
+                }
+
+                pub fn drop_binding(self, state: &mut dyn State) {
+                    Binding::from(self).drop_binding(state);
+                }
+
+                $(
+                    pub fn [< set_source_ $i >] (self, state: &mut dyn State, source: &mut dyn Source< [< S $i >] >) {
+                        let handler: [< BindingY $n Source $i Handler >] ::<$( [< S $j >] ,)* Y, T>  = [< BindingY $n Source $i Handler >] {
+                            binding: self.0,
+                            phantom: PhantomType::new()
+                        };
+                        let source = source.handle(
+                            state,
+                            Box::new(handler)
+                        );
+                        let bindings: &mut Bindings = state.get_mut();
+                        let node = bindings.0[self.0].0.downcast_mut::<BindingNode<T>>().unwrap();
+                        let sources = node.sources.downcast_mut::< [< BindingY $n NodeSources >] <$( [< S $j >] ),* , Y, T>>().unwrap();
+                        if let Some(source) = sources. [< source_ $i >] .replace(source) {
+                            source.handler_id.unhandle(state);
+                        }
+                    }
+                )*
+
+                pub fn set_sync_source(self, state: &mut dyn State, source: &mut dyn SyncSource<Y>) {
+                    let handler: [< BindingY $n SyncSourceHandler >] ::<$( [< S $i >] ,)* Y, T>  = [< BindingY $n SyncSourceHandler >] {
+                        binding: self.0,
+                        phantom: PhantomType::new()
+                    };
+                    let source = source.handle(
+                        state,
+                        Box::new(handler)
+                    );
+                    let bindings: &mut Bindings = state.get_mut();
+                    let node = bindings.0[self.0].0.downcast_mut::<BindingNode<T>>().unwrap();
+                    let sources = node.sources.downcast_mut::< [< BindingY $n NodeSources >] <$( [< S $i >] ,)* Y, T>>().unwrap();
+                    if let Some(source) = sources.sync_source.replace(source.handler_id) {
+                        source.unhandle(state);
+                    }
+                    if let Some(value) = source.value {
+                        [< knoke_target_y_ $n >] ::< $( [< S $i >] ,)* Y, T > (self.0, state, value);
+                    }
+                }
+            }
+
+            impl<
+                $( [< S $i >] : Convenient, )*
+                Y, T: Convenient
+            > From< [< BindingY $n >] < $( [< S $i >] , )* Y, T> > for Binding<T> {
+                fn from(v: [< BindingY $n >] < $( [< S $i >] , )* Y, T> ) -> Binding<T> {
+                    Binding(v.0, PhantomType::new())
+                }
+            }
+
+            impl<
+                $( [< S $i >] : Convenient, )*
+                Y, T: Convenient
+            > From< [< BindingY $n >] < $( [< S $i >] , )* Y, T> > for AnyBinding {
+                fn from(v: [< BindingY $n >] < $( [< S $i >] , )* Y, T> ) -> AnyBinding {
+                    AnyBinding(v.0)
+                }
+            }
+
+            $(
+                #[derive(Educe)]
+                #[educe(Debug, Clone)]
+                struct [< BindingY $n Source $i Handler >] <
+                    $( [< S $j >] : Convenient, )*
+                    Y, T: Convenient
+                > {
+                    binding: Id<BoxedBindingNode>,
+                    phantom: PhantomType<($( [< S $j >] ,)* Y, T)>
+                }
+
+                impl<
+                    $( [< S $j >] : Convenient, )*
+                    Y: 'static, T: Convenient
+                > AnyHandler for [< BindingY $n Source $i Handler >] < $( [< S $j >] , )* Y, T >  {
+                    fn clear(&self, state: &mut dyn State) {
+                        let bindings: &mut Bindings = state.get_mut();
+                        let node = bindings.0[self.binding].0.downcast_mut::<BindingNode<T>>().unwrap();
+                        let sources = node.sources.downcast_mut::< [< BindingY $n NodeSources >] <$( [< S $j >] ,)* Y, T>>().unwrap();
+                        sources. [< source_ $i >] .take();
+                    }
+                }
+
+                impl<
+                    $( [< S $j >] : Convenient, )*
+                    Y: 'static, T: Convenient
+                > Handler< [< S $i >] > for [< BindingY $n Source $i Handler >] < $( [< S $j >] , )* Y, T >  {
+                    fn into_any(self: Box<Self>) -> Box<dyn AnyHandler> {
+                        self
+                    }
+
+                    fn execute(&self, state: &mut dyn State, value: [< S $i >] ) {
+                        let bindings: &mut Bindings = state.get_mut();
+                        let node = bindings.0[self.binding].0.downcast_mut::<BindingNode<T>>().unwrap();
+                        let sources = node.sources.downcast_mut::< [< BindingY $n NodeSources >] <$( [< S $j >] ,)* Y, T>>().unwrap();
+                        sources. [< source_ $i >] .as_mut().unwrap().value = value;
+                    }
+                }
+            )*
+
+            #[derive(Educe)]
+            #[educe(Debug, Clone)]
+            struct [< BindingY $n SyncSourceHandler >] <
+                $( [< S $i >] : Convenient, )*
+                Y, T: Convenient
+            > {
+                binding: Id<BoxedBindingNode>,
+                phantom: PhantomType<($( [< S $i >] ,)* Y, T)>
+            }
+
+            impl<
+                $( [< S $i >] : Convenient, )*
+                Y: 'static, T: Convenient
+            > AnyHandler for [< BindingY $n SyncSourceHandler >] < $( [< S $i >] , )* Y, T >  {
+                fn clear(&self, state: &mut dyn State) {
+                    let bindings: &mut Bindings = state.get_mut();
+                    let node = bindings.0[self.binding].0.downcast_mut::<BindingNode<T>>().unwrap();
+                    let sources = node.sources.downcast_mut::< [< BindingY $n NodeSources >] <$( [< S $i >] ,)* Y, T>>().unwrap();
+                    sources.sync_source.take();
+                }
+            }
+
+            impl<
+                $( [< S $i >] : Convenient, )*
+                Y: 'static, T: Convenient
+            > SyncHandler<Y> for [< BindingY $n SyncSourceHandler >] < $( [< S $i >] , )* Y, T >  {
+                fn into_any(self: Box<Self>) -> Box<dyn AnyHandler> {
+                    self
+                }
+
+                fn execute(&self, state: &mut dyn State, value: &mut Y) {
+                    [< knoke_target_y_ $n >] ::< $( [< S $i >] ,)* Y, T > (self.binding, state, value);
+                }
+            }
         }
     };
 }
