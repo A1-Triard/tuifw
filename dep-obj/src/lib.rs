@@ -174,7 +174,7 @@ pub use memoffset::offset_of as memoffset_offset_of;
 #[doc(hidden)]
 pub use paste::paste as paste_paste;
 
-use crate::binding::{AnyBinding, AnyHandler, Binding, HandledSource, Handler, HandlerId, Source, Target};
+use crate::binding::*;
 use alloc::boxed::Box;
 use alloc::collections::TryReserveError;
 use alloc::vec;
@@ -233,8 +233,15 @@ impl<Id: ComponentId, Obj> Glob<Id, Obj> {
 }
 
 macro_attr! {
-    #[derive(Debug, Clone, Component!(class=HandlerComponent))]
+    #[derive(Educe, Component!(class=HandlerComponent))]
+    #[educe(Debug, Clone)]
     struct BoxedHandler<T: Convenient>(Box<dyn Handler<T>>);
+}
+
+macro_attr! {
+    #[derive(Educe, Component!(class=SyncHandlerComponent))]
+    #[educe(Debug, Clone)]
+    struct BoxedSyncHandler<T>(Box<dyn SyncHandler<T>>);
 }
 
 #[derive(Debug)]
@@ -267,11 +274,11 @@ impl<PropType: Convenient> DepPropEntry<PropType> {
 }
 
 #[derive(Debug)]
-pub struct DepEventEntry<ArgsType: Convenient> {
-    handlers: Arena<BoxedHandler<Option<ArgsType>>>,
+pub struct DepEventEntry<ArgsType> {
+    handlers: Arena<BoxedSyncHandler<ArgsType>>,
 }
 
-impl<ArgsType: Convenient> DepEventEntry<ArgsType> {
+impl<ArgsType> DepEventEntry<ArgsType> {
     pub const fn new() -> Self {
         DepEventEntry {
             handlers: Arena::new(),
@@ -433,12 +440,12 @@ pub trait DepType: Debug {
 
 #[derive(Educe)]
 #[educe(Debug, Clone, Copy)]
-pub struct DepEvent<Owner: DepType, ArgsType: Convenient> {
+pub struct DepEvent<Owner: DepType, ArgsType> {
     offset: usize,
     _phantom: PhantomType<(Owner, ArgsType)>
 }
 
-impl<Owner: DepType, ArgsType: Convenient> DepEvent<Owner, ArgsType> {
+impl<Owner: DepType, ArgsType> DepEvent<Owner, ArgsType> {
     pub const unsafe fn new(offset: usize) -> Self {
         DepEvent { offset, _phantom: PhantomType::new() }
     }
@@ -453,13 +460,12 @@ impl<Owner: DepType, ArgsType: Convenient> DepEvent<Owner, ArgsType> {
         }
     }
 
-    pub fn raise(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, args: ArgsType) {
+    pub fn raise(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, args: &mut ArgsType) {
         let mut obj_mut = obj.get_mut(state);
         let entry_mut = self.entry_mut(&mut obj_mut);
         let handlers = entry_mut.handlers.items().clone().into_values();
         for handler in handlers {
-            handler.0.execute(state, Some(args.clone()));
-            handler.0.execute(state, None);
+            handler.0.execute(state, args);
         }
     }
 
@@ -869,13 +875,13 @@ pub trait DepObjBaseBuilder<OwnerId: ComponentId> {
 
 #[derive(Educe)]
 #[educe(Debug)]
-struct DepEventHandledSource<Owner: DepType, ArgsType: Convenient> {
+struct DepEventHandledSource<Owner: DepType, ArgsType> {
     obj: Glob<Owner::Id, Owner>,
-    handler_id: Id<BoxedHandler<Option<ArgsType>>>,
+    handler_id: Id<BoxedSyncHandler<ArgsType>>,
     event: DepEvent<Owner, ArgsType>,
 }
 
-impl<Owner: DepType, ArgsType: Convenient> HandlerId for DepEventHandledSource<Owner, ArgsType> {
+impl<Owner: DepType, ArgsType> HandlerId for DepEventHandledSource<Owner, ArgsType> {
     fn unhandle(&self, state: &mut dyn State) {
         let mut obj = self.obj.get_mut(state);
         let entry_mut = self.event.entry_mut(&mut obj);
@@ -885,19 +891,19 @@ impl<Owner: DepType, ArgsType: Convenient> HandlerId for DepEventHandledSource<O
 
 #[derive(Educe)]
 #[educe(Debug)]
-pub struct DepEventSource<Owner: DepType, ArgsType: Convenient> {
+pub struct DepEventSource<Owner: DepType, ArgsType> {
     obj: Glob<Owner::Id, Owner>,
     event: DepEvent<Owner, ArgsType>,
 }
 
-impl<Owner: DepType + 'static, ArgsType: Convenient> Source<Option<ArgsType>> for DepEventSource<Owner, ArgsType> {
-    fn handle(&self, state: &mut dyn State, handler: Box<dyn Handler<Option<ArgsType>>>) -> HandledSource<Option<ArgsType>> {
+impl<Owner: DepType + 'static, ArgsType: 'static> SyncSource<ArgsType> for DepEventSource<Owner, ArgsType> {
+    fn handle(&self, state: &mut dyn State, handler: Box<dyn SyncHandler<ArgsType>>) -> HandledSyncSource<ArgsType> {
         let mut obj = self.obj.get_mut(state);
         let entry = self.event.entry_mut(&mut obj);
-        let handler_id = entry.handlers.insert(|handler_id| (BoxedHandler(handler), handler_id));
-        HandledSource {
+        let handler_id = entry.handlers.insert(|handler_id| (BoxedSyncHandler(handler), handler_id));
+        HandledSyncSource {
             handler_id: Box::new(DepEventHandledSource { handler_id, obj: self.obj, event: self.event }),
-            value: None
+            value: None // TODO "once" events with cached value?
         }
     }
 }
