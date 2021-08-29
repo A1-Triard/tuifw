@@ -22,7 +22,6 @@ mod base;
 pub use base::*;
 
 pub mod binding;
-pub mod binding_t;
 
 #[cfg(docsrs)]
 pub mod example {
