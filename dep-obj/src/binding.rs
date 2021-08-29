@@ -17,17 +17,6 @@ pub trait Target<T: Convenient>: Debug + DynClone {
 
 clone_trait_object!(<T: Convenient> Target<T>);
 
-pub trait AnyHandler: Debug {
-    fn clear(&self, state: &mut dyn State);
-}
-
-pub trait Handler<T: Convenient>: Debug + DynClone + Send + Sync {
-    fn into_any(self: Box<Self>) -> Box<dyn AnyHandler>;
-    fn execute(&self, state: &mut dyn State, value: T);
-}
-
-clone_trait_object!(<T: Convenient> Handler<T>);
-
 #[derive(Educe)]
 #[educe(Debug, Clone)]
 struct FnTarget<Context: Debug + Clone, T: Convenient> {
@@ -43,6 +32,17 @@ impl<Context: Debug + Clone, T: Convenient> Target<T> for FnTarget<Context, T> {
 
     fn clear(&self, _state: &mut dyn State) { }
 }
+
+pub trait AnyHandler: Debug {
+    fn clear(&self, state: &mut dyn State);
+}
+
+pub trait Handler<T: Convenient>: Debug + DynClone + Send + Sync {
+    fn into_any(self: Box<Self>) -> Box<dyn AnyHandler>;
+    fn execute(&self, state: &mut dyn State, value: T);
+}
+
+clone_trait_object!(<T: Convenient> Handler<T>);
 
 pub trait Source<T: Convenient>: Debug {
     fn handle(&self, state: &mut dyn State, handler: Box<dyn Handler<T>>) -> HandledSource<T>;
@@ -324,7 +324,8 @@ macro_rules! binding_n {
             }
 
             $(
-                #[derive(Debug, Clone)]
+                #[derive(Educe)]
+                #[educe(Debug, Clone)]
                 struct [< Binding $n Source $i Handler >] <
                     $( [< S $j >] : Convenient, )*
                     T: Convenient
@@ -359,7 +360,7 @@ macro_rules! binding_n {
                         let bindings: &mut Bindings = state.get_mut();
                         let node = bindings.0[binding.0].0.downcast_mut::<BindingNode<T>>().unwrap();
                         let sources = node.sources.downcast_mut::< [< Binding $n NodeSources >] <$( [< S $j >] ),* , T>>().unwrap();
-                        sources. [< source_ $i >] .as_mut().unwrap().value = value.clone();
+                        sources. [< source_ $i >] .as_mut().unwrap().value = value;
                         Binding::from(binding).knoke_target(state);
                     }
                 }
