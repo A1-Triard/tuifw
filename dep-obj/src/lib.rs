@@ -267,6 +267,23 @@ impl<PropType: Convenient> DepPropEntry<PropType> {
 }
 
 #[derive(Debug)]
+pub struct DepEventEntry<ArgsType: Convenient> {
+    handlers: Arena<BoxedHandler<Option<ArgsType>>>,
+}
+
+impl<ArgsType: Convenient> DepEventEntry<ArgsType> {
+    pub const fn new() -> Self {
+        DepEventEntry {
+            handlers: Arena::new(),
+        }
+    }
+
+    pub fn take_all_handlers(&mut self, handlers: &mut Vec<Box<dyn AnyHandler>>) {
+        handlers.extend(take(&mut self.handlers).into_items().into_values().map(|x| x.0.into_any()));
+    }
+}
+
+#[derive(Debug)]
 pub struct DepVecEntry<ItemType: Convenient> {
     items: Vec<ItemType>,
     removed_items_handlers: Arena<BoxedHandler<Vec<ItemType>>>,
@@ -414,6 +431,43 @@ pub trait DepType: Debug {
     fn take_added_bindings_and_collect_all__(&mut self) -> Vec<AnyBinding>;
 }
 
+#[derive(Educe)]
+#[educe(Debug, Clone, Copy)]
+pub struct DepEvent<Owner: DepType, ArgsType: Convenient> {
+    offset: usize,
+    _phantom: PhantomType<(Owner, ArgsType)>
+}
+
+impl<Owner: DepType, ArgsType: Convenient> DepEvent<Owner, ArgsType> {
+    pub const unsafe fn new(offset: usize) -> Self {
+        DepEvent { offset, _phantom: PhantomType::new() }
+    }
+
+    pub fn offset(self) -> usize { self.offset }
+
+    fn entry_mut(self, owner: &mut Owner) -> &mut DepEventEntry<ArgsType> {
+        unsafe {
+            let entry = (owner as *mut _ as usize).unchecked_add(self.offset);
+            let entry = entry as *mut DepEventEntry<ArgsType>;
+            &mut *entry
+        }
+    }
+
+    pub fn raise(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, args: ArgsType) {
+        let mut obj_mut = obj.get_mut(state);
+        let entry_mut = self.entry_mut(&mut obj_mut);
+        let handlers = entry_mut.handlers.items().clone().into_values();
+        for handler in handlers {
+            handler.0.execute(state, Some(args.clone()));
+            handler.0.execute(state, None);
+        }
+    }
+
+    pub fn source(self, obj: Glob<Owner::Id, Owner>) -> DepEventSource<Owner, ArgsType> {
+        DepEventSource { obj, event: self }
+    }
+}
+
 /// A dependency property.
 #[derive(Educe)]
 #[educe(Debug, Clone, Copy)]
@@ -469,7 +523,7 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         let old = entry_mut.local.as_ref()
             .or_else(|| entry_mut.style.as_ref())
             .unwrap_or(entry_mut.default)
-            ;
+        ;
         if &value == old { return; }
         let old = entry_mut.local.replace(value.clone()).unwrap_or_else(||
             entry_mut.style.as_ref().unwrap_or(entry_mut.default).clone());
@@ -815,6 +869,41 @@ pub trait DepObjBaseBuilder<OwnerId: ComponentId> {
 
 #[derive(Educe)]
 #[educe(Debug)]
+struct DepEventHandledSource<Owner: DepType, ArgsType: Convenient> {
+    obj: Glob<Owner::Id, Owner>,
+    handler_id: Id<BoxedHandler<Option<ArgsType>>>,
+    event: DepEvent<Owner, ArgsType>,
+}
+
+impl<Owner: DepType, ArgsType: Convenient> HandlerId for DepEventHandledSource<Owner, ArgsType> {
+    fn unhandle(&self, state: &mut dyn State) {
+        let mut obj = self.obj.get_mut(state);
+        let entry_mut = self.event.entry_mut(&mut obj);
+        entry_mut.handlers.remove(self.handler_id);
+    }
+}
+
+#[derive(Educe)]
+#[educe(Debug)]
+pub struct DepEventSource<Owner: DepType, ArgsType: Convenient> {
+    obj: Glob<Owner::Id, Owner>,
+    event: DepEvent<Owner, ArgsType>,
+}
+
+impl<Owner: DepType + 'static, ArgsType: Convenient> Source<Option<ArgsType>> for DepEventSource<Owner, ArgsType> {
+    fn handle(&self, state: &mut dyn State, handler: Box<dyn Handler<Option<ArgsType>>>) -> HandledSource<Option<ArgsType>> {
+        let mut obj = self.obj.get_mut(state);
+        let entry = self.event.entry_mut(&mut obj);
+        let handler_id = entry.handlers.insert(|handler_id| (BoxedHandler(handler), handler_id));
+        HandledSource {
+            handler_id: Box::new(DepEventHandledSource { handler_id, obj: self.obj, event: self.event }),
+            value: None
+        }
+    }
+}
+
+#[derive(Educe)]
+#[educe(Debug)]
 struct DepPropHandledSource<Owner: DepType, PropType: Convenient> {
     obj: Glob<Owner::Id, Owner>,
     handler_id: Id<BoxedHandler<(PropType, PropType)>>,
@@ -1092,8 +1181,8 @@ macro_rules! dep_type_with_builder_impl {
             invalid dep type definition, allowed form is\n\
             \n\
             $(#[$attr])* $vis struct $name $(<$generics> $(where $where_clause)?)? become $obj in $Id {\n\
-                $field_1_name $(: $field_1_type = $field_1_value | [$field_1_type]),\n\
-                $field_2_name $(: $field_2_type = $field_2_value | [$field_2_type]),\n\
+                $field_1_name $(: $field_1_type = $field_1_value | [$field_1_type] | yield $field_1_type),\n\
+                $field_2_name $(: $field_2_type = $field_2_value | [$field_2_type] | yield $field_2_type),\n\
                 ...\n\
             }\n\
             \n\
@@ -1183,8 +1272,8 @@ macro_rules! dep_type_with_builder_impl {
             invalid dep type definition, allowed form is\n\
             \n\
             $(#[$attr])* $vis struct $name $(<$generics> $(where $where_clause)?)? become $obj in $Id {\n\
-                $field_1_name $(: $field_1_type = $field_1_value | [$field_1_type]),\n\
-                $field_2_name $(: $field_2_type = $field_2_value | [$field_2_type]),\n\
+                $field_1_name $(: $field_1_type = $field_1_value | [$field_1_type] | yield $field_1_type),\n\
+                $field_2_name $(: $field_2_type = $field_2_value | [$field_2_type] | yield $field_2_type),\n\
                 ...\n\
             }\n\
             \n\
@@ -1259,8 +1348,8 @@ macro_rules! dep_type_impl {
             invalid dep type definition, allowed form is\n\
             \n\
             $(#[$attr])* $vis struct $name $(<$generics> $(where $where_clause)?)? in $Id {\n\
-                $field_1_name $(: $field_1_type = $field_1_value | [$field_1_type]),\n\
-                $field_2_name $(: $field_2_type = $field_2_value | [$field_2_type]),\n\
+                $field_1_name $(: $field_1_type = $field_1_value | [$field_1_type] | yield $field_1_type),\n\
+                $field_2_name $(: $field_2_type = $field_2_value | [$field_2_type] | yield $field_2_type),\n\
                 ...\n\
             }\n\
             \n\
@@ -1273,8 +1362,8 @@ macro_rules! dep_type_impl {
             invalid dep type definition, allowed form is\n\
             \n\
             $(#[$attr])* $vis struct $name $(<$generics> $(where $where_clause)?)? in $Id {\n\
-                $field_1_name $(: $field_1_type = $field_1_value | [$field_1_type]),\n\
-                $field_2_name $(: $field_2_type = $field_2_value | [$field_2_type]),\n\
+                $field_1_name $(: $field_1_type = $field_1_value | [$field_1_type] | yield $field_1_type),\n\
+                $field_2_name $(: $field_2_type = $field_2_value | [$field_2_type] | yield $field_2_type),\n\
                 ...\n\
             }\n\
             \n\
@@ -1321,7 +1410,7 @@ macro_rules! dep_type_impl_raw {
                 $($dep_props)*
 
                 $vis const [< $field:upper >] : $crate::DepProp<Self, $field_ty> = {
-                    unsafe { 
+                    unsafe {
                         let offset = $crate::memoffset_offset_of!( [< $name Core >] $($r)*, $field );
                         $crate::DepProp::new(offset)
                     }
@@ -1348,6 +1437,63 @@ macro_rules! dep_type_impl_raw {
                         $name:: [< $field:upper >] .set_uncond(state, id.$obj(), value);
                         self
                     }
+                ]
+            )?]
+            [$($fields)*]
+        }
+    };
+    (
+        @unroll_fields
+        [$([$attr:meta])*] [$vis:vis] [$name:ident] [$obj:ident] [$Id:ty] [$state:ident] [$this:ident] [$bindings:ident] [$handlers:ident]
+        [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
+        [$($core_fields:tt)*]
+        [$($core_new:tt)*]
+        [$($core_consts:tt)*]
+        [$($dep_props:tt)*]
+        [$($core_bindings:tt)*]
+        [$($core_handlers:tt)*]
+        [$(
+            [$BaseBuilder:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
+            [$($builder_methods:tt)*]
+        )?]
+        [[$field:ident yield $field_ty:ty] $($fields:tt)*]
+    ) => {
+        $crate::dep_type_impl_raw! {
+            @unroll_fields
+            [$([$attr])*] [$vis] [$name] [$obj] [$Id] [$state] [$this] [$bindings] [$handlers]
+            [$($g)*] [$($r)*] [$($w)*]
+            [
+                $($core_fields)*
+                $field: $crate::DepEventEntry<$field_ty>,
+            ]
+            [
+                $($core_new)*
+                $field: $crate::DepEventEntry::new(),
+            ]
+            [
+                $($core_consts)*
+            ]
+            [
+                $($dep_props)*
+
+                $vis const [< $field:upper >] : $crate::DepEvent<Self, $field_ty> = {
+                    unsafe { 
+                        let offset = $crate::memoffset_offset_of!( [< $name Core >] $($r)*, $field );
+                        $crate::DepEvent::new(offset)
+                    }
+                };
+            ]
+            [
+                $($core_bindings)*
+            ]
+            [
+                $($core_handlers)*
+                $this . $field .take_all_handlers(&mut $handlers);
+            ]
+            [$(
+                [$BaseBuilder] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]
+                [
+                    $($builder_methods)*
                 ]
             )?]
             [$($fields)*]
@@ -1434,8 +1580,9 @@ macro_rules! dep_type_impl_raw {
         "\
             \n\n\
             allowed forms are \
-            '$field_name : $field_type = $field_value', and \
-            '$field_name [$field_type]'\
+            '$field_name : $field_type = $field_value', \
+            '$field_name [$field_type]', and \
+            '$field_name yield $field_type'\
         "));
     };
     (
