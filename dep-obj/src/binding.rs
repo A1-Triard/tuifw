@@ -1,6 +1,6 @@
 use crate::base::*;
 use alloc::boxed::Box;
-use components_arena::{Component, ComponentId, Id, Arena, RawId, NewtypeComponentId};
+use components_arena::{Component, Id, Arena, NewtypeComponentId};
 use core::fmt::Debug;
 use downcast_rs::{Downcast, impl_downcast};
 use dyn_clone::{DynClone, clone_trait_object};
@@ -134,7 +134,7 @@ impl<T: Convenient> Binding<T> {
         let bindings: &mut Bindings = state.get_mut();
         let node = bindings.0[self.0].0.downcast_mut::<BindingNode<T>>().unwrap();
         node.target = Some(target);
-        self.knoke_target(state);
+        knoke_target::<T>(self.0, state);
     }
 
     pub fn set_target_fn<Context: Debug + Clone + 'static>(
@@ -158,14 +158,14 @@ impl<T: Convenient> Binding<T> {
         let node = bindings.0[self.0].0.downcast_ref::<BindingNode<T>>().unwrap();
         node.sources.get_value()
     }
+}
 
-    fn knoke_target(self, state: &mut dyn State) {
-        let bindings: &Bindings = state.get();
-        let node = bindings.0[self.0].0.downcast_ref::<BindingNode<T>>().unwrap();
-        if let Some(value) = node.sources.get_value() {
-            if let Some(target) = node.target.clone() {
-                target.execute(state, value);
-            }
+fn knoke_target<T: Convenient>(binding: Id<BoxedBindingNode>, state: &mut dyn State) {
+    let bindings: &Bindings = state.get();
+    let node = bindings.0[binding].0.downcast_ref::<BindingNode<T>>().unwrap();
+    if let Some(value) = node.sources.get_value() {
+        if let Some(target) = node.target.clone() {
+            target.execute(state, value);
         }
     }
 }
@@ -287,7 +287,7 @@ macro_rules! binding_n {
                 $(
                     pub fn [< set_source_ $i >] (self, state: &mut dyn State, source: &mut dyn Source< [< S $i >] >) {
                         let handler: [< Binding $n Source $i Handler >] ::<$( [< S $j >] ),* , T>  = [< Binding $n Source $i Handler >] {
-                            binding: self.into_raw(),
+                            binding: self.0,
                             phantom: PhantomType::new()
                         };
                         let source = source.handle(
@@ -300,7 +300,7 @@ macro_rules! binding_n {
                         if let Some(source) = sources. [< source_ $i >] .replace(source) {
                             source.handler_id.unhandle(state);
                         }
-                        Binding::from(self).knoke_target(state);
+                        knoke_target::<T>(self.0, state);
                     }
                 )*
             }
@@ -330,7 +330,7 @@ macro_rules! binding_n {
                     $( [< S $j >] : Convenient, )*
                     T: Convenient
                 > {
-                    binding: RawId,
+                    binding: Id<BoxedBindingNode>,
                     phantom: PhantomType<($( [< S $j >] ),* , T)>
                 }
 
@@ -339,9 +339,8 @@ macro_rules! binding_n {
                     T: Convenient
                 > AnyHandler for [< Binding $n Source $i Handler >] < $( [< S $j >] , )* T >  {
                     fn clear(&self, state: &mut dyn State) {
-                        let binding: [< Binding $n >] <$( [< S $j >] ),* , T> = [< Binding $n >] ::from_raw(self.binding);
                         let bindings: &mut Bindings = state.get_mut();
-                        let node = bindings.0[binding.0].0.downcast_mut::<BindingNode<T>>().unwrap();
+                        let node = bindings.0[self.binding].0.downcast_mut::<BindingNode<T>>().unwrap();
                         let sources = node.sources.downcast_mut::< [< Binding $n NodeSources >] <$( [< S $j >] ),* , T>>().unwrap();
                         sources. [< source_ $i >] .take();
                     }
@@ -356,12 +355,11 @@ macro_rules! binding_n {
                     }
 
                     fn execute(&self, state: &mut dyn State, value: [< S $i >] ) {
-                        let binding: [< Binding $n >] <$( [< S $j >] ),* , T> = [< Binding $n >] ::from_raw(self.binding);
                         let bindings: &mut Bindings = state.get_mut();
-                        let node = bindings.0[binding.0].0.downcast_mut::<BindingNode<T>>().unwrap();
+                        let node = bindings.0[self.binding].0.downcast_mut::<BindingNode<T>>().unwrap();
                         let sources = node.sources.downcast_mut::< [< Binding $n NodeSources >] <$( [< S $j >] ),* , T>>().unwrap();
                         sources. [< source_ $i >] .as_mut().unwrap().value = value;
-                        Binding::from(binding).knoke_target(state);
+                        knoke_target::<T>(self.binding, state);
                     }
                 }
             )*
