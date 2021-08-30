@@ -110,7 +110,7 @@ impl Npc {
     fn new(state: &mut dyn State) -> Npc {
         let game: &mut Game = state.get_mut();
         let npc = game.npcs.insert(|id| (NpcComponent { props: NpcProps::new_priv() }, Npc(id)));
-        let removed_items_binding = Binding1::new(state, |x| Some(x));
+        let removed_items_binding = Binding1::new(state, (), |(), x| Some(x));
         removed_items_binding.set_source_1(state, &mut NpcProps::EQUIPPED_ITEMS.removed_items_source(npc.props()));
         removed_items_binding.set_target_fn(state, (), |state, (), items| {
             for item in items {
@@ -118,7 +118,7 @@ impl Npc {
             }
         });
         npc.props().add_binding(state, removed_items_binding.into());
-        let inserted_items_binding = Binding1::new(state, |x| Some(x));
+        let inserted_items_binding = Binding1::new(state, (), |(), x| Some(x));
         inserted_items_binding.set_source_1(state, &mut NpcProps::EQUIPPED_ITEMS.inserted_items_source(npc.props()));
         inserted_items_binding.set_target_fn(state, (), |state, (), items| {
             for item in items {
@@ -199,7 +199,7 @@ fn main() {
     let shield = Item::new(game);
     ItemProps::NAME.set_uncond(game, shield.props(), Cow::Borrowed("Shield"));
     for item in [sword, shield] {
-        let log = Binding2::new(game, |(old, new), (_, name)| if old == new { None } else { Some((new, name)) });
+        let log = Binding2::new(game, (), |(), (old, new), (_, name)| if old == new { None } else { Some((new, name)) });
         log.set_source_1(game, &mut ItemProps::EQUIPPED.source(item.props()));
         log.set_source_2(game, &mut ItemProps::NAME.source(item.props()));
         log.set_target_fn(game, (), |game, (), (equipped, name)| {
