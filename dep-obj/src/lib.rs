@@ -233,15 +233,15 @@ impl<Id: ComponentId, Obj> Glob<Id, Obj> {
 }
 
 macro_attr! {
-    #[derive(Educe, Component!(class=HandlerComponent))]
+    #[derive(Educe, Component!(class=ValueHandlerComponent))]
     #[educe(Debug, Clone)]
-    struct BoxedHandler<T: Convenient>(Box<dyn Handler<T>>);
+    struct BoxedValueHandler<T: Convenient>(Box<dyn ValueHandler<T>>);
 }
 
 macro_attr! {
-    #[derive(Educe, Component!(class=SyncHandlerComponent))]
+    #[derive(Educe, Component!(class=EventHandlerComponent))]
     #[educe(Debug, Clone)]
-    struct BoxedSyncHandler<T>(Box<dyn SyncHandler<T>>);
+    struct BoxedEventHandler<T>(Box<dyn EventHandler<T>>);
 }
 
 #[derive(Debug)]
@@ -249,7 +249,7 @@ pub struct DepPropEntry<PropType: Convenient> {
     default: &'static PropType,
     style: Option<PropType>,
     local: Option<PropType>,
-    handlers: Arena<BoxedHandler<(PropType, PropType)>>,
+    handlers: Arena<BoxedValueHandler<(PropType, PropType)>>,
     binding: Option<Binding<PropType>>,
 }
 
@@ -275,7 +275,7 @@ impl<PropType: Convenient> DepPropEntry<PropType> {
 
 #[derive(Debug)]
 pub struct DepEventEntry<ArgsType> {
-    handlers: Arena<BoxedSyncHandler<ArgsType>>,
+    handlers: Arena<BoxedEventHandler<ArgsType>>,
 }
 
 impl<ArgsType> DepEventEntry<ArgsType> {
@@ -293,8 +293,8 @@ impl<ArgsType> DepEventEntry<ArgsType> {
 #[derive(Debug)]
 pub struct DepVecEntry<ItemType: Convenient> {
     items: Vec<ItemType>,
-    removed_items_handlers: Arena<BoxedHandler<Vec<ItemType>>>,
-    inserted_items_handlers: Arena<BoxedHandler<Vec<ItemType>>>,
+    removed_items_handlers: Arena<BoxedValueHandler<Vec<ItemType>>>,
+    inserted_items_handlers: Arena<BoxedValueHandler<Vec<ItemType>>>,
 }
 
 impl<ItemType: Convenient> DepVecEntry<ItemType> {
@@ -877,7 +877,7 @@ pub trait DepObjBaseBuilder<OwnerId: ComponentId> {
 #[educe(Debug)]
 struct DepEventHandledSource<Owner: DepType, ArgsType> {
     obj: Glob<Owner::Id, Owner>,
-    handler_id: Id<BoxedSyncHandler<ArgsType>>,
+    handler_id: Id<BoxedEventHandler<ArgsType>>,
     event: DepEvent<Owner, ArgsType>,
 }
 
@@ -896,14 +896,14 @@ pub struct DepEventSource<Owner: DepType, ArgsType> {
     event: DepEvent<Owner, ArgsType>,
 }
 
-impl<Owner: DepType + 'static, ArgsType: 'static> SyncSource<ArgsType> for DepEventSource<Owner, ArgsType> {
-    fn handle(&self, state: &mut dyn State, handler: Box<dyn SyncHandler<ArgsType>>) -> HandledSyncSource<ArgsType> {
+impl<Owner: DepType + 'static, ArgsType: 'static> EventSource<ArgsType> for DepEventSource<Owner, ArgsType> {
+    fn handle(&self, state: &mut dyn State, handler: Box<dyn EventHandler<ArgsType>>) -> HandledEventSource<ArgsType> {
         let mut obj = self.obj.get_mut(state);
         let entry = self.event.entry_mut(&mut obj);
-        let handler_id = entry.handlers.insert(|handler_id| (BoxedSyncHandler(handler), handler_id));
-        HandledSyncSource {
+        let handler_id = entry.handlers.insert(|handler_id| (BoxedEventHandler(handler), handler_id));
+        HandledEventSource {
             handler_id: Box::new(DepEventHandledSource { handler_id, obj: self.obj, event: self.event }),
-            value: None // TODO "once" events with cached value?
+            args: None // TODO "once" events with cached value?
         }
     }
 }
@@ -912,7 +912,7 @@ impl<Owner: DepType + 'static, ArgsType: 'static> SyncSource<ArgsType> for DepEv
 #[educe(Debug)]
 struct DepPropHandledSource<Owner: DepType, PropType: Convenient> {
     obj: Glob<Owner::Id, Owner>,
-    handler_id: Id<BoxedHandler<(PropType, PropType)>>,
+    handler_id: Id<BoxedValueHandler<(PropType, PropType)>>,
     prop: DepProp<Owner, PropType>,
 }
 
@@ -931,14 +931,14 @@ pub struct DepPropSource<Owner: DepType, PropType: Convenient> {
     prop: DepProp<Owner, PropType>,
 }
 
-impl<Owner: DepType + 'static, PropType: Convenient> Source<(PropType, PropType)> for DepPropSource<Owner, PropType> {
-    fn handle(&self, state: &mut dyn State, handler: Box<dyn Handler<(PropType, PropType)>>) -> HandledSource<(PropType, PropType)> {
+impl<Owner: DepType + 'static, PropType: Convenient> ValueSource<(PropType, PropType)> for DepPropSource<Owner, PropType> {
+    fn handle(&self, state: &mut dyn State, handler: Box<dyn ValueHandler<(PropType, PropType)>>) -> HandledValueSource<(PropType, PropType)> {
         let mut obj = self.obj.get_mut(state);
         let entry = self.prop.entry_mut(&mut obj);
         let old = entry.default.clone();
         let new = entry.local.as_ref().or_else(|| entry.style.as_ref()).unwrap_or(entry.default).clone();
-        let handler_id = entry.handlers.insert(|handler_id| (BoxedHandler(handler), handler_id));
-        HandledSource {
+        let handler_id = entry.handlers.insert(|handler_id| (BoxedValueHandler(handler), handler_id));
+        HandledValueSource {
             handler_id: Box::new(DepPropHandledSource { handler_id, obj: self.obj, prop: self.prop }),
             value: (old, new)
         }
@@ -949,7 +949,7 @@ impl<Owner: DepType + 'static, PropType: Convenient> Source<(PropType, PropType)
 #[educe(Debug)]
 struct DepVecInsertedItemsHandledSource<Owner: DepType, ItemType: Convenient> {
     obj: Glob<Owner::Id, Owner>,
-    handler_id: Id<BoxedHandler<Vec<ItemType>>>,
+    handler_id: Id<BoxedValueHandler<Vec<ItemType>>>,
     vec: DepVec<Owner, ItemType>,
 }
 
@@ -965,7 +965,7 @@ impl<Owner: DepType, ItemType: Convenient> HandlerId for DepVecInsertedItemsHand
 #[educe(Debug)]
 struct DepVecRemovedItemsHandledSource<Owner: DepType, ItemType: Convenient> {
     obj: Glob<Owner::Id, Owner>,
-    handler_id: Id<BoxedHandler<Vec<ItemType>>>,
+    handler_id: Id<BoxedValueHandler<Vec<ItemType>>>,
     vec: DepVec<Owner, ItemType>,
 }
 
@@ -984,13 +984,13 @@ pub struct DepVecInsertedItemSource<Owner: DepType, ItemType: Convenient> {
     vec: DepVec<Owner, ItemType>,
 }
 
-impl<Owner: DepType + 'static, ItemType: Convenient> Source<Vec<ItemType>> for DepVecInsertedItemSource<Owner, ItemType> {
-    fn handle(&self, state: &mut dyn State, handler: Box<dyn Handler<Vec<ItemType>>>) -> HandledSource<Vec<ItemType>> {
+impl<Owner: DepType + 'static, ItemType: Convenient> ValueSource<Vec<ItemType>> for DepVecInsertedItemSource<Owner, ItemType> {
+    fn handle(&self, state: &mut dyn State, handler: Box<dyn ValueHandler<Vec<ItemType>>>) -> HandledValueSource<Vec<ItemType>> {
         let mut obj = self.obj.get_mut(state);
         let entry = self.vec.entry_mut(&mut obj);
         let items = entry.items.clone();
-        let handler_id = entry.inserted_items_handlers.insert(|handler_id| (BoxedHandler(handler), handler_id));
-        HandledSource {
+        let handler_id = entry.inserted_items_handlers.insert(|handler_id| (BoxedValueHandler(handler), handler_id));
+        HandledValueSource {
             handler_id: Box::new(DepVecInsertedItemsHandledSource { handler_id, obj: self.obj, vec: self.vec }),
             value: items
         }
@@ -1004,13 +1004,13 @@ pub struct DepVecRemovedItemSource<Owner: DepType, ItemType: Convenient> {
     vec: DepVec<Owner, ItemType>,
 }
 
-impl<Owner: DepType + 'static, ItemType: Convenient> Source<Vec<ItemType>> for DepVecRemovedItemSource<Owner, ItemType> {
-    fn handle(&self, state: &mut dyn State, handler: Box<dyn Handler<Vec<ItemType>>>) -> HandledSource<Vec<ItemType>> {
+impl<Owner: DepType + 'static, ItemType: Convenient> ValueSource<Vec<ItemType>> for DepVecRemovedItemSource<Owner, ItemType> {
+    fn handle(&self, state: &mut dyn State, handler: Box<dyn ValueHandler<Vec<ItemType>>>) -> HandledValueSource<Vec<ItemType>> {
         let mut obj = self.obj.get_mut(state);
         let entry = self.vec.entry_mut(&mut obj);
         let items = entry.items.clone();
-        let handler_id = entry.removed_items_handlers.insert(|handler_id| (BoxedHandler(handler), handler_id));
-        HandledSource {
+        let handler_id = entry.removed_items_handlers.insert(|handler_id| (BoxedValueHandler(handler), handler_id));
+        HandledValueSource {
             handler_id: Box::new(DepVecRemovedItemsHandledSource { handler_id, obj: self.obj, vec: self.vec }),
             value: items
         }
