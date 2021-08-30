@@ -114,12 +114,6 @@ trait AnyBindingNodeSources: Debug + Downcast {
 
 impl_downcast!(AnyBindingNodeSources assoc Value where Value: Convenient);
 
-trait AnyRefBindingNodeSources: Debug + Downcast {
-    fn unhandle(&mut self, state: &mut dyn State);
-}
-
-impl_downcast!(AnyRefBindingNodeSources);
-
 #[derive(Educe)]
 #[educe(Debug)]
 struct BindingNode<T: Convenient> {
