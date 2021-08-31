@@ -1712,14 +1712,14 @@ macro_rules! dep_type_impl_raw {
 macro_rules! dep_obj {
     (
         $(
-            $vis:vis fn $name:ident (self as $this:ident, $arena:ident : $Arena:ty) -> $(trait $tr:tt)? $($ty:ty)? {
+            $vis:vis fn $name:ident (self as $this:ident, $arena:ident : $Arena:ty) -> $(trait $tr:tt)? $([trait $opt_tr:tt])? $($ty:ty)? $([ $opt_ty:ty ])? {
                 if mut { $field_mut:expr } else { $field:expr }
             }
         )*
     ) => {
         $(
             $crate::dep_obj_impl! {
-                $vis fn $name (self as $this, $arena : $Arena) -> $(trait $tr)? $($ty)? {
+                $vis fn $name (self as $this, $arena : $Arena) -> $(trait $tr)? $([trait $opt_tr])? $($ty)? $([ $opt_ty ])? {
                     if mut { $field_mut } else { $field }
                 }
             }
@@ -1728,8 +1728,35 @@ macro_rules! dep_obj {
             $(
                 let $this = self;
                 let $arena: &mut $Arena = <dyn $crate::dyn_context_state_State as $crate::dyn_context_state_StateExt>::get_mut(state);
-                let handlers = <$(dyn $tr)? $($ty)? as $crate::DepType>::take_all_handlers__($field_mut);
-                let bindings = <$(dyn $tr)? $($ty)? as $crate::DepType>::take_added_bindings_and_collect_all__($field_mut);
+                $(
+                    let f = $field_mut;
+                    let handlers = <dyn $tr as $crate::DepType>::take_all_handlers__(f);
+                    let bindings = <dyn $tr as $crate::DepType>::take_added_bindings_and_collect_all__(f);
+                )?
+                $(
+                    let (handlers, bindings) = if let $crate::std_option_Option::Some(f) = $field_mut {
+                        (
+                            <dyn $opt_tr as $crate::DepType>::take_all_handlers__(f),
+                            <dyn $opt_tr as $crate::DepType>::take_added_bindings_and_collect_all__(f)
+                        )
+                    } else {
+                        ($crate::std_vec_Vec::new(), $crate::std_vec_Vec::new())
+                    };
+                )?
+                $(
+                    let handlers = <$ty as $crate::DepType>::take_all_handlers__($field_mut);
+                    let bindings = <$ty as $crate::DepType>::take_added_bindings_and_collect_all__($field_mut);
+                )?
+                $(
+                    let (handlers, bindings) = if let $crate::std_option_Option::Some(f) = $field_mut {
+                        (
+                            <$opt_ty as $crate::DepType>::take_all_handlers__(f),
+                            <$opt_ty as $crate::DepType>::take_added_bindings_and_collect_all__(f)
+                        )
+                    } else {
+                        ($crate::std_vec_Vec::new(), $crate::std_vec_Vec::new())
+                    };
+                )?
                 for handler in handlers {
                     handler.clear(state);
                 }
@@ -1744,6 +1771,48 @@ macro_rules! dep_obj {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! dep_obj_impl {
+    (
+        $vis:vis fn $name:ident (self as $this:ident, $arena:ident : $Arena:ty) -> [trait $ty:tt] {
+            if mut { $field_mut:expr } else { $field:expr }
+        }
+    ) => {
+        $crate::paste_paste! {
+            fn [< $name _ref >] <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
+                $arena: &'arena_lifetime dyn $crate::std_any_Any,
+                $this: Self
+            ) -> &'arena_lifetime DepObjType {
+                let $arena = $arena.downcast_ref::<$Arena>().expect("invalid arena cast");
+                ($field)
+                    .expect($crate::std_concat!("missing ", $crate::std_stringify!($name)))
+                    .downcast_ref::<DepObjType>().expect("invalid cast")
+            }
+
+            fn [< $name _mut >] <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
+                $arena: &'arena_lifetime mut dyn $crate::std_any_Any,
+                $this: Self
+            ) -> &'arena_lifetime mut DepObjType {
+                let $arena = $arena.downcast_mut::<$Arena>().expect("invalid arena cast");
+                ($field_mut)
+                    .expect($crate::std_concat!("missing ", $crate::std_stringify!($name)))
+                    .downcast_mut::<DepObjType>().expect("invalid cast")
+            }
+
+            $vis fn [< $name _descriptor >] <DepObjType: $ty + $crate::DepType<Id=Self>>(
+            ) -> $crate::GlobDescriptor<Self, DepObjType> {
+                $crate::GlobDescriptor {
+                    arena: $crate::std_any_TypeId::of::<$Arena>(),
+                    field_ref: Self:: [< $name _ref >] ,
+                    field_mut: Self:: [< $name _mut >] ,
+                }
+            }
+
+            $vis fn $name <DepObjType: $ty + $crate::DepType<Id=Self>>(
+                self
+            ) -> $crate::Glob<Self, DepObjType> {
+                $crate::Glob { id: self, descriptor: Self:: [< $name _descriptor >] }
+            }
+        }
+    };
     (
         $vis:vis fn $name:ident (self as $this:ident, $arena:ident : $Arena:ty) -> trait $ty:tt {
             if mut { $field_mut:expr } else { $field:expr }
@@ -1778,6 +1847,44 @@ macro_rules! dep_obj_impl {
             $vis fn $name <DepObjType: $ty + $crate::DepType<Id=Self>>(
                 self
             ) -> $crate::Glob<Self, DepObjType> {
+                $crate::Glob { id: self, descriptor: Self:: [< $name _descriptor >] }
+            }
+        }
+    };
+    (
+        $vis:vis fn $name:ident (self as $this:ident, $arena:ident: $Arena:ty) -> [$ty:ty] {
+            if mut { $field_mut:expr } else { $field:expr }
+        }
+    ) => {
+        $crate::paste_paste! {
+            fn [< $name _ref >] <'arena_lifetime>(
+                $arena: &'arena_lifetime dyn $crate::std_any_Any,
+                $this: Self
+            ) -> &'arena_lifetime $ty {
+                let $arena = $arena.downcast_ref::<$Arena>().expect("invalid arena cast");
+                ($field).expect($crate::std_concat!("missing ", $crate::std_stringify!($name)))
+            }
+
+            fn [< $name _mut >] <'arena_lifetime>(
+                $arena: &'arena_lifetime mut dyn $crate::std_any_Any,
+                $this: Self
+            ) -> &'arena_lifetime mut $ty {
+                let $arena = $arena.downcast_mut::<$Arena>().expect("invalid arena cast");
+                ($field_mut).expect($crate::std_concat!("missing ", $crate::std_stringify!($name)))
+            }
+
+            $vis fn [< $name _descriptor >] (
+            ) -> $crate::GlobDescriptor<Self, $ty> {
+                $crate::GlobDescriptor {
+                    arena: $crate::std_any_TypeId::of::<$Arena>(),
+                    field_ref: Self:: [< $name _ref >] ,
+                    field_mut: Self:: [< $name _mut >] ,
+                }
+            }
+
+            $vis fn $name (
+                self
+            ) -> $crate::Glob<Self, $ty> {
                 $crate::Glob { id: self, descriptor: Self:: [< $name _descriptor >] }
             }
         }
@@ -1821,7 +1928,7 @@ macro_rules! dep_obj_impl {
         }
     };
     (
-        $vis:vis fn $name:ident (self as $this:ident, $arena:ident : $Arena:ty) -> $(trait $tr:tt)? $($ty:ty)? {
+        $vis:vis fn $name:ident (self as $this:ident, $arena:ident : $Arena:ty) -> $(trait $tr:tt)? $([trait $opt_tr:tt])? $($ty:ty)? $([ $opt_ty:ty ])? {
             if mut { $field_mut:expr } else { $field:expr }
         }
     ) => {
@@ -1833,8 +1940,10 @@ macro_rules! dep_obj_impl {
         "\
             \n\n\
             allowed forms are \
-            'trait $trait:tt', and \
-            '$ty:ty'\
+            'trait $trait:tt', \
+            '[trait $trait:tt]', \
+            '$ty:ty', and \
+            '[$ty:ty]'\
         "));
     };
 }
