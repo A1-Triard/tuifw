@@ -405,12 +405,11 @@ macro_rules! binding_n {
                         return;
                     }
                 )*
-                if let Some(target) = node.target.clone() {
-                    let filter_map = sources.filter_map;
-                    let param = sources.param.clone();
-                    if let Some(value) = filter_map(state, param, $( [< value_ $i >] ,)* event_args) {
-                        target.execute(state, value);
-                    }
+                let filter_map = sources.filter_map;
+                let param = sources.param.clone();
+                let target = node.target.clone();
+                if let Some(value) = filter_map(state, param, $( [< value_ $i >] ,)* event_args) {
+                    target.map(|target| target.execute(state, value));
                 }
             }
 
