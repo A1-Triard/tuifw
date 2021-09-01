@@ -70,7 +70,7 @@ pub mod example {
     //!     }
     //!
     //!     dep_obj! {
-    //!         pub fn obj(self as this, app: MyApp) -> MyDepType {
+    //!         pub fn obj(self as this, app: MyApp) -> (MyDepType) {
     //!             if mut {
     //!                 &mut app.my_dep_types[this.0].dep_data
     //!             } else {
@@ -126,7 +126,7 @@ pub mod example {
         }
 
         dep_obj! {
-            pub fn obj(self as this, app: MyApp) -> MyDepType {
+            pub fn obj(self as this, app: MyApp) -> (MyDepType) {
                 if mut {
                     &mut app.my_dep_types[this.0].dep_data
                 } else {
