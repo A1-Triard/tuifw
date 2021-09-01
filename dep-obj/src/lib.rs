@@ -1712,14 +1712,14 @@ macro_rules! dep_type_impl_raw {
 macro_rules! dep_obj {
     (
         $(
-            $vis:vis fn $name:ident (self as $this:ident, $arena:ident : $Arena:ty) -> $(trait $tr:tt)? $([trait $opt_tr:tt])? $($ty:ty)? $([ $opt_ty:ty ])? {
+            $vis:vis fn $name:ident (self as $this:ident, $arena:ident : $Arena:ty) -> $(optional(trait $opt_tr:tt))? $(trait $tr:tt)? $(optional($opt_ty:ty))? $($ty:ty)? {
                 if mut { $field_mut:expr } else { $field:expr }
             }
         )*
     ) => {
         $(
             $crate::dep_obj_impl! {
-                $vis fn $name (self as $this, $arena : $Arena) -> $(trait $tr)? $([trait $opt_tr])? $($ty)? $([ $opt_ty ])? {
+                $vis fn $name (self as $this, $arena : $Arena) -> $(optional(trait $opt_tr))? $(trait $tr)? $(optional($opt_ty))? $($ty)? {
                     if mut { $field_mut } else { $field }
                 }
             }
@@ -1772,7 +1772,7 @@ macro_rules! dep_obj {
 #[macro_export]
 macro_rules! dep_obj_impl {
     (
-        $vis:vis fn $name:ident (self as $this:ident, $arena:ident : $Arena:ty) -> [trait $ty:tt] {
+        $vis:vis fn $name:ident (self as $this:ident, $arena:ident : $Arena:ty) -> optional(trait $ty:tt) {
             if mut { $field_mut:expr } else { $field:expr }
         }
     ) => {
@@ -1852,7 +1852,7 @@ macro_rules! dep_obj_impl {
         }
     };
     (
-        $vis:vis fn $name:ident (self as $this:ident, $arena:ident: $Arena:ty) -> [$ty:ty] {
+        $vis:vis fn $name:ident (self as $this:ident, $arena:ident: $Arena:ty) -> optional($ty:ty) {
             if mut { $field_mut:expr } else { $field:expr }
         }
     ) => {
@@ -1928,7 +1928,7 @@ macro_rules! dep_obj_impl {
         }
     };
     (
-        $vis:vis fn $name:ident (self as $this:ident, $arena:ident : $Arena:ty) -> $(trait $tr:tt)? $([trait $opt_tr:tt])? $($ty:ty)? $([ $opt_ty:ty ])? {
+        $vis:vis fn $name:ident (self as $this:ident, $arena:ident : $Arena:ty) -> $(optional(trait $opt_tr:tt))? $(trait $tr:tt)? $(optional($opt_ty:ty))? $($ty:ty)? {
             if mut { $field_mut:expr } else { $field:expr }
         }
     ) => {
@@ -1939,11 +1939,11 @@ macro_rules! dep_obj_impl {
             $crate::std_stringify!($(dyn $tr)? $($ty)?),
         "\
             \n\n\
-            allowed forms are \
+            allowed form are \
+            '$ty:ty', \
             'trait $trait:tt', \
-            '[trait $trait:tt]', \
-            '$ty:ty', and \
-            '[$ty:ty]'\
+            'optional($ty:ty)', and \
+            'optional(trait $trait:tt)'\
         "));
     };
 }
