@@ -426,16 +426,22 @@ pub trait DepType: Debug {
     type Id: ComponentId;
 
     #[doc(hidden)]
-    fn style__(&mut self) -> &mut Option<Style<Self>> where Self: Sized;
+    fn style_storage_mut(&mut self) -> &mut Option<Style<Self>> where Self: Sized;
 
     #[doc(hidden)]
-    fn add_binding__(&mut self, binding: AnyBinding);
+    fn parent_storage(&self) -> &Option<Self::Id> where Self: Sized;
 
     #[doc(hidden)]
-    fn take_all_handlers__(&mut self) -> Vec<Box<dyn AnyHandler>>;
+    fn parent_storage_mut(&mut self) -> &mut Option<Self::Id> where Self: Sized;
 
     #[doc(hidden)]
-    fn take_added_bindings_and_collect_all__(&mut self) -> Vec<AnyBinding>;
+    fn add_binding(&mut self, binding: AnyBinding);
+
+    #[doc(hidden)]
+    fn take_all_handlers(&mut self) -> Vec<Box<dyn AnyHandler>>;
+
+    #[doc(hidden)]
+    fn take_added_bindings_and_collect_all(&mut self) -> Vec<AnyBinding>;
 }
 
 #[derive(Educe)]
@@ -723,7 +729,7 @@ impl<Owner: DepType, ItemType: Convenient> DepVec<Owner, ItemType> {
 impl<Owner: DepType> Glob<Owner::Id, Owner> {
     pub fn add_binding(self, state: &mut dyn State, binding: AnyBinding) {
         let mut obj_mut = self.get_mut(state);
-        obj_mut.add_binding__(binding);
+        obj_mut.add_binding(binding);
     }
 
     pub fn apply_style(
@@ -733,7 +739,7 @@ impl<Owner: DepType> Glob<Owner::Id, Owner> {
     ) -> Option<Style<Owner>> {
         let mut on_changed = Vec::new();
         let obj = &mut self.get_mut(state);
-        let old = obj.style__().take();
+        let old = obj.style_storage_mut().take();
         if let Some(old) = old.as_ref() {
             old.setters
                 .iter()
@@ -755,7 +761,7 @@ impl<Owner: DepType> Glob<Owner::Id, Owner> {
                 .for_each(|x| on_changed.push(x))
             ;
         }
-        *obj.style__() = style;
+        *obj.style_storage_mut() = style;
         for on_changed in on_changed {
             on_changed(state);
         }
@@ -1611,6 +1617,7 @@ macro_rules! dep_type_impl_raw {
             #[derive($crate::std_fmt_Debug)]
             struct [< $name Core >] $($g)* $($w)* {
                 dep_type_core_style: $crate::std_option_Option<$crate::Style<$name $($r)*>>,
+                dep_type_core_parent: $crate::std_option_Option<$Id>,
                 dep_type_core_added_bindings: $crate::std_vec_Vec<$crate::binding::AnyBinding>,
                 $($core_fields)*
             }
@@ -1619,6 +1626,7 @@ macro_rules! dep_type_impl_raw {
                 const fn new() -> Self {
                     Self {
                         dep_type_core_style: $crate::std_option_Option::None,
+                        dep_type_core_parent: $crate::std_option_Option::None,
                         dep_type_core_added_bindings: $crate::std_vec_Vec::new(),
                         $($core_new)*
                     }
@@ -1662,22 +1670,32 @@ macro_rules! dep_type_impl_raw {
                 type Id = $Id;
 
                 #[doc(hidden)]
-                fn style__(&mut self) -> &mut $crate::std_option_Option<$crate::Style<$name $($r)*>> {
+                fn style_storage_mut(&mut self) -> &mut $crate::std_option_Option<$crate::Style<$name $($r)*>> {
                     &mut self.core.dep_type_core_style
                 }
 
                 #[doc(hidden)]
-                fn take_all_handlers__(&mut self) -> $crate::std_vec_Vec<$crate::std_boxed_Box<dyn $crate::binding::AnyHandler>> {
+                fn parent_storage(&self) -> &$crate::std_option_Option<$Id> {
+                    &self.core.dep_type_core_parent
+                }
+
+                #[doc(hidden)]
+                fn parent_storage_mut(&mut self) -> &mut $crate::std_option_Option<$Id> {
+                    &mut self.core.dep_type_core_parent
+                }
+
+                #[doc(hidden)]
+                fn take_all_handlers(&mut self) -> $crate::std_vec_Vec<$crate::std_boxed_Box<dyn $crate::binding::AnyHandler>> {
                     self.core.dep_type_core_take_all_handlers()
                 }
 
                 #[doc(hidden)]
-                fn take_added_bindings_and_collect_all__(&mut self) -> $crate::std_vec_Vec<$crate::binding::AnyBinding> {
+                fn take_added_bindings_and_collect_all(&mut self) -> $crate::std_vec_Vec<$crate::binding::AnyBinding> {
                     self.core.dep_type_core_take_added_bindings_and_collect_all()
                 }
 
                 #[doc(hidden)]
-                fn add_binding__(&mut self, binding: $crate::binding::AnyBinding) {
+                fn add_binding(&mut self, binding: $crate::binding::AnyBinding) {
                     self.core.dep_type_core_added_bindings.push(binding);
                 }
             }
@@ -1730,28 +1748,28 @@ macro_rules! dep_obj {
                 let $arena: &mut $Arena = <dyn $crate::dyn_context_state_State as $crate::dyn_context_state_StateExt>::get_mut(state);
                 $(
                     let f = $field_mut;
-                    let handlers = <dyn $tr as $crate::DepType>::take_all_handlers__(f);
-                    let bindings = <dyn $tr as $crate::DepType>::take_added_bindings_and_collect_all__(f);
+                    let handlers = <dyn $tr as $crate::DepType>::take_all_handlers(f);
+                    let bindings = <dyn $tr as $crate::DepType>::take_added_bindings_and_collect_all(f);
                 )?
                 $(
                     let (handlers, bindings) = if let $crate::std_option_Option::Some(f) = $field_mut {
                         (
-                            <dyn $opt_tr as $crate::DepType>::take_all_handlers__(f),
-                            <dyn $opt_tr as $crate::DepType>::take_added_bindings_and_collect_all__(f)
+                            <dyn $opt_tr as $crate::DepType>::take_all_handlers(f),
+                            <dyn $opt_tr as $crate::DepType>::take_added_bindings_and_collect_all(f)
                         )
                     } else {
                         ($crate::std_vec_Vec::new(), $crate::std_vec_Vec::new())
                     };
                 )?
                 $(
-                    let handlers = <$ty as $crate::DepType>::take_all_handlers__($field_mut);
-                    let bindings = <$ty as $crate::DepType>::take_added_bindings_and_collect_all__($field_mut);
+                    let handlers = <$ty as $crate::DepType>::take_all_handlers($field_mut);
+                    let bindings = <$ty as $crate::DepType>::take_added_bindings_and_collect_all($field_mut);
                 )?
                 $(
                     let (handlers, bindings) = if let $crate::std_option_Option::Some(f) = $field_mut {
                         (
-                            <$opt_ty as $crate::DepType>::take_all_handlers__(f),
-                            <$opt_ty as $crate::DepType>::take_added_bindings_and_collect_all__(f)
+                            <$opt_ty as $crate::DepType>::take_all_handlers(f),
+                            <$opt_ty as $crate::DepType>::take_added_bindings_and_collect_all(f)
                         )
                     } else {
                         ($crate::std_vec_Vec::new(), $crate::std_vec_Vec::new())
