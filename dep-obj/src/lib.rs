@@ -312,6 +312,29 @@ impl<ItemType: Convenient> DepVecEntry<ItemType> {
     }
 }
 
+#[derive(Debug)]
+pub struct BaseDepObjCore<Owner: DepType> {
+    style: Option<Style<Owner>>,
+    parent: Option<Owner::Id>,
+    added_bindings: Vec<AnyBinding>,
+}
+
+impl<Owner: DepType> BaseDepObjCore<Owner> {
+    pub const fn new() -> Self {
+        BaseDepObjCore {
+            style: None,
+            parent: None,
+            added_bindings: Vec::new(),
+        }
+    }
+
+    pub fn take_bindings(&mut self) -> Vec<AnyBinding> { take(&mut self.added_bindings) }
+}
+
+impl<Owner: DepType> Default for BaseDepObjCore<Owner> {
+    fn default() -> Self { BaseDepObjCore::new() }
+}
+
 /// A dependency type.
 /// Use the [`dep_type`] or the [`dep_type_with_builder`] macro
 /// to create a type implementing this trait.
@@ -426,16 +449,10 @@ pub trait DepType: Debug {
     type Id: ComponentId;
 
     #[doc(hidden)]
-    fn style_storage_mut(&mut self) -> &mut Option<Style<Self>> where Self: Sized;
+    fn core_base_priv(&self) -> &BaseDepObjCore<Self> where Self: Sized;
 
     #[doc(hidden)]
-    fn parent_storage(&self) -> &Option<Self::Id> where Self: Sized;
-
-    #[doc(hidden)]
-    fn parent_storage_mut(&mut self) -> &mut Option<Self::Id> where Self: Sized;
-
-    #[doc(hidden)]
-    fn add_binding(&mut self, binding: AnyBinding);
+    fn core_base_priv_mut(&mut self) -> &mut BaseDepObjCore<Self> where Self: Sized;
 
     #[doc(hidden)]
     fn take_all_handlers(&mut self) -> Vec<Box<dyn AnyHandler>>;
@@ -729,7 +746,7 @@ impl<Owner: DepType, ItemType: Convenient> DepVec<Owner, ItemType> {
 impl<Owner: DepType> Glob<Owner::Id, Owner> {
     pub fn add_binding(self, state: &mut dyn State, binding: AnyBinding) {
         let mut obj_mut = self.get_mut(state);
-        obj_mut.add_binding(binding);
+        obj_mut.core_base_priv_mut().added_bindings.push(binding);
     }
 
     pub fn apply_style(
@@ -739,7 +756,7 @@ impl<Owner: DepType> Glob<Owner::Id, Owner> {
     ) -> Option<Style<Owner>> {
         let mut on_changed = Vec::new();
         let obj = &mut self.get_mut(state);
-        let old = obj.style_storage_mut().take();
+        let old = obj.core_base_priv_mut().style.take();
         if let Some(old) = old.as_ref() {
             old.setters
                 .iter()
@@ -761,7 +778,7 @@ impl<Owner: DepType> Glob<Owner::Id, Owner> {
                 .for_each(|x| on_changed.push(x))
             ;
         }
-        *obj.style_storage_mut() = style;
+        obj.core_base_priv_mut().style = style;
         for on_changed in on_changed {
             on_changed(state);
         }
@@ -1616,23 +1633,27 @@ macro_rules! dep_type_impl_raw {
         $crate::paste_paste! {
             #[derive($crate::std_fmt_Debug)]
             struct [< $name Core >] $($g)* $($w)* {
-                dep_type_core_style: $crate::std_option_Option<$crate::Style<$name $($r)*>>,
-                dep_type_core_parent: $crate::std_option_Option<$Id>,
-                dep_type_core_added_bindings: $crate::std_vec_Vec<$crate::binding::AnyBinding>,
+                dep_type_core_base: $crate::BaseDepObjCore<$name $($r)*>,
                 $($core_fields)*
             }
 
             impl $($g)* [< $name Core >] $($r)* $($w)* {
                 const fn new() -> Self {
                     Self {
-                        dep_type_core_style: $crate::std_option_Option::None,
-                        dep_type_core_parent: $crate::std_option_Option::None,
-                        dep_type_core_added_bindings: $crate::std_vec_Vec::new(),
+                        dep_type_core_base: $crate::BaseDepObjCore::new(),
                         $($core_new)*
                     }
                 }
 
                 $($core_consts)*
+
+                fn dep_type_core_base(&self) -> &$crate::BaseDepObjCore<$name $($r)*> {
+                    &self.dep_type_core_base
+                }
+
+                fn dep_type_core_base_mut(&mut self) -> &mut $crate::BaseDepObjCore<$name $($r)*> {
+                    &mut self.dep_type_core_base
+                }
 
                 fn dep_type_core_take_all_handlers(&mut self) -> $crate::std_vec_Vec<$crate::std_boxed_Box<dyn $crate::binding::AnyHandler>> {
                     let mut $handlers = $crate::std_vec_Vec::new();
@@ -1642,7 +1663,7 @@ macro_rules! dep_type_impl_raw {
                 }
 
                 fn dep_type_core_take_added_bindings_and_collect_all(&mut self) -> $crate::std_vec_Vec<$crate::binding::AnyBinding> {
-                    let mut $bindings = $crate::std_mem_take(&mut self.dep_type_core_added_bindings);
+                    let mut $bindings = self.dep_type_core_base.take_bindings();
                     let $this = self;
                     $($core_bindings)*
                     $bindings
@@ -1670,18 +1691,13 @@ macro_rules! dep_type_impl_raw {
                 type Id = $Id;
 
                 #[doc(hidden)]
-                fn style_storage_mut(&mut self) -> &mut $crate::std_option_Option<$crate::Style<$name $($r)*>> {
-                    &mut self.core.dep_type_core_style
+                fn core_base_priv(&self) -> &$crate::BaseDepObjCore<$name $($r)*> {
+                    &self.core.dep_type_core_base
                 }
 
                 #[doc(hidden)]
-                fn parent_storage(&self) -> &$crate::std_option_Option<$Id> {
-                    &self.core.dep_type_core_parent
-                }
-
-                #[doc(hidden)]
-                fn parent_storage_mut(&mut self) -> &mut $crate::std_option_Option<$Id> {
-                    &mut self.core.dep_type_core_parent
+                fn core_base_priv_mut(&mut self) -> &mut $crate::BaseDepObjCore<$name $($r)*> {
+                    &mut self.core.dep_type_core_base
                 }
 
                 #[doc(hidden)]
@@ -1692,11 +1708,6 @@ macro_rules! dep_type_impl_raw {
                 #[doc(hidden)]
                 fn take_added_bindings_and_collect_all(&mut self) -> $crate::std_vec_Vec<$crate::binding::AnyBinding> {
                     self.core.dep_type_core_take_added_bindings_and_collect_all()
-                }
-
-                #[doc(hidden)]
-                fn add_binding(&mut self, binding: $crate::binding::AnyBinding) {
-                    self.core.dep_type_core_added_bindings.push(binding);
                 }
             }
 
