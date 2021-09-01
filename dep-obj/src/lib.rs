@@ -316,23 +316,23 @@ impl<ItemType: Convenient> DepVecEntry<ItemType> {
 pub struct BaseDepObjCore<Owner: DepType> {
     style: Option<Style<Owner>>,
     parent: Option<Owner::Id>,
+    last_child: Option<Owner::Id>,
+    next: Owner::Id,
     added_bindings: Vec<AnyBinding>,
 }
 
 impl<Owner: DepType> BaseDepObjCore<Owner> {
-    pub const fn new() -> Self {
+    pub const fn new(owner_id: Owner::Id) -> Self {
         BaseDepObjCore {
             style: None,
             parent: None,
+            last_child: None,
+            next: owner_id,
             added_bindings: Vec::new(),
         }
     }
 
     pub fn take_bindings(&mut self) -> Vec<AnyBinding> { take(&mut self.added_bindings) }
-}
-
-impl<Owner: DepType> Default for BaseDepObjCore<Owner> {
-    fn default() -> Self { BaseDepObjCore::new() }
 }
 
 /// A dependency type.
@@ -1638,9 +1638,9 @@ macro_rules! dep_type_impl_raw {
             }
 
             impl $($g)* [< $name Core >] $($r)* $($w)* {
-                const fn new() -> Self {
+                const fn new(owner_id: $Id) -> Self {
                     Self {
-                        dep_type_core_base: $crate::BaseDepObjCore::new(),
+                        dep_type_core_base: $crate::BaseDepObjCore::new(owner_id),
                         $($core_new)*
                     }
                 }
@@ -1670,18 +1670,14 @@ macro_rules! dep_type_impl_raw {
                 }
             }
 
-            impl $($g)* $crate::std_default_Default for [< $name Core >] $($r)* $($w)* {
-                fn default() -> Self { Self::new() }
-            }
-
             $( #[ $attr ] )*
             $vis struct $name $($g)* $($w)* {
                 core: [< $name Core >] $($r)*
             }
 
             impl $($g)* $name $($r)* $($w)* {
-                const fn new_priv() -> Self {
-                    Self { core: [< $name Core >] ::new() }
+                const fn new_priv(id: $Id) -> Self {
+                    Self { core: [< $name Core >] ::new(id) }
                 }
 
                 $($dep_props)*

@@ -59,7 +59,7 @@ impl<'a> ItemBuilder<'a> {
 impl Item {
     fn new(state: &mut dyn State) -> Item {
         let game: &mut Game = state.get_mut();
-        game.items.insert(|id| (ItemData { props: ItemProps::new_priv() }, Item(id)))
+        game.items.insert(|id| (ItemData { props: ItemProps::new_priv(Item(id)) }, Item(id)))
     }
 
     fn drop_item(self, state: &mut dyn State) {
@@ -109,7 +109,7 @@ dep_type! {
 impl Npc {
     fn new(state: &mut dyn State) -> Npc {
         let game: &mut Game = state.get_mut();
-        let npc = game.npcs.insert(|id| (NpcComponent { props: NpcProps::new_priv() }, Npc(id)));
+        let npc = game.npcs.insert(|id| (NpcComponent { props: NpcProps::new_priv(Npc(id)) }, Npc(id)));
         let removed_items_binding = Binding1::new(state, (), |(), x| Some(x));
         removed_items_binding.set_source_1(state, &mut NpcProps::EQUIPPED_ITEMS.removed_items_source(npc.props()));
         removed_items_binding.set_target_fn(state, (), |state, (), items| {
