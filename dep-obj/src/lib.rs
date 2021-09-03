@@ -315,24 +315,34 @@ impl<ItemType: Convenient> DepVecEntry<ItemType> {
 #[derive(Debug)]
 pub struct BaseDepObjCore<Owner: DepType> {
     style: Option<Style<Owner>>,
-    parent: Option<Owner::Id>,
-    last_child: Option<Owner::Id>,
-    next: Owner::Id,
     added_bindings: Vec<AnyBinding>,
 }
 
 impl<Owner: DepType> BaseDepObjCore<Owner> {
-    pub const fn new(owner_id: Owner::Id) -> Self {
+    pub const fn new(_owner_id: Owner::Id) -> Self {
         BaseDepObjCore {
             style: None,
-            parent: None,
-            last_child: None,
-            next: owner_id,
             added_bindings: Vec::new(),
         }
     }
 
     pub fn take_bindings(&mut self) -> Vec<AnyBinding> { take(&mut self.added_bindings) }
+}
+
+pub trait DepObjIdBase: ComponentId {
+    fn parent(self, state: &dyn State) -> Option<Self>;
+    fn next(self, state: &dyn State) -> Self;
+    fn last_child(self, state: &dyn State) -> Option<Self>;
+}
+
+pub trait DepObjId: ComponentId { }
+
+impl<T: DepObjId> DepObjIdBase for T {
+    fn parent(self, _state: &dyn State) -> Option<Self> { None }
+
+    fn next(self, _state: &dyn State) -> Self { self }
+
+    fn last_child(self, _state: &dyn State) -> Option<Self> { None }
 }
 
 /// A dependency type.
@@ -446,7 +456,7 @@ impl<Owner: DepType> BaseDepObjCore<Owner> {
 /// }
 /// ```
 pub trait DepType: Debug {
-    type Id: ComponentId;
+    type Id: DepObjIdBase;
 
     #[doc(hidden)]
     fn core_base_priv(&self) -> &BaseDepObjCore<Self> where Self: Sized;

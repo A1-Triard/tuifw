@@ -6,12 +6,11 @@
 #![feature(const_raw_ptr_deref)]
 
 mod circuit {
-    use components_arena::{Component, NewtypeComponentId, Id, Arena};
-    use dep_obj::{dep_obj, DepType};
+    use components_arena::{Arena, Component, Id, NewtypeComponentId};
+    use dep_obj::{DepObjId, DepType, dep_obj};
     use downcast_rs::{Downcast, impl_downcast};
-    use dyn_context::state::{State, SelfState, StateExt};
+    use dyn_context::state::{SelfState, State, StateExt};
     use macro_attr_2018::macro_attr;
-    use std::fmt::Debug;
 
     pub trait ChipLegs: Downcast + DepType<Id=Chip> { }
 
@@ -57,6 +56,8 @@ mod circuit {
             }
         }
     }
+
+    impl DepObjId for Chip { }
 
     #[derive(Debug)]
     pub struct Circuit {

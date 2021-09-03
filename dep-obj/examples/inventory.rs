@@ -6,7 +6,7 @@
 #![feature(const_raw_ptr_deref)]
 
 use components_arena::{Arena, Component, NewtypeComponentId, Id};
-use dep_obj::{DepObjBaseBuilder, dep_obj, dep_type, dep_type_with_builder};
+use dep_obj::{DepObjBaseBuilder, DepObjId, dep_obj, dep_type, dep_type_with_builder};
 use macro_attr_2018::macro_attr;
 use dep_obj::binding::{Bindings, Binding1, Binding2};
 use dyn_context::state::{State, StateExt};
@@ -25,6 +25,8 @@ macro_attr! {
     #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, NewtypeComponentId!)]
     struct Item(Id<ItemData>);
 }
+
+impl DepObjId for Item { }
 
 dep_type_with_builder! {
     #[derive(Debug)]
@@ -98,6 +100,8 @@ macro_attr! {
     #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, NewtypeComponentId!)]
     struct Npc(Id<NpcComponent>);
 }
+
+impl DepObjId for Npc { }
 
 dep_type! {
     #[derive(Debug)]
