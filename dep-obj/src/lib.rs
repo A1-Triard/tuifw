@@ -356,7 +356,7 @@ impl<T: DepObjId> DepObjIdBase for T {
 /// # #![feature(const_ptr_offset_from)]
 /// # #![feature(const_raw_ptr_deref)]
 /// use components_arena::{Arena, Component, NewtypeComponentId, Id};
-/// use dep_obj::{dep_obj, dep_type};
+/// use dep_obj::{DepObjId, dep_obj, dep_type};
 /// use dep_obj::binding::{Bindings, Binding1};
 /// use dyn_context::state::{State, StateExt};
 /// use macro_attr_2018::macro_attr;
@@ -381,6 +381,8 @@ impl<T: DepObjId> DepObjIdBase for T {
 ///     #[derive(NewtypeComponentId!, Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 ///     pub struct MyDepTypeId(Id<MyDepTypePrivateData>);
 /// }
+///
+/// impl DepObjId for MyDepTypeId { }
 ///
 /// pub struct MyApp {
 ///     bindings: Bindings,
@@ -414,7 +416,7 @@ impl<T: DepObjId> DepObjIdBase for T {
 ///     pub fn new(state: &mut dyn State) -> MyDepTypeId {
 ///         let app: &mut MyApp = state.get_mut();
 ///         app.my_dep_types.insert(|id| (MyDepTypePrivateData {
-///             dep_data: MyDepType::new_priv()
+///             dep_data: MyDepType::new_priv(MyDepTypeId(id))
 ///         }, MyDepTypeId(id)))
 ///     }
 ///
