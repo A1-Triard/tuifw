@@ -4,9 +4,9 @@
 #![feature(const_mut_refs)]
 #![feature(const_ptr_offset_from)]
 #![feature(const_raw_ptr_deref)]
+#![feature(option_result_unwrap_unchecked)]
 #![feature(try_reserve)]
 #![feature(unchecked_math)]
-#![feature(option_result_unwrap_unchecked)]
 
 #![deny(warnings)]
 #![doc(test(attr(deny(warnings))))]
@@ -569,7 +569,15 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
     fn unstyled_non_local_value<T>(self, state: &dyn State, obj: Glob<Owner::Id, Owner>, f: impl FnOnce(&PropType) -> T) -> T {
         let obj_ref = obj.get(state);
         let entry = self.entry(&obj_ref);
-        f(&entry.default)
+        if entry.inherits {
+            if let Some(parent) = obj.parent(state) {
+                self.current_value(state, parent, f)
+            } else {
+                f(&entry.default)
+            }
+        } else {
+            f(&entry.default)
+        }
     }
 
     fn non_local_value<T>(self, state: &dyn State, obj: Glob<Owner::Id, Owner>, f: impl FnOnce(&PropType) -> T) -> T {
@@ -849,6 +857,10 @@ impl<Owner: DepType, ItemType: Convenient> DepVec<Owner, ItemType> {
 }
 
 impl<Owner: DepType> Glob<Owner::Id, Owner> {
+    pub fn parent(self, state: &dyn State) -> Option<Self> {
+        self.id.parent(state).map(|id| Glob { id, descriptor: self.descriptor })
+    }
+
     pub fn add_binding(self, state: &mut dyn State, binding: AnyBinding) {
         let mut obj_mut = self.get_mut(state);
         obj_mut.core_base_priv_mut().added_bindings.push(binding);
