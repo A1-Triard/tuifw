@@ -203,6 +203,19 @@ pub struct Glob<Id: ComponentId, Obj> {
     pub descriptor: fn() -> GlobDescriptor<Id, Obj>,
 }
 
+pub struct GlobRef<'a, Id: ComponentId, Obj> {
+    pub arena: &'a dyn Any,
+    pub glob: Glob<Id, Obj>,
+}
+
+impl<'a, Id: ComponentId, Obj> Deref for GlobRef<'a, Id, Obj> {
+    type Target = Obj;
+
+    fn deref(&self) -> &Obj {
+        ((self.glob.descriptor)().field_ref)(self.arena.deref(), self.glob.id)
+    }
+}
+
 pub struct GlobMut<'a, Id: ComponentId, Obj> {
     pub arena: &'a mut dyn Any,
     pub glob: Glob<Id, Obj>,
@@ -223,6 +236,14 @@ impl<'a, Id: ComponentId, Obj> DerefMut for GlobMut<'a, Id, Obj> {
 }
 
 impl<Id: ComponentId, Obj> Glob<Id, Obj> {
+    pub fn get(self, state: &dyn State) -> GlobRef<Id, Obj> {
+        let arena = (self.descriptor)().arena;
+        GlobRef {
+            arena: state.get_raw(arena).unwrap_or_else(|| panic!("{:?} required", arena)),
+            glob: self
+        }
+    }
+
     pub fn get_mut(self, state: &mut dyn State) -> GlobMut<Id, Obj> {
         let arena = (self.descriptor)().arena;
         GlobMut {
@@ -272,6 +293,18 @@ impl<PropType: Convenient> DepPropEntry<PropType> {
 
     pub fn binding(&self) -> Option<Binding<PropType>> {
         self.binding
+    }
+
+    fn unstyled_non_local_value(&self) -> &PropType {
+        &self.default
+    }
+
+    fn non_local_value(&self) -> &PropType {
+        self.style.as_ref().unwrap_or(self.default)
+    }
+
+    fn current_value(&self) -> &PropType {
+        self.local.as_ref().unwrap_or_else(|| self.non_local_value())
     }
 }
 
@@ -528,6 +561,16 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
 
     pub fn offset(self) -> usize { self.offset }
 
+    /*
+    fn entry(self, owner: &Owner) -> &DepPropEntry<PropType> {
+        unsafe {
+            let entry = (owner as *const _ as usize).unchecked_add(self.offset);
+            let entry = entry as *const DepPropEntry<PropType>;
+            &*entry
+        }
+    }
+    */
+
     fn entry_mut(self, owner: &mut Owner) -> &mut DepPropEntry<PropType> {
         unsafe {
             let entry = (owner as *mut _ as usize).unchecked_add(self.offset);
@@ -539,9 +582,7 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
     pub fn set_uncond(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: PropType) {
         let mut obj_mut = obj.get_mut(state);
         let entry_mut = self.entry_mut(&mut obj_mut);
-        let old = entry_mut.local.replace(value.clone()).unwrap_or_else(||
-            entry_mut.style.as_ref().unwrap_or(entry_mut.default).clone()
-        );
+        let old = entry_mut.local.replace(value.clone()).unwrap_or_else(|| entry_mut.non_local_value().clone());
         let handlers = entry_mut.handlers.items().clone().into_values();
         for handler in handlers {
             handler.0.execute(state, (old.clone(), value.clone()));
@@ -552,7 +593,7 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         let mut obj_mut = obj.get_mut(state);
         let entry_mut = self.entry_mut(&mut obj_mut);
         if let Some(old) = entry_mut.local.take() {
-            let default = entry_mut.style.as_ref().unwrap_or(entry_mut.default).clone();
+            let default = entry_mut.non_local_value().clone();
             let handlers = entry_mut.handlers.items().clone().into_values();
             for handler in handlers {
                 handler.0.execute(state, (old.clone(), default.clone()));
@@ -563,13 +604,9 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
     pub fn set_distinct(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: PropType) where PropType: PartialEq {
         let mut obj_mut = obj.get_mut(state);
         let entry_mut = self.entry_mut(&mut obj_mut);
-        let old = entry_mut.local.as_ref()
-            .or_else(|| entry_mut.style.as_ref())
-            .unwrap_or(entry_mut.default)
-        ;
+        let old = entry_mut.current_value();
         if &value == old { return; }
-        let old = entry_mut.local.replace(value.clone()).unwrap_or_else(||
-            entry_mut.style.as_ref().unwrap_or(entry_mut.default).clone());
+        let old = entry_mut.local.replace(value.clone()).unwrap_or_else(|| entry_mut.non_local_value().clone());
         let handlers = entry_mut.handlers.items().clone().into_values();
         for handler in handlers {
             handler.0.execute(state, (old.clone(), value.clone()));
@@ -580,8 +617,9 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         let mut obj_mut = obj.get_mut(state);
         let entry_mut = self.entry_mut(&mut obj_mut);
         if let Some(old) = entry_mut.local.take() {
-            let new = entry_mut.style.as_ref().unwrap_or(entry_mut.default).clone();
-            if new == old { return; }
+            let new = entry_mut.non_local_value();
+            if new == &old { return; }
+            let new = new.clone();
             let handlers = entry_mut.handlers.items().clone().into_values();
             for handler in handlers {
                 handler.0.execute(state, (old.clone(), new.clone()));
@@ -835,8 +873,8 @@ impl<Owner: DepType, PropType: Convenient> AnySetter<Owner> for Setter<Owner, Pr
         let value = if unapply { None } else { Some(self.value.clone()) };
         let old = replace(&mut entry_mut.style, value.clone());
         if let Some(handlers) = handlers {
-            let old = old.unwrap_or_else(|| entry_mut.default.clone());
-            let value = value.unwrap_or_else(|| entry_mut.default.clone());
+            let old = old.unwrap_or_else(|| entry_mut.unstyled_non_local_value().clone());
+            let value = value.unwrap_or_else(|| entry_mut.unstyled_non_local_value().clone());
             Some(Box::new(move |state: &'_ mut dyn State| {
                 for handler in handlers.into_values() {
                     handler.0.execute(state, (old.clone(), value.clone()));
@@ -973,7 +1011,7 @@ impl<Owner: DepType + 'static, PropType: Convenient> ValueSource<(PropType, Prop
         let mut obj = self.obj.get_mut(state);
         let entry = self.prop.entry_mut(&mut obj);
         let old = entry.default.clone();
-        let new = entry.local.as_ref().or_else(|| entry.style.as_ref()).unwrap_or(entry.default).clone();
+        let new = entry.current_value().clone();
         let handler_id = entry.handlers.insert(|handler_id| (BoxedValueHandler(handler), handler_id));
         HandledValueSource {
             handler_id: Box::new(DepPropHandledSource { handler_id, obj: self.obj, prop: self.prop }),
