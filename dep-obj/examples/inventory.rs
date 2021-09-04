@@ -8,7 +8,7 @@
 use components_arena::{Arena, Component, NewtypeComponentId, Id};
 use dep_obj::{DepObjBaseBuilder, DepObjId, dep_obj, dep_type, dep_type_with_builder};
 use macro_attr_2018::macro_attr;
-use dep_obj::binding::{Bindings, Binding1, Binding2};
+use dep_obj::binding::{Bindings, Binding2, EventBinding0};
 use dyn_context::state::{State, StateExt};
 use std::any::{TypeId, Any};
 use std::borrow::Cow;
@@ -114,21 +114,21 @@ impl Npc {
     fn new(state: &mut dyn State) -> Npc {
         let game: &mut Game = state.get_mut();
         let npc = game.npcs.insert(|id| (NpcComponent { props: NpcProps::new_priv() }, Npc(id)));
-        let removed_items_binding = Binding1::new(state, (), |(), x| Some(x));
-        removed_items_binding.set_source_1(state, &mut NpcProps::EQUIPPED_ITEMS.removed_items_source(npc.props()));
-        removed_items_binding.set_target_fn(state, (), |state, (), items| {
+        let removed_items_binding = EventBinding0::new(state, (), |state, (), items: &mut Vec<Item>| {
             for item in items {
                 ItemProps::EQUIPPED.set_distinct(state, item.props(), false);
             }
+            Some(())
         });
+        removed_items_binding.set_event_source(state, &mut NpcProps::EQUIPPED_ITEMS.removed_items_source(npc.props()));
         npc.props().add_binding(state, removed_items_binding.into());
-        let inserted_items_binding = Binding1::new(state, (), |(), x| Some(x));
-        inserted_items_binding.set_source_1(state, &mut NpcProps::EQUIPPED_ITEMS.inserted_items_source(npc.props()));
-        inserted_items_binding.set_target_fn(state, (), |state, (), items| {
+        let inserted_items_binding = EventBinding0::new(state, (), |state, (), items: &mut Vec<Item>| {
             for item in items {
                 ItemProps::EQUIPPED.set_distinct(state, item.props(), true);
             }
+            Some(())
         });
+        inserted_items_binding.set_event_source(state, &mut NpcProps::EQUIPPED_ITEMS.inserted_items_source(npc.props()));
         npc.props().add_binding(state, inserted_items_binding.into());
         npc
     }

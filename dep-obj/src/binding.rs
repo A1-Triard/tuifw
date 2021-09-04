@@ -56,7 +56,12 @@ pub trait ValueSource<T: Convenient>: Debug {
 }
 
 pub trait EventSource<T>: Debug {
-    fn handle(&self, state: &mut dyn State, handler: Box<dyn EventHandler<T>>) -> HandledEventSource<T>;
+    fn handle(
+        &self,
+        state: &mut dyn State,
+        handler: Box<dyn EventHandler<T>>,
+        result: Box<dyn FnOnce(HandledEventSource<T>)>
+    );
 }
 
 pub trait HandlerId: Debug {
@@ -71,7 +76,9 @@ pub struct HandledValueSource<T: Convenient> {
 
 #[derive(Educe)]
 #[educe(Debug)]
-pub struct HandledEventSource<'a, T> {
+pub struct HandledEventSource<'a, 'b, T> {
+    #[educe(Debug(ignore))]
+    pub state: &'b mut dyn State,
     pub handler_id: Box<dyn HandlerId>,
     #[educe(Debug(ignore))]
     pub args: Option<&'a mut T>,
@@ -526,19 +533,22 @@ macro_rules! binding_n {
                         binding: self.0,
                         phantom: PhantomType::new()
                     };
-                    let source = source.handle(
+                    source.handle(
                         state,
-                        Box::new(handler)
+                        Box::new(handler),
+                        Box::new(move |source| {
+                            let state = source.state;
+                            let bindings: &mut Bindings = state.get_mut();
+                            let node = bindings.0[self.0].0.downcast_mut::<BindingNode<T>>().unwrap();
+                            let sources = node.sources.downcast_mut::< [< EventBinding $n NodeSources >] <P, $( [< S $i >] ,)* E, T>>().unwrap();
+                            if let Some(source) = sources.event_source.replace(source.handler_id) {
+                                source.unhandle(state);
+                            }
+                            if let Some(args) = source.args {
+                                [< knoke_event_target_ $n >] ::<P, $( [< S $i >] ,)* E, T > (self.0, state, args);
+                            }
+                        })
                     );
-                    let bindings: &mut Bindings = state.get_mut();
-                    let node = bindings.0[self.0].0.downcast_mut::<BindingNode<T>>().unwrap();
-                    let sources = node.sources.downcast_mut::< [< EventBinding $n NodeSources >] <P, $( [< S $i >] ,)* E, T>>().unwrap();
-                    if let Some(source) = sources.event_source.replace(source.handler_id) {
-                        source.unhandle(state);
-                    }
-                    if let Some(args) = source.args {
-                        [< knoke_event_target_ $n >] ::<P, $( [< S $i >] ,)* E, T > (self.0, state, args);
-                    }
                 }
             }
 
