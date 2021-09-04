@@ -1948,14 +1948,6 @@ macro_rules! dep_type_impl_raw {
 
                 $($core_consts)*
 
-                fn dep_type_core_base(&self) -> &$crate::BaseDepObjCore<$name $($r)*> {
-                    &self.dep_type_core_base
-                }
-
-                fn dep_type_core_base_mut(&mut self) -> &mut $crate::BaseDepObjCore<$name $($r)*> {
-                    &mut self.dep_type_core_base
-                }
-
                 fn dep_type_core_take_all_handlers(&mut self) -> $crate::std_vec_Vec<$crate::std_boxed_Box<dyn $crate::binding::AnyHandler>> {
                     let mut $handlers = $crate::std_vec_Vec::new();
                     let $this = self;
