@@ -6,6 +6,7 @@
 #![feature(const_raw_ptr_deref)]
 #![feature(try_reserve)]
 #![feature(unchecked_math)]
+#![feature(option_result_unwrap_unchecked)]
 
 #![deny(warnings)]
 #![doc(test(attr(deny(warnings))))]
@@ -294,18 +295,6 @@ impl<PropType: Convenient> DepPropEntry<PropType> {
     pub fn binding(&self) -> Option<Binding<PropType>> {
         self.binding
     }
-
-    fn unstyled_non_local_value(&self) -> &PropType {
-        &self.default
-    }
-
-    fn non_local_value(&self) -> &PropType {
-        self.style.as_ref().unwrap_or(self.default)
-    }
-
-    fn current_value(&self) -> &PropType {
-        self.local.as_ref().unwrap_or_else(|| self.non_local_value())
-    }
 }
 
 #[derive(Debug)]
@@ -561,7 +550,6 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
 
     pub fn offset(self) -> usize { self.offset }
 
-    /*
     fn entry(self, owner: &Owner) -> &DepPropEntry<PropType> {
         unsafe {
             let entry = (owner as *const _ as usize).unchecked_add(self.offset);
@@ -569,7 +557,6 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
             &*entry
         }
     }
-    */
 
     fn entry_mut(self, owner: &mut Owner) -> &mut DepPropEntry<PropType> {
         unsafe {
@@ -579,52 +566,118 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         }
     }
 
-    pub fn set_uncond(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: PropType) {
-        let mut obj_mut = obj.get_mut(state);
-        let entry_mut = self.entry_mut(&mut obj_mut);
-        let old = entry_mut.local.replace(value.clone()).unwrap_or_else(|| entry_mut.non_local_value().clone());
-        let handlers = entry_mut.handlers.items().clone().into_values();
-        for handler in handlers {
-            handler.0.execute(state, (old.clone(), value.clone()));
+    fn unstyled_non_local_value<T>(self, state: &dyn State, obj: Glob<Owner::Id, Owner>, f: impl FnOnce(&PropType) -> T) -> T {
+        let obj_ref = obj.get(state);
+        let entry = self.entry(&obj_ref);
+        f(&entry.default)
+    }
+
+    fn non_local_value<T>(self, state: &dyn State, obj: Glob<Owner::Id, Owner>, f: impl FnOnce(&PropType) -> T) -> T {
+        let obj_ref = obj.get(state);
+        let entry = self.entry(&obj_ref);
+        if let Some(value) = entry.style.as_ref() {
+            f(value)
+        } else {
+            self.unstyled_non_local_value(state, obj, f)
         }
     }
 
-    pub fn unset_uncond(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>) {
+    fn current_value<T>(self, state: &dyn State, obj: Glob<Owner::Id, Owner>, f: impl FnOnce(&PropType) -> T) -> T {
+        let obj_ref = obj.get(state);
+        let entry = self.entry(&obj_ref);
+        if let Some(value) = entry.local.as_ref() {
+            f(value)
+        } else {
+            self.non_local_value(state, obj, f)
+        }
+    }
+
+    fn set(
+        self,
+        state: &mut dyn State,
+        obj: Glob<Owner::Id, Owner>,
+        mut value: Option<PropType>,
+        notify1: impl FnOnce(&Option<PropType>, &Option<PropType>) -> Option<bool>,
+        notify2: impl FnOnce(&PropType, &PropType) -> bool,
+    ) {
         let mut obj_mut = obj.get_mut(state);
         let entry_mut = self.entry_mut(&mut obj_mut);
-        if let Some(old) = entry_mut.local.take() {
-            let default = entry_mut.non_local_value().clone();
-            let handlers = entry_mut.handlers.items().clone().into_values();
+        let mut old = replace(&mut entry_mut.local, value.clone());
+        let notify = notify1(&old, &value);
+        if notify == Some(false) { return; }
+        let handlers = entry_mut.handlers.items().clone().into_values();
+        let change = if old.is_some() && value.is_some() {
+            let old = unsafe { old.take().unwrap_unchecked() };
+            let value = unsafe { value.take().unwrap_unchecked() };
+            if notify == None && !notify2(&old, &value) { return; }
+            Some((old, value))
+        } else {
+            self.non_local_value(state, obj, |non_local| {
+                let notify = if notify == None {
+                    let old_ref = old.as_ref().unwrap_or(non_local);
+                    let value_ref = value.as_ref().unwrap_or(non_local);
+                    notify2(old_ref, value_ref)
+                } else {
+                    true
+                };
+                if notify {
+                    let old = old.unwrap_or_else(|| non_local.clone());
+                    let value = value.unwrap_or_else(|| non_local.clone());
+                    Some((old, value))
+                } else {
+                    None
+                }
+            })
+        };
+        if let Some(change) = change {
             for handler in handlers {
-                handler.0.execute(state, (old.clone(), default.clone()));
+                handler.0.execute(state, change.clone());
             }
         }
+    }
+
+    fn un_set_uncond(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: Option<PropType>) {
+        self.set(state, obj, value, |_, _| Some(true), |_, _| unreachable!());
+    }
+
+    fn un_set_distinct_local(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: Option<PropType>) where PropType: PartialEq {
+        self.set(state, obj, value, |a, b| Some(a != b), |_, _| unreachable!());
+    }
+
+    fn un_set_distinct(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: Option<PropType>) where PropType: PartialEq {
+        self.set(
+            state, obj, value,
+            |a, b| match (a.as_ref(), b.as_ref()) {
+                (Some(a), Some(b)) => Some(a != b),
+                (None, None) => Some(false),
+                _ => None
+            },
+            |a, b| a != b
+        );
+    }
+
+    pub fn set_uncond(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: PropType) {
+        self.un_set_uncond(state, obj, Some(value));
+    }
+
+    pub fn set_distinct_local(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: PropType) where PropType: PartialEq {
+        self.un_set_distinct_local(state, obj, Some(value));
     }
 
     pub fn set_distinct(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: PropType) where PropType: PartialEq {
-        let mut obj_mut = obj.get_mut(state);
-        let entry_mut = self.entry_mut(&mut obj_mut);
-        let old = entry_mut.current_value();
-        if &value == old { return; }
-        let old = entry_mut.local.replace(value.clone()).unwrap_or_else(|| entry_mut.non_local_value().clone());
-        let handlers = entry_mut.handlers.items().clone().into_values();
-        for handler in handlers {
-            handler.0.execute(state, (old.clone(), value.clone()));
-        }
+        self.un_set_distinct(state, obj, Some(value));
+    }
+
+    pub fn unset_uncond(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>) {
+        self.un_set_uncond(state, obj, None);
+    }
+
+    pub fn unset_distinct_local(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>) where PropType: PartialEq {
+        self.un_set_distinct_local(state, obj, None);
     }
 
     pub fn unset_distinct(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>) where PropType: PartialEq {
-        let mut obj_mut = obj.get_mut(state);
-        let entry_mut = self.entry_mut(&mut obj_mut);
-        if let Some(old) = entry_mut.local.take() {
-            let new = entry_mut.non_local_value();
-            if new == &old { return; }
-            let new = new.clone();
-            let handlers = entry_mut.handlers.items().clone().into_values();
-            for handler in handlers {
-                handler.0.execute(state, (old.clone(), new.clone()));
-            }
-        }
+        self.un_set_distinct(state, obj, None);
     }
 
     fn bind_raw(
@@ -819,17 +872,18 @@ impl<Owner: DepType> Glob<Owner::Id, Owner> {
                         |x| x.prop_offset()
                     ).is_err()
                 ))
-                .filter_map(|setter| setter.un_apply(obj, true))
+                .filter_map(|setter| setter.un_apply(state, self, true))
                 .for_each(|x| on_changed.push(x))
             ;
         }
         if let Some(new) = style.as_ref() {
             new.setters
                 .iter()
-                .filter_map(|setter| setter.un_apply(obj, false))
+                .filter_map(|setter| setter.un_apply(state, self, false))
                 .for_each(|x| on_changed.push(x))
             ;
         }
+        let obj = &mut self.get_mut(state);
         obj.core_base_priv_mut().style = style;
         for on_changed in on_changed {
             on_changed(state);
@@ -849,7 +903,8 @@ trait AnySetter<Owner: DepType>: Debug + DynClone + Send + Sync {
     fn prop_offset(&self) -> usize;
     fn un_apply(
         &self,
-        owner: &mut Owner,
+        state: &mut dyn State,
+        obj: Glob<Owner::Id, Owner>,
         unapply: bool
     ) -> Option<Box<dyn for<'a> FnOnce(&'a mut dyn State)>>;
 }
@@ -861,10 +916,12 @@ impl<Owner: DepType, PropType: Convenient> AnySetter<Owner> for Setter<Owner, Pr
 
     fn un_apply(
         &self,
-        owner: &mut Owner,
+        state: &mut dyn State,
+        obj: Glob<Owner::Id, Owner>,
         unapply: bool
     ) -> Option<Box<dyn for<'a> FnOnce(&'a mut dyn State)>> {
-        let entry_mut = self.prop.entry_mut(owner);
+        let obj_mut = &mut obj.get_mut(state);
+        let entry_mut = self.prop.entry_mut(obj_mut);
         let handlers = if entry_mut.local.is_some() {
             None
         } else {
@@ -873,8 +930,8 @@ impl<Owner: DepType, PropType: Convenient> AnySetter<Owner> for Setter<Owner, Pr
         let value = if unapply { None } else { Some(self.value.clone()) };
         let old = replace(&mut entry_mut.style, value.clone());
         if let Some(handlers) = handlers {
-            let old = old.unwrap_or_else(|| entry_mut.unstyled_non_local_value().clone());
-            let value = value.unwrap_or_else(|| entry_mut.unstyled_non_local_value().clone());
+            let old = old.unwrap_or_else(|| self.prop.unstyled_non_local_value(state, obj, |x| x.clone()));
+            let value = value.unwrap_or_else(|| self.prop.unstyled_non_local_value(state, obj, |x| x.clone()));
             Some(Box::new(move |state: &'_ mut dyn State| {
                 for handler in handlers.into_values() {
                     handler.0.execute(state, (old.clone(), value.clone()));
@@ -1010,9 +1067,9 @@ impl<Owner: DepType + 'static, PropType: Convenient> ValueSource<(PropType, Prop
     fn handle(&self, state: &mut dyn State, handler: Box<dyn ValueHandler<(PropType, PropType)>>) -> HandledValueSource<(PropType, PropType)> {
         let mut obj = self.obj.get_mut(state);
         let entry = self.prop.entry_mut(&mut obj);
-        let old = entry.default.clone();
-        let new = entry.current_value().clone();
         let handler_id = entry.handlers.insert(|handler_id| (BoxedValueHandler(handler), handler_id));
+        let old = entry.default.clone();
+        let new = self.prop.current_value(state, self.obj, |x| x.clone());
         HandledValueSource {
             handler_id: Box::new(DepPropHandledSource { handler_id, obj: self.obj, prop: self.prop }),
             value: (old, new)
