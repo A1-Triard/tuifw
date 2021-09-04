@@ -49,6 +49,8 @@ pub mod example {
     //!     pub struct MyDepTypeId(Id<MyDepTypePrivateData>);
     //! }
     //!
+    //! impl DepObjId for MyDepTypeId { }
+    //!
     //! macro_attr! {
     //!     #[derive(State!, Debug)]
     //!     pub struct MyApp {
@@ -81,7 +83,7 @@ pub mod example {
     //!     }
     //! }
 
-    use crate::{dep_obj, dep_type};
+    use crate::{DepObjId, dep_obj, dep_type};
     use components_arena::{Arena, Component, Id, NewtypeComponentId};
     use dyn_context::state::{SelfState, State, StateExt};
 
@@ -104,6 +106,8 @@ pub mod example {
     pub struct MyDepTypeId(Id<MyDepTypePrivateData>);
 
     NewtypeComponentId!(() pub struct MyDepTypeId(Id<MyDepTypePrivateData>););
+
+    impl DepObjId for MyDepTypeId { }
 
     #[derive(Debug)]
     pub struct MyApp {
