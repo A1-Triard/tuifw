@@ -6,7 +6,7 @@
 #![feature(const_raw_ptr_deref)]
 
 use components_arena::{Arena, Component, NewtypeComponentId, Id};
-use dep_obj::{DepObjBaseBuilder, DepObjId, dep_obj, dep_type, dep_type_with_builder};
+use dep_obj::{DepObjBaseBuilder, DepObjId, Items, dep_obj, dep_type, dep_type_with_builder};
 use macro_attr_2018::macro_attr;
 use dep_obj::binding::{Bindings, Binding2, EventBinding0};
 use dyn_context::state::{State, StateExt};
@@ -114,16 +114,16 @@ impl Npc {
     fn new(state: &mut dyn State) -> Npc {
         let game: &mut Game = state.get_mut();
         let npc = game.npcs.insert(|id| (NpcComponent { props: NpcProps::new_priv() }, Npc(id)));
-        let removed_items_binding = EventBinding0::new(state, (), |state, (), items: &mut Vec<Item>| {
-            for item in items {
+        let removed_items_binding = EventBinding0::new(state, (), |state, (), items: &mut Items<Item>| {
+            for item in items.iter() {
                 ItemProps::EQUIPPED.set_distinct(state, item.props(), false);
             }
             Some(())
         });
         removed_items_binding.set_event_source(state, &mut NpcProps::EQUIPPED_ITEMS.removed_items_source(npc.props()));
         npc.props().add_binding(state, removed_items_binding.into());
-        let inserted_items_binding = EventBinding0::new(state, (), |state, (), items: &mut Vec<Item>| {
-            for item in items {
+        let inserted_items_binding = EventBinding0::new(state, (), |state, (), items: &mut Items<Item>| {
+            for item in items.iter() {
                 ItemProps::EQUIPPED.set_distinct(state, item.props(), true);
             }
             Some(())
