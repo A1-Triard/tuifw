@@ -930,11 +930,18 @@ impl<Owner: DepType, PropType: Convenient> AnySetter<Owner> for Setter<Owner, Pr
         let value = if unapply { None } else { Some(self.value.clone()) };
         let old = replace(&mut entry_mut.style, value.clone());
         if let Some(handlers) = handlers {
-            let old = old.unwrap_or_else(|| self.prop.unstyled_non_local_value(state, obj, |x| x.clone()));
-            let value = value.unwrap_or_else(|| self.prop.unstyled_non_local_value(state, obj, |x| x.clone()));
+            let change = if old.is_some() && value.is_some() {
+                unsafe { (old.unwrap_unchecked(), value.unwrap_unchecked()) }
+            } else {
+                self.prop.unstyled_non_local_value(state, obj, |unstyled_non_local_value| {
+                    let old = old.unwrap_or_else(|| unstyled_non_local_value.clone());
+                    let value = value.unwrap_or_else(|| unstyled_non_local_value.clone());
+                    (old, value)
+                })
+            };
             Some(Box::new(move |state: &'_ mut dyn State| {
                 for handler in handlers.into_values() {
-                    handler.0.execute(state, (old.clone(), value.clone()));
+                    handler.0.execute(state, change.clone());
                 }
             }) as _)
         } else {
