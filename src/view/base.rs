@@ -1173,7 +1173,9 @@ dep_type_with_builder! {
     pub struct ViewBase become base in View {
         #[inherits]
         fg: Color = Color::White,
+        #[inherits]
         bg: Option<Color> = None,
+        #[inherits]
         attr: Attr = Attr::empty(),
         is_focused: bool = false,
         input yield ViewInput,
