@@ -75,7 +75,7 @@ struct DockLayoutBehavior;
 
 impl LayoutBehavior for DockLayoutBehavior {
     fn init_bindings(&self, view: View, state: &mut dyn State) -> Box<dyn LayoutBindings> {
-        let dock = Binding1::new(state, |(_, dock)| Some(dock));
+        let dock = Binding1::new(state, (), |(), (_, dock)| Some(dock));
         dock.set_source_1(state, &mut DockLayout::DOCK.source(view.layout()));
         dock.set_target_fn(state, view, |state, view, _| {
             let tree: &ViewTree = state.get();
@@ -408,7 +408,7 @@ impl PanelBehavior for DockPanelBehavior {
     }
 
     fn init_bindings(&self, view: View, state: &mut dyn State) -> Box<dyn PanelBindings> {
-        let base = Binding1::new(state, |(_, base)| Some(base));
+        let base = Binding1::new(state, (), |(), (_, base)| Some(base));
         base.set_source_1(state, &mut DockPanel::BASE.source(view.panel()));
         base.set_target_fn(state, view, |state, view, _| {
             view.invalidate_measure(state);

@@ -138,14 +138,14 @@ impl DecoratorBehavior for LineDecoratorBehavior {
     }
 
     fn init_bindings(&self, view: View, state: &mut dyn State) -> Box<dyn DecoratorBindings> {
-        let fg = Binding1::new(state, |(_, fg)| Some(fg));
-        let bg = Binding1::new(state, |(_, bg)| Some(bg));
-        let attr = Binding1::new(state, |(_, attr)| Some(attr));
-        let length = Binding1::new(state, |(_, length)| Some(length));
-        let near = Binding1::new(state, |(_, near)| Some(near));
-        let stroke = Binding1::new(state, |(_, stroke)| Some(stroke));
-        let orient = Binding1::new(state, |(_, orient)| Some(orient));
-        let far_orient = Binding2::new(state, |(_, far), (_, orient)| Some((far, orient)));
+        let fg = Binding1::new(state, (), |(), (_, fg)| Some(fg));
+        let bg = Binding1::new(state, (), |(), (_, bg)| Some(bg));
+        let attr = Binding1::new(state, (), |(), (_, attr)| Some(attr));
+        let length = Binding1::new(state, (), |(), (_, length)| Some(length));
+        let near = Binding1::new(state, (), |(), (_, near)| Some(near));
+        let stroke = Binding1::new(state, (), |(), (_, stroke)| Some(stroke));
+        let orient = Binding1::new(state, (), |(), (_, orient)| Some(orient));
+        let far_orient = Binding2::new(state, (), |(), (_, far), (_, orient)| Some((far, orient)));
         bg.set_source_1(state, &mut ViewBase::BG.source(view.base()));
         fg.set_source_1(state, &mut ViewBase::FG.source(view.base()));
         attr.set_source_1(state, &mut ViewBase::ATTR.source(view.base()));

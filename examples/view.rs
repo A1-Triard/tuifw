@@ -1,11 +1,11 @@
 #![deny(warnings)]
-use dep_obj::binding::Bindings;
+use dep_obj::binding::{Bindings, EventBinding1};
 use dyn_context::state::{State, StateExt, StateRefMut};
 use either::Right;
 use std::borrow::Cow;
-use tuifw::{Vector, Thickness, HAlign, VAlign, Point, Side, Rect};
-use tuifw::view::{View, ViewTree, ViewBuilderViewAlignExt};
-use tuifw::view::panels::{ViewBuilderCanvasPanelExt};
+use tuifw::{Vector, Thickness, HAlign, VAlign, Point, Side, Rect, Key, Color};
+use tuifw::view::{View, ViewBase, ViewTree, ViewBuilderViewAlignExt, ViewInput, ViewBuilderViewBaseExt};
+use tuifw::view::panels::{CanvasLayout, ViewBuilderCanvasPanelExt};
 use tuifw::view::panels::{ViewBuilderDockPanelExt};
 use tuifw::view::decorators::{ViewBuilderBorderDecoratorExt};
 use tuifw::view::decorators::{ViewBuilderLabelDecoratorExt};
@@ -15,6 +15,9 @@ fn build(state: &mut dyn State, bounds: Rect) -> View {
     let root = tree.root();
     let mut border = None;
     root.build(state, |view| view
+        .base(|base| base
+            .fg(Color::Green)
+        )
         .canvas_panel(|panel| panel
             .child(Some(&mut border), (), |layout| layout.tl(bounds.tl), |view| view
                 .align(|align| align
@@ -73,10 +76,12 @@ fn main() {
     let tree = &mut ViewTree::new(screen, bindings, |_| ((), |tree| tree));
     tree.merge_mut_and_then(|state| {
         let border = build(state, bounds);
-        let tree: &mut ViewTree = state.get_mut();
-        /*
-        border.base(tree).on(ViewBase::INPUT, |state, border, input| {
-            let tree: &mut ViewTree = state.get_mut();
+        let input_binding = EventBinding1::new(state, border, |
+            state,
+            border,
+            (_, tl): (Point, Point),
+            input: &mut ViewInput
+        | {
             let d = match input.key() {
                 (n, Key::Left) | (n, Key::Char('h')) =>
                     -Vector { x: (n.get() as i16).wrapping_mul(2), y: 0 },
@@ -86,16 +91,19 @@ fn main() {
                     -Vector { x: 0, y: n.get() as i16 },
                 (n, Key::Down) | (n, Key::Char('j')) =>
                     Vector { x: 0, y: n.get() as i16 },
-                (_, Key::Escape) => { input.mark_as_handled(); return tree.quit(); },
-                _ => return,
+                (_, Key::Escape) => { input.mark_as_handled(); ViewTree::quit(state); return Some(()); },
+                _ => return Some(()),
             };
             input.mark_as_handled();
-            let tl = border.layout_ref(tree).get(CanvasLayout::TL).offset(d);
-            border.layout_mut(state).set_distinct(CanvasLayout::TL, tl);
+            CanvasLayout::TL.set_distinct(state, border.layout(), tl.offset(d));
+            Some(())
         });
+        input_binding.set_event_source(state, &mut ViewBase::INPUT.source(border.base()));
+        input_binding.set_source_1(state, &mut CanvasLayout::TL.source(border.layout()));
+        border.base().add_binding(state, input_binding.into());
 
-         */
-        border.focus(tree);
+        border.focus(state);
         while ViewTree::update(state, true).unwrap() { }
+        ViewTree::drop_self(state);
     }, bindings);
 }

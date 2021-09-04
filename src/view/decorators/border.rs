@@ -247,17 +247,17 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
     }
 
     fn init_bindings(&self, view: View, state: &mut dyn State) -> Box<dyn DecoratorBindings> {
-        let bg = Binding1::new(state, |(_, bg)| Some(bg));
-        let fg = Binding1::new(state, |(_, fg)| Some(fg));
-        let attr = Binding1::new(state, |(_, attr)| Some(attr));
-        let tl = Binding1::new(state, |(_, tl)| Some(tl));
-        let tr = Binding1::new(state, |(_, tr)| Some(tr));
-        let bl = Binding1::new(state, |(_, bl)| Some(bl));
-        let br = Binding1::new(state, |(_, br)| Some(br));
-        let l = Binding1::new(state, |(_, l)| Some(l));
-        let t = Binding1::new(state, |(_, t)| Some(t));
-        let r = Binding1::new(state, |(_, r)| Some(r));
-        let b = Binding1::new(state, |(_, b)| Some(b));
+        let bg = Binding1::new(state, (), |(), (_, bg)| Some(bg));
+        let fg = Binding1::new(state, (), |(), (_, fg)| Some(fg));
+        let attr = Binding1::new(state, (), |(), (_, attr)| Some(attr));
+        let tl = Binding1::new(state, (), |(), (_, tl)| Some(tl));
+        let tr = Binding1::new(state, (), |(), (_, tr)| Some(tr));
+        let bl = Binding1::new(state, (), |(), (_, bl)| Some(bl));
+        let br = Binding1::new(state, (), |(), (_, br)| Some(br));
+        let l = Binding1::new(state, (), |(), (_, l)| Some(l));
+        let t = Binding1::new(state, (), |(), (_, t)| Some(t));
+        let r = Binding1::new(state, (), |(), (_, r)| Some(r));
+        let b = Binding1::new(state, (), |(), (_, b)| Some(b));
         bg.set_source_1(state, &mut ViewBase::BG.source(view.base()));
         fg.set_source_1(state, &mut ViewBase::FG.source(view.base()));
         attr.set_source_1(state, &mut ViewBase::ATTR.source(view.base()));
