@@ -600,6 +600,43 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         }
     }
 
+    fn notify_children(
+        self,
+        state: &mut dyn State,
+        obj: Glob<Owner::Id, Owner>,
+        change: &(PropType, PropType),
+    ) {
+        if let Some(last_child) = obj.id.last_child(state) {
+            let mut child = last_child;
+            loop {
+                child = child.next(state);
+                self.on_parent_value_changed(
+                    state,
+                    Glob { id: child, descriptor: obj.descriptor },
+                    change,
+                );
+                if child == last_child { break; }
+            }
+        }
+    }
+
+    fn on_parent_value_changed(
+        self,
+        state: &mut dyn State,
+        obj: Glob<Owner::Id, Owner>,
+        change: &(PropType, PropType),
+    ) {
+        let mut obj_mut = obj.get_mut(state);
+        let entry_mut = self.entry_mut(&mut obj_mut);
+        debug_assert!(entry_mut.inherits);
+        if entry_mut.local.is_some() || entry_mut.style.is_some() { return; }
+        let handlers = entry_mut.handlers.items().clone().into_values();
+        for handler in handlers {
+            handler.0.execute(state, change.clone());
+        }
+        self.notify_children(state, obj, change);
+    }
+
     fn set(
         self,
         state: &mut dyn State,
@@ -610,6 +647,7 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
     ) {
         let mut obj_mut = obj.get_mut(state);
         let entry_mut = self.entry_mut(&mut obj_mut);
+        let inherits = entry_mut.inherits;
         let mut old = replace(&mut entry_mut.local, value.clone());
         let notify = notify1(&old, &value);
         if notify == Some(false) { return; }
@@ -640,6 +678,9 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         if let Some(change) = change {
             for handler in handlers {
                 handler.0.execute(state, change.clone());
+            }
+            if inherits {
+                self.notify_children(state, obj, &change);
             }
         }
     }
