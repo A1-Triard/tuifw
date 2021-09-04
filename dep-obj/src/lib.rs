@@ -343,7 +343,7 @@ pub struct BaseDepObjCore<Owner: DepType> {
 }
 
 impl<Owner: DepType> BaseDepObjCore<Owner> {
-    pub const fn new(_owner_id: Owner::Id) -> Self {
+    pub const fn new() -> Self {
         BaseDepObjCore {
             style: None,
             added_bindings: Vec::new(),
@@ -440,7 +440,7 @@ impl<T: DepObjId> DepObjIdBase for T {
 ///     pub fn new(state: &mut dyn State) -> MyDepTypeId {
 ///         let app: &mut MyApp = state.get_mut();
 ///         app.my_dep_types.insert(|id| (MyDepTypePrivateData {
-///             dep_data: MyDepType::new_priv(MyDepTypeId(id))
+///             dep_data: MyDepType::new_priv()
 ///         }, MyDepTypeId(id)))
 ///     }
 ///
@@ -1935,9 +1935,9 @@ macro_rules! dep_type_impl_raw {
             }
 
             impl $($g)* [< $name Core >] $($r)* $($w)* {
-                const fn new(owner_id: $Id) -> Self {
+                const fn new() -> Self {
                     Self {
-                        dep_type_core_base: $crate::BaseDepObjCore::new(owner_id),
+                        dep_type_core_base: $crate::BaseDepObjCore::new(),
                         $($core_new)*
                     }
                 }
@@ -1973,8 +1973,8 @@ macro_rules! dep_type_impl_raw {
             }
 
             impl $($g)* $name $($r)* $($w)* {
-                const fn new_priv(id: $Id) -> Self {
-                    Self { core: [< $name Core >] ::new(id) }
+                const fn new_priv() -> Self {
+                    Self { core: [< $name Core >] ::new() }
                 }
 
                 $($dep_props)*

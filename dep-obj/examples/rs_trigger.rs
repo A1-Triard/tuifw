@@ -88,7 +88,7 @@ mod or_chip {
 
     impl OrLegs {
         pub fn new(state: &mut dyn State) -> Chip {
-            let chip = Chip::new(state, |chip| (Box::new(Self::new_priv(chip)) as _, chip));
+            let chip = Chip::new(state, |chip| (Box::new(Self::new_priv()) as _, chip));
             let binding = Binding2::new(state, (), |(), (_, in_1), (_, in_2)| Some(in_1 | in_2));
             binding.set_source_1(state, &mut OrLegs::IN_1.source(chip.legs()));
             binding.set_source_2(state, &mut OrLegs::IN_2.source(chip.legs()));
@@ -116,7 +116,7 @@ mod not_chip {
 
     impl NotLegs {
         pub fn new(state: &mut dyn State) -> Chip {
-            let chip = Chip::new(state, |chip| (Box::new(Self::new_priv(chip)) as _, chip));
+            let chip = Chip::new(state, |chip| (Box::new(Self::new_priv()) as _, chip));
             let binding = Binding1::new(state, (), |(), (_, in_1): (bool, bool)| Some(!in_1));
             binding.set_source_1(state, &mut NotLegs::IN_.source(chip.legs()));
             NotLegs::OUT.bind_distinct(state, chip.legs(), binding);
