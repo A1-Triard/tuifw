@@ -610,31 +610,20 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
             let mut child = last_child;
             loop {
                 child = child.next(state);
-                self.on_parent_value_changed(
-                    state,
-                    Glob { id: child, descriptor: obj.descriptor },
-                    change,
-                );
+                let child_obj = Glob { id: child, descriptor: obj.descriptor };
+                let mut obj_mut = child_obj.get_mut(state);
+                let entry_mut = self.entry_mut(&mut obj_mut);
+                debug_assert!(entry_mut.inherits);
+                if entry_mut.local.is_none() && entry_mut.style.is_none() {
+                    let handlers = entry_mut.handlers.items().clone().into_values();
+                    for handler in handlers {
+                        handler.0.execute(state, change.clone());
+                    }
+                    self.notify_children(state, child_obj, change);
+                }
                 if child == last_child { break; }
             }
         }
-    }
-
-    fn on_parent_value_changed(
-        self,
-        state: &mut dyn State,
-        obj: Glob<Owner::Id, Owner>,
-        change: &(PropType, PropType),
-    ) {
-        let mut obj_mut = obj.get_mut(state);
-        let entry_mut = self.entry_mut(&mut obj_mut);
-        debug_assert!(entry_mut.inherits);
-        if entry_mut.local.is_some() || entry_mut.style.is_some() { return; }
-        let handlers = entry_mut.handlers.items().clone().into_values();
-        for handler in handlers {
-            handler.0.execute(state, change.clone());
-        }
-        self.notify_children(state, obj, change);
     }
 
     fn set(
@@ -964,7 +953,7 @@ trait AnySetter<Owner: DepType>: Debug + DynClone + Send + Sync {
 
 clone_trait_object!(<Owner: DepType> AnySetter<Owner>);
 
-impl<Owner: DepType, PropType: Convenient> AnySetter<Owner> for Setter<Owner, PropType> where Owner::Id: 'static {
+impl<Owner: DepType + 'static, PropType: Convenient> AnySetter<Owner> for Setter<Owner, PropType> where Owner::Id: 'static {
     fn prop_offset(&self) -> usize { self.prop.offset }
 
     fn un_apply(
@@ -975,6 +964,7 @@ impl<Owner: DepType, PropType: Convenient> AnySetter<Owner> for Setter<Owner, Pr
     ) -> Option<Box<dyn for<'a> FnOnce(&'a mut dyn State)>> {
         let obj_mut = &mut obj.get_mut(state);
         let entry_mut = self.prop.entry_mut(obj_mut);
+        let inherits = entry_mut.inherits;
         let handlers = if entry_mut.local.is_some() {
             None
         } else {
@@ -992,9 +982,13 @@ impl<Owner: DepType, PropType: Convenient> AnySetter<Owner> for Setter<Owner, Pr
                     (old, value)
                 })
             };
+            let prop = self.prop;
             Some(Box::new(move |state: &'_ mut dyn State| {
                 for handler in handlers.into_values() {
                     handler.0.execute(state, change.clone());
+                }
+                if inherits {
+                    prop.notify_children(state, obj, &change);
                 }
             }) as _)
         } else {
