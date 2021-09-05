@@ -857,7 +857,7 @@ impl<Owner: DepType, ItemType: Convenient> DepVec<Owner, ItemType> {
         p: P,
         store: impl FnOnce(&mut Vec<ItemType>, P) -> S,
         deref: impl FnOnce(&S) -> &[ItemType],
-    ) {
+    ) -> S {
         let mut obj_mut = obj.get_mut(state);
         let entry_mut = self.entry_mut(&mut obj_mut);
         let items = store(&mut entry_mut.items, p);
@@ -877,6 +877,17 @@ impl<Owner: DepType, ItemType: Convenient> DepVec<Owner, ItemType> {
         for handler in changed_handlers {
             handler.0.execute(state, &mut ());
         }
+        items
+    }
+
+    pub fn refresh(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>) {
+        let stored_items = self.modify(true, state, obj, (), |items, ()| {
+            take(items)
+        }, |x| x);
+        self.modify(false, state, obj, stored_items, |items, stored_items| {
+            *items = stored_items.clone();
+            stored_items
+        }, |x| &x);
     }
 
     pub fn clear(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>) {
