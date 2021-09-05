@@ -8,7 +8,7 @@
 use components_arena::{Arena, Component, NewtypeComponentId, Id};
 use dep_obj::{DepObjBaseBuilder, DepObjId, Items, dep_obj, dep_type, dep_type_with_builder};
 use macro_attr_2018::macro_attr;
-use dep_obj::binding::{Bindings, Binding2, EventBinding0};
+use dep_obj::binding::{Bindings, Binding2, EventBinding0, EventBinding1};
 use dyn_context::state::{State, StateExt};
 use std::any::{TypeId, Any};
 use std::borrow::Cow;
@@ -33,6 +33,7 @@ dep_type_with_builder! {
     struct ItemProps become props in Item {
         name: Cow<'static, str> = Cow::Borrowed(""),
         equipped: bool = false,
+        enhancement: i8 = 0,
     }
 
     type BaseBuilder<'a> = ItemBuilder<'a>;
@@ -107,6 +108,7 @@ dep_type! {
     #[derive(Debug)]
     struct NpcProps in Npc {
         equipped_items [Item],
+        items_enhancement: i8 = 0,
     }
 }
 
@@ -132,6 +134,28 @@ impl Npc {
         });
         inserted_items_binding.set_event_source(state, &mut NpcProps::EQUIPPED_ITEMS.inserted_items_source(npc.props()));
         npc.props().add_binding(state, inserted_items_binding.into());
+        let apply_enhancement = EventBinding1::new(state, npc, |state, npc, (_, enhancement), items: Option<&mut Items<Item>>| {
+            if let Some(items) = items {
+                for item in items.iter() {
+                    ItemProps::ENHANCEMENT.set_distinct(state, item.props(), enhancement);
+                }
+            } else {
+                NpcProps::EQUIPPED_ITEMS.refresh(state, npc.props());
+            }
+            Some(())
+        });
+        apply_enhancement.set_source_1(state, &mut NpcProps::ITEMS_ENHANCEMENT.source(npc.props()));
+        apply_enhancement.set_event_source(state, &mut NpcProps::EQUIPPED_ITEMS.inserted_items_source(npc.props()));
+        npc.props().add_binding(state, apply_enhancement.into());
+        let unapply_enhancement = EventBinding0::new(state, (), |state, (), items: Option<&mut Items<Item>>| {
+            items.map(|items| {
+                for item in items.iter() {
+                    ItemProps::ENHANCEMENT.unset_distinct(state, item.props());
+                }
+            })
+        });
+        unapply_enhancement.set_event_source(state, &mut NpcProps::EQUIPPED_ITEMS.removed_items_source(npc.props()));
+        npc.props().add_binding(state, unapply_enhancement.into());
         npc
     }
 
