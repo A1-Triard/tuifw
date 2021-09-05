@@ -400,7 +400,11 @@ macro_rules! binding_n {
                 }
             )*
 
-            fn [< knoke_event_target_ $n >] <P: Convenient, $( [< S $i >] : Convenient, )* E: 'static, T: Convenient>(binding: Id<BoxedBindingNode>, state: &mut dyn State, event_args: &mut E) {
+            fn [< knoke_event_target_ $n >] <P: Convenient, $( [< S $i >] : Convenient, )* E: 'static, T: Convenient>(
+                binding: Id<BoxedBindingNode>,
+                state: &mut dyn State,
+                event_args: Option<&mut E>,
+            ) {
                 let bindings: &Bindings = state.get();
                 let node = bindings.0[binding].0.downcast_ref::<BindingNode<T>>().unwrap();
                 let sources = node.sources.downcast_ref::< [< EventBinding $n NodeSources >] <P, $( [< S $i >] ,)* E, T>>().unwrap();
@@ -429,7 +433,7 @@ macro_rules! binding_n {
                 )*
                 event_source: Option<Box<dyn HandlerId>>,
                 #[educe(Debug(ignore))]
-                filter_map: fn(&mut dyn State, P, $( [< S $i >] ,)* &mut E) -> Option<T>,
+                filter_map: fn(&mut dyn State, P, $( [< S $i >] ,)* Option<&mut E>) -> Option<T>,
             }
 
             impl<
@@ -471,7 +475,7 @@ macro_rules! binding_n {
                 pub fn new(
                     state: &mut dyn State,
                     param: P,
-                    filter_map: fn(&mut dyn State, P, $( [< S $i >] ,)* &mut E) -> Option<T>
+                    filter_map: fn(&mut dyn State, P, $( [< S $i >] ,)* Option<&mut E>) -> Option<T>
                 ) -> Self {
                     let bindings: &mut Bindings = state.get_mut();
                     let id = bindings.0.insert(|id| {
@@ -525,6 +529,7 @@ macro_rules! binding_n {
                         if let Some(source) = sources. [< source_ $i >] .replace(source) {
                             source.handler_id.unhandle(state);
                         }
+                        [< knoke_event_target_ $n >] ::<P, $( [< S $j >] ,)* E, T > (self.0, state, None);
                     }
                 )*
 
@@ -545,7 +550,7 @@ macro_rules! binding_n {
                                 source.unhandle(state);
                             }
                             if let Some(args) = source.args {
-                                [< knoke_event_target_ $n >] ::<P, $( [< S $i >] ,)* E, T > (self.0, state, args);
+                                [< knoke_event_target_ $n >] ::<P, $( [< S $i >] ,)* E, T > (self.0, state, Some(args));
                             }
                         })
                     );
@@ -611,6 +616,7 @@ macro_rules! binding_n {
                         let node = bindings.0[self.binding].0.downcast_mut::<BindingNode<T>>().unwrap();
                         let sources = node.sources.downcast_mut::< [< EventBinding $n NodeSources >] <P, $( [< S $j >] ,)* E, T>>().unwrap();
                         sources. [< source_ $i >] .as_mut().unwrap().value = value;
+                        [< knoke_event_target_ $n >] ::<P, $( [< S $j >] ,)* E, T > (self.binding, state, None);
                     }
                 }
             )*
@@ -649,7 +655,7 @@ macro_rules! binding_n {
                 }
 
                 fn execute(&self, state: &mut dyn State, args: &mut E) {
-                    [< knoke_event_target_ $n >] ::<P, $( [< S $i >] ,)* E, T > (self.binding, state, args);
+                    [< knoke_event_target_ $n >] ::<P, $( [< S $i >] ,)* E, T > (self.binding, state, Some(args));
                 }
             }
         }
