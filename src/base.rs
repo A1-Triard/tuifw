@@ -1,7 +1,7 @@
 use crate::view::{View, ViewTree, ViewBuilder, PanelTemplate, RootDecorator};
 use components_arena::{Arena, Component, Id, NewtypeComponentId};
 use dep_obj::{DepObjBaseBuilder, DepObjIdBase, DepType, Items, Style, dep_type, dep_obj};
-use dep_obj::binding::{AnyBinding, Binding1, Bindings, EventBinding0};
+use dep_obj::binding::{Binding1, Bindings, EventBinding0, EventBinding1};
 use downcast_rs::{Downcast, impl_downcast};
 use dyn_clone::{DynClone, clone_trait_object};
 use dyn_context::state::{State, StateExt, StateRefMut};
@@ -57,7 +57,6 @@ pub struct WidgetTree {
     _model_arena: Arena<ModelNode>,
     view_tree: ViewTree,
     root: Widget,
-    inserted_children: Option<AnyBinding>,
 }
 
 impl State for WidgetTree {
@@ -102,7 +101,6 @@ impl WidgetTree {
             _model_arena: model_arena,
             view_tree,
             root,
-            inserted_children: None,
         };
         (&mut tree).merge_mut_and_then(|state| {
             let decorator_style = Binding1::new(state, (), |(), (_, x)| Some(x));
@@ -111,49 +109,46 @@ impl WidgetTree {
             decorator_style.set_target_fn(state, root_view, |state, root_view, decorator_style| {
                 root_view.decorator().apply_style(state, decorator_style);
             });
-            let children_changed = EventBinding0::new(state, root_view, |state, root_view, _: &mut ()| {
+            let children_changed = EventBinding0::new(state, root_view, |state, root_view, _: Option<&mut ()>| {
                 root_view.invalidate_measure(state);
                 Some(())
             });
             root.obj::<Root>().add_binding(state, children_changed.into());
             children_changed.set_event_source(state, &mut Root::CHILDREN.changed_source(root.obj()));
-            let panel_template = Binding1::new(state, (), |(), (_, x)| Some(x));
-            root.obj::<Root>().add_binding(state, panel_template.into());
-            panel_template.set_source_1(state, &mut Root::PANEL_TEMPLATE.source(root.obj()));
-            panel_template.set_target_fn(state, root_view, |state, root_view, panel_template| {
-                panel_template.map(|x| x.apply_panel(state, root_view));
-            });
-            let inserted_children = Binding1::new(state, (), |(), (_, x)| Some(x));
-            root.obj::<Root>().add_binding(state, inserted_children.into());
-            inserted_children.set_source_1(state, &mut Root::PANEL_TEMPLATE.source(root.obj()));
-            inserted_children.set_target_fn(state, (root, root_view), |state, (root, root_view), panel_template| {
-                let inserted_children = EventBinding0::new(
-                    state, (root, root_view, panel_template),
-                    |
-                        state,
-                        (root, root_view, panel_template),
-                        args: &mut Items<Widget>
-                    | {
-                        for &child in args.iter() {
+            let inserted_children = EventBinding1::new(
+                state,
+                (root, root_view),
+                |
+                    state,
+                    (root, root_view),
+                    (old, new): (Option<Box<dyn PanelTemplate>>, Option<Box<dyn PanelTemplate>>),
+                    children: Option<&mut Items<Widget>>
+                | {
+                    if let Some(children) = children {
+                        for &child in children.iter() {
                             child.attach(state, root);
                             let view = View::new(state, root_view, |view| (child, view));
-                            panel_template.as_ref().map(|x| x.apply_layout(state, view));
+                            new.as_ref().map(|x| x.apply_layout(state, view));
                             child.load(state, view);
                         }
-                        Some(())
+                    } else {
+                        if !old.is_none() || !new.is_none() {
+                            Root::CHILDREN.refresh(state, root.obj());
+                        }
+                        new.map(|x| x.apply_panel(state, root_view));
                     }
-                );
-                {
-                    let tree: &mut WidgetTree = state.get_mut();
-                    tree.inserted_children.replace(inserted_children.into()).map(|x| x.drop_binding(state));
+                    Some(())
                 }
-                inserted_children.set_event_source(state, &mut Root::CHILDREN.inserted_items_source(root.obj()));
-            });
-            let removed_children = EventBinding0::new(state, (), |state, (), args: &mut Items<Widget>| {
-                for &child in args.iter() {
-                    child.detach(state);
-                }
-                Some(())
+            );
+            root.obj::<Root>().add_binding(state, inserted_children.into());
+            inserted_children.set_source_1(state, &mut Root::PANEL_TEMPLATE.source(root.obj()));
+            inserted_children.set_event_source(state, &mut Root::CHILDREN.inserted_items_source(root.obj()));
+            let removed_children = EventBinding0::new(state, (), |state, (), children: Option<&mut Items<Widget>>| {
+                children.map(|children| {
+                    for &child in children.iter() {
+                        child.detach(state);
+                    }
+                })
             });
             root.obj::<Root>().add_binding(state, removed_children.into());
             removed_children.set_event_source(state, &mut Root::CHILDREN.removed_items_source(root.obj()));

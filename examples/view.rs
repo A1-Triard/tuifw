@@ -80,8 +80,8 @@ fn main() {
             state,
             border,
             (_, tl): (Point, Point),
-            input: &mut ViewInput
-        | {
+            input: Option<&mut ViewInput>
+        | input.map(|input| {
             let d = match input.key() {
                 (n, Key::Left) | (n, Key::Char('h')) =>
                     -Vector { x: (n.get() as i16).wrapping_mul(2), y: 0 },
@@ -91,13 +91,12 @@ fn main() {
                     -Vector { x: 0, y: n.get() as i16 },
                 (n, Key::Down) | (n, Key::Char('j')) =>
                     Vector { x: 0, y: n.get() as i16 },
-                (_, Key::Escape) => { input.mark_as_handled(); ViewTree::quit(state); return Some(()); },
-                _ => return Some(()),
+                (_, Key::Escape) => { input.mark_as_handled(); ViewTree::quit(state); return; },
+                _ => return,
             };
             input.mark_as_handled();
             CanvasLayout::TL.set_distinct(state, border.layout(), tl.offset(d));
-            Some(())
-        });
+        }));
         input_binding.set_event_source(state, &mut ViewBase::INPUT.source(border.base()));
         input_binding.set_source_1(state, &mut CanvasLayout::TL.source(border.layout()));
         border.base().add_binding(state, input_binding.into());
