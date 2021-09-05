@@ -17,3 +17,6 @@
 pub use tuifw_screen_base::*;
 
 pub mod view;
+
+mod base;
+pub use base::*;
