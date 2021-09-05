@@ -20,3 +20,6 @@ pub mod view;
 
 mod base;
 pub use base::*;
+
+mod label;
+pub use label::*;
