@@ -29,7 +29,7 @@ macro_attr! {
 macro_attr! {
     #[derive(Debug, Component!)]
     struct WidgetNode {
-        attached: bool,
+        loaded: bool,
         base: WidgetBase,
         obj: Box<dyn WidgetObj>,
     }
@@ -120,7 +120,7 @@ impl Widget {
         let widget = {
             let tree: &mut WidgetTree = state.get_mut();
             tree.0.get_mut().widget_arena.insert(|widget| (WidgetNode {
-                attached: false,
+                loaded: false,
                 base: WidgetBase::new_priv(),
                 obj: Box::new(obj),
             }, Widget(widget)))
@@ -138,24 +138,27 @@ impl Widget {
         self.drop_bindings_priv(state);
         {
             let tree: &mut WidgetTree = state.get_mut();
-            tree.0.get_mut().widget_arena.remove(self.0);
+            let node = tree.0.get_mut().widget_arena.remove(self.0);
+            assert!(!node.loaded, "Loaded widget dropped");
         }
     }
 
-    pub fn attach(self, state: &mut dyn State, parent: View) {
+    pub fn load(self, state: &mut dyn State, parent: View) {
         {
             let tree: &mut WidgetTree = state.get_mut();
-            assert!(!replace(&mut tree.0.get_mut().widget_arena[self.0].attached, true), "Widget already attached");
+            assert!(!replace(&mut tree.0.get_mut().widget_arena[self.0].loaded, true), "Widget already loaded");
         }
         let view = View::new(state, parent, |view| (self, view));
         WidgetBase::VIEW.set_uncond(state, self.base(), Some(view));
+        WidgetBase::LOADED.set_uncond(state, self.base(), true);
     }
 
-    pub fn detach(self, state: &mut dyn State) {
+    pub fn unload(self, state: &mut dyn State) {
         {
             let tree: &mut WidgetTree = state.get_mut();
-            assert!(replace(&mut tree.0.get_mut().widget_arena[self.0].attached, false), "Widget is not attached");
+            assert!(replace(&mut tree.0.get_mut().widget_arena[self.0].loaded, false), "Widget is not loaded");
         }
+        WidgetBase::LOADED.set_uncond(state, self.base(), false);
         WidgetBase::VIEW.set_uncond(state, self.base(), None);
     }
 
@@ -184,5 +187,6 @@ dep_type! {
     #[derive(Debug)]
     pub struct WidgetBase in Widget {
         view: Option<View> = None,
+        loaded: bool = false,
     }
 }
