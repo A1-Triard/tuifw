@@ -1727,7 +1727,7 @@ macro_rules! dep_type_impl_raw {
                     $vis fn $field(mut self, value: $field_ty) -> Self {
                         let id = <$BaseBuilder as $crate::DepObjBaseBuilder<$Id>>::id(&self.base);
                         let state = <$BaseBuilder as $crate::DepObjBaseBuilder<$Id>>::state_mut(&mut self.base);
-                        $name:: [< $field:upper >] .set(state, id.$obj(), value);
+                        $name:: [< $field:upper >] .set_local(state, id.$obj(), value);
                         self
                     }
                 ]
@@ -1795,7 +1795,7 @@ macro_rules! dep_type_impl_raw {
                     $vis fn $field(mut self, value: $field_ty) -> Self {
                         let id = <$BaseBuilder as $crate::DepObjBaseBuilder<$Id>>::id(&self.base);
                         let state = <$BaseBuilder as $crate::DepObjBaseBuilder<$Id>>::state_mut(&mut self.base);
-                        $name:: [< $field:upper >] .set(state, id.$obj(), value);
+                        $name:: [< $field:upper >] .set_local(state, id.$obj(), value);
                         self
                     }
                 ]
