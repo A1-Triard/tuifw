@@ -550,6 +550,9 @@ pub trait DepType: Debug {
 
     #[doc(hidden)]
     fn take_added_bindings_and_collect_all(&mut self) -> Vec<AnyBinding>;
+
+    #[doc(hidden)]
+    fn update_parent_children_has_handlers(state: &mut dyn State, obj: Glob<Self::Id, Self>) where Self: Sized;
 }
 
 pub trait DepEventArgs {
@@ -680,27 +683,28 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         }
     }
 
-    fn update_children_has_handlers(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>) {
-        let children_has_handlers = if let Some(last_child) = obj.id.last_child(state) {
-            let mut child = last_child;
-            loop {
-                child = child.next(state);
-                let child_obj = Glob { id: child, descriptor: obj.descriptor };
-                let obj = child_obj.get(state);
-                let entry = self.entry(&obj);
-                debug_assert!(entry.inherits());
-                if entry.has_handlers() { break true; }
-                if child == last_child { break false; }
-            }
-        } else {
-            false
-        };
-        let mut obj_mut = obj.get_mut(state);
-        let entry_mut = self.entry_mut(&mut obj_mut);
-        if children_has_handlers == entry_mut.children_has_handlers.unwrap() { return; }
-        entry_mut.children_has_handlers = Some(children_has_handlers);
-        if let Some(parent) = obj.parent(state) {
-            self.update_children_has_handlers(state, parent);
+    #[doc(hidden)]
+    pub fn update_parent_children_has_handlers(self, state: &mut dyn State, mut obj: Glob<Owner::Id, Owner>) {
+        while let Some(parent) = obj.parent(state) {
+            obj = parent;
+            let children_has_handlers = if let Some(last_child) = obj.id.last_child(state) {
+                let mut child = last_child;
+                loop {
+                    child = child.next(state);
+                    let child_obj = Glob { id: child, descriptor: obj.descriptor };
+                    let obj = child_obj.get(state);
+                    let entry = self.entry(&obj);
+                    debug_assert!(entry.inherits());
+                    if entry.has_handlers() { break true; }
+                    if child == last_child { break false; }
+                }
+            } else {
+                false
+            };
+            let mut obj_mut = obj.get_mut(state);
+            let entry_mut = self.entry_mut(&mut obj_mut);
+            if children_has_handlers == entry_mut.children_has_handlers.unwrap() { return; }
+            entry_mut.children_has_handlers = Some(children_has_handlers);
         }
     }
 
@@ -1196,9 +1200,7 @@ impl<Owner: DepType, PropType: Convenient> HandlerId for DepPropHandledValueSour
         let entry_mut = self.prop.entry_mut(&mut obj);
         entry_mut.value_handlers.remove(self.handler_id);
         if entry_mut.inherits() && !entry_mut.has_handlers() {
-            if let Some(parent) = self.obj.parent(state) {
-                self.prop.update_children_has_handlers(state, parent);
-            }
+            self.prop.update_parent_children_has_handlers(state, self.obj);
         }
     }
 }
@@ -1217,9 +1219,7 @@ impl<Owner: DepType, PropType: Convenient> HandlerId for DepPropHandledChangeSou
         let entry_mut = self.prop.entry_mut(&mut obj);
         entry_mut.change_handlers.remove(self.handler_id);
         if entry_mut.inherits() && !entry_mut.has_handlers() {
-            if let Some(parent) = self.obj.parent(state) {
-                self.prop.update_children_has_handlers(state, parent);
-            }
+            self.prop.update_parent_children_has_handlers(state, self.obj);
         }
     }
 }
@@ -1238,9 +1238,7 @@ impl<Owner: DepType + 'static, PropType: Convenient> ValueSource<PropType> for D
         let update_parent_children_has_handlers = entry.inherits() && !entry.has_handlers();
         let handler_id = entry.value_handlers.insert(|handler_id| (BoxedValueHandler(handler), handler_id));
         if update_parent_children_has_handlers {
-            if let Some(parent) = self.obj.parent(state) {
-                self.prop.update_children_has_handlers(state, parent);
-            }
+            self.prop.update_parent_children_has_handlers(state, self.obj);
         }
         let new = self.prop.current_value(state, self.obj, |x| x.clone());
         HandledValueSource {
@@ -1278,9 +1276,7 @@ impl<Owner: DepType + 'static, PropType: Convenient> EventSource<Change<PropType
         let update_parent_children_has_handlers = entry.inherits() && !entry.has_handlers();
         let handler_id = entry.change_handlers.insert(|handler_id| (BoxedEventHandler(handler), handler_id));
         if update_parent_children_has_handlers {
-            if let Some(parent) = self.obj.parent(state) {
-                self.prop.update_children_has_handlers(state, parent);
-            }
+            self.prop.update_parent_children_has_handlers(state, self.obj);
         }
         result(HandledEventSource {
             state,
@@ -1588,8 +1584,8 @@ macro_rules! dep_type_with_builder_impl {
             invalid dep type definition, allowed form is\n\
             \n\
             $(#[$attr])* $vis struct $name $(<$generics> $(where $where_clause)?)? become $obj in $Id {\n\
-                $(#[inherits])? $field_1_name $(: $field_1_type = $field_1_value | [$field_1_type] | yield $field_1_type),\n\
-                $(#[inherits])? $field_2_name $(: $field_2_type = $field_2_value | [$field_2_type] | yield $field_2_type),\n\
+                $(#[$field_1_attr])* $field_1_name $(: $field_1_type = $field_1_value | [$field_1_type] | yield $field_1_type),\n\
+                $(#[$field_2_attr])* $field_2_name $(: $field_2_type = $field_2_value | [$field_2_type] | yield $field_2_type),\n\
                 ...\n\
             }\n\
             \n\
@@ -1667,7 +1663,7 @@ macro_rules! dep_type_with_builder_impl {
             @unroll_fields
             [$([$attr])*] [$vis] [$name] [$obj] [$Id] [state] [this] [bindings] [handlers]
             [$($g)*] [$($r)*] [$($w)*]
-            [] [] [] [] [] []
+            [] [] [] [] [] [] []
             [[$BaseBuilder] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*] []]
             [$([[$($inherits)?] $field $delim $($field_ty $(= $field_val)?)?])*]
         }
@@ -1679,8 +1675,8 @@ macro_rules! dep_type_with_builder_impl {
             invalid dep type definition, allowed form is\n\
             \n\
             $(#[$attr])* $vis struct $name $(<$generics> $(where $where_clause)?)? become $obj in $Id {\n\
-                $(#[inherits])? $field_1_name $(: $field_1_type = $field_1_value | [$field_1_type] | yield $field_1_type),\n\
-                $(#[inherits])? $field_2_name $(: $field_2_type = $field_2_value | [$field_2_type] | yield $field_2_type),\n\
+                $(#[$field_1_attr])* $field_1_name $(: $field_1_type = $field_1_value | [$field_1_type] | yield $field_1_type),\n\
+                $(#[$field_2_attr])* $field_2_name $(: $field_2_type = $field_2_value | [$field_2_type] | yield $field_2_type),\n\
                 ...\n\
             }\n\
             \n\
@@ -1726,7 +1722,7 @@ macro_rules! dep_type_impl {
             @unroll_fields
             [$([$attr])*] [$vis] [$name] [obj] [$Id] [state] [this] [bindings] [handlers]
             [$($g)*] [$($r)*] [$($w)*]
-            [] [] [] [] [] []
+            [] [] [] [] [] [] []
             []
             [$($([[$($inherits)?] $field $delim $($field_ty $(= $field_val)?)?])+)?]
         }
@@ -1755,8 +1751,8 @@ macro_rules! dep_type_impl {
             invalid dep type definition, allowed form is\n\
             \n\
             $(#[$attr])* $vis struct $name $(<$generics> $(where $where_clause)?)? in $Id {\n\
-                $(#[inherits])? $field_1_name $(: $field_1_type = $field_1_value | [$field_1_type] | yield $field_1_type),\n\
-                $(#[inherits])? $field_2_name $(: $field_2_type = $field_2_value | [$field_2_type] | yield $field_2_type),\n\
+                $(#[$field_1_attr])* $field_1_name $(: $field_1_type = $field_1_value | [$field_1_type] | yield $field_1_type),\n\
+                $(#[$field_2_attr])* $field_2_name $(: $field_2_type = $field_2_value | [$field_2_type] | yield $field_2_type),\n\
                 ...\n\
             }\n\
             \n\
@@ -1769,8 +1765,8 @@ macro_rules! dep_type_impl {
             invalid dep type definition, allowed form is\n\
             \n\
             $(#[$attr])* $vis struct $name $(<$generics> $(where $where_clause)?)? in $Id {\n\
-                $field_1_name $(: $field_1_type = $field_1_value | [$field_1_type] | yield $field_1_type),\n\
-                $field_2_name $(: $field_2_type = $field_2_value | [$field_2_type] | yield $field_2_type),\n\
+                $(#[$field_1_attr])* $field_1_name $(: $field_1_type = $field_1_value | [$field_1_type] | yield $field_1_type),\n\
+                $(#[$field_2_attr])* $field_2_name $(: $field_2_type = $field_2_value | [$field_2_type] | yield $field_2_type),\n\
                 ...\n\
             }\n\
             \n\
@@ -1791,6 +1787,7 @@ macro_rules! dep_type_impl_raw {
         [$($dep_props:tt)*]
         [$($core_bindings:tt)*]
         [$($core_handlers:tt)*]
+        [$($update_handlers:tt)*]
         [$(
             [$BaseBuilder:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
             [$($builder_methods:tt)*]
@@ -1833,6 +1830,10 @@ macro_rules! dep_type_impl_raw {
                 $($core_handlers)*
                 $this . $field .take_all_handlers(&mut $handlers);
             ]
+            [
+                $($update_handlers)*
+                $name:: [< $field:upper >] .update_parent_children_has_handlers($state, $obj);
+            ]
             [$(
                 [$BaseBuilder] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]
                 [
@@ -1859,6 +1860,7 @@ macro_rules! dep_type_impl_raw {
         [$($dep_props:tt)*]
         [$($core_bindings:tt)*]
         [$($core_handlers:tt)*]
+        [$($update_handlers:tt)*]
         [$(
             [$BaseBuilder:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
             [$($builder_methods:tt)*]
@@ -1901,6 +1903,9 @@ macro_rules! dep_type_impl_raw {
                 $($core_handlers)*
                 $this . $field .take_all_handlers(&mut $handlers);
             ]
+            [
+                $($update_handlers)*
+            ]
             [$(
                 [$BaseBuilder] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]
                 [
@@ -1927,6 +1932,7 @@ macro_rules! dep_type_impl_raw {
         [$($dep_props:tt)*]
         [$($core_bindings:tt)*]
         [$($core_handlers:tt)*]
+        [$($update_handlers:tt)*]
         [$(
             [$BaseBuilder:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
             [$($builder_methods:tt)*]
@@ -1949,6 +1955,7 @@ macro_rules! dep_type_impl_raw {
         [$($dep_props:tt)*]
         [$($core_bindings:tt)*]
         [$($core_handlers:tt)*]
+        [$($update_handlers:tt)*]
         [$(
             [$BaseBuilder:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
             [$($builder_methods:tt)*]
@@ -1987,6 +1994,9 @@ macro_rules! dep_type_impl_raw {
                 $($core_handlers)*
                 $this . $field .take_all_handlers(&mut $handlers);
             ]
+            [
+                $($update_handlers)*
+            ]
             [$(
                 [$BaseBuilder] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]
                 [
@@ -2006,6 +2016,7 @@ macro_rules! dep_type_impl_raw {
         [$($dep_props:tt)*]
         [$($core_bindings:tt)*]
         [$($core_handlers:tt)*]
+        [$($update_handlers:tt)*]
         [$(
             [$BaseBuilder:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
             [$($builder_methods:tt)*]
@@ -2044,6 +2055,9 @@ macro_rules! dep_type_impl_raw {
                 $($core_handlers)*
                 $this . $field .take_all_handlers(&mut $handlers);
             ]
+            [
+                $($update_handlers)*
+            ]
             [$(
                 [$BaseBuilder] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]
                 [
@@ -2063,6 +2077,7 @@ macro_rules! dep_type_impl_raw {
         [$($dep_props:tt)*]
         [$($core_bindings:tt)*]
         [$($core_handlers:tt)*]
+        [$($update_handlers:tt)*]
         [$(
             [$BaseBuilder:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
             [$($builder_methods:tt)*]
@@ -2085,6 +2100,7 @@ macro_rules! dep_type_impl_raw {
         [$($dep_props:tt)*]
         [$($core_bindings:tt)*]
         [$($core_handlers:tt)*]
+        [$($update_handlers:tt)*]
         [$(
             [$BaseBuilder:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
             [$($builder_methods:tt)*]
@@ -2123,6 +2139,9 @@ macro_rules! dep_type_impl_raw {
                 $($core_handlers)*
                 $this . $field .take_all_handlers(&mut $handlers);
             ]
+            [
+                $($update_handlers)*
+            ]
             [$(
                 [$BaseBuilder] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]
                 [
@@ -2142,6 +2161,7 @@ macro_rules! dep_type_impl_raw {
         [$($dep_props:tt)*]
         [$($core_bindings:tt)*]
         [$($core_handlers:tt)*]
+        [$($update_handlers:tt)*]
         [$(
             [$BaseBuilder:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
             [$($builder_methods:tt)*]
@@ -2164,6 +2184,7 @@ macro_rules! dep_type_impl_raw {
         [$($dep_props:tt)*]
         [$($core_bindings:tt)*]
         [$($core_handlers:tt)*]
+        [$($update_handlers:tt)*]
         [$(
             [$BaseBuilder:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
             [$($builder_methods:tt)*]
@@ -2180,7 +2201,7 @@ macro_rules! dep_type_impl_raw {
             allowed forms are \
             '$(#[inherits])? $field_name : $field_type = $field_value', \
             '$field_name [$field_type]', and \
-            '$field_name yield $field_type'\
+            '$(#[bubble])? $field_name yield $field_type'\
         "));
     };
     (
@@ -2193,6 +2214,7 @@ macro_rules! dep_type_impl_raw {
         [$($dep_props:tt)*]
         [$($core_bindings:tt)*]
         [$($core_handlers:tt)*]
+        [$($update_handlers:tt)*]
         [$(
             [$BaseBuilder:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
             [$($builder_methods:tt)*]
@@ -2266,6 +2288,12 @@ macro_rules! dep_type_impl_raw {
                 fn take_added_bindings_and_collect_all(&mut self) -> $crate::std_vec_Vec<$crate::binding::AnyBinding> {
                     self.core.dep_type_core_take_added_bindings_and_collect_all()
                 }
+
+                #[doc(hidden)]
+                #[allow(unused_variables)]
+                fn update_parent_children_has_handlers($state: &mut dyn $crate::dyn_context_state_State, $obj: $crate::Glob < $Id, $name $($r)* >) where Self: Sized {
+                    $($update_handlers)*
+                }
             }
 
             $(
@@ -2332,6 +2360,9 @@ macro_rules! dep_obj {
                 $(
                     let handlers = <$ty as $crate::DepType>::take_all_handlers($field_mut);
                     let bindings = <$ty as $crate::DepType>::take_added_bindings_and_collect_all($field_mut);
+                    if !handlers.is_empty() {
+                        <$ty as $crate::DepType>::update_parent_children_has_handlers(state, self.$name());
+                    }
                 )?
                 $(
                     let (handlers, bindings) = if let $crate::std_option_Option::Some(f) = $field_mut {
