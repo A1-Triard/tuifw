@@ -276,7 +276,8 @@ pub struct DepPropEntry<PropType: Convenient> {
     inherits: bool,
     style: Option<PropType>,
     local: Option<PropType>,
-    handlers: Arena<BoxedValueHandler<(PropType, PropType)>>,
+    value_handlers: Arena<BoxedValueHandler<PropType>>,
+    change_handlers: Arena<BoxedEventHandler<(PropType, PropType)>>,
     binding: Option<Binding<PropType>>,
 }
 
@@ -287,13 +288,15 @@ impl<PropType: Convenient> DepPropEntry<PropType> {
             inherits,
             style: None,
             local: None,
-            handlers: Arena::new(),
+            value_handlers: Arena::new(),
+            change_handlers: Arena::new(),
             binding: None,
         }
     }
 
     pub fn take_all_handlers(&mut self, handlers: &mut Vec<Box<dyn AnyHandler>>) {
-        handlers.extend(take(&mut self.handlers).into_items().into_values().map(|x| x.0.into_any()));
+        handlers.extend(take(&mut self.value_handlers).into_items().into_values().map(|x| x.0.into_any()));
+        handlers.extend(take(&mut self.change_handlers).into_items().into_values().map(|x| x.0.into_any()));
     }
 
     pub fn binding(&self) -> Option<Binding<PropType>> {
@@ -626,7 +629,7 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         self,
         state: &mut dyn State,
         obj: Glob<Owner::Id, Owner>,
-        change: &(PropType, PropType),
+        change: &mut (PropType, PropType),
     ) {
         if let Some(last_child) = obj.id.last_child(state) {
             let mut child = last_child;
@@ -637,9 +640,13 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
                 let entry_mut = self.entry_mut(&mut obj_mut);
                 debug_assert!(entry_mut.inherits);
                 if entry_mut.local.is_none() && entry_mut.style.is_none() {
-                    let handlers = entry_mut.handlers.items().clone().into_values();
-                    for handler in handlers {
-                        handler.0.execute(state, change.clone());
+                    let value_handlers = entry_mut.value_handlers.items().clone().into_values();
+                    let change_handlers = entry_mut.change_handlers.items().clone().into_values();
+                    for handler in value_handlers {
+                        handler.0.execute(state, change.1.clone());
+                    }
+                    for handler in change_handlers {
+                        handler.0.execute(state, change);
                     }
                     self.notify_children(state, child_obj, change);
                 }
@@ -662,8 +669,9 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         let mut old = replace(&mut entry_mut.local, value.clone());
         let notify = notify1(&old, &value);
         if notify == Some(false) { return; }
-        let handlers = entry_mut.handlers.items().clone().into_values();
-        let change = if old.is_some() && value.is_some() {
+        let value_handlers = entry_mut.value_handlers.items().clone().into_values();
+        let change_handlers = entry_mut.change_handlers.items().clone().into_values();
+        let mut change = if old.is_some() && value.is_some() {
             let old = unsafe { old.take().unwrap_unchecked() };
             let value = unsafe { value.take().unwrap_unchecked() };
             if notify == None && !notify2(&old, &value) { return; }
@@ -686,12 +694,15 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
                 }
             })
         };
-        if let Some(change) = change {
-            for handler in handlers {
-                handler.0.execute(state, change.clone());
+        if let Some(change) = change.as_mut() {
+            for handler in value_handlers {
+                handler.0.execute(state, change.1.clone());
+            }
+            for handler in change_handlers {
+                handler.0.execute(state, change);
             }
             if inherits {
-                self.notify_children(state, obj, &change);
+                self.notify_children(state, obj, change);
             }
         }
     }
@@ -776,8 +787,12 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         entry_mut.binding.take();
     }
 
-    pub fn source(self, obj: Glob<Owner::Id, Owner>) -> DepPropSource<Owner, PropType> {
-        DepPropSource { obj, prop: self }
+    pub fn value_source(self, obj: Glob<Owner::Id, Owner>) -> DepPropValueSource<Owner, PropType> {
+        DepPropValueSource { obj, prop: self }
+    }
+
+    pub fn change_source(self, obj: Glob<Owner::Id, Owner>) -> DepPropChangeSource<Owner, PropType> {
+        DepPropChangeSource { obj, prop: self }
     }
 }
 
@@ -1007,12 +1022,12 @@ impl<Owner: DepType + 'static, PropType: Convenient> AnySetter<Owner> for Setter
         let handlers = if entry_mut.local.is_some() {
             None
         } else {
-            Some(entry_mut.handlers.items().clone())
+            Some((entry_mut.value_handlers.items().clone(), entry_mut.change_handlers.items().clone()))
         };
         let value = if unapply { None } else { Some(self.value.clone()) };
         let old = replace(&mut entry_mut.style, value.clone());
         if let Some(handlers) = handlers {
-            let change = if old.is_some() && value.is_some() {
+            let mut change = if old.is_some() && value.is_some() {
                 unsafe { (old.unwrap_unchecked(), value.unwrap_unchecked()) }
             } else {
                 self.prop.unstyled_non_local_value(state, obj, |unstyled_non_local_value| {
@@ -1023,11 +1038,14 @@ impl<Owner: DepType + 'static, PropType: Convenient> AnySetter<Owner> for Setter
             };
             let prop = self.prop;
             Some(Box::new(move |state: &'_ mut dyn State| {
-                for handler in handlers.into_values() {
-                    handler.0.execute(state, change.clone());
+                for handler in handlers.0.into_values() {
+                    handler.0.execute(state, change.1.clone());
+                }
+                for handler in handlers.1.into_values() {
+                    handler.0.execute(state, &mut change);
                 }
                 if inherits {
-                    prop.notify_children(state, obj, &change);
+                    prop.notify_children(state, obj, &mut change);
                 }
             }) as _)
         } else {
@@ -1141,38 +1159,87 @@ impl<Owner: DepType + 'static, ArgsType: 'static> EventSource<ArgsType> for DepE
 
 #[derive(Educe)]
 #[educe(Debug)]
-struct DepPropHandledSource<Owner: DepType, PropType: Convenient> {
+struct DepPropHandledValueSource<Owner: DepType, PropType: Convenient> {
     obj: Glob<Owner::Id, Owner>,
-    handler_id: Id<BoxedValueHandler<(PropType, PropType)>>,
+    handler_id: Id<BoxedValueHandler<PropType>>,
     prop: DepProp<Owner, PropType>,
 }
 
-impl<Owner: DepType, PropType: Convenient> HandlerId for DepPropHandledSource<Owner, PropType> {
+impl<Owner: DepType, PropType: Convenient> HandlerId for DepPropHandledValueSource<Owner, PropType> {
     fn unhandle(&self, state: &mut dyn State) {
         let mut obj = self.obj.get_mut(state);
         let entry_mut = self.prop.entry_mut(&mut obj);
-        entry_mut.handlers.remove(self.handler_id);
+        entry_mut.value_handlers.remove(self.handler_id);
     }
 }
 
 #[derive(Educe)]
 #[educe(Debug)]
-pub struct DepPropSource<Owner: DepType, PropType: Convenient> {
+struct DepPropHandledChangeSource<Owner: DepType, PropType: Convenient> {
+    obj: Glob<Owner::Id, Owner>,
+    handler_id: Id<BoxedEventHandler<(PropType, PropType)>>,
+    prop: DepProp<Owner, PropType>,
+}
+
+impl<Owner: DepType, PropType: Convenient> HandlerId for DepPropHandledChangeSource<Owner, PropType> {
+    fn unhandle(&self, state: &mut dyn State) {
+        let mut obj = self.obj.get_mut(state);
+        let entry_mut = self.prop.entry_mut(&mut obj);
+        entry_mut.change_handlers.remove(self.handler_id);
+    }
+}
+
+#[derive(Educe)]
+#[educe(Debug)]
+pub struct DepPropValueSource<Owner: DepType, PropType: Convenient> {
     obj: Glob<Owner::Id, Owner>,
     prop: DepProp<Owner, PropType>,
 }
 
-impl<Owner: DepType + 'static, PropType: Convenient> ValueSource<(PropType, PropType)> for DepPropSource<Owner, PropType> {
-    fn handle(&self, state: &mut dyn State, handler: Box<dyn ValueHandler<(PropType, PropType)>>) -> HandledValueSource<(PropType, PropType)> {
+impl<Owner: DepType + 'static, PropType: Convenient> ValueSource<PropType> for DepPropValueSource<Owner, PropType> {
+    fn handle(&self, state: &mut dyn State, handler: Box<dyn ValueHandler<PropType>>) -> HandledValueSource<PropType> {
         let mut obj = self.obj.get_mut(state);
         let entry = self.prop.entry_mut(&mut obj);
-        let handler_id = entry.handlers.insert(|handler_id| (BoxedValueHandler(handler), handler_id));
-        let old = entry.default.clone();
+        let handler_id = entry.value_handlers.insert(|handler_id| (BoxedValueHandler(handler), handler_id));
         let new = self.prop.current_value(state, self.obj, |x| x.clone());
         HandledValueSource {
-            handler_id: Box::new(DepPropHandledSource { handler_id, obj: self.obj, prop: self.prop }),
-            value: (old, new)
+            handler_id: Box::new(DepPropHandledValueSource { handler_id, obj: self.obj, prop: self.prop }),
+            value: new
         }
+    }
+}
+
+#[derive(Educe)]
+#[educe(Debug)]
+pub struct DepPropChangeSource<Owner: DepType, PropType: Convenient> {
+    obj: Glob<Owner::Id, Owner>,
+    prop: DepProp<Owner, PropType>,
+}
+
+impl<Owner: DepType + 'static, PropType: Convenient> EventSource<(PropType, PropType)> for DepPropChangeSource<Owner, PropType> {
+    fn handle(
+        &self,
+        state: &mut dyn State,
+        handler: Box<dyn EventHandler<(PropType, PropType)>>,
+        result: Box<dyn FnOnce(HandledEventSource<(PropType, PropType)>)>,
+    ) {
+        let mut change = self.prop.current_value(state, self.obj, |new| {
+            let obj = self.obj.get(state);
+            let entry = self.prop.entry(&obj);
+            if new == entry.default {
+                None
+            } else {
+                Some((entry.default.clone(), new.clone()))
+            }
+        });
+        let mut obj = self.obj.get_mut(state);
+        let entry = self.prop.entry_mut(&mut obj);
+        let handler_id = entry.change_handlers.insert(|handler_id| (BoxedEventHandler(handler), handler_id));
+        result(HandledEventSource {
+            state,
+            handler_id: Box::new(DepPropHandledChangeSource { handler_id, obj: self.obj, prop: self.prop }),
+            args: change.as_mut()
+        })
     }
 }
 
