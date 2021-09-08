@@ -92,7 +92,7 @@ mod or_chip {
             let binding = Binding2::new(state, (), |(), (_, in_1), (_, in_2)| Some(in_1 | in_2));
             binding.set_source_1(state, &mut OrLegs::IN_1.source(chip.legs()));
             binding.set_source_2(state, &mut OrLegs::IN_2.source(chip.legs()));
-            OrLegs::OUT.bind_distinct(state, chip.legs(), binding);
+            OrLegs::OUT.bind(state, chip.legs(), binding);
             chip
         }
     }
@@ -119,7 +119,7 @@ mod not_chip {
             let chip = Chip::new(state, |chip| (Box::new(Self::new_priv()) as _, chip));
             let binding = Binding1::new(state, (), |(), (_, in_1): (bool, bool)| Some(!in_1));
             binding.set_source_1(state, &mut NotLegs::IN_.source(chip.legs()));
-            NotLegs::OUT.bind_distinct(state, chip.legs(), binding);
+            NotLegs::OUT.bind(state, chip.legs(), binding);
             chip
         }
     }
@@ -191,16 +191,16 @@ fn main() {
 
     let not_1_out_to_or_2_in = Binding1::new(state, (), |(), (_, value)| Some(value));
     not_1_out_to_or_2_in.set_source_1(state, &mut NotLegs::OUT.source(chips.not_1.legs()));
-    OrLegs::IN_2.bind_uncond(state, chips.or_2.legs(), not_1_out_to_or_2_in);
+    OrLegs::IN_2.bind(state, chips.or_2.legs(), not_1_out_to_or_2_in);
     let not_2_out_to_or_1_in = Binding1::new(state, (), |(), (_, value)| Some(value));
     not_2_out_to_or_1_in.set_source_1(state, &mut NotLegs::OUT.source(chips.not_2.legs()));
-    OrLegs::IN_2.bind_uncond(state, chips.or_1.legs(), not_2_out_to_or_1_in);
+    OrLegs::IN_2.bind(state, chips.or_1.legs(), not_2_out_to_or_1_in);
     let or_1_out_to_not_1_in = Binding1::new(state, (), |(), (_, value)| Some(value));
     or_1_out_to_not_1_in.set_source_1(state, &mut OrLegs::OUT.source(chips.or_1.legs()));
-    NotLegs::IN_.bind_uncond(state, chips.not_1.legs(), or_1_out_to_not_1_in);
+    NotLegs::IN_.bind(state, chips.not_1.legs(), or_1_out_to_not_1_in);
     let or_2_out_to_not_2_in = Binding1::new(state, (), |(), (_, value)| Some(value));
     or_2_out_to_not_2_in.set_source_1(state, &mut OrLegs::OUT.source(chips.or_2.legs()));
-    NotLegs::IN_.bind_uncond(state, chips.not_2.legs(), or_2_out_to_not_2_in);
+    NotLegs::IN_.bind(state, chips.not_2.legs(), or_2_out_to_not_2_in);
 
     let print_out = Binding1::new(state, (), |(), x| Some(x));
     print_out.set_source_1(state, &mut NotLegs::OUT.source(chips.not_2.legs()));
@@ -209,14 +209,14 @@ fn main() {
         let new = if new { "1" } else { "0" };
         println!("{} -> {}", old, new);
     });
-    OrLegs::IN_1.set_distinct(state, chips.or_1.legs(), true);
-    OrLegs::IN_1.set_distinct(state, chips.or_1.legs(), false);
-    OrLegs::IN_1.set_distinct(state, chips.or_2.legs(), true);
-    OrLegs::IN_1.set_distinct(state, chips.or_2.legs(), false);
-    OrLegs::IN_1.set_distinct(state, chips.or_1.legs(), true);
-    OrLegs::IN_1.set_distinct(state, chips.or_1.legs(), false);
-    OrLegs::IN_1.set_distinct(state, chips.or_2.legs(), true);
-    OrLegs::IN_1.set_distinct(state, chips.or_2.legs(), false);
+    OrLegs::IN_1.set(state, chips.or_1.legs(), true);
+    OrLegs::IN_1.set(state, chips.or_1.legs(), false);
+    OrLegs::IN_1.set(state, chips.or_2.legs(), true);
+    OrLegs::IN_1.set(state, chips.or_2.legs(), false);
+    OrLegs::IN_1.set(state, chips.or_1.legs(), true);
+    OrLegs::IN_1.set(state, chips.or_1.legs(), false);
+    OrLegs::IN_1.set(state, chips.or_2.legs(), true);
+    OrLegs::IN_1.set(state, chips.or_2.legs(), false);
 
     print_out.drop_binding(state);
     chips.or_1.drop_chip(state);

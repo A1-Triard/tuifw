@@ -119,7 +119,7 @@ impl Npc {
         let removed_items_binding = EventBinding0::new(state, (), |state, (), items: Option<&mut Items<Item>>| {
             items.map(|items| {
                 for item in items.iter() {
-                    ItemProps::EQUIPPED.set_distinct(state, item.props(), false);
+                    ItemProps::EQUIPPED.set(state, item.props(), false);
                 }
             })
         });
@@ -128,7 +128,7 @@ impl Npc {
         let inserted_items_binding = EventBinding0::new(state, (), |state, (), items: Option<&mut Items<Item>>| {
             items.map(|items| {
                 for item in items.iter() {
-                    ItemProps::EQUIPPED.set_distinct(state, item.props(), true);
+                    ItemProps::EQUIPPED.set(state, item.props(), true);
                 }
             })
         });
@@ -137,7 +137,7 @@ impl Npc {
         let apply_enhancement = EventBinding1::new(state, npc, |state, npc, (_, enhancement), items: Option<&mut Items<Item>>| {
             if let Some(items) = items {
                 for item in items.iter() {
-                    ItemProps::ENHANCEMENT.set_distinct(state, item.props(), enhancement);
+                    ItemProps::ENHANCEMENT.set(state, item.props(), enhancement);
                 }
             } else {
                 NpcProps::EQUIPPED_ITEMS.refresh(state, npc.props());
@@ -150,7 +150,7 @@ impl Npc {
         let unapply_enhancement = EventBinding0::new(state, (), |state, (), items: Option<&mut Items<Item>>| {
             items.map(|items| {
                 for item in items.iter() {
-                    ItemProps::ENHANCEMENT.unset_distinct(state, item.props());
+                    ItemProps::ENHANCEMENT.unset(state, item.props());
                 }
             })
         });
@@ -227,7 +227,7 @@ fn main() {
         )
     );
     let shield = Item::new(game);
-    ItemProps::NAME.set_uncond(game, shield.props(), Cow::Borrowed("Shield"));
+    ItemProps::NAME.set(game, shield.props(), Cow::Borrowed("Shield"));
     for item in [sword, shield] {
         let log = Binding2::new(game, (), |(), (old, new), (_, name)| if old == new { None } else { Some((new, name)) });
         log.set_source_1(game, &mut ItemProps::EQUIPPED.source(item.props()));

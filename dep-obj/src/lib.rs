@@ -497,7 +497,7 @@ impl<T: DepObjId> DepObjIdBase for T {
 ///         app.res = value;
 ///     });
 ///     assert_eq!(app.res, 10);
-///     MyDepType::PROP_2.set_distinct(app, id.obj(), 5);
+///     MyDepType::PROP_2.set(app, id.obj(), 5);
 ///     assert_eq!(app.res, 5);
 ///     id.drop_my_dep_type(app);
 ///     res.drop_binding(app);
@@ -648,7 +648,7 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         }
     }
 
-    fn set(
+    fn set_raw(
         self,
         state: &mut dyn State,
         obj: Glob<Owner::Id, Owner>,
@@ -696,16 +696,12 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         }
     }
 
-    fn un_set_uncond(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: Option<PropType>) {
-        self.set(state, obj, value, |_, _| Some(true), |_, _| unreachable!());
+    fn un_set_local(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: Option<PropType>) {
+        self.set_raw(state, obj, value, |a, b| Some(a != b), |_, _| unreachable!());
     }
 
-    fn un_set_distinct_local(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: Option<PropType>) {
-        self.set(state, obj, value, |a, b| Some(a != b), |_, _| unreachable!());
-    }
-
-    fn un_set_distinct(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: Option<PropType>) {
-        self.set(
+    fn un_set(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: Option<PropType>) {
+        self.set_raw(
             state, obj, value,
             |a, b| match (a.as_ref(), b.as_ref()) {
                 (Some(a), Some(b)) => Some(a != b),
@@ -716,28 +712,20 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         );
     }
 
-    pub fn set_uncond(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: PropType) {
-        self.un_set_uncond(state, obj, Some(value));
+    pub fn set_local(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: PropType) {
+        self.un_set_local(state, obj, Some(value));
     }
 
-    pub fn set_distinct_local(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: PropType) {
-        self.un_set_distinct_local(state, obj, Some(value));
+    pub fn set(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: PropType) {
+        self.un_set(state, obj, Some(value));
     }
 
-    pub fn set_distinct(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: PropType) {
-        self.un_set_distinct(state, obj, Some(value));
+    pub fn unset_local(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>) {
+        self.un_set_local(state, obj, None);
     }
 
-    pub fn unset_uncond(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>) {
-        self.un_set_uncond(state, obj, None);
-    }
-
-    pub fn unset_distinct_local(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>) {
-        self.un_set_distinct_local(state, obj, None);
-    }
-
-    pub fn unset_distinct(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>) {
-        self.un_set_distinct(state, obj, None);
+    pub fn unset(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>) {
+        self.un_set(state, obj, None);
     }
 
     fn bind_raw(
@@ -754,22 +742,22 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         binding.set_target(state, target(self, obj));
     }
 
-    pub fn bind_distinct(
+    pub fn bind(
         self,
         state: &mut dyn State,
         obj: Glob<Owner::Id, Owner>,
         binding: impl Into<Binding<PropType>>
     ) where Owner: 'static {
-        self.bind_raw(state, obj, |prop, obj| Box::new(DepPropSetDistinct { prop, obj }), binding.into());
+        self.bind_raw(state, obj, |prop, obj| Box::new(DepPropSet { prop, obj }), binding.into());
     }
 
-    pub fn bind_uncond(
+    pub fn bind_local(
         self,
         state: &mut dyn State,
         obj: Glob<Owner::Id, Owner>,
         binding: impl Into<Binding<PropType>>
     ) where Owner: 'static {
-        self.bind_raw(state, obj, |prop, obj| Box::new(DepPropSetUncond { prop, obj }), binding.into());
+        self.bind_raw(state, obj, |prop, obj| Box::new(DepPropSetLocal { prop, obj }), binding.into());
     }
 
     pub fn unbind(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>) {
@@ -795,14 +783,14 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
 
 #[derive(Educe)]
 #[educe(Debug, Clone)]
-struct DepPropSetDistinct<Owner: DepType, PropType: Convenient> {
+struct DepPropSet<Owner: DepType, PropType: Convenient> {
     obj: Glob<Owner::Id, Owner>,
     prop: DepProp<Owner, PropType>,
 }
 
-impl<Owner: DepType, PropType: Convenient> Target<PropType> for DepPropSetDistinct<Owner, PropType> {
+impl<Owner: DepType, PropType: Convenient> Target<PropType> for DepPropSet<Owner, PropType> {
     fn execute(&self, state: &mut dyn State, value: PropType) {
-        self.prop.set_distinct(state, self.obj, value);
+        self.prop.set(state, self.obj, value);
     }
 
     fn clear(&self, state: &mut dyn State) {
@@ -812,14 +800,14 @@ impl<Owner: DepType, PropType: Convenient> Target<PropType> for DepPropSetDistin
 
 #[derive(Educe)]
 #[educe(Debug, Clone)]
-struct DepPropSetUncond<Owner: DepType, PropType: Convenient> {
+struct DepPropSetLocal<Owner: DepType, PropType: Convenient> {
     obj: Glob<Owner::Id, Owner>,
     prop: DepProp<Owner, PropType>,
 }
 
-impl<Owner: DepType, PropType: Convenient> Target<PropType> for DepPropSetUncond<Owner, PropType> {
+impl<Owner: DepType, PropType: Convenient> Target<PropType> for DepPropSetLocal<Owner, PropType> {
     fn execute(&self, state: &mut dyn State, value: PropType) {
-        self.prop.set_uncond(state, self.obj, value);
+        self.prop.set_local(state, self.obj, value);
     }
 
     fn clear(&self, state: &mut dyn State) {
@@ -1739,7 +1727,7 @@ macro_rules! dep_type_impl_raw {
                     $vis fn $field(mut self, value: $field_ty) -> Self {
                         let id = <$BaseBuilder as $crate::DepObjBaseBuilder<$Id>>::id(&self.base);
                         let state = <$BaseBuilder as $crate::DepObjBaseBuilder<$Id>>::state_mut(&mut self.base);
-                        $name:: [< $field:upper >] .set_uncond(state, id.$obj(), value);
+                        $name:: [< $field:upper >] .set(state, id.$obj(), value);
                         self
                     }
                 ]
@@ -1807,7 +1795,7 @@ macro_rules! dep_type_impl_raw {
                     $vis fn $field(mut self, value: $field_ty) -> Self {
                         let id = <$BaseBuilder as $crate::DepObjBaseBuilder<$Id>>::id(&self.base);
                         let state = <$BaseBuilder as $crate::DepObjBaseBuilder<$Id>>::state_mut(&mut self.base);
-                        $name:: [< $field:upper >] .set_uncond(state, id.$obj(), value);
+                        $name:: [< $field:upper >] .set(state, id.$obj(), value);
                         self
                     }
                 ]
