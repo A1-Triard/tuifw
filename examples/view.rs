@@ -79,7 +79,7 @@ fn main() {
         let input_binding = EventBinding1::new(state, border, |
             state,
             border,
-            (_, tl): (Point, Point),
+            tl: Point,
             input: Option<&mut ViewInput>
         | input.map(|input| {
             let d = match input.key() {
@@ -95,11 +95,11 @@ fn main() {
                 _ => return,
             };
             input.mark_as_handled();
-            CanvasLayout::TL.set_distinct(state, border.layout(), tl.offset(d));
+            CanvasLayout::TL.set(state, border.layout(), tl.offset(d));
         }));
         input_binding.set_event_source(state, &mut ViewBase::INPUT.source(border.base()));
-        input_binding.set_source_1(state, &mut CanvasLayout::TL.source(border.layout()));
-        border.base().add_binding(state, input_binding.into());
+        input_binding.set_source_1(state, &mut CanvasLayout::TL.value_source(border.layout()));
+        border.base().add_binding(state, input_binding);
 
         border.focus(state);
         while ViewTree::update(state, true).unwrap() { }

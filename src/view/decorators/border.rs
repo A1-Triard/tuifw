@@ -247,28 +247,28 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
     }
 
     fn init_bindings(&self, view: View, state: &mut dyn State) -> Box<dyn DecoratorBindings> {
-        let bg = Binding1::new(state, (), |(), (_, bg)| Some(bg));
-        let fg = Binding1::new(state, (), |(), (_, fg)| Some(fg));
-        let attr = Binding1::new(state, (), |(), (_, attr)| Some(attr));
-        let tl = Binding1::new(state, (), |(), (_, tl)| Some(tl));
-        let tr = Binding1::new(state, (), |(), (_, tr)| Some(tr));
-        let bl = Binding1::new(state, (), |(), (_, bl)| Some(bl));
-        let br = Binding1::new(state, (), |(), (_, br)| Some(br));
-        let l = Binding1::new(state, (), |(), (_, l)| Some(l));
-        let t = Binding1::new(state, (), |(), (_, t)| Some(t));
-        let r = Binding1::new(state, (), |(), (_, r)| Some(r));
-        let b = Binding1::new(state, (), |(), (_, b)| Some(b));
-        bg.set_source_1(state, &mut ViewBase::BG.source(view.base()));
-        fg.set_source_1(state, &mut ViewBase::FG.source(view.base()));
-        attr.set_source_1(state, &mut ViewBase::ATTR.source(view.base()));
-        tl.set_source_1(state, &mut BorderDecorator::TL.source(view.decorator()));
-        tr.set_source_1(state, &mut BorderDecorator::TR.source(view.decorator()));
-        bl.set_source_1(state, &mut BorderDecorator::BL.source(view.decorator()));
-        br.set_source_1(state, &mut BorderDecorator::BR.source(view.decorator()));
-        l.set_source_1(state, &mut BorderDecorator::L.source(view.decorator()));
-        t.set_source_1(state, &mut BorderDecorator::T.source(view.decorator()));
-        r.set_source_1(state, &mut BorderDecorator::R.source(view.decorator()));
-        b.set_source_1(state, &mut BorderDecorator::B.source(view.decorator()));
+        let bg = Binding1::new(state, (), |(), bg| Some(bg));
+        let fg = Binding1::new(state, (), |(), fg| Some(fg));
+        let attr = Binding1::new(state, (), |(), attr| Some(attr));
+        let tl = Binding1::new(state, (), |(), tl| Some(tl));
+        let tr = Binding1::new(state, (), |(), tr| Some(tr));
+        let bl = Binding1::new(state, (), |(), bl| Some(bl));
+        let br = Binding1::new(state, (), |(), br| Some(br));
+        let l = Binding1::new(state, (), |(), l| Some(l));
+        let t = Binding1::new(state, (), |(), t| Some(t));
+        let r = Binding1::new(state, (), |(), r| Some(r));
+        let b = Binding1::new(state, (), |(), b| Some(b));
+        bg.set_source_1(state, &mut ViewBase::BG.value_source(view.base()));
+        fg.set_source_1(state, &mut ViewBase::FG.value_source(view.base()));
+        attr.set_source_1(state, &mut ViewBase::ATTR.value_source(view.base()));
+        tl.set_source_1(state, &mut BorderDecorator::TL.value_source(view.decorator()));
+        tr.set_source_1(state, &mut BorderDecorator::TR.value_source(view.decorator()));
+        bl.set_source_1(state, &mut BorderDecorator::BL.value_source(view.decorator()));
+        br.set_source_1(state, &mut BorderDecorator::BR.value_source(view.decorator()));
+        l.set_source_1(state, &mut BorderDecorator::L.value_source(view.decorator()));
+        t.set_source_1(state, &mut BorderDecorator::T.value_source(view.decorator()));
+        r.set_source_1(state, &mut BorderDecorator::R.value_source(view.decorator()));
+        b.set_source_1(state, &mut BorderDecorator::B.value_source(view.decorator()));
         bg.set_target_fn(state, view, |state, view, _| {
             let tree: &mut ViewTree = state.get_mut();
             view.invalidate_render(tree).expect("invalidate_render failed");

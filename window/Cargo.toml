@@ -16,7 +16,7 @@ tuifw-screen-base = { path = "../screen-base", version = "0.8.1" }
 components-arena = "2.1.5"
 educe = "0.4.18"
 macro-attr-2018 = "1.1.1"
-dyn-context = "0.10.6"
+dyn-context = "0.10.7"
 
 [dev-dependencies]
 tuifw-screen-test = { path = "../screen-test", version = "0.8.1" }

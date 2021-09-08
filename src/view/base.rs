@@ -1,6 +1,6 @@
 use components_arena::{Arena, Component, ComponentId, Id, NewtypeComponentId, RawId};
 use debug_panic::debug_panic;
-use dep_obj::{DepObjBaseBuilder, DepObjIdBase, DepType, dep_obj, dep_type_with_builder};
+use dep_obj::{DepObjBaseBuilder, DepObjIdBase, DepType, dep_obj, dep_type_with_builder, DepEventArgs};
 use dep_obj::binding::{Binding, Binding0, Binding1, Binding5, Bindings};
 use downcast_rs::{Downcast, impl_downcast};
 use dyn_clone::{DynClone, clone_trait_object};
@@ -93,7 +93,7 @@ pub trait Decorator: Downcast + DepType<Id=View> + Sync + Send {
 
 impl_downcast!(Decorator);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 struct ViewSizeMinMax {
     min_size: Vector,
     max_w: Option<i16>,
@@ -300,17 +300,8 @@ impl ViewTree {
         if let Some(Event::Key(n, key)) = event {
             let mut input = ViewInput { key: (n, key), handled: false };
             let tree: &ViewTree = state.get();
-            let mut view = tree.0.get().actual_focused;
-            loop {
-                ViewBase::INPUT.raise(state, view.base(), &mut input);
-                if input.handled { break; }
-                let tree: &ViewTree = state.get();
-                if let Some(parent) = view.parent(tree) {
-                    view = parent;
-                } else {
-                    break;
-                }
-            }
+            let view = tree.0.get().actual_focused;
+            ViewBase::INPUT.raise(state, view.base(), &mut input);
         }
         Ok(true)
     }
@@ -329,7 +320,7 @@ impl ViewTree {
         }
         let mut view = actual_focused;
         loop {
-            ViewBase::IS_FOCUSED.set_uncond(state, view.base(), false);
+            ViewBase::IS_FOCUSED.set(state, view.base(), false);
             let tree: &ViewTree = state.get();
             if let Some(parent) = view.parent(tree) {
                 view = parent;
@@ -339,7 +330,7 @@ impl ViewTree {
         }
         let mut view = focused;
         loop {
-            ViewBase::IS_FOCUSED.set_uncond(state, view.base(), true);
+            ViewBase::IS_FOCUSED.set(state, view.base(), true);
             let tree: &ViewTree = state.get();
             if let Some(parent) = view.parent(tree) {
                 view = parent;
@@ -417,36 +408,36 @@ impl View {
             (view, result)
         };
         let size_min_max = Binding5::new(state, (), |(),
-            (_, w): (Option<i16>, Option<i16>),
-            (_, h): (Option<i16>, Option<i16>),
-            (_, min_size): (Vector, Vector),
-            (_, max_w),
-            (_, max_h)
+            w: Option<i16>,
+            h: Option<i16>,
+            min_size: Vector,
+            max_w,
+            max_h
         | Some(ViewSizeMinMax {
             min_size: Vector { x: w.unwrap_or(min_size.x), y: h.unwrap_or(min_size.y) },
             max_w: w.or(max_w),
             max_h: h.or(max_h),
         }));
-        size_min_max.set_source_1(state, &mut ViewAlign::W.source(view.align()));
-        size_min_max.set_source_2(state, &mut ViewAlign::H.source(view.align()));
-        size_min_max.set_source_3(state, &mut ViewAlign::MIN_SIZE.source(view.align()));
-        size_min_max.set_source_4(state, &mut ViewAlign::MAX_W.source(view.align()));
-        size_min_max.set_source_5(state, &mut ViewAlign::MAX_H.source(view.align()));
+        size_min_max.set_source_1(state, &mut ViewAlign::W.value_source(view.align()));
+        size_min_max.set_source_2(state, &mut ViewAlign::H.value_source(view.align()));
+        size_min_max.set_source_3(state, &mut ViewAlign::MIN_SIZE.value_source(view.align()));
+        size_min_max.set_source_4(state, &mut ViewAlign::MAX_W.value_source(view.align()));
+        size_min_max.set_source_5(state, &mut ViewAlign::MAX_H.value_source(view.align()));
         size_min_max.set_target_fn(state, view, |state, view, _| {
             view.invalidate_measure(state);
         });
-        let margin = Binding1::new(state, (), |(), (_, margin)| Some(margin));
-        margin.set_source_1(state, &mut ViewAlign::MARGIN.source(view.align()));
+        let margin = Binding1::new(state, (), |(), margin| Some(margin));
+        margin.set_source_1(state, &mut ViewAlign::MARGIN.value_source(view.align()));
         margin.set_target_fn(state, view, |state, view, _| {
             view.invalidate_measure(state);
         });
-        let h_align = Binding1::new(state, (), |(), (_, h_align)| Some(h_align));
-        h_align.set_source_1(state, &mut ViewAlign::H_ALIGN.source(view.align()));
+        let h_align = Binding1::new(state, (), |(), h_align| Some(h_align));
+        h_align.set_source_1(state, &mut ViewAlign::H_ALIGN.value_source(view.align()));
         h_align.set_target_fn(state, view, |state, view, _| {
             view.invalidate_arrange(state);
         });
-        let v_align = Binding1::new(state, (), |(), (_, v_align)| Some(v_align));
-        v_align.set_source_1(state, &mut ViewAlign::V_ALIGN.source(view.align()));
+        let v_align = Binding1::new(state, (), |(), v_align| Some(v_align));
+        v_align.set_source_1(state, &mut ViewAlign::V_ALIGN.value_source(view.align()));
         v_align.set_target_fn(state, view, |state, view, _| {
             view.invalidate_arrange(state);
         });
@@ -1080,14 +1071,14 @@ impl DecoratorBehavior for RootDecoratorBehavior {
     }
 
     fn init_bindings(&self, view: View, state: &mut dyn State) -> Box<dyn DecoratorBindings> {
-        let bg = Binding1::new(state, (), |(), (_, bg)| Some(bg));
-        let fg = Binding1::new(state, (), |(), (_, fg)| Some(fg));
-        let attr = Binding1::new(state, (), |(), (_, attr)| Some(attr));
-        let fill = Binding1::new(state, (), |(), (_, fill)| Some(fill));
-        bg.set_source_1(state, &mut ViewBase::BG.source(view.base()));
-        fg.set_source_1(state, &mut ViewBase::FG.source(view.base()));
-        attr.set_source_1(state, &mut ViewBase::ATTR.source(view.base()));
-        fill.set_source_1(state, &mut RootDecorator::FILL.source(view.decorator()));
+        let bg = Binding1::new(state, (), |(), bg| Some(bg));
+        let fg = Binding1::new(state, (), |(), fg| Some(fg));
+        let attr = Binding1::new(state, (), |(), attr| Some(attr));
+        let fill = Binding1::new(state, (), |(), fill| Some(fill));
+        bg.set_source_1(state, &mut ViewBase::BG.value_source(view.base()));
+        fg.set_source_1(state, &mut ViewBase::FG.value_source(view.base()));
+        attr.set_source_1(state, &mut ViewBase::ATTR.value_source(view.base()));
+        fill.set_source_1(state, &mut RootDecorator::FILL.value_source(view.decorator()));
         bg.set_target_fn(state, view, |state, view, _| {
             let tree: &mut ViewTree = state.get_mut();
             view.invalidate_render(tree).expect("invalidate_render failed");
@@ -1152,6 +1143,10 @@ impl ViewInput {
     }
 }
 
+impl DepEventArgs for ViewInput {
+    fn handled(&self) -> bool { self.handled }
+}
+
 pub trait ViewBuilderViewBaseExt {
     fn base(
         self,
@@ -1178,6 +1173,7 @@ dep_type_with_builder! {
         #[inherits]
         attr: Attr = Attr::empty(),
         is_focused: bool = false,
+        #[bubble]
         input yield ViewInput,
     }
 

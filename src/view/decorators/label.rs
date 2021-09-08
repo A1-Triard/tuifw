@@ -118,14 +118,14 @@ impl DecoratorBehavior for LabelDecoratorBehavior {
     }
 
     fn init_bindings(&self, view: View, state: &mut dyn State) -> Box<dyn DecoratorBindings> {
-        let fg = Binding1::new(state, (), |(), (_, fg)| Some(fg));
-        let bg = Binding1::new(state, (), |(), (_, bg)| Some(bg));
-        let attr = Binding1::new(state, (), |(), (_, attr)| Some(attr));
-        let text = Binding1::new(state, (), |(), (_, text)| Some(text));
-        bg.set_source_1(state, &mut ViewBase::BG.source(view.base()));
-        fg.set_source_1(state, &mut ViewBase::FG.source(view.base()));
-        attr.set_source_1(state, &mut ViewBase::ATTR.source(view.base()));
-        text.set_source_1(state, &mut LabelDecorator::TEXT.source(view.decorator()));
+        let fg = Binding1::new(state, (), |(), fg| Some(fg));
+        let bg = Binding1::new(state, (), |(), bg| Some(bg));
+        let attr = Binding1::new(state, (), |(), attr| Some(attr));
+        let text = Binding1::new(state, (), |(), text| Some(text));
+        bg.set_source_1(state, &mut ViewBase::BG.value_source(view.base()));
+        fg.set_source_1(state, &mut ViewBase::FG.value_source(view.base()));
+        attr.set_source_1(state, &mut ViewBase::ATTR.value_source(view.base()));
+        text.set_source_1(state, &mut LabelDecorator::TEXT.value_source(view.decorator()));
         bg.set_target_fn(state, view, |state, view, _| {
             view.invalidate_render(state).expect("invalidate_render failed");
         });

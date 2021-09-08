@@ -75,8 +75,8 @@ struct CanvasLayoutBehavior;
 
 impl LayoutBehavior for CanvasLayoutBehavior {
     fn init_bindings(&self, view: View, state: &mut dyn State) -> Box<dyn LayoutBindings> {
-        let tl = Binding1::new(state, (), |(), (_, tl)| Some(tl));
-        tl.set_source_1(state, &mut CanvasLayout::TL.source(view.layout()));
+        let tl = Binding1::new(state, (), |(), tl| Some(tl));
+        tl.set_source_1(state, &mut CanvasLayout::TL.value_source(view.layout()));
         tl.set_target_fn(state, view, |state, view, _| {
             let tree: &ViewTree = state.get();
             view.parent(tree).map(|parent| parent.invalidate_arrange(state)).expect("invalidate_arrange failed");

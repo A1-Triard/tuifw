@@ -138,23 +138,23 @@ impl DecoratorBehavior for LineDecoratorBehavior {
     }
 
     fn init_bindings(&self, view: View, state: &mut dyn State) -> Box<dyn DecoratorBindings> {
-        let fg = Binding1::new(state, (), |(), (_, fg)| Some(fg));
-        let bg = Binding1::new(state, (), |(), (_, bg)| Some(bg));
-        let attr = Binding1::new(state, (), |(), (_, attr)| Some(attr));
-        let length = Binding1::new(state, (), |(), (_, length)| Some(length));
-        let near = Binding1::new(state, (), |(), (_, near)| Some(near));
-        let stroke = Binding1::new(state, (), |(), (_, stroke)| Some(stroke));
-        let orient = Binding1::new(state, (), |(), (_, orient)| Some(orient));
-        let far_orient = Binding2::new(state, (), |(), (_, far), (_, orient)| Some((far, orient)));
-        bg.set_source_1(state, &mut ViewBase::BG.source(view.base()));
-        fg.set_source_1(state, &mut ViewBase::FG.source(view.base()));
-        attr.set_source_1(state, &mut ViewBase::ATTR.source(view.base()));
-        length.set_source_1(state, &mut LineDecorator::LENGTH.source(view.decorator()));
-        near.set_source_1(state, &mut LineDecorator::NEAR.source(view.decorator()));
-        stroke.set_source_1(state, &mut LineDecorator::STROKE.source(view.decorator()));
-        orient.set_source_1(state, &mut LineDecorator::ORIENT.source(view.decorator()));
-        far_orient.set_source_1(state, &mut LineDecorator::FAR.source(view.decorator()));
-        far_orient.set_source_2(state, &mut LineDecorator::ORIENT.source(view.decorator()));
+        let fg = Binding1::new(state, (), |(), fg| Some(fg));
+        let bg = Binding1::new(state, (), |(), bg| Some(bg));
+        let attr = Binding1::new(state, (), |(), attr| Some(attr));
+        let length = Binding1::new(state, (), |(), length| Some(length));
+        let near = Binding1::new(state, (), |(), near| Some(near));
+        let stroke = Binding1::new(state, (), |(), stroke| Some(stroke));
+        let orient = Binding1::new(state, (), |(), orient| Some(orient));
+        let far_orient = Binding2::new(state, (), |(), far, orient| Some((far, orient)));
+        bg.set_source_1(state, &mut ViewBase::BG.value_source(view.base()));
+        fg.set_source_1(state, &mut ViewBase::FG.value_source(view.base()));
+        attr.set_source_1(state, &mut ViewBase::ATTR.value_source(view.base()));
+        length.set_source_1(state, &mut LineDecorator::LENGTH.value_source(view.decorator()));
+        near.set_source_1(state, &mut LineDecorator::NEAR.value_source(view.decorator()));
+        stroke.set_source_1(state, &mut LineDecorator::STROKE.value_source(view.decorator()));
+        orient.set_source_1(state, &mut LineDecorator::ORIENT.value_source(view.decorator()));
+        far_orient.set_source_1(state, &mut LineDecorator::FAR.value_source(view.decorator()));
+        far_orient.set_source_2(state, &mut LineDecorator::ORIENT.value_source(view.decorator()));
         bg.set_target_fn(state, view, |state, view, _| {
             view.invalidate_render(state).expect("invalidate_render failed");
         });
