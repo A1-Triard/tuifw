@@ -655,84 +655,46 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         }
     }
 
-    fn set_raw(
-        self,
-        state: &mut dyn State,
-        obj: Glob<Owner::Id, Owner>,
-        mut value: Option<PropType>,
-        notify1: impl FnOnce(&Option<PropType>, &Option<PropType>) -> Option<bool>,
-        notify2: impl FnOnce(&PropType, &PropType) -> bool,
-    ) {
+    fn un_set(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: Option<PropType>) {
         let mut obj_mut = obj.get_mut(state);
         let entry_mut = self.entry_mut(&mut obj_mut);
         let inherits = entry_mut.inherits;
-        let mut old = replace(&mut entry_mut.local, value.clone());
-        let notify = notify1(&old, &value);
-        if notify == Some(false) { return; }
+        let old = replace(&mut entry_mut.local, value.clone());
+        if old == value { return; }
         let value_handlers = entry_mut.value_handlers.items().clone().into_values();
         let change_handlers = entry_mut.change_handlers.items().clone().into_values();
         let mut change = if old.is_some() && value.is_some() {
-            let old = unsafe { old.take().unwrap_unchecked() };
-            let value = unsafe { value.take().unwrap_unchecked() };
-            if notify == None && !notify2(&old, &value) { return; }
-            Some((old, value))
+            unsafe { (old.unwrap_unchecked(), value.unwrap_unchecked()) }
         } else {
-            self.non_local_value(state, obj, |non_local| {
-                let notify = if notify == None {
-                    let old_ref = old.as_ref().unwrap_or(non_local);
-                    let value_ref = value.as_ref().unwrap_or(non_local);
-                    notify2(old_ref, value_ref)
+            if let Some(change) = self.non_local_value(state, obj, |non_local| {
+                let old_ref = old.as_ref().unwrap_or(non_local);
+                let value_ref = value.as_ref().unwrap_or(non_local);
+                if old_ref == value_ref {
+                    None
                 } else {
-                    true
-                };
-                if notify {
                     let old = old.unwrap_or_else(|| non_local.clone());
                     let value = value.unwrap_or_else(|| non_local.clone());
                     Some((old, value))
-                } else {
-                    None
                 }
-            })
+            }) {
+                change
+            } else {
+                return;
+            }
         };
-        if let Some(change) = change.as_mut() {
-            for handler in value_handlers {
-                handler.0.execute(state, change.1.clone());
-            }
-            for handler in change_handlers {
-                handler.0.execute(state, change);
-            }
-            if inherits {
-                self.notify_children(state, obj, change);
-            }
+        for handler in value_handlers {
+            handler.0.execute(state, change.1.clone());
         }
-    }
-
-    fn un_set_local(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: Option<PropType>) {
-        self.set_raw(state, obj, value, |a, b| Some(a != b), |_, _| unreachable!());
-    }
-
-    fn un_set(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: Option<PropType>) {
-        self.set_raw(
-            state, obj, value,
-            |a, b| match (a.as_ref(), b.as_ref()) {
-                (Some(a), Some(b)) => Some(a != b),
-                (None, None) => Some(false),
-                _ => None
-            },
-            |a, b| a != b
-        );
-    }
-
-    pub fn set_local(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: PropType) {
-        self.un_set_local(state, obj, Some(value));
+        for handler in change_handlers {
+            handler.0.execute(state, &mut change);
+        }
+        if inherits {
+            self.notify_children(state, obj, &mut change);
+        }
     }
 
     pub fn set(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: PropType) {
         self.un_set(state, obj, Some(value));
-    }
-
-    pub fn unset_local(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>) {
-        self.un_set_local(state, obj, None);
     }
 
     pub fn unset(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>) {
@@ -743,14 +705,13 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         self,
         state: &mut dyn State,
         obj: Glob<Owner::Id, Owner>,
-        target: impl FnOnce(Self, Glob<Owner::Id, Owner>) -> Box<dyn Target<PropType>>,
         binding: Binding<PropType>
-    ) {
+    ) where Owner: 'static {
         self.unbind(state, obj);
         let mut obj_mut = obj.get_mut(state);
         let entry_mut = self.entry_mut(&mut obj_mut);
         entry_mut.binding = Some(binding);
-        binding.set_target(state, target(self, obj));
+        binding.set_target(state, Box::new(DepPropSet { prop: self, obj }));
     }
 
     pub fn bind(
@@ -759,16 +720,7 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         obj: Glob<Owner::Id, Owner>,
         binding: impl Into<Binding<PropType>>
     ) where Owner: 'static {
-        self.bind_raw(state, obj, |prop, obj| Box::new(DepPropSet { prop, obj }), binding.into());
-    }
-
-    pub fn bind_local(
-        self,
-        state: &mut dyn State,
-        obj: Glob<Owner::Id, Owner>,
-        binding: impl Into<Binding<PropType>>
-    ) where Owner: 'static {
-        self.bind_raw(state, obj, |prop, obj| Box::new(DepPropSetLocal { prop, obj }), binding.into());
+        self.bind_raw(state, obj, binding.into());
     }
 
     pub fn unbind(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>) {
@@ -806,23 +758,6 @@ struct DepPropSet<Owner: DepType, PropType: Convenient> {
 impl<Owner: DepType, PropType: Convenient> Target<PropType> for DepPropSet<Owner, PropType> {
     fn execute(&self, state: &mut dyn State, value: PropType) {
         self.prop.set(state, self.obj, value);
-    }
-
-    fn clear(&self, state: &mut dyn State) {
-        self.prop.clear_binding(state, self.obj);
-    }
-}
-
-#[derive(Educe)]
-#[educe(Debug, Clone)]
-struct DepPropSetLocal<Owner: DepType, PropType: Convenient> {
-    obj: Glob<Owner::Id, Owner>,
-    prop: DepProp<Owner, PropType>,
-}
-
-impl<Owner: DepType, PropType: Convenient> Target<PropType> for DepPropSetLocal<Owner, PropType> {
-    fn execute(&self, state: &mut dyn State, value: PropType) {
-        self.prop.set_local(state, self.obj, value);
     }
 
     fn clear(&self, state: &mut dyn State) {
@@ -945,9 +880,13 @@ impl<Owner: DepType> Glob<Owner::Id, Owner> {
         self.id.parent(state).map(|id| Glob { id, descriptor: self.descriptor })
     }
 
-    pub fn add_binding(self, state: &mut dyn State, binding: AnyBinding) {
+    fn add_binding_raw(self, state: &mut dyn State, binding: AnyBinding) {
         let mut obj_mut = self.get_mut(state);
         obj_mut.core_base_priv_mut().added_bindings.push(binding);
+    }
+
+    pub fn add_binding(self, state: &mut dyn State, binding: impl Into<AnyBinding>) {
+        self.add_binding_raw(state, binding.into());
     }
 
     pub fn apply_style(
@@ -1019,38 +958,42 @@ impl<Owner: DepType + 'static, PropType: Convenient> AnySetter<Owner> for Setter
         let obj_mut = &mut obj.get_mut(state);
         let entry_mut = self.prop.entry_mut(obj_mut);
         let inherits = entry_mut.inherits;
-        let handlers = if entry_mut.local.is_some() {
-            None
-        } else {
-            Some((entry_mut.value_handlers.items().clone(), entry_mut.change_handlers.items().clone()))
-        };
         let value = if unapply { None } else { Some(self.value.clone()) };
         let old = replace(&mut entry_mut.style, value.clone());
-        if let Some(handlers) = handlers {
-            let mut change = if old.is_some() && value.is_some() {
-                unsafe { (old.unwrap_unchecked(), value.unwrap_unchecked()) }
-            } else {
-                self.prop.unstyled_non_local_value(state, obj, |unstyled_non_local_value| {
+        if entry_mut.local.is_some() || old == value { return None; }
+        let value_handlers = entry_mut.value_handlers.items().clone();
+        let change_handlers = entry_mut.change_handlers.items().clone();
+        let mut change = if old.is_some() && value.is_some() {
+            unsafe { (old.unwrap_unchecked(), value.unwrap_unchecked()) }
+        } else {
+            if let Some(change) = self.prop.unstyled_non_local_value(state, obj, |unstyled_non_local_value| {
+                let old_ref = old.as_ref().unwrap_or(unstyled_non_local_value);
+                let value_ref = value.as_ref().unwrap_or(unstyled_non_local_value);
+                if old_ref == value_ref {
+                    None
+                } else {
                     let old = old.unwrap_or_else(|| unstyled_non_local_value.clone());
                     let value = value.unwrap_or_else(|| unstyled_non_local_value.clone());
-                    (old, value)
-                })
-            };
-            let prop = self.prop;
-            Some(Box::new(move |state: &'_ mut dyn State| {
-                for handler in handlers.0.into_values() {
-                    handler.0.execute(state, change.1.clone());
+                    Some((old, value))
                 }
-                for handler in handlers.1.into_values() {
-                    handler.0.execute(state, &mut change);
-                }
-                if inherits {
-                    prop.notify_children(state, obj, &mut change);
-                }
-            }) as _)
-        } else {
-            None
-        }
+            }) {
+                change
+            } else {
+                return None;
+            }
+        };
+        let prop = self.prop;
+        Some(Box::new(move |state: &'_ mut dyn State| {
+            for handler in value_handlers.into_values() {
+                handler.0.execute(state, change.1.clone());
+            }
+            for handler in change_handlers.into_values() {
+                handler.0.execute(state, &mut change);
+            }
+            if inherits {
+                prop.notify_children(state, obj, &mut change);
+            }
+        }) as _)
     }
 }
 
@@ -1794,7 +1737,7 @@ macro_rules! dep_type_impl_raw {
                     $vis fn $field(mut self, value: $field_ty) -> Self {
                         let id = <$BaseBuilder as $crate::DepObjBaseBuilder<$Id>>::id(&self.base);
                         let state = <$BaseBuilder as $crate::DepObjBaseBuilder<$Id>>::state_mut(&mut self.base);
-                        $name:: [< $field:upper >] .set_local(state, id.$obj(), value);
+                        $name:: [< $field:upper >] .set(state, id.$obj(), value);
                         self
                     }
                 ]
@@ -1862,7 +1805,7 @@ macro_rules! dep_type_impl_raw {
                     $vis fn $field(mut self, value: $field_ty) -> Self {
                         let id = <$BaseBuilder as $crate::DepObjBaseBuilder<$Id>>::id(&self.base);
                         let state = <$BaseBuilder as $crate::DepObjBaseBuilder<$Id>>::state_mut(&mut self.base);
-                        $name:: [< $field:upper >] .set_local(state, id.$obj(), value);
+                        $name:: [< $field:upper >] .set(state, id.$obj(), value);
                         self
                     }
                 ]

@@ -8,7 +8,7 @@
 use components_arena::{Arena, Component, NewtypeComponentId, Id};
 use dep_obj::{DepObjBaseBuilder, DepObjId, Items, dep_obj, dep_type, dep_type_with_builder};
 use macro_attr_2018::macro_attr;
-use dep_obj::binding::{Bindings, Binding2, EventBinding0, EventBinding1};
+use dep_obj::binding::{Bindings, EventBinding0, EventBinding1};
 use dyn_context::state::{State, StateExt};
 use std::any::{TypeId, Any};
 use std::borrow::Cow;
@@ -124,7 +124,7 @@ impl Npc {
             })
         });
         removed_items_binding.set_event_source(state, &mut NpcProps::EQUIPPED_ITEMS.removed_items_source(npc.props()));
-        npc.props().add_binding(state, removed_items_binding.into());
+        npc.props().add_binding(state, removed_items_binding);
         let inserted_items_binding = EventBinding0::new(state, (), |state, (), items: Option<&mut Items<Item>>| {
             items.map(|items| {
                 for item in items.iter() {
@@ -133,8 +133,8 @@ impl Npc {
             })
         });
         inserted_items_binding.set_event_source(state, &mut NpcProps::EQUIPPED_ITEMS.inserted_items_source(npc.props()));
-        npc.props().add_binding(state, inserted_items_binding.into());
-        let apply_enhancement = EventBinding1::new(state, npc, |state, npc, (_, enhancement), items: Option<&mut Items<Item>>| {
+        npc.props().add_binding(state, inserted_items_binding);
+        let apply_enhancement = EventBinding1::new(state, npc, |state, npc, enhancement, items: Option<&mut Items<Item>>| {
             if let Some(items) = items {
                 for item in items.iter() {
                     ItemProps::ENHANCEMENT.set(state, item.props(), enhancement);
@@ -144,9 +144,9 @@ impl Npc {
             }
             Some(())
         });
-        apply_enhancement.set_source_1(state, &mut NpcProps::ITEMS_ENHANCEMENT.source(npc.props()));
+        apply_enhancement.set_source_1(state, &mut NpcProps::ITEMS_ENHANCEMENT.value_source(npc.props()));
         apply_enhancement.set_event_source(state, &mut NpcProps::EQUIPPED_ITEMS.inserted_items_source(npc.props()));
-        npc.props().add_binding(state, apply_enhancement.into());
+        npc.props().add_binding(state, apply_enhancement);
         let unapply_enhancement = EventBinding0::new(state, (), |state, (), items: Option<&mut Items<Item>>| {
             items.map(|items| {
                 for item in items.iter() {
@@ -155,7 +155,7 @@ impl Npc {
             })
         });
         unapply_enhancement.set_event_source(state, &mut NpcProps::EQUIPPED_ITEMS.removed_items_source(npc.props()));
-        npc.props().add_binding(state, unapply_enhancement.into());
+        npc.props().add_binding(state, unapply_enhancement);
         npc
     }
 
@@ -229,14 +229,16 @@ fn main() {
     let shield = Item::new(game);
     ItemProps::NAME.set(game, shield.props(), Cow::Borrowed("Shield"));
     for item in [sword, shield] {
-        let log = Binding2::new(game, (), |(), (old, new), (_, name)| if old == new { None } else { Some((new, name)) });
-        log.set_source_1(game, &mut ItemProps::EQUIPPED.source(item.props()));
-        log.set_source_2(game, &mut ItemProps::NAME.source(item.props()));
+        let log = EventBinding1::new(game, (), |_, (), name, equipped: Option<&mut (bool, bool)>|
+            equipped.map(|equipped| (equipped.1, name))
+        );
+        log.set_event_source(game, &mut ItemProps::EQUIPPED.change_source(item.props()));
+        log.set_source_1(game, &mut ItemProps::NAME.value_source(item.props()));
         log.set_target_fn(game, (), |game, (), (equipped, name)| {
             let game: &mut Game = game.get_mut();
             writeln!(&mut game.log, "{} {}.", name, if equipped { "equipped" } else { "unequipped" }).unwrap();
         });
-        item.props().add_binding(game, log.into());
+        item.props().add_binding(game, log);
     }
     NpcProps::EQUIPPED_ITEMS.push(game, npc.props(), sword);
     NpcProps::EQUIPPED_ITEMS.push(game, npc.props(), shield);
