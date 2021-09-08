@@ -195,6 +195,43 @@ use educe::Educe;
 use macro_attr_2018::macro_attr;
 use phantom_type::PhantomType;
 
+free_lifetimes! {
+    #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Clone)]
+    pub struct Items<ItemType: 'static> {
+        items: 'items ref [ItemType],
+    }
+}
+
+impl<ItemType> Deref for Items<ItemType> {
+    type Target = [ItemType];
+
+    fn deref(&self) -> &Self::Target {
+        self.items()
+    }
+}
+
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Copy, Clone, Hash)]
+pub struct Change<PropType> {
+    old: PropType,
+    new: PropType,
+}
+
+impl<PropType> Change<PropType> {
+    pub fn new_self(old: PropType, new: PropType) -> Self {
+        Change { old, new }
+    }
+
+    pub fn old(&self) -> &PropType { &self.old }
+
+    pub fn into_old(self) -> PropType { self.old }
+
+    pub fn new(&self) -> &PropType { &self.new }
+
+    pub fn into_new(self) -> PropType { self.new }
+
+    pub fn into_old_new(self) -> (PropType, PropType) { (self.old, self.new) }
+}
+
 pub struct GlobDescriptor<Id: ComponentId, Obj> {
     pub arena: TypeId,
     pub field_ref: fn(arena: &dyn Any, id: Id) -> &Obj,
@@ -311,13 +348,15 @@ impl<PropType: Convenient> DepPropEntry<PropType> {
 }
 
 #[derive(Debug)]
-pub struct DepEventEntry<ArgsType> {
+pub struct DepEventEntry<ArgsType: DepEventArgs> {
+    bubble: bool,
     handlers: Arena<BoxedEventHandler<ArgsType>>,
 }
 
-impl<ArgsType> DepEventEntry<ArgsType> {
-    pub const fn new() -> Self {
+impl<ArgsType: DepEventArgs> DepEventEntry<ArgsType> {
+    pub const fn new(bubble: bool) -> Self {
         DepEventEntry {
+            bubble,
             handlers: Arena::new(),
         }
     }
@@ -325,43 +364,6 @@ impl<ArgsType> DepEventEntry<ArgsType> {
     pub fn take_all_handlers(&mut self, handlers: &mut Vec<Box<dyn AnyHandler>>) {
         handlers.extend(take(&mut self.handlers).into_items().into_values().map(|x| x.0.into_any()));
     }
-}
-
-free_lifetimes! {
-    #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Clone)]
-    pub struct Items<ItemType: 'static> {
-        items: 'items ref [ItemType],
-    }
-}
-
-impl<ItemType> Deref for Items<ItemType> {
-    type Target = [ItemType];
-
-    fn deref(&self) -> &Self::Target {
-        self.items()
-    }
-}
-
-#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Copy, Clone, Hash)]
-pub struct Change<PropType> {
-    old: PropType,
-    new: PropType,
-}
-
-impl<PropType> Change<PropType> {
-    pub fn new_self(old: PropType, new: PropType) -> Self {
-        Change { old, new }
-    }
-
-    pub fn old(&self) -> &PropType { &self.old }
-
-    pub fn into_old(self) -> PropType { self.old }
-
-    pub fn new(&self) -> &PropType { &self.new }
-
-    pub fn into_new(self) -> PropType { self.new }
-
-    pub fn into_old_new(self) -> (PropType, PropType) { (self.old, self.new) }
 }
 
 #[derive(Debug)]
@@ -550,19 +552,31 @@ pub trait DepType: Debug {
     fn take_added_bindings_and_collect_all(&mut self) -> Vec<AnyBinding>;
 }
 
+pub trait DepEventArgs {
+    fn handled(&self) -> bool;
+}
+
 #[derive(Educe)]
 #[educe(Debug, Clone, Copy)]
-pub struct DepEvent<Owner: DepType, ArgsType> {
+pub struct DepEvent<Owner: DepType, ArgsType: DepEventArgs> {
     offset: usize,
     _phantom: PhantomType<(Owner, ArgsType)>
 }
 
-impl<Owner: DepType, ArgsType> DepEvent<Owner, ArgsType> {
+impl<Owner: DepType, ArgsType: DepEventArgs> DepEvent<Owner, ArgsType> {
     pub const unsafe fn new(offset: usize) -> Self {
         DepEvent { offset, _phantom: PhantomType::new() }
     }
 
     pub fn offset(self) -> usize { self.offset }
+
+    fn entry(self, owner: &Owner) -> &DepEventEntry<ArgsType> {
+        unsafe {
+            let entry = (owner as *const _ as usize).unchecked_add(self.offset);
+            let entry = entry as *const DepEventEntry<ArgsType>;
+            &*entry
+        }
+    }
 
     fn entry_mut(self, owner: &mut Owner) -> &mut DepEventEntry<ArgsType> {
         unsafe {
@@ -572,12 +586,25 @@ impl<Owner: DepType, ArgsType> DepEvent<Owner, ArgsType> {
         }
     }
 
-    pub fn raise(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, args: &mut ArgsType) {
-        let mut obj_mut = obj.get_mut(state);
-        let entry_mut = self.entry_mut(&mut obj_mut);
-        let handlers = entry_mut.handlers.items().clone().into_values();
+    fn raise_raw(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, args: &mut ArgsType) -> bool {
+        let obj = obj.get(state);
+        let entry = self.entry(&obj);
+        let bubble = entry.bubble;
+        let handlers = entry.handlers.items().clone().into_values();
         for handler in handlers {
             handler.0.execute(state, args);
+        }
+        bubble
+    }
+
+    pub fn raise(self, state: &mut dyn State, mut obj: Glob<Owner::Id, Owner>, args: &mut ArgsType) {
+        let bubble = self.raise_raw(state, obj, args);
+        if !bubble || args.handled() { return; }
+        while let Some(parent) = obj.parent(state) {
+            obj = parent;
+            let bubble = self.raise_raw(state, obj, args);
+            debug_assert!(bubble);
+            if args.handled() { return; }
         }
     }
 
@@ -1116,13 +1143,13 @@ pub trait DepObjBaseBuilder<OwnerId: ComponentId> {
 
 #[derive(Educe)]
 #[educe(Debug)]
-struct DepEventHandledSource<Owner: DepType, ArgsType> {
+struct DepEventHandledSource<Owner: DepType, ArgsType: DepEventArgs> {
     obj: Glob<Owner::Id, Owner>,
     handler_id: Id<BoxedEventHandler<ArgsType>>,
     event: DepEvent<Owner, ArgsType>,
 }
 
-impl<Owner: DepType, ArgsType> HandlerId for DepEventHandledSource<Owner, ArgsType> {
+impl<Owner: DepType, ArgsType: DepEventArgs> HandlerId for DepEventHandledSource<Owner, ArgsType> {
     fn unhandle(&self, state: &mut dyn State) {
         let mut obj = self.obj.get_mut(state);
         let entry_mut = self.event.entry_mut(&mut obj);
@@ -1132,12 +1159,12 @@ impl<Owner: DepType, ArgsType> HandlerId for DepEventHandledSource<Owner, ArgsTy
 
 #[derive(Educe)]
 #[educe(Debug)]
-pub struct DepEventSource<Owner: DepType, ArgsType> {
+pub struct DepEventSource<Owner: DepType, ArgsType: DepEventArgs> {
     obj: Glob<Owner::Id, Owner>,
     event: DepEvent<Owner, ArgsType>,
 }
 
-impl<Owner: DepType + 'static, ArgsType: 'static> EventSource<ArgsType> for DepEventSource<Owner, ArgsType> {
+impl<Owner: DepType + 'static, ArgsType: DepEventArgs + 'static> EventSource<ArgsType> for DepEventSource<Owner, ArgsType> {
     fn handle(
         &self,
         state: &mut dyn State,
@@ -1327,11 +1354,12 @@ impl<Owner: DepType + 'static, ItemType: Convenient> EventSource<()> for DepVecC
     ) {
         let mut obj = self.obj.get_mut(state);
         let entry = self.vec.entry_mut(&mut obj);
+        let mut changed = if entry.items.is_empty() { None } else { Some(()) };
         let handler_id = entry.changed_handlers.insert(|handler_id| (BoxedEventHandler(handler), handler_id));
         result(HandledEventSource {
             state,
             handler_id: Box::new(DepVecChangedHandledSource { handler_id, obj: self.obj, vec: self.vec }),
-            args: Some(&mut ())
+            args: changed.as_mut()
         });
     }
 }
@@ -1354,15 +1382,14 @@ impl<Owner: DepType + 'static, ItemType: Convenient> EventSource<Items<ItemType>
         let entry = self.vec.entry_mut(&mut obj);
         let items = entry.items.clone();
         let handler_id = entry.inserted_items_handlers.insert(|handler_id| (BoxedEventHandler(handler), handler_id));
-        ItemsBuilder {
-            items: &items
-        }.build_and_then(|items| {
-            result(HandledEventSource {
-                state,
-                handler_id: Box::new(DepVecInsertedItemsHandledSource { handler_id, obj: self.obj, vec: self.vec }),
-                args: Some(items)
-            })
-        });
+        let handler_id = Box::new(DepVecInsertedItemsHandledSource { handler_id, obj: self.obj, vec: self.vec });
+        if items.is_empty() {
+            result(HandledEventSource { state, handler_id, args: None });
+        } else {
+            ItemsBuilder { items: &items }.build_and_then(|items|
+                result(HandledEventSource { state, handler_id, args: Some(items) })
+            );
+        }
     }
 }
 
@@ -1926,6 +1953,63 @@ macro_rules! dep_type_impl_raw {
             [$BaseBuilder:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
             [$($builder_methods:tt)*]
         )?]
+        [[[bubble] $field:ident yield $field_ty:ty] $($fields:tt)*]
+    ) => {
+        $crate::dep_type_impl_raw! {
+            @unroll_fields
+            [$([$attr])*] [$vis] [$name] [$obj] [$Id] [$state] [$this] [$bindings] [$handlers]
+            [$($g)*] [$($r)*] [$($w)*]
+            [
+                $($core_fields)*
+                $field: $crate::DepEventEntry<$field_ty>,
+            ]
+            [
+                $($core_new)*
+                $field: $crate::DepEventEntry::new(true),
+            ]
+            [
+                $($core_consts)*
+            ]
+            [
+                $($dep_props)*
+
+                $vis const [< $field:upper >] : $crate::DepEvent<Self, $field_ty> = {
+                    unsafe {
+                        let offset = $crate::memoffset_offset_of!( [< $name Core >] $($r)*, $field );
+                        $crate::DepEvent::new(offset)
+                    }
+                };
+            ]
+            [
+                $($core_bindings)*
+            ]
+            [
+                $($core_handlers)*
+                $this . $field .take_all_handlers(&mut $handlers);
+            ]
+            [$(
+                [$BaseBuilder] [$($bc_g)*] [$($bc_r)*] [$($bc_w)*]
+                [
+                    $($builder_methods)*
+                ]
+            )?]
+            [$($fields)*]
+        }
+    };
+    (
+        @unroll_fields
+        [$([$attr:meta])*] [$vis:vis] [$name:ident] [$obj:ident] [$Id:ty] [$state:ident] [$this:ident] [$bindings:ident] [$handlers:ident]
+        [$($g:tt)*] [$($r:tt)*] [$($w:tt)*]
+        [$($core_fields:tt)*]
+        [$($core_new:tt)*]
+        [$($core_consts:tt)*]
+        [$($dep_props:tt)*]
+        [$($core_bindings:tt)*]
+        [$($core_handlers:tt)*]
+        [$(
+            [$BaseBuilder:ty] [$($bc_g:tt)*] [$($bc_r:tt)*] [$($bc_w:tt)*]
+            [$($builder_methods:tt)*]
+        )?]
         [[[] $field:ident yield $field_ty:ty] $($fields:tt)*]
     ) => {
         $crate::dep_type_impl_raw! {
@@ -1938,7 +2022,7 @@ macro_rules! dep_type_impl_raw {
             ]
             [
                 $($core_new)*
-                $field: $crate::DepEventEntry::new(),
+                $field: $crate::DepEventEntry::new(false),
             ]
             [
                 $($core_consts)*
@@ -1986,9 +2070,9 @@ macro_rules! dep_type_impl_raw {
         [[[$inherits:tt] $field:ident yield $field_ty:ty] $($fields:tt)*]
     ) => {
         $crate::std_compile_error!($crate::std_concat!(
-            "unexpected dep type event attribute: '#[",
+            "invalid dep type event attribute: '#[",
             $crate::std_stringify!($inherits),
-            "]'"
+            "]; allowed attributes are: '#[bubble]'"
         ));
     };
     (
