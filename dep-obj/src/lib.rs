@@ -523,8 +523,8 @@ impl<T: DepObjId> DepObjIdBase for T {
 ///         res: 0,
 ///     };
 ///     let id = MyDepTypeId::new(app);
-///     let res = Binding1::new(&mut app.bindings, (), |(), (_, x)| Some(x));
-///     res.set_source_1(app, &mut MyDepType::PROP_2.source(id.obj()));
+///     let res = Binding1::new(&mut app.bindings, (), |(), x| Some(x));
+///     res.set_source_1(app, &mut MyDepType::PROP_2.value_source(id.obj()));
 ///     res.set_target_fn(app, (), |app, (), value| {
 ///         let app: &mut MyApp = app.get_mut();
 ///         app.res = value;
