@@ -6,7 +6,7 @@
 #![feature(const_raw_ptr_deref)]
 
 use components_arena::{Arena, Component, NewtypeComponentId, Id};
-use dep_obj::{DepObjBaseBuilder, DepObjId, Items, dep_obj, dep_type, dep_type_with_builder};
+use dep_obj::{DepObjBaseBuilder, DepObjId, Items, dep_obj, dep_type, dep_type_with_builder, Change};
 use macro_attr_2018::macro_attr;
 use dep_obj::binding::{Bindings, EventBinding0, EventBinding1};
 use dyn_context::state::{State, StateExt};
@@ -229,8 +229,8 @@ fn main() {
     let shield = Item::new(game);
     ItemProps::NAME.set(game, shield.props(), Cow::Borrowed("Shield"));
     for item in [sword, shield] {
-        let log = EventBinding1::new(game, (), |_, (), name, equipped: Option<&mut (bool, bool)>|
-            equipped.map(|equipped| (equipped.1, name))
+        let log = EventBinding1::new(game, (), |_, (), name, equipped: Option<&mut Change<bool>>|
+            equipped.map(|equipped| (*equipped.new(), name))
         );
         log.set_event_source(game, &mut ItemProps::EQUIPPED.change_source(item.props()));
         log.set_source_1(game, &mut ItemProps::NAME.value_source(item.props()));

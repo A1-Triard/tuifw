@@ -277,7 +277,7 @@ pub struct DepPropEntry<PropType: Convenient> {
     style: Option<PropType>,
     local: Option<PropType>,
     value_handlers: Arena<BoxedValueHandler<PropType>>,
-    change_handlers: Arena<BoxedEventHandler<(PropType, PropType)>>,
+    change_handlers: Arena<BoxedEventHandler<Change<PropType>>>,
     binding: Option<Binding<PropType>>,
 }
 
@@ -322,8 +322,8 @@ impl<ArgsType> DepEventEntry<ArgsType> {
 }
 
 free_lifetimes! {
-    #[derive(Debug)]
-    pub struct Items<ItemType> {
+    #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Clone)]
+    pub struct Items<ItemType: 'static> {
         items: 'items ref [ItemType],
     }
 }
@@ -334,6 +334,28 @@ impl<ItemType> Deref for Items<ItemType> {
     fn deref(&self) -> &Self::Target {
         self.items()
     }
+}
+
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Copy, Clone, Hash)]
+pub struct Change<PropType> {
+    old: PropType,
+    new: PropType,
+}
+
+impl<PropType> Change<PropType> {
+    pub fn new_self(old: PropType, new: PropType) -> Self {
+        Change { old, new }
+    }
+
+    pub fn old(&self) -> &PropType { &self.old }
+
+    pub fn into_old(self) -> PropType { self.old }
+
+    pub fn new(&self) -> &PropType { &self.new }
+
+    pub fn into_new(self) -> PropType { self.new }
+
+    pub fn into_old_new(self) -> (PropType, PropType) { (self.old, self.new) }
 }
 
 #[derive(Debug)]
@@ -629,7 +651,7 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         self,
         state: &mut dyn State,
         obj: Glob<Owner::Id, Owner>,
-        change: &mut (PropType, PropType),
+        change: &mut Change<PropType>,
     ) {
         if let Some(last_child) = obj.id.last_child(state) {
             let mut child = last_child;
@@ -643,7 +665,7 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
                     let value_handlers = entry_mut.value_handlers.items().clone().into_values();
                     let change_handlers = entry_mut.change_handlers.items().clone().into_values();
                     for handler in value_handlers {
-                        handler.0.execute(state, change.1.clone());
+                        handler.0.execute(state, change.new().clone());
                     }
                     for handler in change_handlers {
                         handler.0.execute(state, change);
@@ -664,7 +686,7 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         let value_handlers = entry_mut.value_handlers.items().clone().into_values();
         let change_handlers = entry_mut.change_handlers.items().clone().into_values();
         let mut change = if old.is_some() && value.is_some() {
-            unsafe { (old.unwrap_unchecked(), value.unwrap_unchecked()) }
+            unsafe { Change::new_self(old.unwrap_unchecked(), value.unwrap_unchecked()) }
         } else {
             if let Some(change) = self.non_local_value(state, obj, |non_local| {
                 let old_ref = old.as_ref().unwrap_or(non_local);
@@ -674,7 +696,7 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
                 } else {
                     let old = old.unwrap_or_else(|| non_local.clone());
                     let value = value.unwrap_or_else(|| non_local.clone());
-                    Some((old, value))
+                    Some(Change::new_self(old, value))
                 }
             }) {
                 change
@@ -683,7 +705,7 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
             }
         };
         for handler in value_handlers {
-            handler.0.execute(state, change.1.clone());
+            handler.0.execute(state, change.new().clone());
         }
         for handler in change_handlers {
             handler.0.execute(state, &mut change);
@@ -964,7 +986,7 @@ impl<Owner: DepType + 'static, PropType: Convenient> AnySetter<Owner> for Setter
         let value_handlers = entry_mut.value_handlers.items().clone();
         let change_handlers = entry_mut.change_handlers.items().clone();
         let mut change = if old.is_some() && value.is_some() {
-            unsafe { (old.unwrap_unchecked(), value.unwrap_unchecked()) }
+            unsafe { Change::new_self(old.unwrap_unchecked(), value.unwrap_unchecked()) }
         } else {
             if let Some(change) = self.prop.unstyled_non_local_value(state, obj, |unstyled_non_local_value| {
                 let old_ref = old.as_ref().unwrap_or(unstyled_non_local_value);
@@ -974,7 +996,7 @@ impl<Owner: DepType + 'static, PropType: Convenient> AnySetter<Owner> for Setter
                 } else {
                     let old = old.unwrap_or_else(|| unstyled_non_local_value.clone());
                     let value = value.unwrap_or_else(|| unstyled_non_local_value.clone());
-                    Some((old, value))
+                    Some(Change::new_self(old, value))
                 }
             }) {
                 change
@@ -985,7 +1007,7 @@ impl<Owner: DepType + 'static, PropType: Convenient> AnySetter<Owner> for Setter
         let prop = self.prop;
         Some(Box::new(move |state: &'_ mut dyn State| {
             for handler in value_handlers.into_values() {
-                handler.0.execute(state, change.1.clone());
+                handler.0.execute(state, change.new().clone());
             }
             for handler in change_handlers.into_values() {
                 handler.0.execute(state, &mut change);
@@ -1120,7 +1142,7 @@ impl<Owner: DepType, PropType: Convenient> HandlerId for DepPropHandledValueSour
 #[educe(Debug)]
 struct DepPropHandledChangeSource<Owner: DepType, PropType: Convenient> {
     obj: Glob<Owner::Id, Owner>,
-    handler_id: Id<BoxedEventHandler<(PropType, PropType)>>,
+    handler_id: Id<BoxedEventHandler<Change<PropType>>>,
     prop: DepProp<Owner, PropType>,
 }
 
@@ -1159,12 +1181,12 @@ pub struct DepPropChangeSource<Owner: DepType, PropType: Convenient> {
     prop: DepProp<Owner, PropType>,
 }
 
-impl<Owner: DepType + 'static, PropType: Convenient> EventSource<(PropType, PropType)> for DepPropChangeSource<Owner, PropType> {
+impl<Owner: DepType + 'static, PropType: Convenient> EventSource<Change<PropType>> for DepPropChangeSource<Owner, PropType> {
     fn handle(
         &self,
         state: &mut dyn State,
-        handler: Box<dyn EventHandler<(PropType, PropType)>>,
-        result: Box<dyn FnOnce(HandledEventSource<(PropType, PropType)>)>,
+        handler: Box<dyn EventHandler<Change<PropType>>>,
+        result: Box<dyn FnOnce(HandledEventSource<Change<PropType>>)>,
     ) {
         let mut change = self.prop.current_value(state, self.obj, |new| {
             let obj = self.obj.get(state);
@@ -1172,7 +1194,7 @@ impl<Owner: DepType + 'static, PropType: Convenient> EventSource<(PropType, Prop
             if new == entry.default {
                 None
             } else {
-                Some((entry.default.clone(), new.clone()))
+                Some(Change::new_self(entry.default.clone(), new.clone()))
             }
         });
         let mut obj = self.obj.get_mut(state);
