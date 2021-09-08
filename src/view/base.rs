@@ -589,60 +589,29 @@ impl View {
         }
     }
 
-    pub fn unset_decorator(self, state: &mut dyn State) {
-        let tree: &ViewTree = state.get();
-        if self == tree.0.get().root { panic!("root view decorator can not be changed"); }
-        self.drop_decorator_bindings(state);
-        {
-            let tree: &mut ViewTree = state.get_mut();
-            if tree.0.get_mut().arena[self.0].decorator.take().is_some() {
-                let window = tree.0.get().arena[self.0].window.unwrap();
-                window.drop(tree.window_tree());
-                tree.0.get_mut().arena[self.0].window = None;
-                if let Some(last_child) = self.last_child(tree) {
-                    let parent_window = self
-                        .self_and_parents(tree)
-                        .find_map(|view| tree.0.get().arena[view.0].window)
-                        ;
-                    let mut child = last_child;
-                    loop {
-                        child = child.next(tree);
-                        child.renew_window(tree, parent_window);
-                        if child == last_child { break; }
-                    }
-                }
-            }
-        }
-        self.invalidate_measure(state);
-    }
-
     pub fn set_decorator<D: Decorator>(self, state: &mut dyn State, decorator: D) {
-        let tree: &ViewTree = state.get();
-        if self == tree.0.get().root { panic!("root view decorator can not be changed"); }
-        self.drop_decorator_bindings(state);
         let behavior = decorator.behavior();
         {
             let tree: &mut ViewTree = state.get_mut();
-            if tree.0.get_mut().arena[self.0].decorator.replace(Box::new(decorator)).is_none() {
-                let parent_window = self
-                    .self_and_parents(tree)
-                    .find_map(|view| tree.0.get().arena[view.0].window)
-                    ;
-                let render_bounds = self.render_bounds(tree);
-                let window = Window::new(
-                    tree.window_tree(),
-                    parent_window,
-                    render_bounds,
-                    |window| (self, window)
-                );
-                tree.0.get_mut().arena[self.0].window = Some(window);
-                if let Some(last_child) = self.last_child(tree) {
-                    let mut child = last_child;
-                    loop {
-                        child = child.next(tree);
-                        child.renew_window(tree, Some(window));
-                        if child == last_child { break; }
-                    }
+            assert!(tree.0.get_mut().arena[self.0].decorator.replace(Box::new(decorator)).is_none(), "Decorator is already set and cannot be changed");
+            let parent_window = self
+                .self_and_parents(tree)
+                .find_map(|view| tree.0.get().arena[view.0].window)
+                ;
+            let render_bounds = self.render_bounds(tree);
+            let window = Window::new(
+                tree.window_tree(),
+                parent_window,
+                render_bounds,
+                |window| (self, window)
+            );
+            tree.0.get_mut().arena[self.0].window = Some(window);
+            if let Some(last_child) = self.last_child(tree) {
+                let mut child = last_child;
+                loop {
+                    child = child.next(tree);
+                    child.renew_window(tree, Some(window));
+                    if child == last_child { break; }
                 }
             }
         }
@@ -654,40 +623,11 @@ impl View {
         self.invalidate_measure(state);
     }
 
-    pub fn decorator_bindings(self, tree: &ViewTree) -> &dyn DecoratorBindings {
-        tree.0.get().arena[self.0].decorator_bindings.as_ref().expect("Decorator Bindings missing").as_ref()
-    }
-
-    pub fn decorator_bindings_mut(self, state: &mut dyn State) -> &mut dyn DecoratorBindings {
-        let tree: &mut ViewTree = state.get_mut();
-        tree.0.get_mut().arena[self.0].decorator_bindings.as_mut().expect("Decorator Bindings missing").as_mut()
-    }
-
-    pub fn layout_bindings(self, tree: &ViewTree) -> &dyn LayoutBindings {
-        tree.0.get().arena[self.0].layout_bindings.as_ref().expect("Layout Bindings missing").as_ref()
-    }
-
-    pub fn layout_bindings_mut(self, state: &mut dyn State) -> &mut dyn LayoutBindings {
-        let tree: &mut ViewTree = state.get_mut();
-        tree.0.get_mut().arena[self.0].layout_bindings.as_mut().expect("Layout Bindings missing").as_mut()
-    }
-
-    pub fn unset_layout(self, state: &mut dyn State) {
-        self.drop_layout_bindings(state);
-        let tree: &mut ViewTree = state.get_mut();
-        if tree.0.get_mut().arena[self.0].layout.take().is_some() {
-            self.parent(tree).map(|parent| parent.invalidate_measure(state));
-        }
-    }
-
     pub fn set_layout<L: Layout>(self, state: &mut dyn State, layout: L) {
-        let tree: &ViewTree = state.get();
-        if self == tree.0.get().root { panic!("root view layout can not be changed"); }
-        self.drop_layout_bindings(state);
         let behavior = layout.behavior();
         {
             let tree: &mut ViewTree = state.get_mut();
-            tree.0.get_mut().arena[self.0].layout = Some(Box::new(layout));
+            assert!(tree.0.get_mut().arena[self.0].layout.replace(Box::new(layout)).is_none(), "Layout is already set and cannot be changed");
         }
         let bindings = behavior.init_bindings(self, state);
         {
@@ -698,29 +638,11 @@ impl View {
         self.parent(tree).map(|parent| parent.invalidate_measure(state));
     }
 
-    pub fn panel_bindings(self, tree: &ViewTree) -> &dyn PanelBindings {
-        tree.0.get().arena[self.0].panel_bindings.as_ref().expect("Panel Bindings missing").as_ref()
-    }
-
-    pub fn panel_bindings_mut(self, state: &mut dyn State) -> &mut dyn PanelBindings {
-        let tree: &mut ViewTree = state.get_mut();
-        tree.0.get_mut().arena[self.0].panel_bindings.as_mut().expect("Panel Bindings missing").as_mut()
-    }
-
-    pub fn unset_panel(self, state: &mut dyn State) {
-        self.drop_panel_bindings(state);
-        let tree: &mut ViewTree = state.get_mut();
-        if tree.0.get_mut().arena[self.0].panel.take().is_some() {
-            self.invalidate_measure(state);
-        }
-    }
-
     pub fn set_panel<P: Panel>(self, state: &mut dyn State, panel: P) {
-        self.drop_panel_bindings(state);
         let behavior = panel.behavior();
         {
             let tree: &mut ViewTree = state.get_mut();
-            tree.0.get_mut().arena[self.0].panel = Some(Box::new(panel));
+            assert!(tree.0.get_mut().arena[self.0].panel.replace(Box::new(panel)).is_none(), "Panel is already set and cannot be changed");
         }
         let bindings = behavior.init_bindings(self, state);
         {
@@ -728,6 +650,18 @@ impl View {
             tree.0.get_mut().arena[self.0].panel_bindings = Some(bindings);
         }
         self.invalidate_measure(state);
+    }
+
+    pub fn decorator_bindings(self, tree: &ViewTree) -> &dyn DecoratorBindings {
+        tree.0.get().arena[self.0].decorator_bindings.as_ref().expect("Decorator Bindings missing").as_ref()
+    }
+
+    pub fn layout_bindings(self, tree: &ViewTree) -> &dyn LayoutBindings {
+        tree.0.get().arena[self.0].layout_bindings.as_ref().expect("Layout Bindings missing").as_ref()
+    }
+
+    pub fn panel_bindings(self, tree: &ViewTree) -> &dyn PanelBindings {
+        tree.0.get().arena[self.0].panel_bindings.as_ref().expect("Panel Bindings missing").as_ref()
     }
 
     pub fn parent(self, tree: &ViewTree) -> Option<View> { tree.0.get().arena[self.0].parent }
