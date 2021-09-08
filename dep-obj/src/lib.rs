@@ -700,11 +700,11 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         self.set(state, obj, value, |_, _| Some(true), |_, _| unreachable!());
     }
 
-    fn un_set_distinct_local(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: Option<PropType>) where PropType: PartialEq {
+    fn un_set_distinct_local(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: Option<PropType>) {
         self.set(state, obj, value, |a, b| Some(a != b), |_, _| unreachable!());
     }
 
-    fn un_set_distinct(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: Option<PropType>) where PropType: PartialEq {
+    fn un_set_distinct(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: Option<PropType>) {
         self.set(
             state, obj, value,
             |a, b| match (a.as_ref(), b.as_ref()) {
@@ -720,11 +720,11 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         self.un_set_uncond(state, obj, Some(value));
     }
 
-    pub fn set_distinct_local(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: PropType) where PropType: PartialEq {
+    pub fn set_distinct_local(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: PropType) {
         self.un_set_distinct_local(state, obj, Some(value));
     }
 
-    pub fn set_distinct(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: PropType) where PropType: PartialEq {
+    pub fn set_distinct(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: PropType) {
         self.un_set_distinct(state, obj, Some(value));
     }
 
@@ -732,11 +732,11 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         self.un_set_uncond(state, obj, None);
     }
 
-    pub fn unset_distinct_local(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>) where PropType: PartialEq {
+    pub fn unset_distinct_local(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>) {
         self.un_set_distinct_local(state, obj, None);
     }
 
-    pub fn unset_distinct(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>) where PropType: PartialEq {
+    pub fn unset_distinct(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>) {
         self.un_set_distinct(state, obj, None);
     }
 
@@ -759,7 +759,7 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         state: &mut dyn State,
         obj: Glob<Owner::Id, Owner>,
         binding: impl Into<Binding<PropType>>
-    ) where PropType: PartialEq, Owner: 'static {
+    ) where Owner: 'static {
         self.bind_raw(state, obj, |prop, obj| Box::new(DepPropSetDistinct { prop, obj }), binding.into());
     }
 
@@ -800,7 +800,7 @@ struct DepPropSetDistinct<Owner: DepType, PropType: Convenient> {
     prop: DepProp<Owner, PropType>,
 }
 
-impl<Owner: DepType, PropType: Convenient + PartialEq> Target<PropType> for DepPropSetDistinct<Owner, PropType> {
+impl<Owner: DepType, PropType: Convenient> Target<PropType> for DepPropSetDistinct<Owner, PropType> {
     fn execute(&self, state: &mut dyn State, value: PropType) {
         self.prop.set_distinct(state, self.obj, value);
     }
