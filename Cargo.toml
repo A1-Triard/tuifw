@@ -1,7 +1,7 @@
 [package]
 edition = "2018"
 name = "tuifw"
-version = "0.0.5"
+version = "0.0.6"
 authors = ["warlock <internalmike@gmail.com>"]
 description = "Text User Interface Framework."
 readme = "README.md"
@@ -30,13 +30,13 @@ dyn-context = "0.10.7"
 dep-obj = "0.27.0"
 educe = "0.4.18"
 either = "1.6.1"
-enum-derive-2018 = "1.0.1"
+enum-derive-2018 = "1.0.2"
 macro-attr-2018 = "1.1.1"
 panicking = "0.0.1"
-tuifw-screen-base = { path = "screen-base", version = "0.8.1" }
-tuifw-window = { path = "window", version = "0.8.1" }
-unicode-segmentation = "1.7.1"
+tuifw-screen-base = { path = "screen-base", version = "0.9.0" }
+tuifw-window = { path = "window", version = "0.9.0" }
+unicode-segmentation = "1.8.0"
 unicode-width = "0.1.8"
 
 [dev-dependencies]
-tuifw-screen = { path = "screen", version = "0.8.1" }
+tuifw-screen = { path = "screen", version = "0.9.0" }

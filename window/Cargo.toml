@@ -1,7 +1,7 @@
 [package]
 edition = "2018"
 name = "tuifw-window"
-version = "0.8.1"
+version = "0.9.0"
 authors = ["warlock <internalmike@gmail.com>"]
 description = "Text User Interface Framework. Overlappable hierachical windows."
 readme = "README.md"
@@ -12,12 +12,12 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/A1-Triard/tuifw"
 
 [dependencies]
-tuifw-screen-base = { path = "../screen-base", version = "0.8.1" }
+tuifw-screen-base = { path = "../screen-base", version = "0.9.0" }
 components-arena = "2.1.5"
 educe = "0.4.18"
 macro-attr-2018 = "1.1.1"
 dyn-context = "0.10.7"
 
 [dev-dependencies]
-tuifw-screen-test = { path = "../screen-test", version = "0.8.1" }
-tuifw-screen = { path = "../screen", version = "0.8.1" }
+tuifw-screen-test = { path = "../screen-test", version = "0.9.0" }
+tuifw-screen = { path = "../screen", version = "0.9.0" }
