@@ -263,22 +263,34 @@ macro_attr! {
     struct BoxedHandler<T>(Box<dyn Handler<T>>);
 }
 
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
+pub struct Change<PropType: Convenient> {
+    pub old: PropType,
+    pub new: PropType,
+}
+
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
+pub struct InsertRemove<ItemType: Convenient> {
+    pub item: ItemType,
+    pub remove: bool,
+}
+
 #[derive(Debug)]
 struct DepPropHandlers<PropType: Convenient> {
     children_has_handlers: Option<bool>,
     value_handlers: Arena<BoxedHandler<PropType>>,
-    change_handlers: Arena<BoxedHandler<(PropType, PropType)>>,
-    change_initial_handler: Option<Box<dyn Handler<(PropType, PropType)>>>,
-    change_final_handler: Option<Box<dyn Handler<(PropType, PropType)>>>,
+    change_handlers: Arena<BoxedHandler<Change<PropType>>>,
+    change_initial_handler: Option<Box<dyn Handler<Change<PropType>>>>,
+    change_final_handler: Option<Box<dyn Handler<Change<PropType>>>>,
 }
 
 #[derive(Debug)]
 struct DepPropHandlersCopy<PropType: Convenient> {
     notify_children: bool,
     value_handlers: ArenaItemsIntoValues<BoxedHandler<PropType>>,
-    change_handlers: ArenaItemsIntoValues<BoxedHandler<(PropType, PropType)>>,
-    change_initial_handler: Option<Box<dyn Handler<(PropType, PropType)>>>,
-    change_final_handler: Option<Box<dyn Handler<(PropType, PropType)>>>,
+    change_handlers: ArenaItemsIntoValues<BoxedHandler<Change<PropType>>>,
+    change_initial_handler: Option<Box<dyn Handler<Change<PropType>>>>,
+    change_final_handler: Option<Box<dyn Handler<Change<PropType>>>>,
 }
 
 impl<PropType: Convenient> DepPropHandlers<PropType> {
@@ -322,12 +334,12 @@ impl<PropType: Convenient> DepPropHandlersCopy<PropType> {
     fn execute<Owner: DepType>(
         self,
         state: &mut dyn State,
-        change: &(PropType, PropType),
+        change: &Change<PropType>,
         obj: Glob<Owner::Id, Owner>,
         prop: DepProp<Owner, PropType>
     ) {
         for handler in self.value_handlers {
-            handler.0.execute(state, change.1.clone());
+            handler.0.execute(state, change.new.clone());
         }
         if let Some(change_initial_handler) = self.change_initial_handler {
             change_initial_handler.execute(state, change.clone());
@@ -401,52 +413,34 @@ impl<ArgsType: DepEventArgs> DepEventEntry<ArgsType> {
     }
 }
 
+
 #[derive(Debug)]
 struct DepVecHandlers<ItemType: Convenient> {
     changed_handlers: Arena<BoxedHandler<()>>,
-    removed_item_handlers: Arena<BoxedHandler<ItemType>>,
-    removed_items_final_handler: Option<Box<dyn Handler<ItemType>>>,
-    inserted_item_handlers: Arena<BoxedHandler<ItemType>>,
-    inserted_items_initial_handler: Option<Box<dyn Handler<ItemType>>>,
+    item_handlers: Arena<BoxedHandler<InsertRemove<ItemType>>>,
+    item_initial_final_handler: Option<Box<dyn Handler<InsertRemove<ItemType>>>>,
 }
 
 impl<ItemType: Convenient> DepVecHandlers<ItemType> {
     const fn new() -> Self {
         DepVecHandlers {
             changed_handlers: Arena::new(),
-            removed_item_handlers: Arena::new(),
-            removed_items_final_handler: None,
-            inserted_item_handlers: Arena::new(),
-            inserted_items_initial_handler: None,
+            item_handlers: Arena::new(),
+            item_initial_final_handler: None,
         }
     }
 
     fn take_all(&mut self, handlers: &mut Vec<Box<dyn AnyHandler>>) {
         handlers.extend(take(&mut self.changed_handlers).into_items().into_values().map(|x| x.0.into_any()));
-        handlers.extend(take(&mut self.removed_item_handlers).into_items().into_values().map(|x| x.0.into_any()));
-        self.removed_items_final_handler.take().map(|x| handlers.push(x.into_any()));
-        handlers.extend(take(&mut self.inserted_item_handlers).into_items().into_values().map(|x| x.0.into_any()));
-        self.inserted_items_initial_handler.take().map(|x| handlers.push(x.into_any()));
+        handlers.extend(take(&mut self.item_handlers).into_items().into_values().map(|x| x.0.into_any()));
+        self.item_initial_final_handler.take().map(|x| handlers.push(x.into_any()));
     }
 
-    fn clone(&self, remove: bool) -> DepVecHandlersCopy<ItemType> {
+    fn clone(&self) -> DepVecHandlersCopy<ItemType> {
         DepVecHandlersCopy {
             changed_handlers: self.changed_handlers.items().clone().into_values(),
-            items_initial_handler: if remove {
-                None
-            } else {
-                self.inserted_items_initial_handler.clone()
-            },
-            item_handlers: if remove {
-                &self.removed_item_handlers
-            } else {
-                &self.inserted_item_handlers
-            }.items().clone().into_values(),
-            items_final_handler: if remove {
-                self.removed_items_final_handler.clone()
-            } else {
-                None
-            },
+            item_handlers: self.item_handlers.items().clone().into_values(),
+            item_initial_final_handler: self.item_initial_final_handler.clone(),
         }
     }
 }
@@ -454,31 +448,34 @@ impl<ItemType: Convenient> DepVecHandlers<ItemType> {
 #[derive(Debug)]
 struct DepVecHandlersCopy<ItemType: Convenient> {
     changed_handlers: ArenaItemsIntoValues<BoxedHandler<()>>,
-    item_handlers: ArenaItemsIntoValues<BoxedHandler<ItemType>>,
-    items_final_handler: Option<Box<dyn Handler<ItemType>>>,
-    items_initial_handler: Option<Box<dyn Handler<ItemType>>>,
+    item_handlers: ArenaItemsIntoValues<BoxedHandler<InsertRemove<ItemType>>>,
+    item_initial_final_handler: Option<Box<dyn Handler<InsertRemove<ItemType>>>>,
 }
 
 impl<ItemType: Convenient> DepVecHandlersCopy<ItemType> {
-    fn execute(self, state: &mut dyn State, items: &[ItemType]) {
-            if let Some(items_initial_handler) = self.items_initial_handler {
+    fn execute(self, state: &mut dyn State, remove: bool, items: &[ItemType]) {
+        if !remove {
+            if let Some(item_initial_final_handler) = self.item_initial_final_handler.as_ref() {
                 for item in items {
-                    items_initial_handler.execute(state, item.clone());
+                    item_initial_final_handler.execute(state, InsertRemove { remove: false, item: item.clone() });
                 }
             }
-            for handler in self.item_handlers {
+        }
+        for handler in self.item_handlers {
+            for item in items {
+                handler.0.execute(state, InsertRemove { remove, item: item.clone() });
+            }
+        }
+        if remove {
+            if let Some(item_initial_final_handler) = self.item_initial_final_handler.as_ref() {
                 for item in items {
-                    handler.0.execute(state, item.clone());
+                    item_initial_final_handler.execute(state, InsertRemove { remove: true, item: item.clone() });
                 }
             }
-            if let Some(items_final_handler) = self.items_final_handler {
-                for item in items {
-                    items_final_handler.execute(state, item.clone());
-                }
-            }
-            for handler in self.changed_handlers {
-                handler.0.execute(state, ());
-            }
+        }
+        for handler in self.changed_handlers {
+            handler.0.execute(state, ());
+        }
     }
 }
 
@@ -827,7 +824,7 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         self,
         state: &mut dyn State,
         obj: Glob<Owner::Id, Owner>,
-        change: &(PropType, PropType),
+        change: &Change<PropType>,
     ) {
         if let Some(last_child) = obj.id.last_child(state) {
             let mut child = last_child;
@@ -862,7 +859,7 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
             if old == value { return; }
             let handlers = entry_mut.handlers.clone();
             let mut change = if old.is_some() && value.is_some() {
-                unsafe { (old.unwrap_unchecked(), value.unwrap_unchecked()) }
+                unsafe { Change { old: old.unwrap_unchecked(), new: value.unwrap_unchecked() } }
             } else {
                 if let Some(change) = self.non_local_value(state, obj, |non_local| {
                     let old_ref = old.as_ref().unwrap_or(non_local);
@@ -871,8 +868,8 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
                         None
                     } else {
                         let old = old.unwrap_or_else(|| non_local.clone());
-                        let value = value.unwrap_or_else(|| non_local.clone());
-                        Some((old, value))
+                        let new = value.unwrap_or_else(|| non_local.clone());
+                        Some(Change { old, new })
                     }
                 }) {
                     change
@@ -1065,8 +1062,8 @@ impl<Owner: DepType, ItemType: Convenient> DepVec<Owner, ItemType> {
                     (false, DepVecItems::Vec(vec))
                 },
             };
-            let handlers = entry_mut.handlers.clone(remove);
-            handlers.execute(state, &items);
+            let handlers = entry_mut.handlers.clone();
+            handlers.execute(state, remove, &items);
             let mut obj_mut = obj.get_mut(state);
             let entry_mut = self.entry_mut(&mut obj_mut);
             if let Some(queue) = entry_mut.queue.as_mut() {
@@ -1104,16 +1101,12 @@ impl<Owner: DepType, ItemType: Convenient> DepVec<Owner, ItemType> {
         DepVecChangedSource { obj, vec: self }
     }
 
-    pub fn inserted_item_source(self, obj: Glob<Owner::Id, Owner>) -> DepVecInsertedItemSource<Owner, ItemType> {
-        DepVecInsertedItemSource { obj, vec: self }
+    pub fn item_source(self, obj: Glob<Owner::Id, Owner>) -> DepVecItemSource<Owner, ItemType> {
+        DepVecItemSource { obj, vec: self }
     }
 
-    pub fn inserted_items_initial_source(self, obj: Glob<Owner::Id, Owner>) -> DepVecInsertedItemsInitialSource<Owner, ItemType> {
-        DepVecInsertedItemsInitialSource { obj, vec: self }
-    }
-
-    pub fn removed_item_source(self, obj: Glob<Owner::Id, Owner>) -> DepVecRemovedItemSource<Owner, ItemType> {
-        DepVecRemovedItemSource { obj, vec: self }
+    pub fn item_initial_final_source(self, obj: Glob<Owner::Id, Owner>) -> DepVecItemInitialFinalSource<Owner, ItemType> {
+        DepVecItemInitialFinalSource { obj, vec: self }
     }
 }
 
@@ -1203,8 +1196,8 @@ impl<Owner: DepType + 'static, PropType: Convenient> AnySetter<Owner> for Setter
         let old = replace(&mut entry_mut.style, value.clone());
         if entry_mut.local.is_some() || old == value { return None; }
         let handlers = entry_mut.handlers.clone();
-        let mut change = if old.is_some() && value.is_some() {
-            unsafe { (old.unwrap_unchecked(), value.unwrap_unchecked()) }
+        let change = if old.is_some() && value.is_some() {
+            unsafe { Change { old: old.unwrap_unchecked(), new: value.unwrap_unchecked() } }
         } else {
             if let Some(change) = self.prop.unstyled_non_local_value(state, obj, |unstyled_non_local_value| {
                 let old_ref = old.as_ref().unwrap_or(unstyled_non_local_value);
@@ -1213,8 +1206,8 @@ impl<Owner: DepType + 'static, PropType: Convenient> AnySetter<Owner> for Setter
                     None
                 } else {
                     let old = old.unwrap_or_else(|| unstyled_non_local_value.clone());
-                    let value = value.unwrap_or_else(|| unstyled_non_local_value.clone());
-                    Some((old, value))
+                    let new = value.unwrap_or_else(|| unstyled_non_local_value.clone());
+                    Some(Change { old, new })
                 }
             }) {
                 change
@@ -1223,7 +1216,7 @@ impl<Owner: DepType + 'static, PropType: Convenient> AnySetter<Owner> for Setter
             }
         };
         let prop = self.prop;
-        Some(Box::new(move |state: &'_ mut dyn State| handlers.execute(state, &mut change, obj, prop)))
+        Some(Box::new(move |state: &'_ mut dyn State| handlers.execute(state, &change, obj, prop)))
     }
 }
 
@@ -1323,7 +1316,7 @@ impl<Owner: DepType + 'static, ArgsType: DepEventArgs + 'static> Source<ArgsType
         let handler_id = entry.handlers.insert(|handler_id| (BoxedHandler(handler), handler_id));
         HandledSource {
             handler_id: Box::new(DepEventHandledSource { handler_id, obj: self.obj, event: self.event }),
-            init: Box::new(|_state| { })
+            init: None // TODO some events with cached value?
         }
     }
 }
@@ -1389,7 +1382,7 @@ impl<Owner: DepType, PropType: Convenient> HandlerId for DepPropHandledChangeFin
 #[educe(Debug)]
 struct DepPropHandledChangeSource<Owner: DepType, PropType: Convenient> {
     obj: Glob<Owner::Id, Owner>,
-    handler_id: Id<BoxedHandler<(PropType, PropType)>>,
+    handler_id: Id<BoxedHandler<Change<PropType>>>,
     prop: DepProp<Owner, PropType>,
 }
 
@@ -1420,17 +1413,18 @@ impl<Owner: DepType + 'static, PropType: Convenient> Source<PropType> for DepPro
         if update_parent_children_has_handlers {
             self.prop.update_parent_children_has_handlers(state, self.obj);
         }
-        let new = self.prop.current_value(state, self.obj, |x| x.clone());
+        let value = self.prop.current_value(state, self.obj, |x| x.clone());
         let prop = self.prop;
         let obj = self.obj;
+        let init = Box::new(move |state: &mut dyn State| {
+            let obj = obj.get(state);
+            let entry = prop.entry(&obj);
+            let handler = entry.handlers.value_handlers[handler_id].0.clone();
+            handler.execute(state, value);
+        });
         HandledSource {
             handler_id: Box::new(DepPropHandledValueSource { handler_id, obj: self.obj, prop: self.prop }),
-            init: Box::new(move |state| {
-                let obj = obj.get(state);
-                let entry = prop.entry(&obj);
-                let handler = entry.handlers.value_handlers[handler_id].0.clone();
-                handler.execute(state, new);
-            })
+            init: Some(init)
         }
     }
 }
@@ -1442,38 +1436,40 @@ pub struct DepPropChangeSource<Owner: DepType, PropType: Convenient> {
     prop: DepProp<Owner, PropType>,
 }
 
-impl<Owner: DepType + 'static, PropType: Convenient> Source<(PropType, PropType)> for DepPropChangeSource<Owner, PropType> {
+impl<Owner: DepType + 'static, PropType: Convenient> Source<Change<PropType>> for DepPropChangeSource<Owner, PropType> {
     fn handle(
         &self,
         state: &mut dyn State,
-        handler: Box<dyn Handler<(PropType, PropType)>>,
+        handler: Box<dyn Handler<Change<PropType>>>,
     ) -> HandledSource {
-        let change = self.prop.current_value(state, self.obj, |new| {
-            let obj = self.obj.get(state);
-            let entry = self.prop.entry(&obj);
-            if new == entry.default {
-                None
-            } else {
-                Some((entry.default.clone(), new.clone()))
-            }
-        });
         let mut obj = self.obj.get_mut(state);
         let entry = self.prop.entry_mut(&mut obj);
+        let default_value = entry.default;
         let update_parent_children_has_handlers = entry.inherits() && entry.handlers.is_empty();
         let handler_id = entry.handlers.change_handlers.insert(|handler_id| (BoxedHandler(handler), handler_id));
         if update_parent_children_has_handlers {
             self.prop.update_parent_children_has_handlers(state, self.obj);
         }
-        let prop = self.prop;
-        let obj = self.obj;
-        HandledSource {
-            handler_id: Box::new(DepPropHandledChangeSource { handler_id, obj: self.obj, prop: self.prop }),
-            init: Box::new(move |state| if let Some(change) = change {
+        let change = self.prop.current_value(state, self.obj, |value| {
+            if value == default_value {
+                None
+            } else {
+                Some(Change { old: default_value.clone(), new: value.clone() })
+            }
+        });
+        let init = change.map(|change| {
+            let prop = self.prop;
+            let obj = self.obj;
+            Box::new(move |state: &mut dyn State| {
                 let obj = obj.get(state);
                 let entry = prop.entry(&obj);
                 let handler = entry.handlers.change_handlers[handler_id].0.clone();
                 handler.execute(state, change);
-            })
+            }) as _
+        });
+        HandledSource {
+            handler_id: Box::new(DepPropHandledChangeSource { handler_id, obj: self.obj, prop: self.prop }),
+            init
         }
     }
 }
@@ -1485,39 +1481,41 @@ pub struct DepPropChangeInitialSource<Owner: DepType, PropType: Convenient> {
     prop: DepProp<Owner, PropType>,
 }
 
-impl<Owner: DepType + 'static, PropType: Convenient> Source<(PropType, PropType)> for DepPropChangeInitialSource<Owner, PropType> {
+impl<Owner: DepType + 'static, PropType: Convenient> Source<Change<PropType>> for DepPropChangeInitialSource<Owner, PropType> {
     fn handle(
         &self,
         state: &mut dyn State,
-        handler: Box<dyn Handler<(PropType, PropType)>>,
+        handler: Box<dyn Handler<Change<PropType>>>,
     ) -> HandledSource {
-        let change = self.prop.current_value(state, self.obj, |new| {
-            let obj = self.obj.get(state);
-            let entry = self.prop.entry(&obj);
-            if new == entry.default {
-                None
-            } else {
-                Some((entry.default.clone(), new.clone()))
-            }
-        });
         let mut obj = self.obj.get_mut(state);
         let entry = self.prop.entry_mut(&mut obj);
+        let default_value = entry.default;
         let update_parent_children_has_handlers = entry.inherits() && entry.handlers.is_empty();
         let handler = entry.handlers.change_initial_handler.replace(handler);
         assert!(handler.is_none(), "duplicate initial handler");
         if update_parent_children_has_handlers {
             self.prop.update_parent_children_has_handlers(state, self.obj);
         }
-        let prop = self.prop;
-        let obj = self.obj;
-        HandledSource {
-            handler_id: Box::new(DepPropHandledChangeInitialSource { obj: self.obj, prop: self.prop }),
-            init: Box::new(move |state| if let Some(change) = change {
+        let change = self.prop.current_value(state, self.obj, |value| {
+            if value == default_value {
+                None
+            } else {
+                Some(Change { old: default_value.clone(), new: value.clone() })
+            }
+        });
+        let init = change.map(|change| {
+            let prop = self.prop;
+            let obj = self.obj;
+            Box::new(move |state: &mut dyn State| {
                 let obj = obj.get(state);
                 let entry = prop.entry(&obj);
                 let handler = entry.handlers.change_initial_handler.clone().unwrap();
                 handler.execute(state, change);
-            })
+            }) as _
+        });
+        HandledSource {
+            handler_id: Box::new(DepPropHandledChangeInitialSource { obj: self.obj, prop: self.prop }),
+            init
         }
     }
 }
@@ -1529,39 +1527,41 @@ pub struct DepPropChangeFinalSource<Owner: DepType, PropType: Convenient> {
     prop: DepProp<Owner, PropType>,
 }
 
-impl<Owner: DepType + 'static, PropType: Convenient> Source<(PropType, PropType)> for DepPropChangeFinalSource<Owner, PropType> {
+impl<Owner: DepType + 'static, PropType: Convenient> Source<Change<PropType>> for DepPropChangeFinalSource<Owner, PropType> {
     fn handle(
         &self,
         state: &mut dyn State,
-        handler: Box<dyn Handler<(PropType, PropType)>>,
+        handler: Box<dyn Handler<Change<PropType>>>,
     ) -> HandledSource {
-        let change = self.prop.current_value(state, self.obj, |new| {
-            let obj = self.obj.get(state);
-            let entry = self.prop.entry(&obj);
-            if new == entry.default {
-                None
-            } else {
-                Some((entry.default.clone(), new.clone()))
-            }
-        });
         let mut obj = self.obj.get_mut(state);
         let entry = self.prop.entry_mut(&mut obj);
+        let default_value = entry.default;
         let update_parent_children_has_handlers = entry.inherits() && entry.handlers.is_empty();
         let handler = entry.handlers.change_final_handler.replace(handler);
         assert!(handler.is_none(), "duplicate final handler");
         if update_parent_children_has_handlers {
             self.prop.update_parent_children_has_handlers(state, self.obj);
         }
-        let prop = self.prop;
-        let obj = self.obj;
-        HandledSource {
-            handler_id: Box::new(DepPropHandledChangeFinalSource { obj: self.obj, prop: self.prop }),
-            init: Box::new(move |state| if let Some(change) = change {
+        let change = self.prop.current_value(state, self.obj, |value| {
+            if value == default_value {
+                None
+            } else {
+                Some(Change { old: default_value.clone(), new: value.clone() })
+            }
+        });
+        let init = change.map(|change| {
+            let prop = self.prop;
+            let obj = self.obj;
+            Box::new(move |state: &mut dyn State| {
                 let obj = obj.get(state);
                 let entry = prop.entry(&obj);
                 let handler = entry.handlers.change_final_handler.clone().unwrap();
                 handler.execute(state, change);
-            })
+            }) as _
+        });
+        HandledSource {
+            handler_id: Box::new(DepPropHandledChangeFinalSource { obj: self.obj, prop: self.prop }),
+            init
         }
     }
 }
@@ -1584,65 +1584,33 @@ impl<Owner: DepType, ItemType: Convenient> HandlerId for DepVecChangedHandledSou
 
 #[derive(Educe)]
 #[educe(Debug)]
-struct DepVecInsertedItemsHandledInitialSource<Owner: DepType, ItemType: Convenient> {
+struct DepVecItemHandledInitialFinalSource<Owner: DepType, ItemType: Convenient> {
     obj: Glob<Owner::Id, Owner>,
     vec: DepVec<Owner, ItemType>,
 }
 
-impl<Owner: DepType, ItemType: Convenient> HandlerId for DepVecInsertedItemsHandledInitialSource<Owner, ItemType> {
+impl<Owner: DepType, ItemType: Convenient> HandlerId for DepVecItemHandledInitialFinalSource<Owner, ItemType> {
     fn unhandle(&self, state: &mut dyn State) {
         let mut obj = self.obj.get_mut(state);
         let entry_mut = self.vec.entry_mut(&mut obj);
-        let handler = entry_mut.handlers.inserted_items_initial_handler.take();
+        let handler = entry_mut.handlers.item_initial_final_handler.take();
         debug_assert!(handler.is_some());
     }
 }
 
 #[derive(Educe)]
 #[educe(Debug)]
-struct DepVecRemovedItemsHandledFinalSource<Owner: DepType, ItemType: Convenient> {
+struct DepVecItemHandledSource<Owner: DepType, ItemType: Convenient> {
     obj: Glob<Owner::Id, Owner>,
+    handler_id: Id<BoxedHandler<InsertRemove<ItemType>>>,
     vec: DepVec<Owner, ItemType>,
 }
 
-impl<Owner: DepType, ItemType: Convenient> HandlerId for DepVecRemovedItemsHandledFinalSource<Owner, ItemType> {
+impl<Owner: DepType, ItemType: Convenient> HandlerId for DepVecItemHandledSource<Owner, ItemType> {
     fn unhandle(&self, state: &mut dyn State) {
         let mut obj = self.obj.get_mut(state);
         let entry_mut = self.vec.entry_mut(&mut obj);
-        let handler = entry_mut.handlers.removed_items_final_handler.take();
-        debug_assert!(handler.is_some());
-    }
-}
-
-#[derive(Educe)]
-#[educe(Debug)]
-struct DepVecInsertedItemsHandledSource<Owner: DepType, ItemType: Convenient> {
-    obj: Glob<Owner::Id, Owner>,
-    handler_id: Id<BoxedHandler<ItemType>>,
-    vec: DepVec<Owner, ItemType>,
-}
-
-impl<Owner: DepType, ItemType: Convenient> HandlerId for DepVecInsertedItemsHandledSource<Owner, ItemType> {
-    fn unhandle(&self, state: &mut dyn State) {
-        let mut obj = self.obj.get_mut(state);
-        let entry_mut = self.vec.entry_mut(&mut obj);
-        entry_mut.handlers.inserted_item_handlers.remove(self.handler_id);
-    }
-}
-
-#[derive(Educe)]
-#[educe(Debug)]
-struct DepVecRemovedItemsHandledSource<Owner: DepType, ItemType: Convenient> {
-    obj: Glob<Owner::Id, Owner>,
-    handler_id: Id<BoxedHandler<ItemType>>,
-    vec: DepVec<Owner, ItemType>,
-}
-
-impl<Owner: DepType, ItemType: Convenient> HandlerId for DepVecRemovedItemsHandledSource<Owner, ItemType> {
-    fn unhandle(&self, state: &mut dyn State) {
-        let mut obj = self.obj.get_mut(state);
-        let entry_mut = self.vec.entry_mut(&mut obj);
-        entry_mut.handlers.removed_item_handlers.remove(self.handler_id);
+        entry_mut.handlers.item_handlers.remove(self.handler_id);
     }
 }
 
@@ -1661,130 +1629,99 @@ impl<Owner: DepType + 'static, ItemType: Convenient> Source<()> for DepVecChange
     ) -> HandledSource {
         let mut obj = self.obj.get_mut(state);
         let entry = self.vec.entry_mut(&mut obj);
-        let changed = if entry.items.is_empty() { None } else { Some(()) };
+        let changed = !entry.items.is_empty();
         let handler_id = entry.handlers.changed_handlers.insert(|handler_id| (BoxedHandler(handler), handler_id));
-        let vec = self.vec;
-        let obj = self.obj;
-        HandledSource {
-            handler_id: Box::new(DepVecChangedHandledSource { handler_id, obj: self.obj, vec: self.vec }),
-            init: Box::new(move |state| if let Some(changed) = changed {
+        let init = if changed {
+            let vec = self.vec;
+            let obj = self.obj;
+            Some(Box::new(move |state: &mut dyn State| {
                 let obj = obj.get(state);
                 let entry = vec.entry(&obj);
                 let handler = entry.handlers.changed_handlers[handler_id].0.clone();
-                handler.execute(state, changed);
-            })
+                handler.execute(state, ());
+            }) as _)
+        } else {
+            None
+        };
+        HandledSource {
+            handler_id: Box::new(DepVecChangedHandledSource { handler_id, obj: self.obj, vec: self.vec }),
+            init
         }
     }
 }
 
 #[derive(Educe)]
 #[educe(Debug)]
-pub struct DepVecInsertedItemSource<Owner: DepType, ItemType: Convenient> {
+pub struct DepVecItemSource<Owner: DepType, ItemType: Convenient> {
     obj: Glob<Owner::Id, Owner>,
     vec: DepVec<Owner, ItemType>,
 }
 
-impl<Owner: DepType + 'static, ItemType: Convenient> Source<ItemType> for DepVecInsertedItemSource<Owner, ItemType> {
+impl<Owner: DepType + 'static, ItemType: Convenient> Source<InsertRemove<ItemType>> for DepVecItemSource<Owner, ItemType> {
     fn handle(
         &self,
         state: &mut dyn State,
-        handler: Box<dyn Handler<ItemType>>,
+        handler: Box<dyn Handler<InsertRemove<ItemType>>>,
     ) -> HandledSource {
         let mut obj = self.obj.get_mut(state);
         let entry = self.vec.entry_mut(&mut obj);
         let items = entry.items.clone();
-        let handler_id = entry.handlers.inserted_item_handlers.insert(|handler_id| (BoxedHandler(handler), handler_id));
-        let vec = self.vec;
-        let obj = self.obj;
-        HandledSource {
-            handler_id: Box::new(DepVecInsertedItemsHandledSource { handler_id, obj: self.obj, vec: self.vec }),
-            init: Box::new(move |state| {
+        let handler_id = entry.handlers.item_handlers.insert(|handler_id| (BoxedHandler(handler), handler_id));
+        let init = if items.is_empty() {
+            None
+        } else {
+            let vec = self.vec;
+            let obj = self.obj;
+            Some(Box::new(move |state: &mut dyn State| {
                 let obj = obj.get(state);
                 let entry = vec.entry(&obj);
-                let handler = entry.handlers.inserted_item_handlers[handler_id].0.clone();
+                let handler = entry.handlers.item_handlers[handler_id].0.clone();
                 for item in items {
-                    handler.execute(state, item);
+                    handler.execute(state, InsertRemove { remove: false, item });
                 }
-            })
+            }) as _)
+        };
+        HandledSource {
+            handler_id: Box::new(DepVecItemHandledSource { handler_id, obj: self.obj, vec: self.vec }),
+            init
         }
     }
 }
 
 #[derive(Educe)]
 #[educe(Debug)]
-pub struct DepVecInsertedItemsInitialSource<Owner: DepType, ItemType: Convenient> {
+pub struct DepVecItemInitialFinalSource<Owner: DepType, ItemType: Convenient> {
     obj: Glob<Owner::Id, Owner>,
     vec: DepVec<Owner, ItemType>,
 }
 
-impl<Owner: DepType + 'static, ItemType: Convenient> Source<ItemType> for DepVecInsertedItemsInitialSource<Owner, ItemType> {
+impl<Owner: DepType + 'static, ItemType: Convenient> Source<InsertRemove<ItemType>> for DepVecItemInitialFinalSource<Owner, ItemType> {
     fn handle(
         &self,
         state: &mut dyn State,
-        handler: Box<dyn Handler<ItemType>>,
+        handler: Box<dyn Handler<InsertRemove<ItemType>>>,
     ) -> HandledSource {
         let mut obj = self.obj.get_mut(state);
         let entry = self.vec.entry_mut(&mut obj);
         let items = entry.items.clone();
-        assert!(entry.handlers.inserted_items_initial_handler.replace(handler).is_none(), "duplicate initial handler");
-        let vec = self.vec;
-        let obj = self.obj;
-        HandledSource {
-            handler_id: Box::new(DepVecInsertedItemsHandledInitialSource { obj: self.obj, vec: self.vec }),
-            init: Box::new(move |state| {
+        assert!(entry.handlers.item_initial_final_handler.replace(handler).is_none(), "duplicate initial handler");
+        let init = if items.is_empty() {
+            None
+        } else {
+            let vec = self.vec;
+            let obj = self.obj;
+            Some(Box::new(move |state: &mut dyn State| {
                 let obj = obj.get(state);
                 let entry = vec.entry(&obj);
-                let handler = entry.handlers.inserted_items_initial_handler.clone().unwrap();
+                let handler = entry.handlers.item_initial_final_handler.clone().unwrap();
                 for item in items {
-                    handler.execute(state, item);
+                    handler.execute(state, InsertRemove { remove: false, item });
                 }
-            })
-        }
-    }
-}
-
-#[derive(Educe)]
-#[educe(Debug)]
-pub struct DepVecRemovedItemsFinalSource<Owner: DepType, ItemType: Convenient> {
-    obj: Glob<Owner::Id, Owner>,
-    vec: DepVec<Owner, ItemType>,
-}
-
-impl<Owner: DepType + 'static, ItemType: Convenient> Source<ItemType> for DepVecRemovedItemsFinalSource<Owner, ItemType> {
-    fn handle(
-        &self,
-        state: &mut dyn State,
-        handler: Box<dyn Handler<ItemType>>,
-    ) -> HandledSource {
-        let mut obj = self.obj.get_mut(state);
-        let entry = self.vec.entry_mut(&mut obj);
-        assert!(entry.handlers.removed_items_final_handler.replace(handler).is_none(), "duplicate final handler");
+            }) as _)
+        };
         HandledSource {
-            handler_id: Box::new(DepVecRemovedItemsHandledFinalSource { obj: self.obj, vec: self.vec }),
-            init: Box::new(move |_state| { })
-        }
-    }
-}
-
-#[derive(Educe)]
-#[educe(Debug)]
-pub struct DepVecRemovedItemSource<Owner: DepType, ItemType: Convenient> {
-    obj: Glob<Owner::Id, Owner>,
-    vec: DepVec<Owner, ItemType>,
-}
-
-impl<Owner: DepType + 'static, ItemType: Convenient> Source<ItemType> for DepVecRemovedItemSource<Owner, ItemType> {
-    fn handle(
-        &self,
-        state: &mut dyn State,
-        handler: Box<dyn Handler<ItemType>>,
-    ) -> HandledSource {
-        let mut obj = self.obj.get_mut(state);
-        let entry = self.vec.entry_mut(&mut obj);
-        let handler_id = entry.handlers.removed_item_handlers.insert(|handler_id| (BoxedHandler(handler), handler_id));
-        HandledSource {
-            handler_id: Box::new(DepVecRemovedItemsHandledSource { handler_id, obj: self.obj, vec: self.vec }),
-            init: Box::new(|_state| { })
+            handler_id: Box::new(DepVecItemHandledInitialFinalSource { obj: self.obj, vec: self.vec }),
+            init
         }
     }
 }

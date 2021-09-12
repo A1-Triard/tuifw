@@ -57,7 +57,7 @@ pub trait HandlerId: Debug {
 pub struct HandledSource {
     pub handler_id: Box<dyn HandlerId>,
     #[educe(Debug(ignore))]
-    pub init: Box<dyn FnOnce(&mut dyn State)>,
+    pub init: Option<Box<dyn FnOnce(&mut dyn State)>>,
 }
 
 trait AnyBindingNode: Debug + Downcast {
@@ -311,7 +311,7 @@ macro_rules! binding_n {
                         if sources. [< source_ $i >] .replace((source.handler_id, None)).is_some() {
                             panic!("duplicate source");
                         }
-                        (source.init)(state);
+                        source.init.map(|x| x(state));
                     }
                 )*
             }
@@ -513,7 +513,7 @@ macro_rules! binding_n {
                         if sources. [< source_ $i >] .replace((source.handler_id, None)).is_some() {
                             panic!("duplicate source");
                         }
-                        (source.init)(state);
+                        source.init.map(|x| x(state));
                     }
                 )*
 
@@ -529,7 +529,7 @@ macro_rules! binding_n {
                     if sources.event_source.replace(source.handler_id).is_some() {
                         panic!("duplicate event source");
                     }
-                    (source.init)(state);
+                    source.init.map(|x| x(state));
                 }
             }
 

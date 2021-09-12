@@ -205,8 +205,8 @@ fn main() {
     let print_out = EventBinding0::new(state, (), |_, (), x| x);
     print_out.set_event_source(state, &mut NotLegs::OUT.change_source(chips.not_2.legs()));
     print_out.set_target_fn(state, (), |_, (), change| {
-        let old = if change.0 { "1" } else { "0" };
-        let new = if change.1 { "1" } else { "0" };
+        let old = if change.old { "1" } else { "0" };
+        let new = if change.new { "1" } else { "0" };
         println!("{} -> {}", old, new);
     });
     OrLegs::IN_1.set(state, chips.or_1.legs(), true);
