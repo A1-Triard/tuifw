@@ -52,7 +52,7 @@ pub trait EventHandler<T>: Debug + DynClone + Send + Sync {
 clone_trait_object!(<T> EventHandler<T>);
 
 pub trait ValueSource<T: Convenient>: Debug {
-    fn handle(&self, state: &mut dyn State, handler: Box<dyn ValueHandler<T>>) -> HandledValueSource<T>;
+    fn handle(&self, state: &mut dyn State, handler: Box<dyn ValueHandler<T>>) -> HandledValueSource;
 }
 
 pub trait EventSource<T>: Debug {
@@ -68,10 +68,12 @@ pub trait HandlerId: Debug {
     fn unhandle(&self, state: &mut dyn State);
 }
 
-#[derive(Debug)]
-pub struct HandledValueSource<T: Convenient> {
+#[derive(Educe)]
+#[educe(Debug)]
+pub struct HandledValueSource {
     pub handler_id: Box<dyn HandlerId>,
-    pub value: T,
+    #[educe(Debug(ignore))]
+    pub init: Box<dyn FnOnce(&mut dyn State)>,
 }
 
 #[derive(Educe)]
@@ -222,7 +224,7 @@ macro_rules! binding_n {
             struct [< Binding $n NodeSources >] <P: Convenient, $( [< S $i >] : Convenient, )* T: Convenient> {
                 param: P,
                 $(
-                    [< source_ $i >] : Option<HandledValueSource< [< S $i >] >>,
+                    [< source_ $i >] : Option<(Box<dyn HandlerId>, Option< [< S $i >] >)>,
                 )*
                 #[educe(Debug(ignore))]
                 filter_map: fn(P, $( [< S $i >] ),* ) -> Option<T>,
@@ -239,7 +241,7 @@ macro_rules! binding_n {
                 fn unhandle(&mut self, state: &mut dyn State) {
                     $(
                         if let Some(source) = self. [< source_ $i >] .take() {
-                            source.handler_id.unhandle(state);
+                            source.0.unhandle(state);
                         }
                     )*
                 }
@@ -248,7 +250,11 @@ macro_rules! binding_n {
                     $(
                         let [< value_ $i >] ;
                         if let Some(source) = self. [< source_ $i >] .as_ref() {
-                            [< value_ $i >] = source.value.clone();
+                            if let Some(source) = source.1.as_ref() {
+                                [< value_ $i >] = source.clone();
+                            } else {
+                                return None;
+                            }
                         } else {
                             return None;
                         }
@@ -328,10 +334,10 @@ macro_rules! binding_n {
                         let bindings: &mut Bindings = state.get_mut();
                         let node = bindings.0[self.0].0.downcast_mut::<BindingNode<T>>().unwrap();
                         let sources = node.sources.downcast_mut::< [< Binding $n NodeSources >] <P, $( [< S $j >] ,)* T>>().unwrap();
-                        if let Some(source) = sources. [< source_ $i >] .replace(source) {
-                            source.handler_id.unhandle(state);
+                        if sources. [< source_ $i >] .replace((source.handler_id, None)).is_some() {
+                            panic!("duplicate source");
                         }
-                        knoke_target::<T>(self.0, state);
+                        (source.init)(state);
                     }
                 )*
             }
@@ -394,7 +400,7 @@ macro_rules! binding_n {
                         let bindings: &mut Bindings = state.get_mut();
                         let node = bindings.0[self.binding].0.downcast_mut::<BindingNode<T>>().unwrap();
                         let sources = node.sources.downcast_mut::< [< Binding $n NodeSources >] <P, $( [< S $j >] ,)* T>>().unwrap();
-                        sources. [< source_ $i >] .as_mut().unwrap().value = value;
+                        sources. [< source_ $i >] .as_mut().unwrap().1 = Some(value);
                         knoke_target::<T>(self.binding, state);
                     }
                 }
@@ -411,7 +417,11 @@ macro_rules! binding_n {
                 $(
                     let [< value_ $i >] ;
                     if let Some(source) = sources. [< source_ $i >] .as_ref() {
-                        [< value_ $i >] = source.value.clone();
+                        if let Some(source) = source.1.as_ref() {
+                            [< value_ $i >] = source.clone();
+                        } else {
+                            return;
+                        }
                     } else {
                         return;
                     }
@@ -429,7 +439,7 @@ macro_rules! binding_n {
             struct [< EventBinding $n NodeSources >] <P: Convenient, $( [< S $i >] : Convenient, )* E, T: Convenient> {
                 param: P,
                 $(
-                    [< source_ $i >] : Option<HandledValueSource< [< S $i >] >>,
+                    [< source_ $i >] : Option<(Box<dyn HandlerId>, Option< [< S $i >] >)>,
                 )*
                 event_source: Option<Box<dyn HandlerId>>,
                 #[educe(Debug(ignore))]
@@ -447,7 +457,7 @@ macro_rules! binding_n {
                 fn unhandle(&mut self, state: &mut dyn State) {
                     $(
                         if let Some(source) = self. [< source_ $i >] .take() {
-                            source.handler_id.unhandle(state);
+                            source.0.unhandle(state);
                         }
                     )*
                     if let Some(event_source) = self.event_source.take() {
@@ -526,10 +536,10 @@ macro_rules! binding_n {
                         let bindings: &mut Bindings = state.get_mut();
                         let node = bindings.0[self.0].0.downcast_mut::<BindingNode<T>>().unwrap();
                         let sources = node.sources.downcast_mut::< [< EventBinding $n NodeSources >] <P, $( [< S $j >] ),* , E, T>>().unwrap();
-                        if let Some(source) = sources. [< source_ $i >] .replace(source) {
-                            source.handler_id.unhandle(state);
+                        if sources. [< source_ $i >] .replace((source.handler_id, None)).is_some() {
+                            panic!("duplicate source");
                         }
-                        [< knoke_event_target_ $n >] ::<P, $( [< S $j >] ,)* E, T > (self.0, state, None);
+                        (source.init)(state);
                     }
                 )*
 
@@ -615,7 +625,7 @@ macro_rules! binding_n {
                         let bindings: &mut Bindings = state.get_mut();
                         let node = bindings.0[self.binding].0.downcast_mut::<BindingNode<T>>().unwrap();
                         let sources = node.sources.downcast_mut::< [< EventBinding $n NodeSources >] <P, $( [< S $j >] ,)* E, T>>().unwrap();
-                        sources. [< source_ $i >] .as_mut().unwrap().value = value;
+                        sources. [< source_ $i >] .as_mut().unwrap().1 = Some(value);
                         [< knoke_event_target_ $n >] ::<P, $( [< S $j >] ,)* E, T > (self.binding, state, None);
                     }
                 }

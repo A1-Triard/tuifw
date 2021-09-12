@@ -1448,7 +1448,7 @@ pub struct DepPropValueSource<Owner: DepType, PropType: Convenient> {
 }
 
 impl<Owner: DepType + 'static, PropType: Convenient> ValueSource<PropType> for DepPropValueSource<Owner, PropType> {
-    fn handle(&self, state: &mut dyn State, handler: Box<dyn ValueHandler<PropType>>) -> HandledValueSource<PropType> {
+    fn handle(&self, state: &mut dyn State, handler: Box<dyn ValueHandler<PropType>>) -> HandledValueSource {
         let mut obj = self.obj.get_mut(state);
         let entry = self.prop.entry_mut(&mut obj);
         let update_parent_children_has_handlers = entry.inherits() && entry.handlers.is_empty();
@@ -1457,9 +1457,16 @@ impl<Owner: DepType + 'static, PropType: Convenient> ValueSource<PropType> for D
             self.prop.update_parent_children_has_handlers(state, self.obj);
         }
         let new = self.prop.current_value(state, self.obj, |x| x.clone());
+        let prop = self.prop;
+        let obj = self.obj;
         HandledValueSource {
             handler_id: Box::new(DepPropHandledValueSource { handler_id, obj: self.obj, prop: self.prop }),
-            value: new
+            init: Box::new(move |state| {
+                let mut obj = obj.get_mut(state);
+                let entry = prop.entry_mut(&mut obj);
+                let handler = entry.handlers.value_handlers[handler_id].0.clone();
+                handler.execute(state, new);
+            })
         }
     }
 }
