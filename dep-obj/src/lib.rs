@@ -844,6 +844,34 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         }
     }
 
+    fn un_set_core(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: Option<PropType>) {
+        let mut obj_mut = obj.get_mut(state);
+        let entry_mut = self.entry_mut(&mut obj_mut);
+        let old = replace(&mut entry_mut.local, value.clone());
+        if old == value { return; }
+        let handlers = entry_mut.handlers.clone();
+        let mut change = if old.is_some() && value.is_some() {
+            unsafe { Change { old: old.unwrap_unchecked(), new: value.unwrap_unchecked() } }
+        } else {
+            if let Some(change) = self.non_local_value(state, obj, |non_local| {
+                let old_ref = old.as_ref().unwrap_or(non_local);
+                let value_ref = value.as_ref().unwrap_or(non_local);
+                if old_ref == value_ref {
+                    None
+                } else {
+                    let old = old.unwrap_or_else(|| non_local.clone());
+                    let new = value.unwrap_or_else(|| non_local.clone());
+                    Some(Change { old, new })
+                }
+            }) {
+                change
+            } else {
+                return;
+            }
+        };
+        handlers.execute(state, &mut change, obj, self);
+    }
+
     fn un_set(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, mut value: Option<PropType>) {
         let mut obj_mut = obj.get_mut(state);
         let entry_mut = self.entry_mut(&mut obj_mut);
@@ -854,31 +882,7 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         }
         entry_mut.enqueue = true;
         loop {
-            let mut obj_mut = obj.get_mut(state);
-            let entry_mut = self.entry_mut(&mut obj_mut);
-            let old = replace(&mut entry_mut.local, value.clone());
-            if old == value { return; }
-            let handlers = entry_mut.handlers.clone();
-            let mut change = if old.is_some() && value.is_some() {
-                unsafe { Change { old: old.unwrap_unchecked(), new: value.unwrap_unchecked() } }
-            } else {
-                if let Some(change) = self.non_local_value(state, obj, |non_local| {
-                    let old_ref = old.as_ref().unwrap_or(non_local);
-                    let value_ref = value.as_ref().unwrap_or(non_local);
-                    if old_ref == value_ref {
-                        None
-                    } else {
-                        let old = old.unwrap_or_else(|| non_local.clone());
-                        let new = value.unwrap_or_else(|| non_local.clone());
-                        Some(Change { old, new })
-                    }
-                }) {
-                    change
-                } else {
-                    return;
-                }
-            };
-            handlers.execute(state, &mut change, obj, self);
+            self.un_set_core(state, obj, value);
             let mut obj_mut = obj.get_mut(state);
             let entry_mut = self.entry_mut(&mut obj_mut);
             if let Some(queue) = entry_mut.queue.as_mut() {

@@ -90,9 +90,9 @@ mod or_chip {
         pub fn new(state: &mut dyn State) -> Chip {
             let chip = Chip::new(state, |chip| (Box::new(Self::new_priv()) as _, chip));
             let binding = Binding2::new(state, (), |(), in_1, in_2| Some(in_1 | in_2));
+            OrLegs::OUT.bind(state, chip.legs(), binding);
             binding.set_source_1(state, &mut OrLegs::IN_1.value_source(chip.legs()));
             binding.set_source_2(state, &mut OrLegs::IN_2.value_source(chip.legs()));
-            OrLegs::OUT.bind(state, chip.legs(), binding);
             chip
         }
     }
@@ -118,8 +118,8 @@ mod not_chip {
         pub fn new(state: &mut dyn State) -> Chip {
             let chip = Chip::new(state, |chip| (Box::new(Self::new_priv()) as _, chip));
             let binding = Binding1::new(state, (), |(), in_1: bool| Some(!in_1));
-            binding.set_source_1(state, &mut NotLegs::IN_.value_source(chip.legs()));
             NotLegs::OUT.bind(state, chip.legs(), binding);
+            binding.set_source_1(state, &mut NotLegs::IN_.value_source(chip.legs()));
             chip
         }
     }
@@ -191,17 +191,17 @@ fn main() {
     };
 
     let not_1_out_to_or_2_in = Binding1::new(state, (), |(), value| Some(value));
-    not_1_out_to_or_2_in.set_source_1(state, &mut NotLegs::OUT.value_source(chips.not_1.legs()));
     OrLegs::IN_2.bind(state, chips.or_2.legs(), not_1_out_to_or_2_in);
+    not_1_out_to_or_2_in.set_source_1(state, &mut NotLegs::OUT.value_source(chips.not_1.legs()));
     let not_2_out_to_or_1_in = Binding1::new(state, (), |(), value| Some(value));
-    not_2_out_to_or_1_in.set_source_1(state, &mut NotLegs::OUT.value_source(chips.not_2.legs()));
     OrLegs::IN_2.bind(state, chips.or_1.legs(), not_2_out_to_or_1_in);
+    not_2_out_to_or_1_in.set_source_1(state, &mut NotLegs::OUT.value_source(chips.not_2.legs()));
     let or_1_out_to_not_1_in = Binding1::new(state, (), |(), value| Some(value));
-    or_1_out_to_not_1_in.set_source_1(state, &mut OrLegs::OUT.value_source(chips.or_1.legs()));
     NotLegs::IN_.bind(state, chips.not_1.legs(), or_1_out_to_not_1_in);
+    or_1_out_to_not_1_in.set_source_1(state, &mut OrLegs::OUT.value_source(chips.or_1.legs()));
     let or_2_out_to_not_2_in = Binding1::new(state, (), |(), value| Some(value));
-    or_2_out_to_not_2_in.set_source_1(state, &mut OrLegs::OUT.value_source(chips.or_2.legs()));
     NotLegs::IN_.bind(state, chips.not_2.legs(), or_2_out_to_not_2_in);
+    or_2_out_to_not_2_in.set_source_1(state, &mut OrLegs::OUT.value_source(chips.or_2.legs()));
 
     let print_out = BindingExt1::new(state, (), |_state, (), change: Option<Change<bool>>| change.map(|change| {
         let old = if change.old { "1" } else { "0" };
