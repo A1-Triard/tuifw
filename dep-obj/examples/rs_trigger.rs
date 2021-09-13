@@ -128,7 +128,7 @@ mod not_chip {
 }
 
 use circuit::*;
-use dep_obj::binding::{Binding1, Bindings, EventBinding0};
+use dep_obj::binding::{Binding1, Bindings};
 use dyn_context::state::{State, StateRefMut};
 use not_chip::*;
 use or_chip::*;
@@ -202,8 +202,8 @@ fn main() {
     or_2_out_to_not_2_in.set_source_1(state, &mut OrLegs::OUT.value_source(chips.or_2.legs()));
     NotLegs::IN_.bind(state, chips.not_2.legs(), or_2_out_to_not_2_in);
 
-    let print_out = EventBinding0::new(state, (), |_, (), x| x);
-    print_out.set_event_source(state, &mut NotLegs::OUT.change_source(chips.not_2.legs()));
+    let print_out = Binding1::new(state, (), |(), x| x);
+    print_out.set_source_1(state, &mut NotLegs::OUT.change_source(chips.not_2.legs()));
     print_out.set_target_fn(state, (), |_, (), change| {
         let old = if change.old { "1" } else { "0" };
         let new = if change.new { "1" } else { "0" };

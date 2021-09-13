@@ -1305,7 +1305,10 @@ pub struct DepEventSource<Owner: DepType, ArgsType: DepEventArgs> {
     event: DepEvent<Owner, ArgsType>,
 }
 
-impl<Owner: DepType + 'static, ArgsType: DepEventArgs + 'static> Source<ArgsType> for DepEventSource<Owner, ArgsType> {
+impl<Owner: DepType + 'static, ArgsType: DepEventArgs + 'static> Source for DepEventSource<Owner, ArgsType> {
+    type Value = ArgsType;
+    type Cache = NoCache;
+
     fn handle(
         &self,
         state: &mut dyn State,
@@ -1404,7 +1407,10 @@ pub struct DepPropValueSource<Owner: DepType, PropType: Convenient> {
     prop: DepProp<Owner, PropType>,
 }
 
-impl<Owner: DepType + 'static, PropType: Convenient> Source<PropType> for DepPropValueSource<Owner, PropType> {
+impl<Owner: DepType + 'static, PropType: Convenient> Source for DepPropValueSource<Owner, PropType> {
+    type Value = PropType;
+    type Cache = ValueCache<PropType>;
+
     fn handle(&self, state: &mut dyn State, handler: Box<dyn Handler<PropType>>) -> HandledSource {
         let mut obj = self.obj.get_mut(state);
         let entry = self.prop.entry_mut(&mut obj);
@@ -1436,7 +1442,10 @@ pub struct DepPropChangeSource<Owner: DepType, PropType: Convenient> {
     prop: DepProp<Owner, PropType>,
 }
 
-impl<Owner: DepType + 'static, PropType: Convenient> Source<Change<PropType>> for DepPropChangeSource<Owner, PropType> {
+impl<Owner: DepType + 'static, PropType: Convenient> Source for DepPropChangeSource<Owner, PropType> {
+    type Value = Change<PropType>;
+    type Cache = NoCache;
+
     fn handle(
         &self,
         state: &mut dyn State,
@@ -1481,7 +1490,10 @@ pub struct DepPropChangeInitialSource<Owner: DepType, PropType: Convenient> {
     prop: DepProp<Owner, PropType>,
 }
 
-impl<Owner: DepType + 'static, PropType: Convenient> Source<Change<PropType>> for DepPropChangeInitialSource<Owner, PropType> {
+impl<Owner: DepType + 'static, PropType: Convenient> Source for DepPropChangeInitialSource<Owner, PropType> {
+    type Value = Change<PropType>;
+    type Cache = NoCache;
+
     fn handle(
         &self,
         state: &mut dyn State,
@@ -1527,7 +1539,10 @@ pub struct DepPropChangeFinalSource<Owner: DepType, PropType: Convenient> {
     prop: DepProp<Owner, PropType>,
 }
 
-impl<Owner: DepType + 'static, PropType: Convenient> Source<Change<PropType>> for DepPropChangeFinalSource<Owner, PropType> {
+impl<Owner: DepType + 'static, PropType: Convenient> Source for DepPropChangeFinalSource<Owner, PropType> {
+    type Value = Change<PropType>;
+    type Cache = NoCache;
+
     fn handle(
         &self,
         state: &mut dyn State,
@@ -1621,7 +1636,10 @@ pub struct DepVecChangedSource<Owner: DepType, ItemType: Convenient> {
     vec: DepVec<Owner, ItemType>,
 }
 
-impl<Owner: DepType + 'static, ItemType: Convenient> Source<()> for DepVecChangedSource<Owner, ItemType> {
+impl<Owner: DepType + 'static, ItemType: Convenient> Source for DepVecChangedSource<Owner, ItemType> {
+    type Value = ();
+    type Cache = NoCache;
+
     fn handle(
         &self,
         state: &mut dyn State,
@@ -1657,7 +1675,10 @@ pub struct DepVecItemSource<Owner: DepType, ItemType: Convenient> {
     vec: DepVec<Owner, ItemType>,
 }
 
-impl<Owner: DepType + 'static, ItemType: Convenient> Source<InsertRemove<ItemType>> for DepVecItemSource<Owner, ItemType> {
+impl<Owner: DepType + 'static, ItemType: Convenient> Source for DepVecItemSource<Owner, ItemType> {
+    type Value = InsertRemove<ItemType>;
+    type Cache = NoCache;
+
     fn handle(
         &self,
         state: &mut dyn State,
@@ -1695,7 +1716,10 @@ pub struct DepVecItemInitialFinalSource<Owner: DepType, ItemType: Convenient> {
     vec: DepVec<Owner, ItemType>,
 }
 
-impl<Owner: DepType + 'static, ItemType: Convenient> Source<InsertRemove<ItemType>> for DepVecItemInitialFinalSource<Owner, ItemType> {
+impl<Owner: DepType + 'static, ItemType: Convenient> Source for DepVecItemInitialFinalSource<Owner, ItemType> {
+    type Value = InsertRemove<ItemType>;
+    type Cache = NoCache;
+
     fn handle(
         &self,
         state: &mut dyn State,
