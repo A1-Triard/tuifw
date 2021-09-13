@@ -362,7 +362,7 @@ pub struct DepPropEntry<PropType: Convenient> {
     style: Option<PropType>,
     local: Option<PropType>,
     handlers: DepPropHandlers<PropType>,
-    binding: Option<Binding<PropType>>,
+    binding: Option<BindingBase<PropType>>,
     queue: Option<VecDeque<Option<PropType>>>,
     enqueue: bool,
 }
@@ -388,7 +388,7 @@ impl<PropType: Convenient> DepPropEntry<PropType> {
     }
 
     #[doc(hidden)]
-    pub fn binding(&self) -> Option<Binding<PropType>> {
+    pub fn binding(&self) -> Option<BindingBase<PropType>> {
         self.binding
     }
 }
@@ -506,7 +506,7 @@ impl<ItemType: Convenient> DepVecEntry<ItemType> {
 #[derive(Debug)]
 pub struct BaseDepObjCore<Owner: DepType> {
     style: Option<Style<Owner>>,
-    added_bindings: Vec<AnyBinding>,
+    added_bindings: Vec<AnyBindingBase>,
 }
 
 impl<Owner: DepType> BaseDepObjCore<Owner> {
@@ -517,7 +517,8 @@ impl<Owner: DepType> BaseDepObjCore<Owner> {
         }
     }
 
-    pub fn take_bindings(&mut self) -> Vec<AnyBinding> { take(&mut self.added_bindings) }
+    #[doc(hidden)]
+    pub fn take_bindings(&mut self) -> Vec<AnyBindingBase> { take(&mut self.added_bindings) }
 }
 
 pub trait DepObjIdBase: ComponentId {
@@ -661,7 +662,7 @@ pub trait DepType: Debug {
     fn take_all_handlers(&mut self) -> Vec<Box<dyn AnyHandler>>;
 
     #[doc(hidden)]
-    fn take_added_bindings_and_collect_all(&mut self) -> Vec<AnyBinding>;
+    fn take_added_bindings_and_collect_all(&mut self) -> Vec<AnyBindingBase>;
 
     #[doc(hidden)]
     fn update_parent_children_has_handlers(state: &mut dyn State, obj: Glob<Self::Id, Self>) where Self: Sized;
@@ -903,7 +904,7 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         self,
         state: &mut dyn State,
         obj: Glob<Owner::Id, Owner>,
-        binding: Binding<PropType>
+        binding: BindingBase<PropType>
     ) where Owner: 'static {
         self.unbind(state, obj);
         let mut obj_mut = obj.get_mut(state);
@@ -916,7 +917,7 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         self,
         state: &mut dyn State,
         obj: Glob<Owner::Id, Owner>,
-        binding: impl Into<Binding<PropType>>
+        binding: impl Into<BindingBase<PropType>>
     ) where Owner: 'static {
         self.bind_raw(state, obj, binding.into());
     }
@@ -1115,12 +1116,12 @@ impl<Owner: DepType> Glob<Owner::Id, Owner> {
         self.id.parent(state).map(|id| Glob { id, descriptor: self.descriptor })
     }
 
-    fn add_binding_raw(self, state: &mut dyn State, binding: AnyBinding) {
+    fn add_binding_raw(self, state: &mut dyn State, binding: AnyBindingBase) {
         let mut obj_mut = self.get_mut(state);
         obj_mut.core_base_priv_mut().added_bindings.push(binding);
     }
 
-    pub fn add_binding(self, state: &mut dyn State, binding: impl Into<AnyBinding>) {
+    pub fn add_binding(self, state: &mut dyn State, binding: impl Into<AnyBindingBase>) {
         self.add_binding_raw(state, binding.into());
     }
 
@@ -2159,7 +2160,7 @@ macro_rules! dep_type_impl_raw {
             [
                 $($core_bindings)*
                 $this . $field .binding().map(|x| $bindings.push(
-                    <$crate::binding::AnyBinding as $crate::std_convert_From<$crate::binding::Binding<$field_ty>>>::from(x)
+                    <$crate::binding::AnyBindingBase as $crate::std_convert_From<$crate::binding::BindingBase<$field_ty>>>::from(x)
                 ));
             ]
             [
@@ -2232,7 +2233,7 @@ macro_rules! dep_type_impl_raw {
             [
                 $($core_bindings)*
                 $this . $field .binding().map(|x| $bindings.push(
-                    <$crate::binding::AnyBinding as $crate::std_convert_From<$crate::binding::Binding<$field_ty>>>::from(x)
+                    <$crate::binding::AnyBindingBase as $crate::std_convert_From<$crate::binding::BindingBase<$field_ty>>>::from(x)
                 ));
             ]
             [
@@ -2581,7 +2582,7 @@ macro_rules! dep_type_impl_raw {
                     $handlers
                 }
 
-                fn dep_type_core_take_added_bindings_and_collect_all(&mut self) -> $crate::std_vec_Vec<$crate::binding::AnyBinding> {
+                fn dep_type_core_take_added_bindings_and_collect_all(&mut self) -> $crate::std_vec_Vec<$crate::binding::AnyBindingBase> {
                     let mut $bindings = self.dep_type_core_base.take_bindings();
                     let $this = self;
                     $($core_bindings)*
@@ -2621,7 +2622,7 @@ macro_rules! dep_type_impl_raw {
                 }
 
                 #[doc(hidden)]
-                fn take_added_bindings_and_collect_all(&mut self) -> $crate::std_vec_Vec<$crate::binding::AnyBinding> {
+                fn take_added_bindings_and_collect_all(&mut self) -> $crate::std_vec_Vec<$crate::binding::AnyBindingBase> {
                     self.core.dep_type_core_take_added_bindings_and_collect_all()
                 }
 
