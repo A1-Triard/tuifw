@@ -63,7 +63,9 @@ impl<T: Convenient> SourceCache<T> for ValueCache<T> {
 
     fn update(&mut self, value: T) { self.0 = Some(value); }
 
-    fn get(&self, _current: Option<T>) -> Option<T> { self.0.clone() }
+    fn get(&self, current: Option<T>) -> Option<T> {
+        current.map_or_else(|| self.0.clone(), |current| Some(current))
+    }
 }
 
 #[derive(Educe)]
