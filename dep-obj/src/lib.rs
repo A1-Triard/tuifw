@@ -258,6 +258,15 @@ impl<Id: ComponentId, Obj> Glob<Id, Obj> {
 }
 
 macro_attr! {
+    #[derive(Educe, Component!(class=ItemHandlerComponent))]
+    #[educe(Debug)]
+    struct ItemHandler<ItemType: Convenient> {
+        handler: Box<dyn Handler<InsertRemove<ItemType>>>,
+        refresh: Option<BindingBase<()>>,
+    }
+}
+
+macro_attr! {
     #[derive(Educe, Component!(class=HandlerComponent))]
     #[educe(Debug, Clone)]
     struct BoxedHandler<T>(Box<dyn Handler<T>>);
@@ -417,7 +426,7 @@ impl<ArgsType: DepEventArgs> DepEventEntry<ArgsType> {
 #[derive(Debug)]
 struct DepVecHandlers<ItemType: Convenient> {
     changed_handlers: Arena<BoxedHandler<()>>,
-    item_handlers: Arena<BoxedHandler<InsertRemove<ItemType>>>,
+    item_handlers: Arena<ItemHandler<ItemType>>,
     item_initial_final_handler: Option<Box<dyn Handler<InsertRemove<ItemType>>>>,
 }
 
@@ -432,14 +441,14 @@ impl<ItemType: Convenient> DepVecHandlers<ItemType> {
 
     fn take_all(&mut self, handlers: &mut Vec<Box<dyn AnyHandler>>) {
         handlers.extend(take(&mut self.changed_handlers).into_items().into_values().map(|x| x.0.into_any()));
-        handlers.extend(take(&mut self.item_handlers).into_items().into_values().map(|x| x.0.into_any()));
+        handlers.extend(take(&mut self.item_handlers).into_items().into_values().map(|x| x.handler.into_any()));
         self.item_initial_final_handler.take().map(|x| handlers.push(x.into_any()));
     }
 
     fn clone(&self) -> DepVecHandlersCopy<ItemType> {
         DepVecHandlersCopy {
             changed_handlers: self.changed_handlers.items().clone().into_values(),
-            item_handlers: self.item_handlers.items().clone().into_values(),
+            item_handlers: self.item_handlers.items().values().map(|x| x.handler.clone()).collect(),
             item_initial_final_handler: self.item_initial_final_handler.clone(),
         }
     }
@@ -448,7 +457,7 @@ impl<ItemType: Convenient> DepVecHandlers<ItemType> {
 #[derive(Debug)]
 struct DepVecHandlersCopy<ItemType: Convenient> {
     changed_handlers: ArenaItemsIntoValues<BoxedHandler<()>>,
-    item_handlers: ArenaItemsIntoValues<BoxedHandler<InsertRemove<ItemType>>>,
+    item_handlers: Vec<Box<dyn Handler<InsertRemove<ItemType>>>>,
     item_initial_final_handler: Option<Box<dyn Handler<InsertRemove<ItemType>>>>,
 }
 
@@ -463,7 +472,7 @@ impl<ItemType: Convenient> DepVecHandlersCopy<ItemType> {
         }
         for handler in self.item_handlers {
             for item in items {
-                handler.0.execute(state, InsertRemove { remove, item: item.clone() });
+                handler.execute(state, InsertRemove { remove, item: item.clone() });
             }
         }
         if remove {
@@ -500,6 +509,13 @@ impl<ItemType: Convenient> DepVecEntry<ItemType> {
     #[doc(hidden)]
     pub fn take_all_handlers(&mut self, handlers: &mut Vec<Box<dyn AnyHandler>>) {
         self.handlers.take_all(handlers);
+    }
+
+    #[doc(hidden)]
+    pub fn collect_all_bindings(&mut self, bindings: &mut Vec<AnyBindingBase>) {
+        for binding in self.handlers.item_handlers.items().values().filter_map(|x| x.refresh) {
+            bindings.push(binding.into());
+        }
     }
 }
 
@@ -1107,7 +1123,11 @@ impl<Owner: DepType, ItemType: Convenient> DepVec<Owner, ItemType> {
     }
 
     pub fn item_source(self, obj: Glob<Owner::Id, Owner>) -> DepVecItemSource<Owner, ItemType> {
-        DepVecItemSource { obj, vec: self }
+        DepVecItemSource { obj, vec: self, refresh: None }
+    }
+
+    pub fn item_source_with_refresh(self, refresh: impl Into<BindingBase<()>>, obj: Glob<Owner::Id, Owner>) -> DepVecItemSource<Owner, ItemType> {
+        DepVecItemSource { obj, vec: self, refresh: Some(refresh.into()) }
     }
 
     pub fn item_initial_final_source(self, obj: Glob<Owner::Id, Owner>) -> DepVecItemInitialFinalSource<Owner, ItemType> {
@@ -1622,7 +1642,7 @@ impl<Owner: DepType, ItemType: Convenient> HandlerId for DepVecItemHandledInitia
 #[educe(Debug)]
 struct DepVecItemHandledSource<Owner: DepType, ItemType: Convenient> {
     obj: Glob<Owner::Id, Owner>,
-    handler_id: Id<BoxedHandler<InsertRemove<ItemType>>>,
+    handler_id: Id<ItemHandler<ItemType>>,
     vec: DepVec<Owner, ItemType>,
 }
 
@@ -1678,6 +1698,7 @@ impl<Owner: DepType + 'static, ItemType: Convenient> Source for DepVecChangedSou
 pub struct DepVecItemSource<Owner: DepType, ItemType: Convenient> {
     obj: Glob<Owner::Id, Owner>,
     vec: DepVec<Owner, ItemType>,
+    refresh: Option<BindingBase<()>>,
 }
 
 impl<Owner: DepType + 'static, ItemType: Convenient> Source for DepVecItemSource<Owner, ItemType> {
@@ -1692,7 +1713,9 @@ impl<Owner: DepType + 'static, ItemType: Convenient> Source for DepVecItemSource
         let mut obj = self.obj.get_mut(state);
         let entry = self.vec.entry_mut(&mut obj);
         let items = entry.items.clone();
-        let handler_id = entry.handlers.item_handlers.insert(|handler_id| (BoxedHandler(handler), handler_id));
+        let handler_id = entry.handlers.item_handlers.insert(
+            |handler_id| (ItemHandler { handler, refresh: self.refresh }, handler_id)
+        );
         let init = if items.is_empty() {
             None
         } else {
@@ -1701,7 +1724,7 @@ impl<Owner: DepType + 'static, ItemType: Convenient> Source for DepVecItemSource
             Some(Box::new(move |state: &mut dyn State| {
                 let obj = obj.get(state);
                 let entry = vec.entry(&obj);
-                let handler = entry.handlers.item_handlers[handler_id].0.clone();
+                let handler = entry.handlers.item_handlers[handler_id].handler.clone();
                 for item in items {
                     handler.execute(state, InsertRemove { remove: false, item });
                 }
@@ -2475,6 +2498,7 @@ macro_rules! dep_type_impl_raw {
             ]
             [
                 $($core_bindings)*
+                $this . $field .collect_all_bindings(&mut $bindings);
             ]
             [
                 $($core_handlers)*
