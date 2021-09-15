@@ -4,6 +4,7 @@
 #![feature(const_mut_refs)]
 #![feature(const_ptr_offset_from)]
 #![feature(const_raw_ptr_deref)]
+#![feature(never_type)]
 #![feature(option_result_unwrap_unchecked)]
 #![feature(try_reserve)]
 #![feature(unchecked_math)]
@@ -744,15 +745,16 @@ impl<Owner: DepType, ArgsType: DepEventArgs> DepEvent<Owner, ArgsType> {
         bubble
     }
 
-    pub fn raise(self, state: &mut dyn State, mut obj: Glob<Owner::Id, Owner>, args: &mut ArgsType) {
+    pub fn raise<X: Convenient>(self, state: &mut dyn State, mut obj: Glob<Owner::Id, Owner>, args: &mut ArgsType) -> BYield<X> {
         let bubble = self.raise_raw(state, obj, args);
-        if !bubble || args.handled() { return; }
+        if !bubble || args.handled() { return b_continue(); }
         while let Some(parent) = obj.parent(state) {
             obj = parent;
             let bubble = self.raise_raw(state, obj, args);
             debug_assert!(bubble);
-            if args.handled() { return; }
+            if args.handled() { return b_continue(); }
         }
+        b_continue()
     }
 
     pub fn source(self, obj: Glob<Owner::Id, Owner>) -> DepEventSource<Owner, ArgsType> {
@@ -926,12 +928,14 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         entry_mut.enqueue = false;
     }
 
-    pub fn set(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: PropType) {
+    pub fn set<X: Convenient>(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: PropType) -> BYield<X> {
         self.un_set(state, obj, Some(value));
+        b_continue()
     }
 
-    pub fn unset(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>) {
+    pub fn unset<X: Convenient>(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>) -> BYield<X> {
         self.un_set(state, obj, None);
+        b_continue()
     }
 
     fn bind_raw(
@@ -998,7 +1002,7 @@ struct DepPropSet<Owner: DepType, PropType: Convenient> {
 
 impl<Owner: DepType, PropType: Convenient> Target<PropType> for DepPropSet<Owner, PropType> {
     fn execute(&self, state: &mut dyn State, value: PropType) {
-        self.prop.set(state, self.obj, value);
+        let _: BYield<!> = self.prop.set(state, self.obj, value);
     }
 
     fn clear(&self, state: &mut dyn State) {
@@ -1109,24 +1113,29 @@ impl<Owner: DepType, ItemType: Convenient> DepVec<Owner, ItemType> {
         entry_mut.enqueue = false;
     }
 
-    pub fn clear(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>) {
+    pub fn clear<X: Convenient>(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>) -> BYield<X> {
         self.modify(state, obj, DepVecModification::Clear);
+        b_continue()
     }
 
-    pub fn push(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, item: ItemType) {
+    pub fn push<X: Convenient>(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, item: ItemType) -> BYield<X> {
         self.modify(state, obj, DepVecModification::Push(item));
+        b_continue()
     }
 
-    pub fn insert(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, index: usize, item: ItemType) {
+    pub fn insert<X: Convenient>(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, index: usize, item: ItemType) -> BYield<X> {
         self.modify(state, obj, DepVecModification::Insert(index, item));
+        b_continue()
     }
 
-    pub fn remove(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, index: usize) {
+    pub fn remove<X: Convenient>(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, index: usize) -> BYield<X> {
         self.modify(state, obj, DepVecModification::Remove(index));
+        b_continue()
     }
 
-    pub fn extend_from(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, other: Vec<ItemType>) {
+    pub fn extend_from<X: Convenient>(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, other: Vec<ItemType>) -> BYield<X> {
         self.modify(state, obj, DepVecModification::ExtendFrom(other));
+        b_continue()
     }
 
     pub fn changed_source(self, obj: Glob<Owner::Id, Owner>) -> DepVecChangedSource<Owner, ItemType> {
@@ -2240,7 +2249,7 @@ macro_rules! dep_type_impl_raw {
                     $vis fn $field(mut self, value: $field_ty) -> Self {
                         let id = <$BaseBuilder as $crate::DepObjBaseBuilder<$Id>>::id(&self.base);
                         let state = <$BaseBuilder as $crate::DepObjBaseBuilder<$Id>>::state_mut(&mut self.base);
-                        $name:: [< $field:upper >] .set(state, id.$obj(), value);
+                        $crate::binding::b_immediate($name:: [< $field:upper >] .set(state, id.$obj(), value));
                         self
                     }
                 ]
@@ -2312,7 +2321,7 @@ macro_rules! dep_type_impl_raw {
                     $vis fn $field(mut self, value: $field_ty) -> Self {
                         let id = <$BaseBuilder as $crate::DepObjBaseBuilder<$Id>>::id(&self.base);
                         let state = <$BaseBuilder as $crate::DepObjBaseBuilder<$Id>>::state_mut(&mut self.base);
-                        $name:: [< $field:upper >] .set(state, id.$obj(), value);
+                        $crate::binding::b_immediate($name:: [< $field:upper >] .set(state, id.$obj(), value));
                         self
                     }
                 ]

@@ -10,12 +10,43 @@ use macro_attr_2018::macro_attr;
 use panicking::panicking;
 use phantom_type::PhantomType;
 
+#[must_use]
+pub struct BYield<T: Convenient>(Option<T>);
+
+pub fn b_yield<T: Convenient>(value: T) -> BYield<T> {
+    BYield(Some(value))
+}
+
+pub fn b_continue<T: Convenient>() -> BYield<T> {
+    BYield(None)
+}
+
+pub fn b_immediate(x: BYield<!>) {
+    let _ = x;
+}
+
 pub trait Target<T: Convenient>: Debug + DynClone {
     fn execute(&self, state: &mut dyn State, value: T);
     fn clear(&self, state: &mut dyn State);
 }
 
 clone_trait_object!(<T: Convenient> Target<T>);
+
+#[derive(Educe)]
+#[educe(Debug, Clone)]
+struct DispatchTarget<Context: Debug + Clone, T: Convenient> {
+    context: Context,
+    #[educe(Debug(ignore))]
+    execute: fn(state: &mut dyn State, context: Context, value: T) -> BYield<!>,
+}
+
+impl<Context: Debug + Clone, T: Convenient> Target<T> for DispatchTarget<Context, T> {
+    fn execute(&self, state: &mut dyn State, value: T) {
+        let _ = (self.execute)(state, self.context.clone(), value);
+    }
+
+    fn clear(&self, _state: &mut dyn State) { }
+}
 
 #[derive(Educe)]
 #[educe(Debug, Clone)]
@@ -182,6 +213,15 @@ impl<T: Convenient> BindingBase<T> {
         assert!(node.sources.is_empty(), "set_target/bind should be called before any set_source_*");
     }
 
+    pub fn dispatch<Context: Debug + Clone + 'static>(
+        self,
+        state: &mut dyn State,
+        context: Context,
+        execute: fn(state: &mut dyn State, context: Context, value: T) -> BYield<!>
+    ) {
+        self.set_target(state, Box::new(DispatchTarget { context, execute }));
+    }
+
     pub fn set_target_fn<Context: Debug + Clone + 'static>(
         self,
         state: &mut dyn State,
@@ -220,6 +260,15 @@ impl<T: Convenient> From<Binding<T>> for AnyBindingBase {
 impl<T: Convenient> Binding<T> {
     pub fn set_target(self, state: &mut dyn State, target: Box<dyn Target<T>>) {
         BindingBase::from(self).set_target(state, target);
+    }
+
+    pub fn dispatch<Context: Debug + Clone + 'static>(
+        self,
+        state: &mut dyn State,
+        context: Context,
+        execute: fn(state: &mut dyn State, context: Context, value: T) -> BYield<!>
+    ) {
+        BindingBase::from(self).dispatch(state, context, execute);
     }
 
     pub fn set_target_fn<Context: Debug + Clone + 'static>(
@@ -272,7 +321,7 @@ macro_rules! binding_n {
                 )*
                 #[allow(dead_code)]
                 #[educe(Debug(ignore))]
-                filter_map: fn(&mut dyn State, P, $( < < [< S $i >] as Source > ::Cache as SourceCache< [< S $i >] ::Value > >::Value ),* ) -> Option<T>,
+                dispatch: fn(&mut dyn State, P, $( < < [< S $i >] as Source > ::Cache as SourceCache< [< S $i >] ::Value > >::Value ),* ) -> BYield<T>,
             }
 
             impl<
@@ -322,7 +371,7 @@ macro_rules! binding_n {
                 pub fn new(
                     state: &mut dyn State,
                     param: P,
-                    filter_map: fn(&mut dyn State, P, $( < < [< S $i >] as Source > ::Cache as SourceCache< [< S $i >] ::Value > >::Value ),* ) -> Option<T>,
+                    dispatch: fn(&mut dyn State, P, $( < < [< S $i >] as Source > ::Cache as SourceCache< [< S $i >] ::Value > >::Value ),* ) -> BYield<T>,
                 ) -> Self {
                     let bindings: &mut Bindings = state.get_mut();
                     let id = bindings.0.insert(|id| {
@@ -331,7 +380,7 @@ macro_rules! binding_n {
                             $(
                                 [< source_ $i >] : None,
                             )*
-                            filter_map,
+                            dispatch,
                         };
                         let node: BindingNode<T> = BindingNode {
                             sources: Box::new(sources),
@@ -344,6 +393,15 @@ macro_rules! binding_n {
 
                 pub fn set_target(self, state: &mut dyn State, target: Box<dyn Target<T>>) {
                     BindingBase::from(self).set_target(state, target);
+                }
+
+                pub fn dispatch<Context: Debug + Clone + 'static>(
+                    self,
+                    state: &mut dyn State,
+                    context: Context,
+                    execute: fn(state: &mut dyn State, context: Context, value: T) -> BYield<!>
+                ) {
+                    BindingBase::from(self).dispatch(state, context, execute);
                 }
 
                 pub fn set_target_fn<Context: Debug + Clone + 'static>(
@@ -459,7 +517,7 @@ macro_rules! binding_n {
 
                         let target = node.target.clone();
                         let param = sources.param.clone();
-                        if let Some(value) = (sources.filter_map)(state, param, $( [< value_ $j >] ),*) {
+                        if let BYield(Some(value)) = (sources.dispatch)(state, param, $( [< value_ $j >] ),*) {
                             target.map(|x| x.execute(state, value));
                         }
                     }
@@ -558,6 +616,15 @@ macro_rules! binding_n {
 
                 pub fn set_target(self, state: &mut dyn State, target: Box<dyn Target<T>>) {
                     BindingBase::from(self).set_target(state, target);
+                }
+
+                pub fn dispatch<Context: Debug + Clone + 'static>(
+                    self,
+                    state: &mut dyn State,
+                    context: Context,
+                    execute: fn(state: &mut dyn State, context: Context, value: T) -> BYield<!>
+                ) {
+                    BindingBase::from(self).dispatch(state, context, execute);
                 }
 
                 pub fn set_target_fn<Context: Debug + Clone + 'static>(
