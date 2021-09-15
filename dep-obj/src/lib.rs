@@ -1002,7 +1002,7 @@ struct DepPropSet<Owner: DepType, PropType: Convenient> {
 
 impl<Owner: DepType, PropType: Convenient> Target<PropType> for DepPropSet<Owner, PropType> {
     fn execute(&self, state: &mut dyn State, value: PropType) {
-        let _: BYield<!> = self.prop.set(state, self.obj, value);
+        b_immediate(self.prop.set(state, self.obj, value));
     }
 
     fn clear(&self, state: &mut dyn State) {
