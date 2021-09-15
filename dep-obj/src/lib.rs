@@ -1082,7 +1082,7 @@ impl<Owner: DepType, ItemType: Convenient> DepVec<Owner, ItemType> {
                         handler.execute(state, InsertRemove { remove: true, item: item.clone() });
                     }
                     for item in items {
-                        handler.execute(state, InsertRemove { remove: true, item });
+                        handler.execute(state, InsertRemove { remove: false, item });
                     }
                 },
             };

@@ -203,6 +203,7 @@ impl Game {
 fn main() {
     let game = &mut Game::new();
     let npc = Npc::new(game);
+    NpcProps::ITEMS_ENHANCEMENT.set(game, npc.props(), 5);
     let sword = Item::new(game);
     sword.build(game, |sword| sword
         .props(|props| props
@@ -212,26 +213,48 @@ fn main() {
     let shield = Item::new(game);
     ItemProps::NAME.set(game, shield.props(), Cow::Borrowed("Shield"));
     for item in [sword, shield] {
-        let log = Binding2::new(game, (), |(), name, equipped: Option<Change<bool>>|
-            equipped.map(|equipped| (equipped.new, name))
+        let equipped = Binding2::new(game, (), |(), name, equipped: Option<Change<bool>>|
+            equipped.map(|equipped| (name, equipped.new))
         );
-        log.set_target_fn(game, (), |game, (), (equipped, name)| {
+        equipped.set_target_fn(game, (), |game, (), (name, equipped)| {
             let game: &mut Game = game.get_mut();
             writeln!(&mut game.log, "{} {}.", name, if equipped { "equipped" } else { "unequipped" }).unwrap();
         });
-        log.set_source_1(game, &mut ItemProps::NAME.value_source(item.props()));
-        log.set_source_2(game, &mut ItemProps::EQUIPPED.change_source(item.props()));
-        item.props().add_binding(game, log);
+        equipped.set_source_1(game, &mut ItemProps::NAME.value_source(item.props()));
+        equipped.set_source_2(game, &mut ItemProps::EQUIPPED.change_source(item.props()));
+        item.props().add_binding(game, equipped);
+        let enhancement = Binding2::new(game, (), |(), name, enhancement: Option<Change<i8>>|
+            enhancement.map(|enhancement| (name, enhancement))
+        );
+        enhancement.set_target_fn(game, (), |game, (), (name, enhancement)| {
+            let game: &mut Game = game.get_mut();
+            writeln!(&mut game.log, "{} enhancement changed: {} -> {}.", name, enhancement.old, enhancement.new).unwrap();
+        });
+        enhancement.set_source_1(game, &mut ItemProps::NAME.value_source(item.props()));
+        enhancement.set_source_2(game, &mut ItemProps::ENHANCEMENT.change_source(item.props()));
+        item.props().add_binding(game, enhancement);
     }
     NpcProps::EQUIPPED_ITEMS.push(game, npc.props(), sword);
     NpcProps::EQUIPPED_ITEMS.push(game, npc.props(), shield);
+    NpcProps::ITEMS_ENHANCEMENT.set(game, npc.props(), 4);
     NpcProps::EQUIPPED_ITEMS.remove(game, npc.props(), 0);
+    NpcProps::ITEMS_ENHANCEMENT.set(game, npc.props(), 5);
     assert_eq!(game.log, "\
         Sword equipped.\n\
+        Sword enhancement changed: 0 -> 5.\n\
         Shield equipped.\n\
+        Shield enhancement changed: 0 -> 5.\n\
+        Sword enhancement changed: 5 -> 0.\n\
+        Shield enhancement changed: 5 -> 0.\n\
+        Sword enhancement changed: 0 -> 4.\n\
+        Shield enhancement changed: 0 -> 4.\n\
         Sword unequipped.\n\
+        Sword enhancement changed: 4 -> 0.\n\
+        Shield enhancement changed: 4 -> 0.\n\
+        Shield enhancement changed: 0 -> 5.\n\
     ");
     npc.drop_npc(game);
     sword.drop_item(game);
     shield.drop_item(game);
+    print!("{}", game.log);
 }
