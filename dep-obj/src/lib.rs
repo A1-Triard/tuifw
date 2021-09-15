@@ -999,23 +999,7 @@ enum DepVecModification<ItemType: Convenient> {
     Insert(usize, ItemType),
     Remove(usize),
     ExtendFrom(Vec<ItemType>),
-}
-
-#[derive(Debug)]
-enum DepVecItems<ItemType: Convenient> {
-    Vec(Vec<ItemType>),
-    Item([ItemType; 1]),
-}
-
-impl<ItemType: Convenient> Deref for DepVecItems<ItemType> {
-    type Target = [ItemType];
-
-    fn deref(&self) -> &[ItemType] {
-        match self {
-            DepVecItems::Vec(x) => &x[..],
-            DepVecItems::Item(x) => &x[..],
-        }
-    }
+    Refresh(Id<ItemHandler<ItemType>>),
 }
 
 #[derive(Educe)]
@@ -1065,26 +1049,43 @@ impl<Owner: DepType, ItemType: Convenient> DepVec<Owner, ItemType> {
         loop {
             let mut obj_mut = obj.get_mut(state);
             let entry_mut = self.entry_mut(&mut obj_mut);
-            let (remove, items) = match modification {
-                DepVecModification::Clear =>
-                    (true, DepVecItems::Vec(take(&mut entry_mut.items))),
+            match modification {
+                DepVecModification::Clear => {
+                    let items = take(&mut entry_mut.items);
+                    let handlers = entry_mut.handlers.clone();
+                    handlers.execute(state, true, &items);
+                },
                 DepVecModification::Push(item) => {
                     entry_mut.items.push(item.clone());
-                    (false, DepVecItems::Item([item]))
+                    let handlers = entry_mut.handlers.clone();
+                    handlers.execute(state, false, &[item]);
                 },
                 DepVecModification::Insert(index, item) => {
                     entry_mut.items.insert(index, item.clone());
-                    (false, DepVecItems::Item([item]))
+                    let handlers = entry_mut.handlers.clone();
+                    handlers.execute(state, false, &[item]);
                 },
-                DepVecModification::Remove(index) =>
-                    (true, DepVecItems::Item([entry_mut.items.remove(index)])),
+                DepVecModification::Remove(index) => {
+                    let item = entry_mut.items.remove(index);
+                    let handlers = entry_mut.handlers.clone();
+                    handlers.execute(state, true, &[item]);
+                },
                 DepVecModification::ExtendFrom(vec) => {
                     entry_mut.items.extend_from_slice(&vec);
-                    (false, DepVecItems::Vec(vec))
+                    let handlers = entry_mut.handlers.clone();
+                    handlers.execute(state, false, &vec);
+                },
+                DepVecModification::Refresh(handler_id) => {
+                    let items = entry_mut.items.clone();
+                    let handler = entry_mut.handlers.item_handlers[handler_id].handler.clone();
+                    for item in &items {
+                        handler.execute(state, InsertRemove { remove: true, item: item.clone() });
+                    }
+                    for item in items {
+                        handler.execute(state, InsertRemove { remove: true, item });
+                    }
                 },
             };
-            let handlers = entry_mut.handlers.clone();
-            handlers.execute(state, remove, &items);
             let mut obj_mut = obj.get_mut(state);
             let entry_mut = self.entry_mut(&mut obj_mut);
             if let Some(queue) = entry_mut.queue.as_mut() {
@@ -1694,6 +1695,26 @@ impl<Owner: DepType + 'static, ItemType: Convenient> Source for DepVecChangedSou
 }
 
 #[derive(Educe)]
+#[educe(Debug, Clone)]
+pub struct DepVecItemSourceRefresh<Owner: DepType, ItemType: Convenient> {
+    obj: Glob<Owner::Id, Owner>,
+    vec: DepVec<Owner, ItemType>,
+    handler_id: Id<ItemHandler<ItemType>>,
+}
+
+impl<Owner: DepType, ItemType: Convenient> Target<()> for DepVecItemSourceRefresh<Owner, ItemType> {
+    fn execute(&self, state: &mut dyn State, (): ()) {
+        self.vec.modify(state, self.obj, DepVecModification::Refresh(self.handler_id));
+    }
+
+    fn clear(&self, state: &mut dyn State) {
+        let mut obj = self.obj.get_mut(state);
+        let entry = self.vec.entry_mut(&mut obj);
+        entry.handlers.item_handlers[self.handler_id].refresh = None;
+    }
+}
+
+#[derive(Educe)]
 #[educe(Debug)]
 pub struct DepVecItemSource<Owner: DepType, ItemType: Convenient> {
     obj: Glob<Owner::Id, Owner>,
@@ -1716,6 +1737,9 @@ impl<Owner: DepType + 'static, ItemType: Convenient> Source for DepVecItemSource
         let handler_id = entry.handlers.item_handlers.insert(
             |handler_id| (ItemHandler { handler, refresh: self.refresh }, handler_id)
         );
+        if let Some(refresh) = self.refresh {
+            refresh.set_target(state, Box::new(DepVecItemSourceRefresh { obj: self.obj, vec: self.vec, handler_id }));
+        }
         let init = if items.is_empty() {
             None
         } else {

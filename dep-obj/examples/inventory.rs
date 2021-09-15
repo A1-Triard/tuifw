@@ -136,8 +136,8 @@ impl Npc {
                 Some(())
             }
         });
-        enhancement.set_source_1(state, &mut NpcProps::ITEMS_ENHANCEMENT.value_source(npc.props()));
         enhancement.set_source_2(state, &mut NpcProps::EQUIPPED_ITEMS.item_source_with_refresh(enhancement, npc.props()));
+        enhancement.set_source_1(state, &mut NpcProps::ITEMS_ENHANCEMENT.value_source(npc.props()));
 
         npc
     }

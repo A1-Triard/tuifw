@@ -149,8 +149,8 @@ struct BindingNode<T: Convenient> {
 
 impl<T: Convenient> AnyBindingNode for BindingNode<T> {
     fn unhandle_sources_and_clear_target(&mut self, state: &mut dyn State) {
-        self.sources.unhandle(state);
         self.target.as_ref().map(|x| x.clear(state));
+        self.sources.unhandle(state);
     }
 }
 
