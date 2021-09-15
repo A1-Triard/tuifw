@@ -6,7 +6,7 @@
 #![feature(const_raw_ptr_deref)]
 
 use components_arena::{Arena, Component, NewtypeComponentId, Id};
-use dep_obj::{Change, DepObjBaseBuilder, DepObjId, dep_obj, dep_type, dep_type_with_builder, InsertRemove};
+use dep_obj::{Change, DepObjBaseBuilder, DepObjId, dep_obj, dep_type, dep_type_with_builder, ItemChange};
 use macro_attr_2018::macro_attr;
 use dep_obj::binding::{Binding1, Binding2, BindingExt2, Bindings};
 use dyn_context::state::{State, StateExt};
@@ -117,26 +117,28 @@ impl Npc {
         let game: &mut Game = state.get_mut();
         let npc = game.npcs.insert(|id| (NpcComponent { props: NpcProps::new_priv() }, Npc(id)));
 
-        let equipped = Binding1::new(state, (), |(), item: Option<InsertRemove<Item>>| item);
-        equipped.set_target_fn(state, (), |state, (), item|
-            ItemProps::EQUIPPED.set(state, item.item.props(), !item.remove)
+        let equipped = Binding1::new(state, (), |(), change: Option<ItemChange<Item>>|
+            change.filter(|change| !change.is_update())
+        );
+        equipped.set_target_fn(state, (), |state, (), change|
+            ItemProps::EQUIPPED.set(state, change.item.props(), change.is_insert())
         );
         equipped.set_source_1(state, &mut NpcProps::EQUIPPED_ITEMS.item_source(npc.props()));
         npc.props().add_binding(state, equipped);
 
-        let enhancement = BindingExt2::new(state, (), |state, (), enhancement, item: Option<InsertRemove<Item>>| {
-            if let Some(item) = item {
-                if item.remove {
-                    ItemProps::ENHANCEMENT.unset(state, item.item.props());
+        let enhancement = BindingExt2::new(state, (), |state, (), enhancement, change: Option<ItemChange<Item>>| {
+            if let Some(change) = change {
+                if change.is_remove() {
+                    ItemProps::ENHANCEMENT.unset(state, change.item.props());
                 } else {
-                    ItemProps::ENHANCEMENT.set(state, item.item.props(), enhancement);
+                    ItemProps::ENHANCEMENT.set(state, change.item.props(), enhancement);
                 }
                 None
             } else {
                 Some(())
             }
         });
-        enhancement.set_source_2(state, &mut NpcProps::EQUIPPED_ITEMS.item_source_with_refresh(enhancement, npc.props()));
+        enhancement.set_source_2(state, &mut NpcProps::EQUIPPED_ITEMS.item_source_with_update(enhancement, npc.props()));
         enhancement.set_source_1(state, &mut NpcProps::ITEMS_ENHANCEMENT.value_source(npc.props()));
 
         npc
@@ -239,22 +241,19 @@ fn main() {
     NpcProps::ITEMS_ENHANCEMENT.set(game, npc.props(), 4);
     NpcProps::EQUIPPED_ITEMS.remove(game, npc.props(), 0);
     NpcProps::ITEMS_ENHANCEMENT.set(game, npc.props(), 5);
+    npc.drop_npc(game);
+    sword.drop_item(game);
+    shield.drop_item(game);
+    print!("{}", game.log);
     assert_eq!(game.log, "\
         Sword equipped.\n\
         Sword enhancement changed: 0 -> 5.\n\
         Shield equipped.\n\
         Shield enhancement changed: 0 -> 5.\n\
-        Sword enhancement changed: 5 -> 0.\n\
-        Shield enhancement changed: 5 -> 0.\n\
-        Sword enhancement changed: 0 -> 4.\n\
-        Shield enhancement changed: 0 -> 4.\n\
+        Sword enhancement changed: 5 -> 4.\n\
+        Shield enhancement changed: 5 -> 4.\n\
         Sword unequipped.\n\
         Sword enhancement changed: 4 -> 0.\n\
-        Shield enhancement changed: 4 -> 0.\n\
-        Shield enhancement changed: 0 -> 5.\n\
+        Shield enhancement changed: 4 -> 5.\n\
     ");
-    npc.drop_npc(game);
-    sword.drop_item(game);
-    shield.drop_item(game);
-    print!("{}", game.log);
 }
