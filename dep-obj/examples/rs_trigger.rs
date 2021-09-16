@@ -129,10 +129,11 @@ mod not_chip {
 
 use circuit::*;
 use dep_obj::binding::{Binding1, Bindings, b_immediate};
-use dyn_context::state::{State, StateRefMut};
+use dyn_context::state::{State, StateExt, StateRefMut};
 use not_chip::*;
 use or_chip::*;
 use std::any::{Any, TypeId};
+use std::fmt::Write;
 use dep_obj::Change;
 
 #[derive(Debug, Clone)]
@@ -148,11 +149,14 @@ struct TriggerState {
     bindings: Bindings,
     circuit: Circuit,
     chips: TriggerChips,
+    log: String,
 }
 
 impl State for TriggerState {
     fn get_raw(&self, ty: TypeId) -> Option<&dyn Any> {
-        if ty == TypeId::of::<Bindings>() {
+        if ty == TypeId::of::<TriggerState>() {
+            Some(self)
+        } else if ty == TypeId::of::<Bindings>() {
             Some(&self.bindings)
         } else if ty == TypeId::of::<Circuit>() {
             Some(&self.circuit)
@@ -164,7 +168,9 @@ impl State for TriggerState {
     }
 
     fn get_mut_raw(&mut self, ty: TypeId) -> Option<&mut dyn Any> {
-        if ty == TypeId::of::<Bindings>() {
+        if ty == TypeId::of::<TriggerState>() {
+            Some(self)
+        } else if ty == TypeId::of::<Bindings>() {
             Some(&mut self.bindings)
         } else if ty == TypeId::of::<Circuit>() {
             Some(&mut self.circuit)
@@ -188,6 +194,7 @@ fn main() {
         circuit,
         bindings,
         chips: chips.clone(),
+        log: String::new(),
     };
 
     let not_1_out_to_or_2_in = Binding1::new(state, (), |(), value| Some(value));
@@ -204,10 +211,11 @@ fn main() {
     or_2_out_to_not_2_in.set_source_1(state, &mut OrLegs::OUT.value_source(chips.or_2.legs()));
 
     let print_out = Binding1::new(state, (), |(), change: Option<Change<bool>>| change);
-    print_out.set_target_fn(state, (), |_state, (), change| {
+    print_out.set_target_fn(state, (), |state, (), change| {
+        let state: &mut TriggerState = state.get_mut();
         let old = if change.old { "1" } else { "0" };
         let new = if change.new { "1" } else { "0" };
-        println!("{} -> {}", old, new);
+        writeln!(state.log, "{} -> {}", old, new).unwrap();
     });
     print_out.set_source_1(state, &mut NotLegs::OUT.change_source(chips.not_2.legs()));
     b_immediate(OrLegs::IN_1.set(state, chips.or_1.legs(), true));
@@ -224,4 +232,11 @@ fn main() {
     chips.or_2.drop_chip(state);
     chips.not_2.drop_chip(state);
     chips.not_1.drop_chip(state);
+
+    print!("{}", state.log);
+    assert_eq!(state.log, "\
+        1 -> 0\n\
+        0 -> 1\n\
+        1 -> 0\n\
+    ");
 }
