@@ -25,8 +25,8 @@ pub struct Glob<Obj> {
 }
 
 pub struct GlobRef<'a, Obj> {
-    pub arena: &'a dyn Any,
-    pub glob: Glob<Obj>,
+    arena: &'a dyn Any,
+    glob: Glob<Obj>,
 }
 
 impl<'a, Obj> Deref for GlobRef<'a, Obj> {
@@ -38,8 +38,8 @@ impl<'a, Obj> Deref for GlobRef<'a, Obj> {
 }
 
 pub struct GlobMut<'a, Obj> {
-    pub arena: &'a mut dyn Any,
-    pub glob: Glob<Obj>,
+    arena: &'a mut dyn Any,
+    glob: Glob<Obj>,
 }
 
 impl<'a, Obj> Deref for GlobMut<'a, Obj> {
