@@ -1,7 +1,7 @@
 use crate::base::*;
 use crate::view::panels::{CanvasLayout};
 use dep_obj::{dep_type, ItemChange};
-use dep_obj::binding::{BindingExt2, b_yield, BYield, b_continue};
+use dep_obj::binding::{BindingExt2, b_yield, b_continue};
 use dyn_context::state::State;
 use crate::view::View;
 
@@ -17,7 +17,7 @@ struct DeskTopBehavior;
 impl WidgetBehavior for DeskTopBehavior {
     fn init_bindings(&self, widget: Widget, state: &mut dyn State) {
         let windows = BindingExt2::new(state, (), |state, (), view: Option<View>, window: Option<ItemChange<Widget>>| {
-            let r: BYield<()> = if let Some(window) = window {
+            if let Some(window) = window {
                 if window.is_remove() || window.is_update() && view.is_none() {
                     window.item.unload(state)
                 } else if let Some(view) = view {
@@ -31,8 +31,7 @@ impl WidgetBehavior for DeskTopBehavior {
                 }
             } else {
                 b_yield(())
-            };
-            r
+            }
         });
         windows.set_source_2(state, &mut DeskTop::WINDOWS.item_initial_final_source_with_update(windows, widget.obj()));
         windows.set_source_1(state, &mut WidgetBase::VIEW.value_source(widget.base()));
