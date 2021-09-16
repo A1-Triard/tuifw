@@ -581,7 +581,7 @@ impl<T: DepObjId> DepObjIdBase for T {
 /// # #![feature(const_raw_ptr_deref)]
 /// use components_arena::{Arena, Component, NewtypeComponentId, Id};
 /// use dep_obj::{DepObjId, dep_obj, dep_type};
-/// use dep_obj::binding::{Bindings, Binding1};
+/// use dep_obj::binding::{Bindings, Binding, Binding1};
 /// use dyn_context::state::{State, StateExt};
 /// use macro_attr_2018::macro_attr;
 /// use std::any::{Any, TypeId};
@@ -611,7 +611,7 @@ impl<T: DepObjId> DepObjIdBase for T {
 /// pub struct MyApp {
 ///     bindings: Bindings,
 ///     my_dep_types: Arena<MyDepTypePrivateData>,
-///     res: i32,
+///     res: Binding<i32>,
 /// }
 ///
 /// impl State for MyApp {
@@ -662,21 +662,19 @@ impl<T: DepObjId> DepObjIdBase for T {
 /// }
 ///
 /// fn main() {
+///     use dep_obj::binding::b_immediate;
+///     let mut bindings = Bindings::new();
+///     let res = Binding1::new(&mut bindings, (), |(), x| Some(x));
 ///     let app = &mut MyApp {
-///         bindings: Bindings::new(),
+///         bindings,
 ///         my_dep_types: Arena::new(),
-///         res: 0,
+///         res: res.into(),
 ///     };
 ///     let id = MyDepTypeId::new(app);
-///     let res = Binding1::new(&mut app.bindings, (), |(), x| Some(x));
 ///     res.set_source_1(app, &mut MyDepType::PROP_2.value_source(id.obj()));
-///     res.set_target_fn(app, (), |app, (), value| {
-///         let app: &mut MyApp = app.get_mut();
-///         app.res = value;
-///     });
-///     assert_eq!(app.res, 10);
-///     MyDepType::PROP_2.set(app, id.obj(), 5);
-///     assert_eq!(app.res, 5);
+///     assert_eq!(app.res.get_value(app), Some(10));
+///     b_immediate(MyDepType::PROP_2.set(app, id.obj(), 5));
+///     assert_eq!(app.res.get_value(app), Some(5));
 ///     id.drop_my_dep_type(app);
 ///     res.drop_binding(app);
 /// }
