@@ -126,7 +126,7 @@ impl Npc {
         equipped.set_source_1(state, &mut NpcProps::EQUIPPED_ITEMS.item_source(npc.props()));
         npc.props().add_binding(state, equipped);
 
-        let enhancement = BindingExt2::new(state, (), |state, (), enhancement, change: Option<ItemChange<Item>>| {
+        let enhancement = BindingExt2::new(state, (), |state, _, enhancement, change: Option<ItemChange<Item>>| {
             if let Some(change) = change {
                 if change.is_remove() {
                     ItemProps::ENHANCEMENT.unset(state, change.item.props())

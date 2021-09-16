@@ -1,6 +1,7 @@
 use crate::base::*;
 use alloc::boxed::Box;
 use components_arena::{Component, Id, Arena, NewtypeComponentId};
+use core::any::{Any, TypeId};
 use core::fmt::Debug;
 use downcast_rs::{Downcast, impl_downcast};
 use dyn_clone::{DynClone, clone_trait_object};
@@ -314,18 +315,22 @@ macro_rules! binding_n {
         $crate::paste_paste! {
             #[derive(Educe)]
             #[educe(Debug)]
-            struct [< BindingExt $n NodeSources >] <P: Convenient, $( [< S $i >] : Source, )* T: Convenient> {
+            struct [< BindingExt $n NodeSources >] <P: Debug, $( [< S $i >] : Source, )* T: Convenient> {
                 param: P,
                 $(
                     [< source_ $i >] : Option<(Box<dyn HandlerId>, [< S $i >] ::Cache )>,
                 )*
                 #[allow(dead_code)]
                 #[educe(Debug(ignore))]
-                dispatch: fn(&mut dyn State, P, $( < < [< S $i >] as Source > ::Cache as SourceCache< [< S $i >] ::Value > >::Value ),* ) -> BYield<T>,
+                dispatch: fn(
+                    &mut dyn State,
+                    Glob < AnyBindingBase, P >,
+                    $( < < [< S $i >] as Source > ::Cache as SourceCache< [< S $i >] ::Value > >::Value ),*
+                ) -> BYield<T>,
             }
 
             impl<
-                P: Convenient,
+                P: Debug + 'static,
                 $( [< S $i >] : Source + 'static, )*
                 T: Convenient
             > AnyBindingNodeSources for [< BindingExt $n NodeSources >] <P, $( [< S $i >] , )* T> {
@@ -364,14 +369,18 @@ macro_rules! binding_n {
             }
 
             impl<
-                P: Convenient,
+                P: Debug + 'static,
                 $( [< S $i >] : Source + 'static, )*
                 T: Convenient
             > [< BindingExt $n >] <P, $( [< S $i >] , )* T> {
                 pub fn new(
                     state: &mut dyn State,
                     param: P,
-                    dispatch: fn(&mut dyn State, P, $( < < [< S $i >] as Source > ::Cache as SourceCache< [< S $i >] ::Value > >::Value ),* ) -> BYield<T>,
+                    dispatch: fn(
+                        &mut dyn State,
+                        Glob < AnyBindingBase, P >,
+                        $( < < [< S $i >] as Source > ::Cache as SourceCache< [< S $i >] ::Value > >::Value ),*
+                    ) -> BYield<T>,
                 ) -> Self {
                     let bindings: &mut Bindings = state.get_mut();
                     let id = bindings.0.insert(|id| {
@@ -389,6 +398,29 @@ macro_rules! binding_n {
                         (BoxedBindingNode(Box::new(node)), id)
                     });
                     [< BindingExt $n >] (id, PhantomType::new())
+                }
+
+                fn param_ref(arena: &dyn Any, id: AnyBindingBase) -> &P {
+                    let bindings = arena.downcast_ref::<Bindings>().unwrap();
+                    let node = bindings.0[id.0].0.downcast_ref::<BindingNode<T>>().unwrap();
+                    let sources = node.sources.downcast_ref::< [< BindingExt $n NodeSources >] <P, $( [< S $i >] ,)* T>>().unwrap();
+                    &sources.param
+                }
+
+                fn param_mut(arena: &mut dyn Any, id: AnyBindingBase) -> &mut P {
+                    let bindings = arena.downcast_mut::<Bindings>().unwrap();
+                    let node = bindings.0[id.0].0.downcast_mut::<BindingNode<T>>().unwrap();
+                    let sources = node.sources.downcast_mut::< [< BindingExt $n NodeSources >] <P, $( [< S $i >] ,)* T>>().unwrap();
+                    &mut sources.param
+                }
+
+                #[allow(dead_code)]
+                fn param_descriptor() -> GlobDescriptor<AnyBindingBase, P> {
+                    GlobDescriptor {
+                        arena: TypeId::of::<Bindings>(),
+                        field_ref: Self::param_ref,
+                        field_mut: Self::param_mut,
+                    }
                 }
 
                 pub fn set_target(self, state: &mut dyn State, target: Box<dyn Target<T>>) {
@@ -471,7 +503,7 @@ macro_rules! binding_n {
                 }
 
                 impl<
-                    P: Convenient,
+                    P: Debug + 'static,
                     $( [< S $j >] : Source + 'static, )*
                     T: Convenient
                 > AnyHandler for [< BindingExt $n Source $i Handler >] <P, $( [< S $j >] , )* T >  {
@@ -484,7 +516,7 @@ macro_rules! binding_n {
                 }
 
                 impl<
-                    P: Convenient,
+                    P: Debug + 'static,
                     $( [< S $j >] : Source + 'static, )*
                     T: Convenient
                 > Handler< [< S $i >] ::Value > for [< BindingExt $n Source $i Handler >] <P, $( [< S $j >] , )* T >  {
@@ -516,7 +548,10 @@ macro_rules! binding_n {
                         )*
 
                         let target = node.target.clone();
-                        let param = sources.param.clone();
+                        let param = Glob {
+                            id: AnyBindingBase(self.binding),
+                            descriptor: < [< BindingExt $n >] <P, $( [< S $j >] ,)* T> > ::param_descriptor
+                        };
                         if let BYield(Some(value)) = (sources.dispatch)(state, param, $( [< value_ $j >] ),*) {
                             target.map(|x| x.execute(state, value));
                         }
