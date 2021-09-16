@@ -37,6 +37,7 @@ dep_type_with_builder! {
         t: Cow<'static, str> = Cow::Borrowed(""),
         r: Cow<'static, str> = Cow::Borrowed(""),
         b: Cow<'static, str> = Cow::Borrowed(""),
+        fill: Cow<'static, str> = Cow::Borrowed(""),
     }
 
     type BaseBuilder<'a> = ViewBuilder<'a>;
@@ -71,6 +72,7 @@ struct BorderDecoratorBindings {
     t: Binding<Cow<'static, str>>,
     r: Binding<Cow<'static, str>>,
     b: Binding<Cow<'static, str>>,
+    fill: Binding<Cow<'static, str>>,
 }
 
 impl DecoratorBindings for BorderDecoratorBindings { }
@@ -204,6 +206,7 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
         let r: &str = &bindings.r.get_value(state).unwrap_or(Cow::Borrowed(""));
         let t: &str = &bindings.t.get_value(state).unwrap_or(Cow::Borrowed(""));
         let b: &str = &bindings.b.get_value(state).unwrap_or(Cow::Borrowed(""));
+        let fill: &str = &bindings.fill.get_value(state).unwrap_or(Cow::Borrowed(""));
         let l = if !l.is_empty() { l } else if !tl.is_empty() || !bl.is_empty() { " " } else { "" };
         let t = if !t.is_empty() { t } else if !tl.is_empty() || !tr.is_empty() { " " } else { "" };
         let r = if !r.is_empty() { r } else if !tr.is_empty() || !br.is_empty() { " " } else { "" };
@@ -211,6 +214,9 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
         let fg = bindings.fg.get_value(state).unwrap_or(Color::White);
         let bg = bindings.bg.get_value(state).unwrap_or_default();
         let attr = bindings.attr.get_value(state).unwrap_or_default();
+        if !fill.is_empty() {
+            port.fill(|port, p| port.out(p, fg, bg, attr, &fill));
+        }
         if !l.is_empty() {
             for y in 0 .. size.y as u16 {
                 port.out(Point { x: 0, y: y as i16 }, fg, bg, attr, l);
@@ -258,6 +264,7 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
         let t = Binding1::new(state, (), |(), t| Some(t));
         let r = Binding1::new(state, (), |(), r| Some(r));
         let b = Binding1::new(state, (), |(), b| Some(b));
+        let fill = Binding1::new(state, (), |(), fill| Some(fill));
         bg.set_target_fn(state, view, |state, view, _| view.invalidate_render(state).expect("invalidate_render failed"));
         fg.set_target_fn(state, view, |state, view, _| view.invalidate_render(state).expect("invalidate_render failed"));
         attr.set_target_fn(state, view, |state, view, _| view.invalidate_render(state).expect("invalidate_render failed"));
@@ -323,6 +330,7 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
                 size: Vector { x: size.x, y: 1 }
             }).unwrap();
         });
+        fill.set_target_fn(state, view, |state, view, _| view.invalidate_render(state).unwrap());
         bg.set_source_1(state, &mut ViewBase::BG.value_source(view.base()));
         fg.set_source_1(state, &mut ViewBase::FG.value_source(view.base()));
         attr.set_source_1(state, &mut ViewBase::ATTR.value_source(view.base()));
@@ -334,6 +342,7 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
         t.set_source_1(state, &mut BorderDecorator::T.value_source(view.decorator()));
         r.set_source_1(state, &mut BorderDecorator::R.value_source(view.decorator()));
         b.set_source_1(state, &mut BorderDecorator::B.value_source(view.decorator()));
+        fill.set_source_1(state, &mut BorderDecorator::FILL.value_source(view.decorator()));
         Box::new(BorderDecoratorBindings {
             bg: bg.into(),
             fg: fg.into(),
@@ -346,6 +355,7 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
             t: t.into(),
             r: r.into(),
             b: b.into(),
+            fill: fill.into(),
         })
     }
 
@@ -362,5 +372,6 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
         bindings.t.drop_binding(state);
         bindings.r.drop_binding(state);
         bindings.b.drop_binding(state);
+        bindings.fill.drop_binding(state);
     }
 }

@@ -24,7 +24,7 @@ fn build(state: &mut dyn State, bounds: Rect) -> View {
                     .w(Some(bounds.w()))
                     .h(Some(bounds.h()))
                 )
-                .border_decorator(|view| view
+                .border_decorator(|decorator| decorator
                     .tl(Cow::Borrowed("╔"))
                     .tr(Cow::Borrowed("╗"))
                     .bl(Cow::Borrowed("╚"))
@@ -78,7 +78,7 @@ fn main() {
         let border = build(state, bounds);
         let input_binding = BindingExt2::new(state, (), |
             state,
-            (),
+            _,
             tl: Point,
             input: Option< ViewInput>
         | input.map_or_else(b_continue, |input| {

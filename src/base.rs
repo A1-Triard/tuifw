@@ -71,23 +71,13 @@ impl RequiresStateDrop for WidgetTreeImpl {
 
 impl State for WidgetTree {
     fn get_raw(&self, ty: TypeId) -> Option<&dyn Any> {
-        if ty == TypeId::of::<WidgetTree>() {
-            Some(self)
-        } else if ty == TypeId::of::<ViewTree>() {
-            Some(&self.0.get().view_tree)
-        } else {
-            None
-        }
+        if ty == TypeId::of::<WidgetTree>() { return Some(self); }
+        self.0.get().view_tree.get_raw(ty)
     }
 
     fn get_mut_raw(&mut self, ty: TypeId) -> Option<&mut dyn Any> {
-        if ty == TypeId::of::<WidgetTree>() {
-            Some(self)
-        } else if ty == TypeId::of::<ViewTree>() {
-            Some(&mut self.0.get_mut().view_tree)
-        } else {
-            None
-        }
+        if ty == TypeId::of::<WidgetTree>() { return Some(self); }
+        self.0.get_mut().view_tree.get_mut_raw(ty)
     }
 }
 
