@@ -743,12 +743,12 @@ impl<Owner: DepType, ArgsType: DepEventArgs> DepEvent<Owner, ArgsType> {
         bubble
     }
 
-    pub fn raise<X: Convenient>(self, state: &mut dyn State, mut obj: Glob<Owner::Id, Owner>, args: &mut ArgsType) -> BYield<X> {
-        let bubble = self.raise_raw(state, obj, args);
+    pub fn raise<X: Convenient>(self, state: &mut dyn State, mut obj: Glob<Owner::Id, Owner>, args: ArgsType) -> BYield<X> {
+        let bubble = self.raise_raw(state, obj, &args);
         if !bubble || args.handled() { return b_continue(); }
         while let Some(parent) = obj.parent(state) {
             obj = parent;
-            let bubble = self.raise_raw(state, obj, args);
+            let bubble = self.raise_raw(state, obj, &args);
             debug_assert!(bubble);
             if args.handled() { return b_continue(); }
         }
@@ -881,7 +881,7 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         let old = replace(&mut entry_mut.local, value.clone());
         if old == value { return; }
         let handlers = entry_mut.handlers.clone();
-        let mut change = if old.is_some() && value.is_some() {
+        let change = if old.is_some() && value.is_some() {
             unsafe { Change { old: old.unwrap_unchecked(), new: value.unwrap_unchecked() } }
         } else {
             if let Some(change) = self.non_local_value(state, obj, |non_local| {
@@ -900,7 +900,7 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
                 return;
             }
         };
-        handlers.execute(state, &mut change, obj, self);
+        handlers.execute(state, &change, obj, self);
     }
 
     fn un_set(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, mut value: Option<PropType>) {
