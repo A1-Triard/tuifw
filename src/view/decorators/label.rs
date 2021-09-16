@@ -122,22 +122,14 @@ impl DecoratorBehavior for LabelDecoratorBehavior {
         let bg = Binding1::new(state, (), |(), bg| Some(bg));
         let attr = Binding1::new(state, (), |(), attr| Some(attr));
         let text = Binding1::new(state, (), |(), text| Some(text));
+        bg.set_target_fn(state, view, |state, view, _| view.invalidate_render(state).expect("invalidate_render failed"));
+        fg.set_target_fn(state, view, |state, view, _| view.invalidate_render(state).expect("invalidate_render failed"));
+        attr.set_target_fn(state, view, |state, view, _| view.invalidate_render(state).expect("invalidate_render failed"));
+        text.set_target_fn(state, view, |state, view, _| view.invalidate_measure(state));
         bg.set_source_1(state, &mut ViewBase::BG.value_source(view.base()));
         fg.set_source_1(state, &mut ViewBase::FG.value_source(view.base()));
         attr.set_source_1(state, &mut ViewBase::ATTR.value_source(view.base()));
         text.set_source_1(state, &mut LabelDecorator::TEXT.value_source(view.decorator()));
-        bg.set_target_fn(state, view, |state, view, _| {
-            view.invalidate_render(state).expect("invalidate_render failed");
-        });
-        fg.set_target_fn(state, view, |state, view, _| {
-            view.invalidate_render(state).expect("invalidate_render failed");
-        });
-        attr.set_target_fn(state, view, |state, view, _| {
-            view.invalidate_render(state).expect("invalidate_render failed");
-        });
-        text.set_target_fn(state, view, |state, view, _| {
-            view.invalidate_measure(state);
-        });
         Box::new(LabelDecoratorBindings {
             bg: bg.into(),
             fg: fg.into(),

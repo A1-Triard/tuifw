@@ -1,8 +1,8 @@
 use crate::view::{View, ViewTree};
 use components_arena::{Arena, Component, Id, NewtypeComponentId};
 use debug_panic::debug_panic;
-use dep_obj::{Change, DepObjId, DepType, dep_obj, dep_type};
-use dep_obj::binding::{Bindings, EventBinding0};
+use dep_obj::{Change, DepObjId, DepType, dep_obj, dep_type, Convenient};
+use dep_obj::binding::{Binding1, Bindings, BYield};
 use downcast_rs::{Downcast, impl_downcast};
 use dyn_context::state::{RequiresStateDrop, State, StateDrop, StateExt};
 use macro_attr_2018::macro_attr;
@@ -12,6 +12,8 @@ use std::mem::replace;
 use tuifw_screen_base::Screen;
 
 pub trait WidgetBehavior {
+    fn init_bindings(&self, widget: Widget, state: &mut dyn State);
+    fn drop_bindings(&self, widget: Widget, state: &mut dyn State);
 }
 
 pub trait WidgetObj: Downcast + DepType<Id=Widget> + Send + Sync {
@@ -57,7 +59,7 @@ impl RequiresStateDrop for WidgetTreeImpl {
         let tree: &WidgetTree = state.get();
         let widgets = tree.0.get().widget_arena.items().ids().collect::<Vec<_>>();
         for widget in widgets {
-            Widget(widget).drop_bindings_priv(state);
+            Widget(widget).drop_bindings(state);
         }
         ViewTree::drop_self(state);
     }
@@ -117,6 +119,7 @@ impl Widget {
         state: &mut dyn State,
         obj: O,
     ) -> Widget {
+        let behavior = obj.behavior();
         let widget = {
             let tree: &mut WidgetTree = state.get_mut();
             tree.0.get_mut().widget_arena.insert(|widget| (WidgetNode {
@@ -125,19 +128,18 @@ impl Widget {
                 obj: Box::new(obj),
             }, Widget(widget)))
         };
-        let drop_old_view = EventBinding0::new(
-            state, (),
-            |state, (), change: Option<&mut Change<Option<View>>>| change.map(|change|
-                change.old().map(|old| old.drop_view(state))
-            )
+        let drop_old_view = Binding1::new(state, (), |(), change: Option<Change<Option<View>>>|
+            change.and_then(|change| change.old)
         );
-        drop_old_view.set_event_source(state, &mut WidgetBase::VIEW.change_source(widget.base()));
+        drop_old_view.set_target_fn(state, (), |state, (), view: View| view.drop_view(state));
+        drop_old_view.set_source_1(state, &mut WidgetBase::VIEW.change_final_source(widget.base()));
         widget.base().add_binding(state, drop_old_view);
+        behavior.init_bindings(widget, state);
         widget
     }
 
     pub fn drop_widget(self, state: &mut dyn State) {
-        self.drop_bindings_priv(state);
+        self.drop_bindings(state);
         {
             let tree: &mut WidgetTree = state.get_mut();
             let node = tree.0.get_mut().widget_arena.remove(self.0);
@@ -145,23 +147,29 @@ impl Widget {
         }
     }
 
-    pub fn load(self, state: &mut dyn State, parent: View) {
+    fn drop_bindings(self, state: &mut dyn State) {
+        let tree: &WidgetTree = state.get();
+        let behavior = tree.0.get().widget_arena[self.0].obj.behavior();
+        behavior.drop_bindings(self, state);
+        self.drop_bindings_priv(state);
+    }
+
+    pub fn load<X: Convenient>(self, state: &mut dyn State, parent: View, init: impl FnOnce(&mut dyn State, View)) -> BYield<X> {
         {
             let tree: &mut WidgetTree = state.get_mut();
             assert!(!replace(&mut tree.0.get_mut().widget_arena[self.0].loaded, true), "Widget already loaded");
         }
         let view = View::new(state, parent, |view| (self, view));
-        WidgetBase::VIEW.set(state, self.base(), Some(view));
-        WidgetBase::LOADED.set(state, self.base(), true);
+        init(state, view);
+        WidgetBase::VIEW.set(state, self.base(), Some(view))
     }
 
-    pub fn unload(self, state: &mut dyn State) {
+    pub fn unload<X: Convenient>(self, state: &mut dyn State) -> BYield<X> {
         {
             let tree: &mut WidgetTree = state.get_mut();
             assert!(replace(&mut tree.0.get_mut().widget_arena[self.0].loaded, false), "Widget is not loaded");
         }
-        WidgetBase::LOADED.set(state, self.base(), false);
-        WidgetBase::VIEW.set(state, self.base(), None);
+        WidgetBase::VIEW.set(state, self.base(), None)
     }
 
     dep_obj! {
@@ -189,6 +197,5 @@ dep_type! {
     #[derive(Debug)]
     pub struct WidgetBase in Widget {
         view: Option<View> = None,
-        loaded: bool = false,
     }
 }

@@ -1,7 +1,7 @@
 use components_arena::{Arena, Component, ComponentId, Id, NewtypeComponentId, RawId};
 use debug_panic::debug_panic;
-use dep_obj::{DepObjBaseBuilder, DepObjIdBase, DepType, dep_obj, dep_type_with_builder, DepEventArgs};
-use dep_obj::binding::{Binding, Binding0, Binding1, Binding5, Bindings};
+use dep_obj::{DepObjBaseBuilder, DepObjIdBase, DepType, dep_obj, dep_type_with_builder, DepEventArgs, Convenient};
+use dep_obj::binding::{Binding, Binding0, Binding1, Binding5, Bindings, b_immediate, BYield, b_continue};
 use downcast_rs::{Downcast, impl_downcast};
 use dyn_clone::{DynClone, clone_trait_object};
 use dyn_context::state::{SelfState, State, StateExt, StateRefMut, RequiresStateDrop, StateDrop};
@@ -15,6 +15,7 @@ use std::mem::replace;
 use std::num::NonZeroU16;
 use tuifw_screen_base::{Attr, Color, Event, HAlign, Key, Point, Rect, Screen, Thickness, VAlign, Vector};
 use tuifw_window::{RenderPort, Window, WindowTree};
+use std::sync::{Arc, Mutex};
 
 pub trait Layout: Downcast + DepType<Id=View> + Send + Sync {
     fn behavior(&self) -> &'static dyn LayoutBehavior;
@@ -160,6 +161,8 @@ struct ViewTreeImpl {
     focused: View,
     actual_focused: View,
     quit: bool,
+    update_actual_focused_queue: usize,
+    update_actual_focused_enqueue: bool,
 }
 
 impl SelfState for ViewTree { }
@@ -229,6 +232,8 @@ impl ViewTree {
             focused: root,
             actual_focused: root,
             quit: false,
+            update_actual_focused_queue: 0,
+            update_actual_focused_enqueue: false,
         }));
         bindings.merge_mut_and_then(|state| {
             let size_min_max = Binding0::new(state, (), |()| Some(ViewSizeMinMax {
@@ -261,9 +266,10 @@ impl ViewTree {
         <StateDrop<ViewTreeImpl>>::drop_self(state);
     }
 
-    pub fn quit(state: &mut dyn State) {
+    pub fn quit<X: Convenient>(state: &mut dyn State) -> BYield<X> {
         let tree: &mut ViewTree = state.get_mut();
         tree.0.get_mut().quit = true;
+        b_continue()
     }
 
     fn window_tree(&mut self) -> &mut WindowTree {
@@ -298,10 +304,10 @@ impl ViewTree {
         }
         let event = event?;
         if let Some(Event::Key(n, key)) = event {
-            let mut input = ViewInput { key: (n, key), handled: false };
+            let input = ViewInput(Arc::new(Mutex::new(ViewInputInstance { key: (n, key), handled: false })));
             let tree: &ViewTree = state.get();
             let view = tree.0.get().actual_focused;
-            ViewBase::INPUT.raise(state, view.base(), &mut input);
+            b_immediate(ViewBase::INPUT.raise(state, view.base(), input));
         }
         Ok(true)
     }
@@ -309,34 +315,52 @@ impl ViewTree {
     pub fn focused(&self) -> View { self.0.get().focused }
 
     fn update_actual_focused(state: &mut dyn State) {
-        let focused;
-        let actual_focused;
         {
             let tree: &mut ViewTree = state.get_mut();
-            focused = tree.0.get().focused;
-            actual_focused = tree.0.get().actual_focused;
-            if focused == actual_focused { return; }
-            tree.0.get_mut().actual_focused = focused;
-        }
-        let mut view = actual_focused;
-        loop {
-            ViewBase::IS_FOCUSED.set(state, view.base(), false);
-            let tree: &ViewTree = state.get();
-            if let Some(parent) = view.parent(tree) {
-                view = parent;
-            } else {
-                break;
+            if replace(&mut tree.0.get_mut().update_actual_focused_enqueue, true) {
+                let update_actual_focused_queue = &mut tree.0.get_mut().update_actual_focused_queue;
+                *update_actual_focused_queue = update_actual_focused_queue.checked_add(1).unwrap();
+                return;
             }
         }
-        let mut view = focused;
         loop {
-            ViewBase::IS_FOCUSED.set(state, view.base(), true);
-            let tree: &ViewTree = state.get();
-            if let Some(parent) = view.parent(tree) {
-                view = parent;
-            } else {
-                break;
+            let focused;
+            let actual_focused;
+            {
+                let tree: &mut ViewTree = state.get_mut();
+                focused = tree.0.get().focused;
+                actual_focused = tree.0.get().actual_focused;
+                if focused == actual_focused { break; }
+                tree.0.get_mut().actual_focused = focused;
             }
+            let mut view = actual_focused;
+            loop {
+                b_immediate(ViewBase::IS_FOCUSED.set(state, view.base(), false));
+                let tree: &ViewTree = state.get();
+                if let Some(parent) = view.parent(tree) {
+                    view = parent;
+                } else {
+                    break;
+                }
+            }
+            let mut view = focused;
+            loop {
+                b_immediate(ViewBase::IS_FOCUSED.set(state, view.base(), true));
+                let tree: &ViewTree = state.get();
+                if let Some(parent) = view.parent(tree) {
+                    view = parent;
+                } else {
+                    break;
+                }
+            }
+            let tree: &mut ViewTree = state.get_mut();
+            let update_actual_focused_queue = &mut tree.0.get_mut().update_actual_focused_queue;
+            if *update_actual_focused_queue == 0 { break; }
+            *update_actual_focused_queue -= 1;
+        }
+        {
+            let tree: &mut ViewTree = state.get_mut();
+            tree.0.get_mut().update_actual_focused_enqueue = false;
         }
     }
 }
@@ -418,29 +442,21 @@ impl View {
             max_w: w.or(max_w),
             max_h: h.or(max_h),
         }));
+        size_min_max.set_target_fn(state, view, |state, view, _| view.invalidate_measure(state));
         size_min_max.set_source_1(state, &mut ViewAlign::W.value_source(view.align()));
         size_min_max.set_source_2(state, &mut ViewAlign::H.value_source(view.align()));
         size_min_max.set_source_3(state, &mut ViewAlign::MIN_SIZE.value_source(view.align()));
         size_min_max.set_source_4(state, &mut ViewAlign::MAX_W.value_source(view.align()));
         size_min_max.set_source_5(state, &mut ViewAlign::MAX_H.value_source(view.align()));
-        size_min_max.set_target_fn(state, view, |state, view, _| {
-            view.invalidate_measure(state);
-        });
         let margin = Binding1::new(state, (), |(), margin| Some(margin));
+        margin.set_target_fn(state, view, |state, view, _| view.invalidate_measure(state));
         margin.set_source_1(state, &mut ViewAlign::MARGIN.value_source(view.align()));
-        margin.set_target_fn(state, view, |state, view, _| {
-            view.invalidate_measure(state);
-        });
         let h_align = Binding1::new(state, (), |(), h_align| Some(h_align));
+        h_align.set_target_fn(state, view, |state, view, _| view.invalidate_arrange(state));
         h_align.set_source_1(state, &mut ViewAlign::H_ALIGN.value_source(view.align()));
-        h_align.set_target_fn(state, view, |state, view, _| {
-            view.invalidate_arrange(state);
-        });
         let v_align = Binding1::new(state, (), |(), v_align| Some(v_align));
+        v_align.set_target_fn(state, view, |state, view, _| view.invalidate_arrange(state));
         v_align.set_source_1(state, &mut ViewAlign::V_ALIGN.value_source(view.align()));
-        v_align.set_target_fn(state, view, |state, view, _| {
-            view.invalidate_arrange(state);
-        });
         {
             let tree: &mut ViewTree = state.get_mut();
             tree.0.get_mut().arena[view.0].raw_align_bindings = Some(ViewRawAlignBindings {
@@ -749,7 +765,12 @@ impl View {
         let window = tree.0.get().arena[self.0].window;
         window.map(|window| window.invalidate(&mut tree.window_tree()))
     }
-    
+
+    pub fn invalidate_parent_measure(self, state: &mut dyn State) {
+        let tree: &ViewTree = state.get();
+        self.parent(tree).map(|parent| parent.invalidate_measure(state));
+    }
+
     pub fn invalidate_measure(self, state: &mut dyn State) {
         let tree: &mut ViewTree = state.get_mut();
         let mut view = self;
@@ -765,6 +786,11 @@ impl View {
                 break;
             }
         }
+    }
+
+    pub fn invalidate_parent_arrange(self, state: &mut dyn State) {
+        let tree: &ViewTree = state.get();
+        self.parent(tree).map(|parent| parent.invalidate_arrange(state));
     }
 
     pub fn invalidate_arrange(self, state: &mut dyn State) {
@@ -1009,26 +1035,14 @@ impl DecoratorBehavior for RootDecoratorBehavior {
         let fg = Binding1::new(state, (), |(), fg| Some(fg));
         let attr = Binding1::new(state, (), |(), attr| Some(attr));
         let fill = Binding1::new(state, (), |(), fill| Some(fill));
+        bg.set_target_fn(state, view, |state, view, _| view.invalidate_render(state).expect("invalidate_render failed"));
+        fg.set_target_fn(state, view, |state, view, _| view.invalidate_render(state).expect("invalidate_render failed"));
+        attr.set_target_fn(state, view, |state, view, _| view.invalidate_render(state).expect("invalidate_render failed"));
+        fill.set_target_fn(state, view, |state, view, _| view.invalidate_render(state).expect("invalidate_render failed"));
         bg.set_source_1(state, &mut ViewBase::BG.value_source(view.base()));
         fg.set_source_1(state, &mut ViewBase::FG.value_source(view.base()));
         attr.set_source_1(state, &mut ViewBase::ATTR.value_source(view.base()));
         fill.set_source_1(state, &mut RootDecorator::FILL.value_source(view.decorator()));
-        bg.set_target_fn(state, view, |state, view, _| {
-            let tree: &mut ViewTree = state.get_mut();
-            view.invalidate_render(tree).expect("invalidate_render failed");
-        });
-        fg.set_target_fn(state, view, |state, view, _| {
-            let tree: &mut ViewTree = state.get_mut();
-            view.invalidate_render(tree).expect("invalidate_render failed");
-        });
-        attr.set_target_fn(state, view, |state, view, _| {
-            let tree: &mut ViewTree = state.get_mut();
-            view.invalidate_render(tree).expect("invalidate_render failed");
-        });
-        fill.set_target_fn(state, view, |state, view, _| {
-            let tree: &mut ViewTree = state.get_mut();
-            view.invalidate_render(tree).expect("invalidate_render failed");
-        });
         Box::new(RootDecoratorBindings {
             bg: bg.into(),
             fg: fg.into(),
@@ -1064,21 +1078,28 @@ pub trait PanelTemplate: Debug + DynClone + Send + Sync {
 clone_trait_object!(PanelTemplate);
 
 #[derive(Debug)]
-pub struct ViewInput {
+struct ViewInputInstance {
     key: (NonZeroU16, Key),
     handled: bool,
 }
 
-impl ViewInput {
-    pub fn key(&self) -> (NonZeroU16, Key) { self.key }
+#[derive(Debug, Clone)]
+pub struct ViewInput(Arc<Mutex<ViewInputInstance>>);
 
-    pub fn mark_as_handled(&mut self) {
-        self.handled = true;
+impl PartialEq for ViewInput {
+    fn eq(&self, _other: &Self) -> bool { false }
+}
+
+impl ViewInput {
+    pub fn key(&self) -> (NonZeroU16, Key) { self.0.lock().unwrap().key }
+
+    pub fn mark_as_handled(&self) {
+        self.0.lock().unwrap().handled = true;
     }
 }
 
 impl DepEventArgs for ViewInput {
-    fn handled(&self) -> bool { self.handled }
+    fn handled(&self) -> bool { self.0.lock().unwrap().handled }
 }
 
 pub trait ViewBuilderViewBaseExt {

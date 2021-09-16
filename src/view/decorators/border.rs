@@ -258,6 +258,71 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
         let t = Binding1::new(state, (), |(), t| Some(t));
         let r = Binding1::new(state, (), |(), r| Some(r));
         let b = Binding1::new(state, (), |(), b| Some(b));
+        bg.set_target_fn(state, view, |state, view, _| view.invalidate_render(state).expect("invalidate_render failed"));
+        fg.set_target_fn(state, view, |state, view, _| view.invalidate_render(state).expect("invalidate_render failed"));
+        attr.set_target_fn(state, view, |state, view, _| view.invalidate_render(state).expect("invalidate_render failed"));
+        tl.set_target_fn(state, view, |state, view, _| {
+            view.invalidate_rect(state, Rect {
+                tl: Point { x: 0, y: 0 },
+                size: Vector { x: 1, y: 1 }
+            }).unwrap();
+        });
+        tr.set_target_fn(state, view, |state, view, _| {
+            let tree: &ViewTree = state.get();
+            let size = view.render_bounds(tree).size;
+            view.invalidate_rect(state, Rect {
+                tl: Point { x: size.x.wrapping_sub(1), y: 0 },
+                size: Vector { x: 1, y: 1 }
+            }).unwrap();
+        });
+        bl.set_target_fn(state, view, |state, view, _| {
+            let tree: &ViewTree = state.get();
+            let size = view.render_bounds(tree).size;
+            view.invalidate_rect(state, Rect {
+                tl: Point { x: 0, y: size.y.wrapping_sub(1) },
+                size: Vector { x: 1, y: 1 }
+            }).unwrap();
+        });
+        br.set_target_fn(state, view, |state, view, _| {
+            let tree: &ViewTree = state.get();
+            let size = view.render_bounds(tree).size;
+            view.invalidate_rect(state, Rect {
+                tl: Point { x: size.x.wrapping_sub(1), y: size.y.wrapping_sub(1) },
+                size: Vector { x: 1, y: 1 }
+            }).unwrap();
+        });
+        l.set_target_fn(state, view, |state, view, _| {
+            let tree: &ViewTree = state.get();
+            let size = view.render_bounds(tree).size;
+            view.invalidate_rect(state, Rect {
+                tl: Point { x: 0, y: 0 },
+                size: Vector { x: 1, y: size.y }
+            }).unwrap();
+        });
+        t.set_target_fn(state, view, |state, view, _| {
+            let tree: &ViewTree = state.get();
+            let size = view.render_bounds(tree).size;
+            view.invalidate_rect(state, Rect {
+                tl: Point { x: 0, y: 0 },
+                size: Vector { x: size.x, y: 1 }
+            }).unwrap();
+        });
+        r.set_target_fn(state, view, |state, view, _| {
+            let tree: &ViewTree = state.get();
+            let size = view.render_bounds(tree).size;
+            view.invalidate_rect(state, Rect {
+                tl: Point { x: size.x.wrapping_sub(1), y: 0 },
+                size: Vector { x: 1, y: size.y }
+            }).unwrap();
+        });
+        b.set_target_fn(state, view, |state, view, _| {
+            let tree: &ViewTree = state.get();
+            let size = view.render_bounds(tree).size;
+            view.invalidate_rect(state, Rect {
+                tl: Point { x: 0, y: size.y.wrapping_sub(1) },
+                size: Vector { x: size.x, y: 1 }
+            }).unwrap();
+        });
         bg.set_source_1(state, &mut ViewBase::BG.value_source(view.base()));
         fg.set_source_1(state, &mut ViewBase::FG.value_source(view.base()));
         attr.set_source_1(state, &mut ViewBase::ATTR.value_source(view.base()));
@@ -269,81 +334,6 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
         t.set_source_1(state, &mut BorderDecorator::T.value_source(view.decorator()));
         r.set_source_1(state, &mut BorderDecorator::R.value_source(view.decorator()));
         b.set_source_1(state, &mut BorderDecorator::B.value_source(view.decorator()));
-        bg.set_target_fn(state, view, |state, view, _| {
-            let tree: &mut ViewTree = state.get_mut();
-            view.invalidate_render(tree).expect("invalidate_render failed");
-        });
-        fg.set_target_fn(state, view, |state, view, _| {
-            let tree: &mut ViewTree = state.get_mut();
-            view.invalidate_render(tree).expect("invalidate_render failed");
-        });
-        attr.set_target_fn(state, view, |state, view, _| {
-            let tree: &mut ViewTree = state.get_mut();
-            view.invalidate_render(tree).expect("invalidate_render failed");
-        });
-        tl.set_target_fn(state, view, |state, view, _| {
-            let tree: &mut ViewTree = state.get_mut();
-            view.invalidate_rect(tree, Rect {
-                tl: Point { x: 0, y: 0 },
-                size: Vector { x: 1, y: 1 }
-            }).unwrap();
-        });
-        tr.set_target_fn(state, view, |state, view, _| {
-            let tree: &mut ViewTree = state.get_mut();
-            let size = view.render_bounds(tree).size;
-            view.invalidate_rect(tree, Rect {
-                tl: Point { x: size.x.wrapping_sub(1), y: 0 },
-                size: Vector { x: 1, y: 1 }
-            }).unwrap();
-        });
-        bl.set_target_fn(state, view, |state, view, _| {
-            let tree: &mut ViewTree = state.get_mut();
-            let size = view.render_bounds(tree).size;
-            view.invalidate_rect(tree, Rect {
-                tl: Point { x: 0, y: size.y.wrapping_sub(1) },
-                size: Vector { x: 1, y: 1 }
-            }).unwrap();
-        });
-        br.set_target_fn(state, view, |state, view, _| {
-            let tree: &mut ViewTree = state.get_mut();
-            let size = view.render_bounds(tree).size;
-            view.invalidate_rect(tree, Rect {
-                tl: Point { x: size.x.wrapping_sub(1), y: size.y.wrapping_sub(1) },
-                size: Vector { x: 1, y: 1 }
-            }).unwrap();
-        });
-        l.set_target_fn(state, view, |state, view, _| {
-            let tree: &mut ViewTree = state.get_mut();
-            let size = view.render_bounds(tree).size;
-            view.invalidate_rect(tree, Rect {
-                tl: Point { x: 0, y: 0 },
-                size: Vector { x: 1, y: size.y }
-            }).unwrap();
-        });
-        t.set_target_fn(state, view, |state, view, _| {
-            let tree: &mut ViewTree = state.get_mut();
-            let size = view.render_bounds(tree).size;
-            view.invalidate_rect(tree, Rect {
-                tl: Point { x: 0, y: 0 },
-                size: Vector { x: size.x, y: 1 }
-            }).unwrap();
-        });
-        r.set_target_fn(state, view, |state, view, _| {
-            let tree: &mut ViewTree = state.get_mut();
-            let size = view.render_bounds(tree).size;
-            view.invalidate_rect(tree, Rect {
-                tl: Point { x: size.x.wrapping_sub(1), y: 0 },
-                size: Vector { x: 1, y: size.y }
-            }).unwrap();
-        });
-        b.set_target_fn(state, view, |state, view, _| {
-            let tree: &mut ViewTree = state.get_mut();
-            let size = view.render_bounds(tree).size;
-            view.invalidate_rect(tree, Rect {
-                tl: Point { x: 0, y: size.y.wrapping_sub(1) },
-                size: Vector { x: size.x, y: 1 }
-            }).unwrap();
-        });
         Box::new(BorderDecoratorBindings {
             bg: bg.into(),
             fg: fg.into(),

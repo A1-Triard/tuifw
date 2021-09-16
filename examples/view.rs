@@ -1,5 +1,5 @@
 #![deny(warnings)]
-use dep_obj::binding::{Bindings, EventBinding1};
+use dep_obj::binding::{BindingExt2, Bindings, b_continue, b_yield};
 use dyn_context::state::{State, StateExt, StateRefMut};
 use either::Right;
 use std::borrow::Cow;
@@ -76,12 +76,12 @@ fn main() {
     let tree = &mut ViewTree::new(screen, bindings, |_| ((), |tree| tree));
     tree.merge_mut_and_then(|state| {
         let border = build(state, bounds);
-        let input_binding = EventBinding1::new(state, border, |
+        let input_binding = BindingExt2::new(state, (), |
             state,
-            border,
+            (),
             tl: Point,
-            input: Option<&mut ViewInput>
-        | input.map(|input| {
+            input: Option< ViewInput>
+        | input.map_or_else(b_continue, |input| {
             let d = match input.key() {
                 (n, Key::Left) | (n, Key::Char('h')) =>
                     -Vector { x: (n.get() as i16).wrapping_mul(2), y: 0 },
@@ -91,15 +91,15 @@ fn main() {
                     -Vector { x: 0, y: n.get() as i16 },
                 (n, Key::Down) | (n, Key::Char('j')) =>
                     Vector { x: 0, y: n.get() as i16 },
-                (_, Key::Escape) => { input.mark_as_handled(); ViewTree::quit(state); return; },
-                _ => return,
+                (_, Key::Escape) => { input.mark_as_handled(); return ViewTree::quit(state); },
+                _ => return b_continue(),
             };
             input.mark_as_handled();
-            CanvasLayout::TL.set(state, border.layout(), tl.offset(d));
+            b_yield(tl.offset(d))
         }));
-        input_binding.set_event_source(state, &mut ViewBase::INPUT.source(border.base()));
+        CanvasLayout::TL.bind(state, border.layout(), input_binding);
         input_binding.set_source_1(state, &mut CanvasLayout::TL.value_source(border.layout()));
-        border.base().add_binding(state, input_binding);
+        input_binding.set_source_2(state, &mut ViewBase::INPUT.source(border.base()));
 
         border.focus(state);
         while ViewTree::update(state, true).unwrap() { }

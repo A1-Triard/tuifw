@@ -146,39 +146,18 @@ impl DecoratorBehavior for LineDecoratorBehavior {
         let stroke = Binding1::new(state, (), |(), stroke| Some(stroke));
         let orient = Binding1::new(state, (), |(), orient| Some(orient));
         let far_orient = Binding2::new(state, (), |(), far, orient| Some((far, orient)));
-        bg.set_source_1(state, &mut ViewBase::BG.value_source(view.base()));
-        fg.set_source_1(state, &mut ViewBase::FG.value_source(view.base()));
-        attr.set_source_1(state, &mut ViewBase::ATTR.value_source(view.base()));
-        length.set_source_1(state, &mut LineDecorator::LENGTH.value_source(view.decorator()));
-        near.set_source_1(state, &mut LineDecorator::NEAR.value_source(view.decorator()));
-        stroke.set_source_1(state, &mut LineDecorator::STROKE.value_source(view.decorator()));
-        orient.set_source_1(state, &mut LineDecorator::ORIENT.value_source(view.decorator()));
-        far_orient.set_source_1(state, &mut LineDecorator::FAR.value_source(view.decorator()));
-        far_orient.set_source_2(state, &mut LineDecorator::ORIENT.value_source(view.decorator()));
-        bg.set_target_fn(state, view, |state, view, _| {
-            view.invalidate_render(state).expect("invalidate_render failed");
-        });
-        fg.set_target_fn(state, view, |state, view, _| {
-            view.invalidate_render(state).expect("invalidate_render failed");
-        });
-        attr.set_target_fn(state, view, |state, view, _| {
-            view.invalidate_render(state).expect("invalidate_render failed");
-        });
-        length.set_target_fn(state, view, |state, view, _| {
-            view.invalidate_measure(state);
-        });
+        bg.set_target_fn(state, view, |state, view, _| view.invalidate_render(state).expect("invalidate_render failed"));
+        fg.set_target_fn(state, view, |state, view, _| view.invalidate_render(state).expect("invalidate_render failed"));
+        attr.set_target_fn(state, view, |state, view, _| view.invalidate_render(state).expect("invalidate_render failed"));
+        length.set_target_fn(state, view, |state, view, _| view.invalidate_measure(state));
         near.set_target_fn(state, view, |state, view, _| {
             view.invalidate_rect(state, Rect {
                 tl: Point { x: 0, y: 0 },
                 size: Vector { x: 1, y: 1 }
             }).unwrap();
         });
-        stroke.set_target_fn(state, view, |state, view, _| {
-            view.invalidate_render(state).expect("invalidate_render failed");
-        });
-        orient.set_target_fn(state, view, |state, view, _| {
-            view.invalidate_measure(state);
-        });
+        stroke.set_target_fn(state, view, |state, view, _| view.invalidate_render(state).expect("invalidate_render failed"));
+        orient.set_target_fn(state, view, |state, view, _| view.invalidate_measure(state));
         far_orient.set_target_fn(state, view, |state, view, (_far, orient)| {
             let tree: &ViewTree = state.get();
             let size = view.render_bounds(tree).size;
@@ -189,6 +168,15 @@ impl DecoratorBehavior for LineDecoratorBehavior {
             };
             view.invalidate_rect(state, invalidated).unwrap();
         });
+        bg.set_source_1(state, &mut ViewBase::BG.value_source(view.base()));
+        fg.set_source_1(state, &mut ViewBase::FG.value_source(view.base()));
+        attr.set_source_1(state, &mut ViewBase::ATTR.value_source(view.base()));
+        length.set_source_1(state, &mut LineDecorator::LENGTH.value_source(view.decorator()));
+        near.set_source_1(state, &mut LineDecorator::NEAR.value_source(view.decorator()));
+        stroke.set_source_1(state, &mut LineDecorator::STROKE.value_source(view.decorator()));
+        orient.set_source_1(state, &mut LineDecorator::ORIENT.value_source(view.decorator()));
+        far_orient.set_source_1(state, &mut LineDecorator::FAR.value_source(view.decorator()));
+        far_orient.set_source_2(state, &mut LineDecorator::ORIENT.value_source(view.decorator()));
         Box::new(LineDecoratorBindings {
             fg: fg.into(),
             bg: bg.into(),
