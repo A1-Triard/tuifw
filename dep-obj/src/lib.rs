@@ -311,11 +311,11 @@ impl<PropType: Convenient> DepPropHandlersCopy<PropType> {
         obj: Glob<Owner::Id, Owner>,
         prop: DepProp<Owner, PropType>
     ) {
-        for handler in self.value_handlers {
-            handler.0.execute(state, change.new.clone());
-        }
         if let Some(change_initial_handler) = self.change_initial_handler {
             change_initial_handler.execute(state, change.clone());
+        }
+        for handler in self.value_handlers {
+            handler.0.execute(state, change.new.clone());
         }
         for handler in self.change_handlers {
             handler.0.execute(state, change.clone());
