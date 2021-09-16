@@ -284,6 +284,7 @@ pub enum ItemChangeAction {
     Insert,
     Remove,
     Update,
+    AfterUpdate,
 }
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
@@ -295,9 +296,21 @@ pub struct ItemChange<ItemType: Convenient> {
 impl<ItemType: Convenient> ItemChange<ItemType> {
     pub fn is_update(&self) -> bool { self.action == ItemChangeAction::Update }
 
+    pub fn is_insert_or_remove(&self) -> bool {
+        self.action == ItemChangeAction::Insert || self.action == ItemChangeAction::Remove
+    }
+
     pub fn is_insert(&self) -> bool { self.action == ItemChangeAction::Insert }
 
+    pub fn is_insert_or_after_update(&self) -> bool {
+        self.action == ItemChangeAction::Insert || self.action == ItemChangeAction::AfterUpdate
+    }
+
     pub fn is_remove(&self) -> bool { self.action == ItemChangeAction::Remove }
+
+    pub fn is_remove_or_update(&self) -> bool {
+        self.action == ItemChangeAction::Remove || self.action == ItemChangeAction::Update
+    }
 }
 
 #[derive(Debug)]
@@ -1095,6 +1108,9 @@ impl<Owner: DepType, ItemType: Convenient> DepVec<Owner, ItemType> {
                     let handler = entry_mut.handlers.item_handlers[handler_id].handler.clone();
                     for item in &items {
                         handler.execute(state, ItemChange { action: ItemChangeAction::Update, item: item.clone() });
+                    }
+                    for item in items {
+                        handler.execute(state, ItemChange { action: ItemChangeAction::AfterUpdate, item });
                     }
                 },
             };

@@ -8,7 +8,7 @@
 use components_arena::{Arena, Component, NewtypeComponentId, Id};
 use dep_obj::{Change, DepObjBaseBuilder, DepObjId, dep_obj, dep_type, dep_type_with_builder, ItemChange};
 use macro_attr_2018::macro_attr;
-use dep_obj::binding::{Binding1, Binding2, BindingExt2, Bindings, b_yield, b_immediate};
+use dep_obj::binding::{Binding1, Binding2, BindingExt2, Bindings, b_yield, b_immediate, b_continue};
 use dyn_context::state::{State, StateExt};
 use std::any::{TypeId, Any};
 use std::borrow::Cow;
@@ -130,8 +130,10 @@ impl Npc {
             if let Some(change) = change {
                 if change.is_remove() {
                     ItemProps::ENHANCEMENT.unset(state, change.item.props())
-                } else {
+                } else if change.is_insert_or_after_update() {
                     ItemProps::ENHANCEMENT.set(state, change.item.props(), enhancement)
+                } else {
+                    b_continue()
                 }
             } else {
                 b_yield(())
