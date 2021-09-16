@@ -456,7 +456,7 @@ impl<ArgsType: DepEventArgs> DepEventEntry<ArgsType> {
 struct DepVecHandlers<ItemType: Convenient> {
     changed_handlers: Arena<BoxedHandler<()>>,
     item_handlers: Arena<ItemHandler<ItemType>>,
-    item_initial_final_handler: Option<Box<dyn Handler<ItemChange<ItemType>>>>,
+    item_initial_final_handler: Option<ItemHandler<ItemType>>,
 }
 
 impl<ItemType: Convenient> DepVecHandlers<ItemType> {
@@ -471,14 +471,14 @@ impl<ItemType: Convenient> DepVecHandlers<ItemType> {
     fn take_all(&mut self, handlers: &mut Vec<Box<dyn AnyHandler>>) {
         handlers.extend(take(&mut self.changed_handlers).into_items().into_values().map(|x| x.0.into_any()));
         handlers.extend(take(&mut self.item_handlers).into_items().into_values().map(|x| x.handler.into_any()));
-        self.item_initial_final_handler.take().map(|x| handlers.push(x.into_any()));
+        self.item_initial_final_handler.take().map(|x| handlers.push(x.handler.into_any()));
     }
 
     fn clone(&self) -> DepVecHandlersCopy<ItemType> {
         DepVecHandlersCopy {
             changed_handlers: self.changed_handlers.items().clone().into_values(),
             item_handlers: self.item_handlers.items().values().map(|x| x.handler.clone()).collect(),
-            item_initial_final_handler: self.item_initial_final_handler.clone(),
+            item_initial_final_handler: self.item_initial_final_handler.as_ref().map(|x| x.handler.clone()),
         }
     }
 }
@@ -492,10 +492,11 @@ struct DepVecHandlersCopy<ItemType: Convenient> {
 
 impl<ItemType: Convenient> DepVecHandlersCopy<ItemType> {
     fn execute(self, state: &mut dyn State, action: ItemChangeAction, items: &[ItemType]) {
+        debug_assert!(action == ItemChangeAction::Insert || action == ItemChangeAction::Remove);
         if action == ItemChangeAction::Insert {
             if let Some(item_initial_final_handler) = self.item_initial_final_handler.as_ref() {
                 for item in items {
-                    item_initial_final_handler.execute(state, ItemChange { action: ItemChangeAction::Insert, item: item.clone() });
+                    item_initial_final_handler.execute(state, ItemChange { action, item: item.clone() });
                 }
             }
         }
@@ -507,7 +508,7 @@ impl<ItemType: Convenient> DepVecHandlersCopy<ItemType> {
         if action == ItemChangeAction::Remove {
             if let Some(item_initial_final_handler) = self.item_initial_final_handler.as_ref() {
                 for item in items {
-                    item_initial_final_handler.execute(state, ItemChange { action: ItemChangeAction::Remove, item: item.clone() });
+                    item_initial_final_handler.execute(state, ItemChange { action, item: item.clone() });
                 }
             }
         }
@@ -543,6 +544,9 @@ impl<ItemType: Convenient> DepVecEntry<ItemType> {
     #[doc(hidden)]
     pub fn collect_all_bindings(&mut self, bindings: &mut Vec<AnyBindingBase>) {
         for binding in self.handlers.item_handlers.items().values().filter_map(|x| x.update) {
+            bindings.push(binding.into());
+        }
+        if let Some(binding) = self.handlers.item_initial_final_handler.as_ref().and_then(|x| x.update) {
             bindings.push(binding.into());
         }
     }
@@ -984,7 +988,8 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
     fn clear_binding(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>) {
         let mut obj_mut = obj.get_mut(state);
         let entry_mut = self.entry_mut(&mut obj_mut);
-        entry_mut.binding = None;
+        let ok = entry_mut.binding.take().is_some();
+        debug_assert!(ok);
     }
 
     pub fn value_source(self, obj: Glob<Owner::Id, Owner>) -> DepPropValueSource<Owner, PropType> {
@@ -1028,7 +1033,7 @@ enum DepVecModification<ItemType: Convenient> {
     Insert(usize, ItemType),
     Remove(usize),
     ExtendFrom(Vec<ItemType>),
-    Update(Id<ItemHandler<ItemType>>),
+    Update(Option<Id<ItemHandler<ItemType>>>),
 }
 
 #[derive(Educe)]
@@ -1105,7 +1110,10 @@ impl<Owner: DepType, ItemType: Convenient> DepVec<Owner, ItemType> {
                 },
                 DepVecModification::Update(handler_id) => {
                     let items = entry_mut.items.clone();
-                    let handler = entry_mut.handlers.item_handlers[handler_id].handler.clone();
+                    let handler = handler_id.map_or_else(
+                        || entry_mut.handlers.item_initial_final_handler.as_ref().unwrap().handler.clone(),
+                        |handler_id| entry_mut.handlers.item_handlers[handler_id].handler.clone()
+                    );
                     for item in &items {
                         handler.execute(state, ItemChange { action: ItemChangeAction::Update, item: item.clone() });
                     }
@@ -1165,7 +1173,11 @@ impl<Owner: DepType, ItemType: Convenient> DepVec<Owner, ItemType> {
     }
 
     pub fn item_initial_final_source(self, obj: Glob<Owner::Id, Owner>) -> DepVecItemInitialFinalSource<Owner, ItemType> {
-        DepVecItemInitialFinalSource { obj, vec: self }
+        DepVecItemInitialFinalSource { obj, vec: self, update: None }
+    }
+
+    pub fn item_initial_final_source_with_update(self, update: impl Into<BindingBase<()>>, obj: Glob<Owner::Id, Owner>) -> DepVecItemInitialFinalSource<Owner, ItemType> {
+        DepVecItemInitialFinalSource { obj, vec: self, update: Some(update.into()) }
     }
 }
 
@@ -1729,7 +1741,27 @@ impl<Owner: DepType + 'static, ItemType: Convenient> Source for DepVecChangedSou
 
 #[derive(Educe)]
 #[educe(Debug, Clone)]
-pub struct DepVecItemSourceUpdate<Owner: DepType, ItemType: Convenient> {
+struct DepVecItemInitialFinalSourceUpdate<Owner: DepType, ItemType: Convenient> {
+    obj: Glob<Owner::Id, Owner>,
+    vec: DepVec<Owner, ItemType>,
+}
+
+impl<Owner: DepType, ItemType: Convenient> Target<()> for DepVecItemInitialFinalSourceUpdate<Owner, ItemType> {
+    fn execute(&self, state: &mut dyn State, (): ()) {
+        self.vec.modify(state, self.obj, DepVecModification::Update(None));
+    }
+
+    fn clear(&self, state: &mut dyn State) {
+        let mut obj = self.obj.get_mut(state);
+        let entry = self.vec.entry_mut(&mut obj);
+        let ok = entry.handlers.item_initial_final_handler.take().is_some();
+        debug_assert!(ok);
+    }
+}
+
+#[derive(Educe)]
+#[educe(Debug, Clone)]
+struct DepVecItemSourceUpdate<Owner: DepType, ItemType: Convenient> {
     obj: Glob<Owner::Id, Owner>,
     vec: DepVec<Owner, ItemType>,
     handler_id: Id<ItemHandler<ItemType>>,
@@ -1737,13 +1769,14 @@ pub struct DepVecItemSourceUpdate<Owner: DepType, ItemType: Convenient> {
 
 impl<Owner: DepType, ItemType: Convenient> Target<()> for DepVecItemSourceUpdate<Owner, ItemType> {
     fn execute(&self, state: &mut dyn State, (): ()) {
-        self.vec.modify(state, self.obj, DepVecModification::Update(self.handler_id));
+        self.vec.modify(state, self.obj, DepVecModification::Update(Some(self.handler_id)));
     }
 
     fn clear(&self, state: &mut dyn State) {
         let mut obj = self.obj.get_mut(state);
         let entry = self.vec.entry_mut(&mut obj);
-        entry.handlers.item_handlers[self.handler_id].update = None;
+        let ok = entry.handlers.item_handlers[self.handler_id].update.take().is_some();
+        debug_assert!(ok);
     }
 }
 
@@ -1799,6 +1832,7 @@ impl<Owner: DepType + 'static, ItemType: Convenient> Source for DepVecItemSource
 pub struct DepVecItemInitialFinalSource<Owner: DepType, ItemType: Convenient> {
     obj: Glob<Owner::Id, Owner>,
     vec: DepVec<Owner, ItemType>,
+    update: Option<BindingBase<()>>,
 }
 
 impl<Owner: DepType + 'static, ItemType: Convenient> Source for DepVecItemInitialFinalSource<Owner, ItemType> {
@@ -1813,7 +1847,11 @@ impl<Owner: DepType + 'static, ItemType: Convenient> Source for DepVecItemInitia
         let mut obj = self.obj.get_mut(state);
         let entry = self.vec.entry_mut(&mut obj);
         let items = entry.items.clone();
+        let handler = ItemHandler { handler, update: self.update };
         assert!(entry.handlers.item_initial_final_handler.replace(handler).is_none(), "duplicate initial handler");
+        if let Some(update) = self.update {
+            update.set_target(state, Box::new(DepVecItemInitialFinalSourceUpdate { obj: self.obj, vec: self.vec }));
+        }
         let init = if items.is_empty() {
             None
         } else {
@@ -1822,7 +1860,7 @@ impl<Owner: DepType + 'static, ItemType: Convenient> Source for DepVecItemInitia
             Some(Box::new(move |state: &mut dyn State| {
                 let obj = obj.get(state);
                 let entry = vec.entry(&obj);
-                let handler = entry.handlers.item_initial_final_handler.clone().unwrap();
+                let handler = entry.handlers.item_initial_final_handler.as_ref().unwrap().handler.clone();
                 for item in items {
                     handler.execute(state, ItemChange { action: ItemChangeAction::Insert, item });
                 }
