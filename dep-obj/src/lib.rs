@@ -148,6 +148,10 @@ pub use alloc::vec::Vec as std_vec_Vec;
 #[doc(hidden)]
 pub use alloc::boxed::Box as std_boxed_Box;
 #[doc(hidden)]
+pub use components_arena::ComponentId as components_arena_ComponentId;
+#[doc(hidden)]
+pub use components_arena::RawId as components_arena_RawId;
+#[doc(hidden)]
 pub use core::any::Any as std_any_Any;
 #[doc(hidden)]
 pub use core::any::TypeId as std_any_TypeId;
@@ -308,7 +312,7 @@ impl<PropType: Convenient> DepPropHandlersCopy<PropType> {
         self,
         state: &mut dyn State,
         change: &Change<PropType>,
-        obj: Glob<Owner::Id, Owner>,
+        obj: Glob<Owner>,
         prop: DepProp<Owner, PropType>
     ) {
         if let Some(change_initial_handler) = self.change_initial_handler {
@@ -647,7 +651,7 @@ pub trait DepType: Debug {
     fn take_added_bindings_and_collect_all(&mut self) -> Vec<AnyBindingBase>;
 
     #[doc(hidden)]
-    fn update_parent_children_has_handlers(state: &mut dyn State, obj: Glob<Self::Id, Self>) where Self: Sized;
+    fn update_parent_children_has_handlers(state: &mut dyn State, obj: Glob<Self>) where Self: Sized;
 }
 
 pub trait DepEventArgs: Convenient {
@@ -684,7 +688,7 @@ impl<Owner: DepType, ArgsType: DepEventArgs> DepEvent<Owner, ArgsType> {
         }
     }
 
-    fn raise_raw(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, args: &ArgsType) -> bool {
+    fn raise_raw(self, state: &mut dyn State, obj: Glob<Owner>, args: &ArgsType) -> bool {
         let obj = obj.get(state);
         let entry = self.entry(&obj);
         let bubble = entry.bubble;
@@ -695,7 +699,7 @@ impl<Owner: DepType, ArgsType: DepEventArgs> DepEvent<Owner, ArgsType> {
         bubble
     }
 
-    pub fn raise<X: Convenient>(self, state: &mut dyn State, mut obj: Glob<Owner::Id, Owner>, args: ArgsType) -> BYield<X> {
+    pub fn raise<X: Convenient>(self, state: &mut dyn State, mut obj: Glob<Owner>, args: ArgsType) -> BYield<X> {
         let bubble = self.raise_raw(state, obj, &args);
         if !bubble || args.handled() { return b_continue(); }
         while let Some(parent) = obj.parent(state) {
@@ -707,7 +711,7 @@ impl<Owner: DepType, ArgsType: DepEventArgs> DepEvent<Owner, ArgsType> {
         b_continue()
     }
 
-    pub fn source(self, obj: Glob<Owner::Id, Owner>) -> DepEventSource<Owner, ArgsType> {
+    pub fn source(self, obj: Glob<Owner>) -> DepEventSource<Owner, ArgsType> {
         DepEventSource { obj, event: self }
     }
 }
@@ -745,7 +749,7 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         }
     }
 
-    fn unstyled_non_local_value<T>(self, state: &dyn State, obj: Glob<Owner::Id, Owner>, f: impl FnOnce(&PropType) -> T) -> T {
+    fn unstyled_non_local_value<T>(self, state: &dyn State, obj: Glob<Owner>, f: impl FnOnce(&PropType) -> T) -> T {
         let obj_ref = obj.get(state);
         let entry = self.entry(&obj_ref);
         if entry.inherits() {
@@ -759,7 +763,7 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         }
     }
 
-    fn non_local_value<T>(self, state: &dyn State, obj: Glob<Owner::Id, Owner>, f: impl FnOnce(&PropType) -> T) -> T {
+    fn non_local_value<T>(self, state: &dyn State, obj: Glob<Owner>, f: impl FnOnce(&PropType) -> T) -> T {
         let obj_ref = obj.get(state);
         let entry = self.entry(&obj_ref);
         if let Some(value) = entry.style.as_ref() {
@@ -769,7 +773,7 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         }
     }
 
-    fn current_value<T>(self, state: &dyn State, obj: Glob<Owner::Id, Owner>, f: impl FnOnce(&PropType) -> T) -> T {
+    fn current_value<T>(self, state: &dyn State, obj: Glob<Owner>, f: impl FnOnce(&PropType) -> T) -> T {
         let obj_ref = obj.get(state);
         let entry = self.entry(&obj_ref);
         if let Some(value) = entry.local.as_ref() {
@@ -780,14 +784,14 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
     }
 
     #[doc(hidden)]
-    pub fn update_parent_children_has_handlers(self, state: &mut dyn State, mut obj: Glob<Owner::Id, Owner>) {
+    pub fn update_parent_children_has_handlers(self, state: &mut dyn State, mut obj: Glob<Owner>) {
         while let Some(parent) = obj.parent(state) {
             obj = parent;
-            let children_has_handlers = if let Some(last_child) = obj.id.last_child(state) {
+            let children_has_handlers = if let Some(last_child) = Owner::Id::from_raw(obj.id).last_child(state) {
                 let mut child = last_child;
                 loop {
                     child = child.next(state);
-                    let child_obj = Glob { id: child, descriptor: obj.descriptor };
+                    let child_obj = Glob { id: child.into_raw(), descriptor: obj.descriptor };
                     let obj = child_obj.get(state);
                     let entry = self.entry(&obj);
                     debug_assert!(entry.inherits());
@@ -807,14 +811,14 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
     fn notify_children(
         self,
         state: &mut dyn State,
-        obj: Glob<Owner::Id, Owner>,
+        obj: Glob<Owner>,
         change: &Change<PropType>,
     ) {
-        if let Some(last_child) = obj.id.last_child(state) {
+        if let Some(last_child) = Owner::Id::from_raw(obj.id).last_child(state) {
             let mut child = last_child;
             loop {
                 child = child.next(state);
-                let child_obj = Glob { id: child, descriptor: obj.descriptor };
+                let child_obj = Glob { id: child.into_raw(), descriptor: obj.descriptor };
                 let mut obj_mut = child_obj.get_mut(state);
                 let entry_mut = self.entry_mut(&mut obj_mut);
                 debug_assert!(entry_mut.inherits());
@@ -827,7 +831,7 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         }
     }
 
-    fn un_set_core(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: Option<PropType>) {
+    fn un_set_core(self, state: &mut dyn State, obj: Glob<Owner>, value: Option<PropType>) {
         let mut obj_mut = obj.get_mut(state);
         let entry_mut = self.entry_mut(&mut obj_mut);
         let old = replace(&mut entry_mut.local, value.clone());
@@ -855,7 +859,7 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         handlers.execute(state, &change, obj, self);
     }
 
-    fn un_set(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, mut value: Option<PropType>) {
+    fn un_set(self, state: &mut dyn State, obj: Glob<Owner>, mut value: Option<PropType>) {
         let mut obj_mut = obj.get_mut(state);
         let entry_mut = self.entry_mut(&mut obj_mut);
         if replace(&mut entry_mut.enqueue, true) {
@@ -878,12 +882,12 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         entry_mut.enqueue = false;
     }
 
-    pub fn set<X: Convenient>(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, value: PropType) -> BYield<X> {
+    pub fn set<X: Convenient>(self, state: &mut dyn State, obj: Glob<Owner>, value: PropType) -> BYield<X> {
         self.un_set(state, obj, Some(value));
         b_continue()
     }
 
-    pub fn unset<X: Convenient>(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>) -> BYield<X> {
+    pub fn unset<X: Convenient>(self, state: &mut dyn State, obj: Glob<Owner>) -> BYield<X> {
         self.un_set(state, obj, None);
         b_continue()
     }
@@ -891,7 +895,7 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
     fn bind_raw(
         self,
         state: &mut dyn State,
-        obj: Glob<Owner::Id, Owner>,
+        obj: Glob<Owner>,
         binding: BindingBase<PropType>
     ) where Owner: 'static {
         self.unbind(state, obj);
@@ -904,13 +908,13 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
     pub fn bind(
         self,
         state: &mut dyn State,
-        obj: Glob<Owner::Id, Owner>,
+        obj: Glob<Owner>,
         binding: impl Into<BindingBase<PropType>>
     ) where Owner: 'static {
         self.bind_raw(state, obj, binding.into());
     }
 
-    pub fn unbind(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>) {
+    pub fn unbind(self, state: &mut dyn State, obj: Glob<Owner>) {
         if let Some(binding) = {
             let mut obj_mut = obj.get_mut(state);
             let entry_mut = self.entry_mut(&mut obj_mut);
@@ -920,26 +924,26 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         }
     }
 
-    fn clear_binding(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>) {
+    fn clear_binding(self, state: &mut dyn State, obj: Glob<Owner>) {
         let mut obj_mut = obj.get_mut(state);
         let entry_mut = self.entry_mut(&mut obj_mut);
         let ok = entry_mut.binding.take().is_some();
         debug_assert!(ok);
     }
 
-    pub fn value_source(self, obj: Glob<Owner::Id, Owner>) -> DepPropValueSource<Owner, PropType> {
+    pub fn value_source(self, obj: Glob<Owner>) -> DepPropValueSource<Owner, PropType> {
         DepPropValueSource { obj, prop: self }
     }
 
-    pub fn change_source(self, obj: Glob<Owner::Id, Owner>) -> DepPropChangeSource<Owner, PropType> {
+    pub fn change_source(self, obj: Glob<Owner>) -> DepPropChangeSource<Owner, PropType> {
         DepPropChangeSource { obj, prop: self }
     }
 
-    pub fn change_initial_source(self, obj: Glob<Owner::Id, Owner>) -> DepPropChangeInitialSource<Owner, PropType> {
+    pub fn change_initial_source(self, obj: Glob<Owner>) -> DepPropChangeInitialSource<Owner, PropType> {
         DepPropChangeInitialSource { obj, prop: self }
     }
 
-    pub fn change_final_source(self, obj: Glob<Owner::Id, Owner>) -> DepPropChangeFinalSource<Owner, PropType> {
+    pub fn change_final_source(self, obj: Glob<Owner>) -> DepPropChangeFinalSource<Owner, PropType> {
         DepPropChangeFinalSource { obj, prop: self }
     }
 }
@@ -947,7 +951,7 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
 #[derive(Educe)]
 #[educe(Debug, Clone)]
 struct DepPropSet<Owner: DepType, PropType: Convenient> {
-    obj: Glob<Owner::Id, Owner>,
+    obj: Glob<Owner>,
     prop: DepProp<Owner, PropType>,
 }
 
@@ -1004,7 +1008,7 @@ impl<Owner: DepType, ItemType: Convenient> DepVec<Owner, ItemType> {
     fn modify(
         self,
         state: &mut dyn State,
-        obj: Glob<Owner::Id, Owner>,
+        obj: Glob<Owner>,
         mut modification: DepVecModification<ItemType>,
     ) {
         let mut obj_mut = obj.get_mut(state);
@@ -1070,55 +1074,55 @@ impl<Owner: DepType, ItemType: Convenient> DepVec<Owner, ItemType> {
         entry_mut.enqueue = false;
     }
 
-    pub fn clear<X: Convenient>(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>) -> BYield<X> {
+    pub fn clear<X: Convenient>(self, state: &mut dyn State, obj: Glob<Owner>) -> BYield<X> {
         self.modify(state, obj, DepVecModification::Clear);
         b_continue()
     }
 
-    pub fn push<X: Convenient>(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, item: ItemType) -> BYield<X> {
+    pub fn push<X: Convenient>(self, state: &mut dyn State, obj: Glob<Owner>, item: ItemType) -> BYield<X> {
         self.modify(state, obj, DepVecModification::Push(item));
         b_continue()
     }
 
-    pub fn insert<X: Convenient>(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, index: usize, item: ItemType) -> BYield<X> {
+    pub fn insert<X: Convenient>(self, state: &mut dyn State, obj: Glob<Owner>, index: usize, item: ItemType) -> BYield<X> {
         self.modify(state, obj, DepVecModification::Insert(index, item));
         b_continue()
     }
 
-    pub fn remove<X: Convenient>(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, index: usize) -> BYield<X> {
+    pub fn remove<X: Convenient>(self, state: &mut dyn State, obj: Glob<Owner>, index: usize) -> BYield<X> {
         self.modify(state, obj, DepVecModification::Remove(index));
         b_continue()
     }
 
-    pub fn extend_from<X: Convenient>(self, state: &mut dyn State, obj: Glob<Owner::Id, Owner>, other: Vec<ItemType>) -> BYield<X> {
+    pub fn extend_from<X: Convenient>(self, state: &mut dyn State, obj: Glob<Owner>, other: Vec<ItemType>) -> BYield<X> {
         self.modify(state, obj, DepVecModification::ExtendFrom(other));
         b_continue()
     }
 
-    pub fn changed_source(self, obj: Glob<Owner::Id, Owner>) -> DepVecChangedSource<Owner, ItemType> {
+    pub fn changed_source(self, obj: Glob<Owner>) -> DepVecChangedSource<Owner, ItemType> {
         DepVecChangedSource { obj, vec: self }
     }
 
-    pub fn item_source(self, obj: Glob<Owner::Id, Owner>) -> DepVecItemSource<Owner, ItemType> {
+    pub fn item_source(self, obj: Glob<Owner>) -> DepVecItemSource<Owner, ItemType> {
         DepVecItemSource { obj, vec: self, update: None }
     }
 
-    pub fn item_source_with_update(self, update: impl Into<BindingBase<()>>, obj: Glob<Owner::Id, Owner>) -> DepVecItemSource<Owner, ItemType> {
+    pub fn item_source_with_update(self, update: impl Into<BindingBase<()>>, obj: Glob<Owner>) -> DepVecItemSource<Owner, ItemType> {
         DepVecItemSource { obj, vec: self, update: Some(update.into()) }
     }
 
-    pub fn item_initial_final_source(self, obj: Glob<Owner::Id, Owner>) -> DepVecItemInitialFinalSource<Owner, ItemType> {
+    pub fn item_initial_final_source(self, obj: Glob<Owner>) -> DepVecItemInitialFinalSource<Owner, ItemType> {
         DepVecItemInitialFinalSource { obj, vec: self, update: None }
     }
 
-    pub fn item_initial_final_source_with_update(self, update: impl Into<BindingBase<()>>, obj: Glob<Owner::Id, Owner>) -> DepVecItemInitialFinalSource<Owner, ItemType> {
+    pub fn item_initial_final_source_with_update(self, update: impl Into<BindingBase<()>>, obj: Glob<Owner>) -> DepVecItemInitialFinalSource<Owner, ItemType> {
         DepVecItemInitialFinalSource { obj, vec: self, update: Some(update.into()) }
     }
 }
 
-impl<Owner: DepType> Glob<Owner::Id, Owner> {
+impl<Owner: DepType> Glob<Owner> {
     pub fn parent(self, state: &dyn State) -> Option<Self> {
-        self.id.parent(state).map(|id| Glob { id, descriptor: self.descriptor })
+        Owner::Id::from_raw(self.id).parent(state).map(|id| Glob { id: id.into_raw(), descriptor: self.descriptor })
     }
 
     fn add_binding_raw(self, state: &mut dyn State, binding: AnyBindingBase) {
@@ -1180,7 +1184,7 @@ trait AnySetter<Owner: DepType>: Debug + DynClone + Send + Sync {
     fn un_apply(
         &self,
         state: &mut dyn State,
-        obj: Glob<Owner::Id, Owner>,
+        obj: Glob<Owner>,
         unapply: bool
     ) -> Option<Box<dyn for<'a> FnOnce(&'a mut dyn State)>>;
 }
@@ -1193,7 +1197,7 @@ impl<Owner: DepType + 'static, PropType: Convenient> AnySetter<Owner> for Setter
     fn un_apply(
         &self,
         state: &mut dyn State,
-        obj: Glob<Owner::Id, Owner>,
+        obj: Glob<Owner>,
         unapply: bool
     ) -> Option<Box<dyn for<'a> FnOnce(&'a mut dyn State)>> {
         let obj_mut = &mut obj.get_mut(state);
@@ -1291,7 +1295,7 @@ pub trait DepObjBaseBuilder<OwnerId: ComponentId> {
 #[derive(Educe)]
 #[educe(Debug)]
 struct DepEventHandledSource<Owner: DepType, ArgsType: DepEventArgs> {
-    obj: Glob<Owner::Id, Owner>,
+    obj: Glob<Owner>,
     handler_id: Id<BoxedHandler<ArgsType>>,
     event: DepEvent<Owner, ArgsType>,
 }
@@ -1307,7 +1311,7 @@ impl<Owner: DepType, ArgsType: DepEventArgs> HandlerId for DepEventHandledSource
 #[derive(Educe)]
 #[educe(Debug)]
 pub struct DepEventSource<Owner: DepType, ArgsType: DepEventArgs> {
-    obj: Glob<Owner::Id, Owner>,
+    obj: Glob<Owner>,
     event: DepEvent<Owner, ArgsType>,
 }
 
@@ -1333,7 +1337,7 @@ impl<Owner: DepType + 'static, ArgsType: DepEventArgs + 'static> Source for DepE
 #[derive(Educe)]
 #[educe(Debug)]
 struct DepPropHandledValueSource<Owner: DepType, PropType: Convenient> {
-    obj: Glob<Owner::Id, Owner>,
+    obj: Glob<Owner>,
     handler_id: Id<BoxedHandler<PropType>>,
     prop: DepProp<Owner, PropType>,
 }
@@ -1352,7 +1356,7 @@ impl<Owner: DepType, PropType: Convenient> HandlerId for DepPropHandledValueSour
 #[derive(Educe)]
 #[educe(Debug)]
 struct DepPropHandledChangeInitialSource<Owner: DepType, PropType: Convenient> {
-    obj: Glob<Owner::Id, Owner>,
+    obj: Glob<Owner>,
     prop: DepProp<Owner, PropType>,
 }
 
@@ -1371,7 +1375,7 @@ impl<Owner: DepType, PropType: Convenient> HandlerId for DepPropHandledChangeIni
 #[derive(Educe)]
 #[educe(Debug)]
 struct DepPropHandledChangeFinalSource<Owner: DepType, PropType: Convenient> {
-    obj: Glob<Owner::Id, Owner>,
+    obj: Glob<Owner>,
     prop: DepProp<Owner, PropType>,
 }
 
@@ -1390,7 +1394,7 @@ impl<Owner: DepType, PropType: Convenient> HandlerId for DepPropHandledChangeFin
 #[derive(Educe)]
 #[educe(Debug)]
 struct DepPropHandledChangeSource<Owner: DepType, PropType: Convenient> {
-    obj: Glob<Owner::Id, Owner>,
+    obj: Glob<Owner>,
     handler_id: Id<BoxedHandler<Change<PropType>>>,
     prop: DepProp<Owner, PropType>,
 }
@@ -1409,7 +1413,7 @@ impl<Owner: DepType, PropType: Convenient> HandlerId for DepPropHandledChangeSou
 #[derive(Educe)]
 #[educe(Debug)]
 pub struct DepPropValueSource<Owner: DepType, PropType: Convenient> {
-    obj: Glob<Owner::Id, Owner>,
+    obj: Glob<Owner>,
     prop: DepProp<Owner, PropType>,
 }
 
@@ -1444,7 +1448,7 @@ impl<Owner: DepType + 'static, PropType: Convenient> Source for DepPropValueSour
 #[derive(Educe)]
 #[educe(Debug)]
 pub struct DepPropChangeSource<Owner: DepType, PropType: Convenient> {
-    obj: Glob<Owner::Id, Owner>,
+    obj: Glob<Owner>,
     prop: DepProp<Owner, PropType>,
 }
 
@@ -1492,7 +1496,7 @@ impl<Owner: DepType + 'static, PropType: Convenient> Source for DepPropChangeSou
 #[derive(Educe)]
 #[educe(Debug)]
 pub struct DepPropChangeInitialSource<Owner: DepType, PropType: Convenient> {
-    obj: Glob<Owner::Id, Owner>,
+    obj: Glob<Owner>,
     prop: DepProp<Owner, PropType>,
 }
 
@@ -1541,7 +1545,7 @@ impl<Owner: DepType + 'static, PropType: Convenient> Source for DepPropChangeIni
 #[derive(Educe)]
 #[educe(Debug)]
 pub struct DepPropChangeFinalSource<Owner: DepType, PropType: Convenient> {
-    obj: Glob<Owner::Id, Owner>,
+    obj: Glob<Owner>,
     prop: DepProp<Owner, PropType>,
 }
 
@@ -1590,7 +1594,7 @@ impl<Owner: DepType + 'static, PropType: Convenient> Source for DepPropChangeFin
 #[derive(Educe)]
 #[educe(Debug)]
 struct DepVecChangedHandledSource<Owner: DepType, ItemType: Convenient> {
-    obj: Glob<Owner::Id, Owner>,
+    obj: Glob<Owner>,
     handler_id: Id<BoxedHandler<()>>,
     vec: DepVec<Owner, ItemType>,
 }
@@ -1606,7 +1610,7 @@ impl<Owner: DepType, ItemType: Convenient> HandlerId for DepVecChangedHandledSou
 #[derive(Educe)]
 #[educe(Debug)]
 struct DepVecItemHandledInitialFinalSource<Owner: DepType, ItemType: Convenient> {
-    obj: Glob<Owner::Id, Owner>,
+    obj: Glob<Owner>,
     vec: DepVec<Owner, ItemType>,
 }
 
@@ -1622,7 +1626,7 @@ impl<Owner: DepType, ItemType: Convenient> HandlerId for DepVecItemHandledInitia
 #[derive(Educe)]
 #[educe(Debug)]
 struct DepVecItemHandledSource<Owner: DepType, ItemType: Convenient> {
-    obj: Glob<Owner::Id, Owner>,
+    obj: Glob<Owner>,
     handler_id: Id<ItemHandler<ItemType>>,
     vec: DepVec<Owner, ItemType>,
 }
@@ -1638,7 +1642,7 @@ impl<Owner: DepType, ItemType: Convenient> HandlerId for DepVecItemHandledSource
 #[derive(Educe)]
 #[educe(Debug)]
 pub struct DepVecChangedSource<Owner: DepType, ItemType: Convenient> {
-    obj: Glob<Owner::Id, Owner>,
+    obj: Glob<Owner>,
     vec: DepVec<Owner, ItemType>,
 }
 
@@ -1677,7 +1681,7 @@ impl<Owner: DepType + 'static, ItemType: Convenient> Source for DepVecChangedSou
 #[derive(Educe)]
 #[educe(Debug, Clone)]
 struct DepVecItemInitialFinalSourceUpdate<Owner: DepType, ItemType: Convenient> {
-    obj: Glob<Owner::Id, Owner>,
+    obj: Glob<Owner>,
     vec: DepVec<Owner, ItemType>,
 }
 
@@ -1697,7 +1701,7 @@ impl<Owner: DepType, ItemType: Convenient> Target<()> for DepVecItemInitialFinal
 #[derive(Educe)]
 #[educe(Debug, Clone)]
 struct DepVecItemSourceUpdate<Owner: DepType, ItemType: Convenient> {
-    obj: Glob<Owner::Id, Owner>,
+    obj: Glob<Owner>,
     vec: DepVec<Owner, ItemType>,
     handler_id: Id<ItemHandler<ItemType>>,
 }
@@ -1718,7 +1722,7 @@ impl<Owner: DepType, ItemType: Convenient> Target<()> for DepVecItemSourceUpdate
 #[derive(Educe)]
 #[educe(Debug)]
 pub struct DepVecItemSource<Owner: DepType, ItemType: Convenient> {
-    obj: Glob<Owner::Id, Owner>,
+    obj: Glob<Owner>,
     vec: DepVec<Owner, ItemType>,
     update: Option<BindingBase<()>>,
 }
@@ -1765,7 +1769,7 @@ impl<Owner: DepType + 'static, ItemType: Convenient> Source for DepVecItemSource
 #[derive(Educe)]
 #[educe(Debug)]
 pub struct DepVecItemInitialFinalSource<Owner: DepType, ItemType: Convenient> {
-    obj: Glob<Owner::Id, Owner>,
+    obj: Glob<Owner>,
     vec: DepVec<Owner, ItemType>,
     update: Option<BindingBase<()>>,
 }
@@ -2686,7 +2690,7 @@ macro_rules! dep_type_impl_raw {
 
                 #[doc(hidden)]
                 #[allow(unused_variables)]
-                fn update_parent_children_has_handlers($state: &mut dyn $crate::dyn_context_state_State, $obj: $crate::Glob < $Id, $name $($r)* >) where Self: Sized {
+                fn update_parent_children_has_handlers($state: &mut dyn $crate::dyn_context_state_State, $obj: $crate::Glob < $name $($r)* >) where Self: Sized {
                     $($update_handlers)*
                 }
             }
@@ -2806,8 +2810,9 @@ macro_rules! dep_obj_impl {
         $crate::paste_paste! {
             fn [< $name _ref >] <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
                 $arena: &'arena_lifetime dyn $crate::std_any_Any,
-                $this: Self
+                $this: $crate::components_arena_RawId,
             ) -> &'arena_lifetime DepObjType {
+                let $this = <Self as $crate::components_arena_ComponentId>::from_raw($this);
                 let $arena = $arena.downcast_ref::<$Arena>().expect("invalid arena cast");
                 ($field)
                     .expect($crate::std_concat!("missing ", $crate::std_stringify!($name)))
@@ -2816,8 +2821,9 @@ macro_rules! dep_obj_impl {
 
             fn [< $name _mut >] <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
                 $arena: &'arena_lifetime mut dyn $crate::std_any_Any,
-                $this: Self
+                $this: $crate::components_arena_RawId,
             ) -> &'arena_lifetime mut DepObjType {
+                let $this = <Self as $crate::components_arena_ComponentId>::from_raw($this);
                 let $arena = $arena.downcast_mut::<$Arena>().expect("invalid arena cast");
                 ($field_mut)
                     .expect($crate::std_concat!("missing ", $crate::std_stringify!($name)))
@@ -2825,7 +2831,7 @@ macro_rules! dep_obj_impl {
             }
 
             $vis fn [< $name _descriptor >] <DepObjType: $ty + $crate::DepType<Id=Self>>(
-            ) -> $crate::GlobDescriptor<Self, DepObjType> {
+            ) -> $crate::GlobDescriptor<DepObjType> {
                 $crate::GlobDescriptor {
                     arena: $crate::std_any_TypeId::of::<$Arena>(),
                     field_ref: Self:: [< $name _ref >] ,
@@ -2835,8 +2841,11 @@ macro_rules! dep_obj_impl {
 
             $vis fn $name <DepObjType: $ty + $crate::DepType<Id=Self>>(
                 self
-            ) -> $crate::Glob<Self, DepObjType> {
-                $crate::Glob { id: self, descriptor: Self:: [< $name _descriptor >] }
+            ) -> $crate::Glob<DepObjType> {
+                $crate::Glob {
+                    id: <Self as $crate::components_arena_ComponentId>::into_raw(self),
+                    descriptor: Self:: [< $name _descriptor >]
+                }
             }
         }
     };
@@ -2848,22 +2857,24 @@ macro_rules! dep_obj_impl {
         $crate::paste_paste! {
             fn [< $name _ref >] <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
                 $arena: &'arena_lifetime dyn $crate::std_any_Any,
-                $this: Self
+                $this: $crate::components_arena_RawId,
             ) -> &'arena_lifetime DepObjType {
+                let $this = <Self as $crate::components_arena_ComponentId>::from_raw($this);
                 let $arena = $arena.downcast_ref::<$Arena>().expect("invalid arena cast");
                 ($field).downcast_ref::<DepObjType>().expect("invalid cast")
             }
 
             fn [< $name _mut >] <'arena_lifetime, DepObjType: $ty + $crate::DepType<Id=Self>>(
                 $arena: &'arena_lifetime mut dyn $crate::std_any_Any,
-                $this: Self
+                $this: $crate::components_arena_RawId,
             ) -> &'arena_lifetime mut DepObjType {
+                let $this = <Self as $crate::components_arena_ComponentId>::from_raw($this);
                 let $arena = $arena.downcast_mut::<$Arena>().expect("invalid arena cast");
                 ($field_mut).downcast_mut::<DepObjType>().expect("invalid cast")
             }
 
             $vis fn [< $name _descriptor >] <DepObjType: $ty + $crate::DepType<Id=Self>>(
-            ) -> $crate::GlobDescriptor<Self, DepObjType> {
+            ) -> $crate::GlobDescriptor<DepObjType> {
                 $crate::GlobDescriptor {
                     arena: $crate::std_any_TypeId::of::<$Arena>(),
                     field_ref: Self:: [< $name _ref >] ,
@@ -2873,8 +2884,11 @@ macro_rules! dep_obj_impl {
 
             $vis fn $name <DepObjType: $ty + $crate::DepType<Id=Self>>(
                 self
-            ) -> $crate::Glob<Self, DepObjType> {
-                $crate::Glob { id: self, descriptor: Self:: [< $name _descriptor >] }
+            ) -> $crate::Glob<DepObjType> {
+                $crate::Glob {
+                    id: <Self as $crate::components_arena_ComponentId>::into_raw(self),
+                    descriptor: Self:: [< $name _descriptor >]
+                }
             }
         }
     };
@@ -2886,22 +2900,23 @@ macro_rules! dep_obj_impl {
         $crate::paste_paste! {
             fn [< $name _ref >] <'arena_lifetime>(
                 $arena: &'arena_lifetime dyn $crate::std_any_Any,
-                $this: Self
+                $this: $crate::components_arena_RawId,
             ) -> &'arena_lifetime $ty {
+                let $this = <Self as $crate::components_arena_ComponentId>::from_raw($this);
                 let $arena = $arena.downcast_ref::<$Arena>().expect("invalid arena cast");
                 ($field).expect($crate::std_concat!("missing ", $crate::std_stringify!($name)))
             }
 
             fn [< $name _mut >] <'arena_lifetime>(
                 $arena: &'arena_lifetime mut dyn $crate::std_any_Any,
-                $this: Self
+                $this: $crate::components_arena_RawId,
             ) -> &'arena_lifetime mut $ty {
+                let $this = <Self as $crate::components_arena_ComponentId>::from_raw($this);
                 let $arena = $arena.downcast_mut::<$Arena>().expect("invalid arena cast");
                 ($field_mut).expect($crate::std_concat!("missing ", $crate::std_stringify!($name)))
             }
 
-            $vis fn [< $name _descriptor >] (
-            ) -> $crate::GlobDescriptor<Self, $ty> {
+            $vis fn [< $name _descriptor >] () -> $crate::GlobDescriptor<$ty> {
                 $crate::GlobDescriptor {
                     arena: $crate::std_any_TypeId::of::<$Arena>(),
                     field_ref: Self:: [< $name _ref >] ,
@@ -2911,8 +2926,11 @@ macro_rules! dep_obj_impl {
 
             $vis fn $name (
                 self
-            ) -> $crate::Glob<Self, $ty> {
-                $crate::Glob { id: self, descriptor: Self:: [< $name _descriptor >] }
+            ) -> $crate::Glob<$ty> {
+                $crate::Glob {
+                    id: <Self as $crate::components_arena_ComponentId>::into_raw(self),
+                    descriptor: Self:: [< $name _descriptor >]
+                }
             }
         }
     };
@@ -2924,22 +2942,23 @@ macro_rules! dep_obj_impl {
         $crate::paste_paste! {
             fn [< $name _ref >] <'arena_lifetime>(
                 $arena: &'arena_lifetime dyn $crate::std_any_Any,
-                $this: Self
+                $this: $crate::components_arena_RawId,
             ) -> &'arena_lifetime $ty {
+                let $this = <Self as $crate::components_arena_ComponentId>::from_raw($this);
                 let $arena = $arena.downcast_ref::<$Arena>().expect("invalid arena cast");
                 $field
             }
 
             fn [< $name _mut >] <'arena_lifetime>(
                 $arena: &'arena_lifetime mut dyn $crate::std_any_Any,
-                $this: Self
+                $this: $crate::components_arena_RawId,
             ) -> &'arena_lifetime mut $ty {
+                let $this = <Self as $crate::components_arena_ComponentId>::from_raw($this);
                 let $arena = $arena.downcast_mut::<$Arena>().expect("invalid arena cast");
                 $field_mut
             }
 
-            $vis fn [< $name _descriptor >] (
-            ) -> $crate::GlobDescriptor<Self, $ty> {
+            $vis fn [< $name _descriptor >] () -> $crate::GlobDescriptor<$ty> {
                 $crate::GlobDescriptor {
                     arena: $crate::std_any_TypeId::of::<$Arena>(),
                     field_ref: Self:: [< $name _ref >] ,
@@ -2949,8 +2968,11 @@ macro_rules! dep_obj_impl {
 
             $vis fn $name (
                 self
-            ) -> $crate::Glob<Self, $ty> {
-                $crate::Glob { id: self, descriptor: Self:: [< $name _descriptor >] }
+            ) -> $crate::Glob<$ty> {
+                $crate::Glob {
+                    id: <Self as $crate::components_arena_ComponentId>::into_raw(self),
+                    descriptor: Self:: [< $name _descriptor >]
+                }
             }
         }
     };

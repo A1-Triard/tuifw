@@ -1,6 +1,6 @@
 use crate::base::*;
 use alloc::boxed::Box;
-use components_arena::{Component, Id, Arena, NewtypeComponentId};
+use components_arena::{Component, ComponentId, Id, Arena, NewtypeComponentId, RawId};
 use core::any::{Any, TypeId};
 use core::fmt::Debug;
 use downcast_rs::{Downcast, impl_downcast};
@@ -324,7 +324,7 @@ macro_rules! binding_n {
                 #[educe(Debug(ignore))]
                 dispatch: fn(
                     &mut dyn State,
-                    Glob < AnyBindingBase, P >,
+                    Glob <  P >,
                     $( < < [< S $i >] as Source > ::Cache as SourceCache< [< S $i >] ::Value > >::Value ),*
                 ) -> BYield<T>,
             }
@@ -378,7 +378,7 @@ macro_rules! binding_n {
                     param: P,
                     dispatch: fn(
                         &mut dyn State,
-                        Glob < AnyBindingBase, P >,
+                        Glob < P >,
                         $( < < [< S $i >] as Source > ::Cache as SourceCache< [< S $i >] ::Value > >::Value ),*
                     ) -> BYield<T>,
                 ) -> Self {
@@ -400,22 +400,22 @@ macro_rules! binding_n {
                     [< BindingExt $n >] (id, PhantomType::new())
                 }
 
-                fn param_ref(arena: &dyn Any, id: AnyBindingBase) -> &P {
+                fn param_ref(arena: &dyn Any, id: RawId) -> &P {
                     let bindings = arena.downcast_ref::<Bindings>().unwrap();
-                    let node = bindings.0[id.0].0.downcast_ref::<BindingNode<T>>().unwrap();
+                    let node = bindings.0[Id::from_raw(id)].0.downcast_ref::<BindingNode<T>>().unwrap();
                     let sources = node.sources.downcast_ref::< [< BindingExt $n NodeSources >] <P, $( [< S $i >] ,)* T>>().unwrap();
                     &sources.param
                 }
 
-                fn param_mut(arena: &mut dyn Any, id: AnyBindingBase) -> &mut P {
+                fn param_mut(arena: &mut dyn Any, id: RawId) -> &mut P {
                     let bindings = arena.downcast_mut::<Bindings>().unwrap();
-                    let node = bindings.0[id.0].0.downcast_mut::<BindingNode<T>>().unwrap();
+                    let node = bindings.0[Id::from_raw(id)].0.downcast_mut::<BindingNode<T>>().unwrap();
                     let sources = node.sources.downcast_mut::< [< BindingExt $n NodeSources >] <P, $( [< S $i >] ,)* T>>().unwrap();
                     &mut sources.param
                 }
 
                 #[allow(dead_code)]
-                fn param_descriptor() -> GlobDescriptor<AnyBindingBase, P> {
+                fn param_descriptor() -> GlobDescriptor<P> {
                     GlobDescriptor {
                         arena: TypeId::of::<Bindings>(),
                         field_ref: Self::param_ref,
@@ -549,7 +549,7 @@ macro_rules! binding_n {
 
                         let target = node.target.clone();
                         let param = Glob {
-                            id: AnyBindingBase(self.binding),
+                            id: self.binding.into_raw(),
                             descriptor: < [< BindingExt $n >] <P, $( [< S $j >] ,)* T> > ::param_descriptor
                         };
                         if let BYield(Some(value)) = (sources.dispatch)(state, param, $( [< value_ $j >] ),*) {
