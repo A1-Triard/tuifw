@@ -2,7 +2,7 @@ use crate::base::*;
 use crate::view::View;
 use crate::view::panels::{CanvasLayout, CanvasPanel};
 use dep_obj::{dep_type, ItemChange, Change, Glob};
-use dep_obj::binding::{BindingExt2, b_yield, b_continue, AnyBindingBase};
+use dep_obj::binding::{BindingExt2, b_continue, b_yield};
 use dyn_context::state::State;
 
 dep_type! {
@@ -18,7 +18,7 @@ impl WidgetBehavior for DeskTopBehavior {
     fn init_bindings(&self, widget: Widget, state: &mut dyn State) {
         let windows = BindingExt2::new(state, None, |
             state,
-            view_cache: Glob<AnyBindingBase, Option<View>>,
+            view_cache: Glob<Option<View>>,
             view_change: Option<Change<Option<View>>>,
             window: Option<ItemChange<Widget>>
         | {
