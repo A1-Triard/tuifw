@@ -1,14 +1,31 @@
 use crate::base::*;
 use crate::view::View;
 use crate::view::panels::{CanvasLayout, CanvasPanel};
-use dep_obj::{dep_type, ItemChange, Change, Glob};
-use dep_obj::binding::{BindingExt2, b_continue, b_yield};
+use crate::window::{Window, WindowBuilder};
+use dep_obj::{DepObjBaseBuilder, dep_type_with_builder, ItemChange, Change, Glob};
+use dep_obj::binding::{BindingExt2, b_continue, b_yield, b_immediate};
 use dyn_context::state::State;
 
-dep_type! {
+dep_type_with_builder! {
     #[derive(Debug)]
-    pub struct DeskTop in Widget {
+    pub struct DeskTop become obj in Widget {
         windows [Widget],
+    }
+
+    type BaseBuilder<'a> = WidgetBuilder<'a>;
+}
+
+impl<'a> DeskTopBuilder<'a> {
+    pub fn window(
+        mut self,
+        storage: Option<&mut Option<Widget>>,
+        f: impl for<'b> FnOnce(WindowBuilder<'b>) -> WindowBuilder<'b>
+    ) -> Self {
+        let desk_top = self.base_priv_ref().id();
+        let window = Window::build(self.base_priv_mut().state_mut(), f);
+        storage.map(|x| x.replace(window));
+        b_immediate(DeskTop::WINDOWS.push(self.base_priv_mut().state_mut(), desk_top.obj(), window));
+        self
     }
 }
 
@@ -55,6 +72,15 @@ impl DeskTop {
 
     pub fn new(state: &mut dyn State) -> Widget {
         Widget::new(state, DeskTop::new_priv())
+    }
+
+    pub fn build<'a>(
+        state: &'a mut dyn State,
+        f: impl FnOnce(DeskTopBuilder<'a>) -> DeskTopBuilder<'a>
+    ) -> Widget {
+        let desk_top = DeskTop::new(state);
+        f(DeskTopBuilder::new_priv(WidgetBuilder { widget: desk_top, state }));
+        desk_top
     }
 }
 

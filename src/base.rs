@@ -1,7 +1,7 @@
 use crate::view::{Layout, View, ViewAlign, ViewBase, ViewTree, Decorator};
 use components_arena::{Arena, Component, Id, NewtypeComponentId};
 use debug_panic::debug_panic;
-use dep_obj::{Change, DepObjId, DepType, dep_obj, dep_type, Convenient, DepProp};
+use dep_obj::{Change, DepObjId, DepType, dep_obj, dep_type, Convenient, DepProp, DepObjBaseBuilder};
 use dep_obj::binding::{Binding1, Bindings, BYield, Binding};
 use downcast_rs::{Downcast, impl_downcast};
 use dyn_context::state::{RequiresStateDrop, State, StateDrop, StateExt};
@@ -203,6 +203,17 @@ impl Widget {
 }
 
 impl DepObjId for Widget { }
+
+pub struct WidgetBuilder<'a> {
+    pub widget: Widget,
+    pub state: &'a mut dyn State,
+}
+
+impl<'a> DepObjBaseBuilder<Widget> for WidgetBuilder<'a> {
+    fn id(&self) -> Widget { self.widget }
+    fn state(&self) -> &dyn State { self.state }
+    fn state_mut(&mut self) -> &mut dyn State { self.state }
+}
 
 pub trait ViewWidgetExt {
     fn bind_base_to_widget<O: WidgetObj, T: Convenient, U: Convenient>(

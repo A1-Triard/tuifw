@@ -5,20 +5,22 @@ use crate::view::decorators::{BorderDecorator, LabelDecorator};
 use crate::view::decorators::ViewBuilderBorderDecoratorExt;
 use crate::view::decorators::ViewBuilderLabelDecoratorExt;
 use crate::view::panels::{CanvasLayout, ViewBuilderDockPanelExt};
-use dep_obj::{dep_type, Change};
+use dep_obj::{dep_type_with_builder, Change};
 use dep_obj::binding::{Binding1};
 use dyn_context::state::State;
 use either::Right;
 use std::borrow::Cow;
 use tuifw_screen_base::*;
 
-dep_type! {
+dep_type_with_builder! {
     #[derive(Debug)]
-    pub struct Window in Widget {
+    pub struct Window become obj in Widget {
         header: Cow<'static, str> = Cow::Borrowed(""),
         bg: Option<Color> = Some(Color::Blue),
         bounds: Rect = Rect { tl: Point { x: 0, y: 0 }, size: Vector { x: 0, y: 0 } },
     }
+
+    type BaseBuilder<'a> = WidgetBuilder<'a>;
 }
 
 struct WindowBehavior;
@@ -84,6 +86,15 @@ impl Window {
 
     pub fn new(state: &mut dyn State) -> Widget {
         Widget::new(state, Window::new_priv())
+    }
+
+    pub fn build<'a>(
+        state: &'a mut dyn State,
+        f: impl FnOnce(WindowBuilder<'a>) -> WindowBuilder<'a>
+    ) -> Widget {
+        let window = Window::new(state);
+        f(WindowBuilder::new_priv(WidgetBuilder { widget: window, state }));
+        window
     }
 }
 

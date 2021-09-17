@@ -29,21 +29,23 @@ fn main() {
     let widgets = WidgetTree::new(screen, &mut bindings);
     let root = widgets.root();
     let app = &mut App { bindings, widgets };
-    let desk_top = DeskTop::new(app);
+    let mut window_3 = None;
+    let desk_top = DeskTop::build(app, |desk_top| desk_top
+        .window(None, |window| window
+            .header(Cow::Borrowed("1"))
+            .bounds(Rect::from_tl_br(Point { x: 5, y: 5}, Point { x: 25, y: 15 }))
+        )
+        .window(None, |window| window
+            .header(Cow::Borrowed("2"))
+            .bounds(Rect::from_tl_br(Point { x: 42, y: 5}, Point { x: 62, y: 15 }))
+        )
+        .window(Some(&mut window_3), |window| window
+            .header(Cow::Borrowed("3"))
+            .bounds(Rect::from_tl_br(Point { x: 79, y: 5}, Point { x: 99, y: 15 }))
+        )
+    );
     b_immediate(desk_top.load(app, root, |_, _| { }));
-    let window = Window::new(app);
-    b_immediate(Window::HEADER.set(app, window.obj(), Cow::Borrowed("1")));
-    b_immediate(Window::BOUNDS.set(app, window.obj(), Rect::from_tl_br(Point { x: 5, y: 5}, Point { x: 25, y: 15 })));
-    b_immediate(DeskTop::WINDOWS.push(app, desk_top.obj(), window));
-    let window = Window::new(app);
-    b_immediate(Window::HEADER.set(app, window.obj(), Cow::Borrowed("2")));
-    b_immediate(Window::BOUNDS.set(app, window.obj(), Rect::from_tl_br(Point { x: 42, y: 5}, Point { x: 62, y: 15 })));
-    b_immediate(DeskTop::WINDOWS.push(app, desk_top.obj(), window));
-    let window = Window::new(app);
-    b_immediate(Window::HEADER.set(app, window.obj(), Cow::Borrowed("3")));
-    b_immediate(Window::BOUNDS.set(app, window.obj(), Rect::from_tl_br(Point { x: 79, y: 5}, Point { x: 99, y: 15 })));
-    b_immediate(DeskTop::WINDOWS.push(app, desk_top.obj(), window));
-    window.focus(app);
+    window_3.unwrap().focus(app);
     while WidgetTree::update(app, true).unwrap() { }
     WidgetTree::drop_self(app);
 }
