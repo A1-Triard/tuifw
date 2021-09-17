@@ -1,6 +1,6 @@
 use components_arena::{Arena, Component, ComponentId, Id, NewtypeComponentId, RawId};
 use debug_panic::debug_panic;
-use dep_obj::{DepObjBaseBuilder, DepObjIdBase, DepType, dep_obj, dep_type_with_builder, DepEventArgs, Convenient};
+use dep_obj::{DepObjBaseBuilder, DepObjIdBase, DepType, dep_obj, dep_type_with_builder, DepEventArgs, Convenient, DepProp};
 use dep_obj::binding::{Binding, Binding0, Binding1, Binding5, Bindings, b_immediate, BYield, b_continue};
 use downcast_rs::{Downcast, impl_downcast};
 use dyn_clone::{DynClone, clone_trait_object};
@@ -707,6 +707,31 @@ impl View {
     pub fn desired_size(self, tree: &ViewTree) -> Vector { tree.0.get().arena[self.0].desired_size }
 
     pub fn render_bounds(self, tree: &ViewTree) -> Rect { tree.0.get().arena[self.0].render_bounds }
+
+    fn bind_raw<P: Clone + 'static, T: Convenient, U: Convenient>(
+        self,
+        state: &mut dyn State,
+        view_base_prop: DepProp<ViewBase, T>,
+        map: fn(T) -> U,
+        param: P,
+        bind: fn(&mut dyn State, P, View, Binding<U>)
+    ) {
+        let binding = Binding1::new(state, map, |map, value: T| Some(map(value)));
+        bind(state, param, self, binding.into());
+        binding.set_source_1(state, &mut view_base_prop.value_source(self.base()));
+    }
+
+    pub fn bind_decorator<D: Decorator, T: Convenient, U: Convenient>(
+        self,
+        state: &mut dyn State,
+        view_base_prop: DepProp<ViewBase, T>,
+        decorator_prop: DepProp<D, U>,
+        map: fn(T) -> U,
+    ) {
+        self.bind_raw(state, view_base_prop, map, decorator_prop, |state, decorator_prop, view, binding|
+            decorator_prop.bind(state, view.decorator(), binding)
+        );
+    }
 
     dep_obj! {
         pub fn base(self as this, tree: ViewTree) -> (ViewBase) {

@@ -33,6 +33,13 @@ fn main() {
     let window = Window::new(app);
     b_immediate(Window::BOUNDS.set(app, window.obj(), Rect::from_tl_br(Point { x: 10, y: 10}, Point { x: 30, y: 20 })));
     b_immediate(DeskTop::WINDOWS.push(app, desk_top.obj(), window));
+    let window = Window::new(app);
+    b_immediate(Window::BOUNDS.set(app, window.obj(), Rect::from_tl_br(Point { x: 50, y: 10}, Point { x: 70, y: 20 })));
+    b_immediate(DeskTop::WINDOWS.push(app, desk_top.obj(), window));
+    let window = Window::new(app);
+    b_immediate(Window::BOUNDS.set(app, window.obj(), Rect::from_tl_br(Point { x: 90, y: 10}, Point { x: 110, y: 20 })));
+    b_immediate(DeskTop::WINDOWS.push(app, desk_top.obj(), window));
+    window.focus(app);
     while WidgetTree::update(app, true).unwrap() { }
     WidgetTree::drop_self(app);
 }
