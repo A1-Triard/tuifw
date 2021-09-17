@@ -1,12 +1,16 @@
 use crate::base::*;
 use crate::view::{View, ViewAlign, ViewBase};
-use crate::view::decorators::{BorderDecorator, ViewBuilderBorderDecoratorExt};
+use crate::view::ViewBuilderViewAlignExt;
+use crate::view::decorators::{BorderDecorator, LabelDecorator};
+use crate::view::decorators::ViewBuilderBorderDecoratorExt;
+use crate::view::decorators::ViewBuilderLabelDecoratorExt;
 use crate::view::panels::{CanvasLayout, ViewBuilderDockPanelExt};
 use dep_obj::{dep_type, Change};
 use dep_obj::binding::{Binding1};
 use dyn_context::state::State;
-use tuifw_screen_base::*;
+use either::Right;
 use std::borrow::Cow;
+use tuifw_screen_base::*;
 
 dep_type! {
     #[derive(Debug)]
@@ -24,46 +28,52 @@ impl WidgetBehavior for WindowBehavior {
         let init_new_view = Binding1::new(state, (), |(), change: Option<Change<Option<View>>>|
             change.and_then(|change| change.new)
         );
-        init_new_view.set_target_fn(state, (), |state, (), view: View| {
+        init_new_view.set_target_fn(state, widget, |state, widget, view: View| {
+            let mut header = None;
             view.build(state, |view| view
                 .border_decorator(|decorator| decorator
                     .fill(Cow::Borrowed(" "))
                     .enable_t_padding(false)
                 )
-                .dock_panel(|panel| panel)
+                .dock_panel(|panel| panel
+                    .child(Some(&mut header), (), |layout| layout.dock(Right(Side::Top)), |child| child
+                        .label_decorator(|decorator| decorator)
+                        .align(|align| align.h_align(HAlign::Center))
+                    )
+                )
             );
-            view.bind_decorator(state, ViewBase::IS_FOCUSED, BorderDecorator::TL, |focused|
+            header.unwrap().bind_decorator_to_widget(state, LabelDecorator::TEXT, widget, Window::HEADER, |x| x);
+            view.bind_base_to_widget(state, ViewBase::BG, widget, Window::BG, |x| x);
+            view.bind_layout_to_widget(state, CanvasLayout::TL, widget, Window::BOUNDS, |x| x.tl);
+            view.bind_align_to_widget(state, ViewAlign::W, widget, Window::BOUNDS, |x| Some(x.w()));
+            view.bind_align_to_widget(state, ViewAlign::H, widget, Window::BOUNDS, |x| Some(x.h()));
+            view.bind_decorator_to_base(state, BorderDecorator::TL, ViewBase::IS_FOCUSED, |focused|
                 Cow::Borrowed(if focused { "╔" } else { "┌" })
             );
-            view.bind_decorator(state, ViewBase::IS_FOCUSED, BorderDecorator::TR, |focused|
+            view.bind_decorator_to_base(state, BorderDecorator::TR, ViewBase::IS_FOCUSED, |focused|
                 Cow::Borrowed(if focused { "╗" } else { "┐" })
             );
-            view.bind_decorator(state, ViewBase::IS_FOCUSED, BorderDecorator::BL, |focused|
+            view.bind_decorator_to_base(state, BorderDecorator::BL, ViewBase::IS_FOCUSED, |focused|
                 Cow::Borrowed(if focused { "╚" } else { "└" })
             );
-            view.bind_decorator(state, ViewBase::IS_FOCUSED, BorderDecorator::BR, |focused|
+            view.bind_decorator_to_base(state, BorderDecorator::BR, ViewBase::IS_FOCUSED, |focused|
                 Cow::Borrowed(if focused { "╝" } else { "┘" })
             );
-            view.bind_decorator(state, ViewBase::IS_FOCUSED, BorderDecorator::L, |focused|
+            view.bind_decorator_to_base(state, BorderDecorator::L, ViewBase::IS_FOCUSED, |focused|
                 Cow::Borrowed(if focused { "║" } else { "│" })
             );
-            view.bind_decorator(state, ViewBase::IS_FOCUSED, BorderDecorator::T, |focused|
+            view.bind_decorator_to_base(state, BorderDecorator::T, ViewBase::IS_FOCUSED, |focused|
                 Cow::Borrowed(if focused { "═" } else { "─" })
             );
-            view.bind_decorator(state, ViewBase::IS_FOCUSED, BorderDecorator::R, |focused|
+            view.bind_decorator_to_base(state, BorderDecorator::R, ViewBase::IS_FOCUSED, |focused|
                 Cow::Borrowed(if focused { "║" } else { "│" })
             );
-            view.bind_decorator(state, ViewBase::IS_FOCUSED, BorderDecorator::B, |focused|
+            view.bind_decorator_to_base(state, BorderDecorator::B, ViewBase::IS_FOCUSED, |focused|
                 Cow::Borrowed(if focused { "═" } else { "─" })
             );
         });
         init_new_view.set_source_1(state, &mut WidgetBase::VIEW.change_initial_source(widget.base()));
         widget.obj::<Window>().add_binding(state, init_new_view);
-
-        widget.bind_base(state, Window::BG, ViewBase::BG, |x| x);
-        widget.bind_layout(state, Window::BOUNDS, CanvasLayout::TL, |x| x.tl);
-        widget.bind_align(state, Window::BOUNDS, ViewAlign::W, |x| Some(x.w()));
-        widget.bind_align(state, Window::BOUNDS, ViewAlign::H, |x| Some(x.h()));
     }
 
     fn drop_bindings(&self, _widget: Widget, _state: &mut dyn State) { }

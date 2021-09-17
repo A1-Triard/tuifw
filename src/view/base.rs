@@ -686,11 +686,11 @@ impl View {
         binding.set_source_1(state, &mut view_base_prop.value_source(self.base()));
     }
 
-    pub fn bind_decorator<D: Decorator, T: Convenient, U: Convenient>(
+    pub fn bind_decorator_to_base<D: Decorator, T: Convenient, U: Convenient>(
         self,
         state: &mut dyn State,
-        view_base_prop: DepProp<ViewBase, T>,
         decorator_prop: DepProp<D, U>,
+        view_base_prop: DepProp<ViewBase, T>,
         map: fn(T) -> U,
     ) {
         self.bind_raw(state, view_base_prop, map, decorator_prop, |state, decorator_prop, view, binding|

@@ -2,6 +2,7 @@ use tuifw::*;
 use dep_obj::binding::{Bindings, b_immediate};
 use dyn_context::state::State;
 use std::any::{TypeId, Any};
+use std::borrow::Cow;
 
 struct App {
     bindings: Bindings,
@@ -31,12 +32,15 @@ fn main() {
     let desk_top = DeskTop::new(app);
     b_immediate(desk_top.load(app, root, |_, _| { }));
     let window = Window::new(app);
+    b_immediate(Window::HEADER.set(app, window.obj(), Cow::Borrowed("1")));
     b_immediate(Window::BOUNDS.set(app, window.obj(), Rect::from_tl_br(Point { x: 5, y: 5}, Point { x: 25, y: 15 })));
     b_immediate(DeskTop::WINDOWS.push(app, desk_top.obj(), window));
     let window = Window::new(app);
+    b_immediate(Window::HEADER.set(app, window.obj(), Cow::Borrowed("2")));
     b_immediate(Window::BOUNDS.set(app, window.obj(), Rect::from_tl_br(Point { x: 42, y: 5}, Point { x: 62, y: 15 })));
     b_immediate(DeskTop::WINDOWS.push(app, desk_top.obj(), window));
     let window = Window::new(app);
+    b_immediate(Window::HEADER.set(app, window.obj(), Cow::Borrowed("3")));
     b_immediate(Window::BOUNDS.set(app, window.obj(), Rect::from_tl_br(Point { x: 79, y: 5}, Point { x: 99, y: 15 })));
     b_immediate(DeskTop::WINDOWS.push(app, desk_top.obj(), window));
     window.focus(app);

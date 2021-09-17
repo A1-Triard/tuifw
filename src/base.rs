@@ -2,7 +2,7 @@ use crate::view::{Layout, View, ViewAlign, ViewBase, ViewTree, Decorator};
 use components_arena::{Arena, Component, Id, NewtypeComponentId};
 use debug_panic::debug_panic;
 use dep_obj::{Change, DepObjId, DepType, dep_obj, dep_type, Convenient, DepProp};
-use dep_obj::binding::{Binding1, Binding2, Bindings, BYield};
+use dep_obj::binding::{Binding1, Bindings, BYield, Binding};
 use downcast_rs::{Downcast, impl_downcast};
 use dyn_context::state::{RequiresStateDrop, State, StateDrop, StateExt};
 use macro_attr_2018::macro_attr;
@@ -170,69 +170,6 @@ impl Widget {
         self.view(tree).map(|view| view.focus(state));
     }
 
-    fn bind_raw<O: WidgetObj, P: Clone + 'static, T: Convenient, U: Convenient>(
-        self,
-        state: &mut dyn State,
-        widget_prop: DepProp<O, T>,
-        map: fn(T) -> U,
-        param: P,
-        set: fn(&mut dyn State, P, View, U) -> BYield<!>
-    ) {
-        let binding = Binding2::new(state, map, |map, value: T, view: Option<View>| view.map(|view| (map(value), view)));
-        binding.dispatch(state, (param, set), |state, (param, set), (value, view)| set(state, param, view, value));
-        binding.set_source_1(state, &mut widget_prop.value_source(self.obj()));
-        binding.set_source_2(state, &mut WidgetBase::VIEW.value_source(self.base()));
-        self.obj::<O>().add_binding(state, binding);
-    }
-
-    pub fn bind_base<O: WidgetObj, T: Convenient, U: Convenient>(
-        self,
-        state: &mut dyn State,
-        widget_prop: DepProp<O, T>,
-        view_base_prop: DepProp<ViewBase, U>,
-        map: fn(T) -> U,
-    ) {
-        self.bind_raw(state, widget_prop, map, view_base_prop, |state, view_base_prop, view, value|
-            view_base_prop.set(state, view.base(), value)
-        );
-    }
-
-    pub fn bind_align<O: WidgetObj, T: Convenient, U: Convenient>(
-        self,
-        state: &mut dyn State,
-        widget_prop: DepProp<O, T>,
-        view_align_prop: DepProp<ViewAlign, U>,
-        map: fn(T) -> U,
-    ) {
-        self.bind_raw(state, widget_prop, map, view_align_prop, |state, view_align_prop, view, value|
-            view_align_prop.set(state, view.align(), value)
-        );
-    }
-
-    pub fn bind_layout<O: WidgetObj, L: Layout, T: Convenient, U: Convenient>(
-        self,
-        state: &mut dyn State,
-        widget_prop: DepProp<O, T>,
-        layout_prop: DepProp<L, U>,
-        map: fn(T) -> U,
-    ) {
-        self.bind_raw(state, widget_prop, map, layout_prop, |state, layout_prop, view, value|
-            layout_prop.set(state, view.layout(), value)
-        );
-    }
-
-    pub fn bind_decorator<O: WidgetObj, D: Decorator, T: Convenient, U: Convenient>(
-        self,
-        state: &mut dyn State,
-        widget_prop: DepProp<O, T>,
-        decorator_prop: DepProp<D, U>,
-        map: fn(T) -> U,
-    ) {
-        self.bind_raw(state, widget_prop, map, decorator_prop, |state, decorator_prop, view, value|
-            decorator_prop.set(state, view.decorator(), value)
-        );
-    }
-
     dep_obj! {
         pub fn base(self as this, tree: WidgetTree) -> (WidgetBase) {
             if mut {
@@ -250,9 +187,114 @@ impl Widget {
             }
         }
     }
+
+    fn bind_view<O: WidgetObj, P: Clone + 'static, T: Convenient, U: Convenient>(
+        self,
+        state: &mut dyn State,
+        widget_prop: DepProp<O, T>,
+        map: fn(T) -> U,
+        param: P,
+        bind: fn(&mut dyn State, P, Binding<U>)
+    ) {
+        let binding = Binding1::new(state, map, |map, value: T| Some(map(value)));
+        bind(state, param, binding.into());
+        binding.set_source_1(state, &mut widget_prop.value_source(self.obj()));
+    }
 }
 
 impl DepObjId for Widget { }
+
+pub trait ViewWidgetExt {
+    fn bind_base_to_widget<O: WidgetObj, T: Convenient, U: Convenient>(
+        self,
+        state: &mut dyn State,
+        view_base_prop: DepProp<ViewBase, U>,
+        widget: Widget,
+        widget_prop: DepProp<O, T>,
+        map: fn(T) -> U,
+    );
+
+    fn bind_align_to_widget<O: WidgetObj, T: Convenient, U: Convenient>(
+        self,
+        state: &mut dyn State,
+        view_align_prop: DepProp<ViewAlign, U>,
+        widget: Widget,
+        widget_prop: DepProp<O, T>,
+        map: fn(T) -> U,
+    );
+
+    fn bind_layout_to_widget<O: WidgetObj, L: Layout, T: Convenient, U: Convenient>(
+        self,
+        state: &mut dyn State,
+        layout_prop: DepProp<L, U>,
+        widget: Widget,
+        widget_prop: DepProp<O, T>,
+        map: fn(T) -> U,
+    );
+
+    fn bind_decorator_to_widget<O: WidgetObj, D: Decorator, T: Convenient, U: Convenient>(
+        self,
+        state: &mut dyn State,
+        decorator_prop: DepProp<D, U>,
+        widget: Widget,
+        widget_prop: DepProp<O, T>,
+        map: fn(T) -> U,
+    );
+}
+
+impl ViewWidgetExt for View {
+    fn bind_base_to_widget<O: WidgetObj, T: Convenient, U: Convenient>(
+        self,
+        state: &mut dyn State,
+        view_base_prop: DepProp<ViewBase, U>,
+        widget: Widget,
+        widget_prop: DepProp<O, T>,
+        map: fn(T) -> U
+    ) {
+        widget.bind_view(state, widget_prop, map, (view_base_prop, self), |state, (view_base_prop, view), binding|
+            view_base_prop.bind(state, view.base(), binding)
+        );
+    }
+
+    fn bind_align_to_widget<O: WidgetObj, T: Convenient, U: Convenient>(
+        self,
+        state: &mut dyn State,
+        view_align_prop: DepProp<ViewAlign, U>,
+        widget: Widget,
+        widget_prop: DepProp<O, T>,
+        map: fn(T) -> U,
+    ) {
+        widget.bind_view(state, widget_prop, map, (view_align_prop, self), |state, (view_align_prop, view), binding|
+            view_align_prop.bind(state, view.align(), binding)
+        );
+    }
+
+    fn bind_layout_to_widget<O: WidgetObj, L: Layout, T: Convenient, U: Convenient>(
+        self,
+        state: &mut dyn State,
+        layout_prop: DepProp<L, U>,
+        widget: Widget,
+        widget_prop: DepProp<O, T>,
+        map: fn(T) -> U,
+    ) {
+        widget.bind_view(state, widget_prop, map, (layout_prop, self), |state, (layout_prop, view), binding|
+            layout_prop.bind(state, view.layout(), binding)
+        );
+    }
+
+    fn bind_decorator_to_widget<O: WidgetObj, D: Decorator, T: Convenient, U: Convenient>(
+        self,
+        state: &mut dyn State,
+        decorator_prop: DepProp<D, U>,
+        widget: Widget,
+        widget_prop: DepProp<O, T>,
+        map: fn(T) -> U,
+    ) {
+        widget.bind_view(state, widget_prop, map, (decorator_prop, self), |state, (decorator_prop, view), binding|
+            decorator_prop.bind(state, view.decorator(), binding)
+        );
+    }
+}
 
 dep_type! {
     #[derive(Debug)]
