@@ -146,9 +146,9 @@ impl DecoratorBehavior for LineDecoratorBehavior {
         let stroke = Binding1::new(state, (), |(), stroke| Some(stroke));
         let orient = Binding1::new(state, (), |(), orient| Some(orient));
         let far_orient = Binding2::new(state, (), |(), far, orient| Some((far, orient)));
-        bg.set_target_fn(state, view, |state, view, _| view.invalidate_render(state).expect("invalidate_render failed"));
-        fg.set_target_fn(state, view, |state, view, _| view.invalidate_render(state).expect("invalidate_render failed"));
-        attr.set_target_fn(state, view, |state, view, _| view.invalidate_render(state).expect("invalidate_render failed"));
+        bg.set_target_fn(state, view, |state, view, _| view.invalidate_render(state));
+        fg.set_target_fn(state, view, |state, view, _| view.invalidate_render(state));
+        attr.set_target_fn(state, view, |state, view, _| view.invalidate_render(state));
         length.set_target_fn(state, view, |state, view, _| view.invalidate_measure(state));
         near.set_target_fn(state, view, |state, view, _| {
             view.invalidate_rect(state, Rect {
@@ -156,7 +156,7 @@ impl DecoratorBehavior for LineDecoratorBehavior {
                 size: Vector { x: 1, y: 1 }
             }).unwrap();
         });
-        stroke.set_target_fn(state, view, |state, view, _| view.invalidate_render(state).expect("invalidate_render failed"));
+        stroke.set_target_fn(state, view, |state, view, _| view.invalidate_render(state));
         orient.set_target_fn(state, view, |state, view, _| view.invalidate_measure(state));
         far_orient.set_target_fn(state, view, |state, view, (_far, orient)| {
             let tree: &ViewTree = state.get();

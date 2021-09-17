@@ -532,31 +532,6 @@ impl View {
         replace(&mut tree.0.get_mut().focused, self)
     }
 
-    fn renew_window(self, tree: &mut ViewTree, parent_window: Option<Window>) {
-        let children_parent_window = if let Some(window) = tree.0.get().arena[self.0].window {
-            window.drop(tree.window_tree());
-            let render_bounds = self.render_bounds(tree);
-            let window = Window::new(
-                tree.window_tree(),
-                parent_window,
-                render_bounds,
-                |window| (self, window)
-            );
-            tree.0.get_mut().arena[self.0].window = Some(window);
-            Some(window)
-        } else {
-            parent_window
-        };
-        if let Some(last_child) = self.last_child(tree) {
-            let mut child = last_child;
-            loop {
-                child = child.next(tree);
-                child.renew_window(tree, children_parent_window);
-                if child == last_child { break; }
-            }
-        }
-    }
-
     fn drop_layout_bindings(self, state: &mut dyn State) {
         let bindings;
         let layout;
@@ -610,6 +585,7 @@ impl View {
         {
             let tree: &mut ViewTree = state.get_mut();
             assert!(tree.0.get_mut().arena[self.0].decorator.replace(Box::new(decorator)).is_none(), "Decorator is already set and cannot be changed");
+            assert!(self.last_child(tree).is_none(), "Decorator should be set before attaching children");
             let parent_window = self
                 .self_and_parents(tree)
                 .find_map(|view| tree.0.get().arena[view.0].window)
@@ -621,22 +597,14 @@ impl View {
                 render_bounds,
                 |window| (self, window)
             );
-            tree.0.get_mut().arena[self.0].window = Some(window);
-            if let Some(last_child) = self.last_child(tree) {
-                let mut child = last_child;
-                loop {
-                    child = child.next(tree);
-                    child.renew_window(tree, Some(window));
-                    if child == last_child { break; }
-                }
-            }
+            let ok = tree.0.get_mut().arena[self.0].window.replace(window).is_none();
+            debug_assert!(ok);
         }
         let bindings = behavior.init_bindings(self, state);
         {
             let tree: &mut ViewTree = state.get_mut();
             tree.0.get_mut().arena[self.0].decorator_bindings = Some(bindings);
         }
-        self.invalidate_measure(state);
     }
 
     pub fn set_layout<L: Layout>(self, state: &mut dyn State, layout: L) {
@@ -650,8 +618,6 @@ impl View {
             let tree: &mut ViewTree = state.get_mut();
             tree.0.get_mut().arena[self.0].layout_bindings = Some(bindings);
         }
-        let tree: &ViewTree = state.get();
-        self.parent(tree).map(|parent| parent.invalidate_measure(state));
     }
 
     pub fn set_panel<P: Panel>(self, state: &mut dyn State, panel: P) {
@@ -665,7 +631,6 @@ impl View {
             let tree: &mut ViewTree = state.get_mut();
             tree.0.get_mut().arena[self.0].panel_bindings = Some(bindings);
         }
-        self.invalidate_measure(state);
     }
 
     pub fn decorator_bindings(self, tree: &ViewTree) -> &dyn DecoratorBindings {
@@ -783,12 +748,11 @@ impl View {
         window.map(|window| window.invalidate_rect(&mut tree.window_tree(), rect))
     }
 
-    #[must_use]
-    pub fn invalidate_render(self, state: &mut dyn State) -> Option<()> {
+    pub fn invalidate_render(self, state: &mut dyn State) {
         let tree: &mut ViewTree = state.get_mut();
-        if self == tree.0.get().root { return Some(tree.window_tree().invalidate_screen()); }
+        if self == tree.0.get().root { return tree.window_tree().invalidate_screen(); }
         let window = tree.0.get().arena[self.0].window;
-        window.map(|window| window.invalidate(&mut tree.window_tree()))
+        window.map(|window| window.invalidate(&mut tree.window_tree()));
     }
 
     pub fn invalidate_parent_measure(self, state: &mut dyn State) {
@@ -853,8 +817,8 @@ impl View {
             let h = max(h as u16, size_min_max.min_size.y as u16);
             Some(size_min_max.max_h.map_or(h, |max_h| min(h, max_h as u16)) as i16)
         });
-        let tree: &mut ViewTree = state.get_mut();
-        let node = &mut tree.0.get_mut().arena[self.0];
+        let tree: &ViewTree = state.get();
+        let node = &tree.0.get().arena[self.0];
         let panel = node.panel.as_ref().map(|x| x.behavior());
         let decorator = node.decorator.as_ref().map(|x| x.behavior());
         let children_measure_size = decorator.as_ref().map_or(
@@ -884,8 +848,6 @@ impl View {
             children_desired_size,
             |d| d.desired_size(self, state, children_desired_size)
         );
-        let tree: &mut ViewTree = state.get_mut();
-        let node = &mut tree.0.get_mut().arena[self.0];
         desired_size = size_min_max.min_size.max(desired_size);
         if let Some(max_w) = size_min_max.max_w {
             desired_size.x = min(desired_size.x as u16, max_w as u16) as i16;
@@ -893,7 +855,11 @@ impl View {
         if let Some(max_h) = size_min_max.max_h {
             desired_size.y = min(desired_size.y as u16, max_h as u16) as i16;
         }
-        node.desired_size = margin.expand_rect_size(desired_size);
+        {
+            let tree: &mut ViewTree = state.get_mut();
+            let node = &mut tree.0.get_mut().arena[self.0];
+            node.desired_size = margin.expand_rect_size(desired_size);
+        }
     }
 
     pub fn arrange(self, state: &mut dyn State, mut rect: Rect) {
@@ -920,6 +886,7 @@ impl View {
         let size_min_max = raw_align_bindings.size_min_max.get_value(state).unwrap_or_default();
         let h_align = raw_align_bindings.h_align.get_value(state).unwrap_or(HAlign::Center);
         let v_align = raw_align_bindings.v_align.get_value(state).unwrap_or(VAlign::Center);
+        self.invalidate_render(state);
         rect = margin.shrink_rect(rect);
         let mut size = size_min_max.min_size.max(rect.size);
         if let Some(max_w) = size_min_max.max_w {
@@ -960,13 +927,15 @@ impl View {
             children_render_bounds,
             |d| d.render_bounds(self, state, children_render_bounds)
         );
-        let tree: &mut ViewTree = state.get_mut();
         let padding = Thickness::align(render_bounds.size, rect.size, h_align, v_align);
         render_bounds = padding.expand_rect(render_bounds);
         render_bounds.tl = rect.tl.offset(Point { x: 0, y: 0 }.offset_from(render_bounds.tl));
-        let window = tree.0.get().arena[self.0].window;
-        window.map(|w| w.move_(tree.window_tree(), render_bounds));
-        tree.0.get_mut().arena[self.0].render_bounds = render_bounds;
+        {
+            let tree: &mut ViewTree = state.get_mut();
+            let window = tree.0.get().arena[self.0].window;
+            window.map(|w| w.move_(tree.window_tree(), render_bounds));
+            tree.0.get_mut().arena[self.0].render_bounds = render_bounds;
+        }
     }
 }
 
@@ -1060,10 +1029,10 @@ impl DecoratorBehavior for RootDecoratorBehavior {
         let fg = Binding1::new(state, (), |(), fg| Some(fg));
         let attr = Binding1::new(state, (), |(), attr| Some(attr));
         let fill = Binding1::new(state, (), |(), fill| Some(fill));
-        bg.set_target_fn(state, view, |state, view, _| view.invalidate_render(state).expect("invalidate_render failed"));
-        fg.set_target_fn(state, view, |state, view, _| view.invalidate_render(state).expect("invalidate_render failed"));
-        attr.set_target_fn(state, view, |state, view, _| view.invalidate_render(state).expect("invalidate_render failed"));
-        fill.set_target_fn(state, view, |state, view, _| view.invalidate_render(state).expect("invalidate_render failed"));
+        bg.set_target_fn(state, view, |state, view, _| view.invalidate_render(state));
+        fg.set_target_fn(state, view, |state, view, _| view.invalidate_render(state));
+        attr.set_target_fn(state, view, |state, view, _| view.invalidate_render(state));
+        fill.set_target_fn(state, view, |state, view, _| view.invalidate_render(state));
         bg.set_source_1(state, &mut ViewBase::BG.value_source(view.base()));
         fg.set_source_1(state, &mut ViewBase::FG.value_source(view.base()));
         attr.set_source_1(state, &mut ViewBase::ATTR.value_source(view.base()));

@@ -122,9 +122,9 @@ impl DecoratorBehavior for LabelDecoratorBehavior {
         let bg = Binding1::new(state, (), |(), bg| Some(bg));
         let attr = Binding1::new(state, (), |(), attr| Some(attr));
         let text = Binding1::new(state, (), |(), text| Some(text));
-        bg.set_target_fn(state, view, |state, view, _| view.invalidate_render(state).expect("invalidate_render failed"));
-        fg.set_target_fn(state, view, |state, view, _| view.invalidate_render(state).expect("invalidate_render failed"));
-        attr.set_target_fn(state, view, |state, view, _| view.invalidate_render(state).expect("invalidate_render failed"));
+        bg.set_target_fn(state, view, |state, view, _| view.invalidate_render(state));
+        fg.set_target_fn(state, view, |state, view, _| view.invalidate_render(state));
+        attr.set_target_fn(state, view, |state, view, _| view.invalidate_render(state));
         text.set_target_fn(state, view, |state, view, _| view.invalidate_measure(state));
         bg.set_source_1(state, &mut ViewBase::BG.value_source(view.base()));
         fg.set_source_1(state, &mut ViewBase::FG.value_source(view.base()));

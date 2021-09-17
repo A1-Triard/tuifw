@@ -1,7 +1,7 @@
 use crate::base::*;
 use crate::view::{View, ViewAlign, ViewBase};
 use crate::view::decorators::{BorderDecorator, ViewBuilderBorderDecoratorExt};
-use crate::view::panels::CanvasLayout;
+use crate::view::panels::{CanvasLayout, ViewBuilderDockPanelExt};
 use dep_obj::{dep_type, Change};
 use dep_obj::binding::{Binding1};
 use dyn_context::state::State;
@@ -11,6 +11,7 @@ use std::borrow::Cow;
 dep_type! {
     #[derive(Debug)]
     pub struct Window in Widget {
+        header: Cow<'static, str> = Cow::Borrowed(""),
         bg: Option<Color> = Some(Color::Blue),
         bounds: Rect = Rect { tl: Point { x: 0, y: 0 }, size: Vector { x: 0, y: 0 } },
     }
@@ -27,7 +28,9 @@ impl WidgetBehavior for WindowBehavior {
             view.build(state, |view| view
                 .border_decorator(|decorator| decorator
                     .fill(Cow::Borrowed(" "))
+                    .enable_t_padding(false)
                 )
+                .dock_panel(|panel| panel)
             );
             view.bind_decorator(state, ViewBase::IS_FOCUSED, BorderDecorator::TL, |focused|
                 Cow::Borrowed(if focused { "╔" } else { "┌" })
