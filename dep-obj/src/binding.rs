@@ -163,7 +163,7 @@ impl Drop for Bindings {
     }
 }
 
-trait AnyBindingNodeSources: Debug + Downcast {
+trait AnyBindingNodeSources: Downcast {
     type Value: Convenient;
     fn unhandle(&mut self, state: &mut dyn State);
     fn get_value(&self) -> Option<Self::Value>;
@@ -175,6 +175,7 @@ impl_downcast!(AnyBindingNodeSources assoc Value where Value: Convenient);
 #[derive(Educe)]
 #[educe(Debug)]
 struct BindingNode<T: Convenient> {
+    #[educe(Debug(ignore))]
     sources: Box<dyn AnyBindingNodeSources<Value=T>>,
     target: Option<Box<dyn Target<T>>>,
 }
@@ -560,8 +561,8 @@ macro_rules! binding_n {
             )*
 
             #[derive(Educe)]
-            #[educe(Debug)]
-            struct [< Binding $n NodeSources >] <P: Convenient, $( [< S $i >] : Source, )* T: Convenient> {
+            #[educe(Debug(bound="P: Debug"))]
+            struct [< Binding $n NodeSources >] <P, $( [< S $i >] : Source, )* T: Convenient> {
                 param: P,
                 $(
                     [< source_ $i >] : Option<(Box<dyn HandlerId>, [< S $i >] ::Cache )>,
@@ -571,7 +572,7 @@ macro_rules! binding_n {
             }
 
             impl<
-                P: Convenient,
+                P: Clone + 'static,
                 $( [< S $i >] : Source + 'static, )*
                 T: Convenient
             > AnyBindingNodeSources for [< Binding $n NodeSources >] <P, $( [< S $i >] , )* T> {
@@ -622,7 +623,7 @@ macro_rules! binding_n {
             }
 
             impl<
-                P: Convenient,
+                P: Clone + 'static,
                 $( [< S $i >] : Source + 'static, )*
                 T: Convenient
             > [< Binding $n >] <P, $( [< S $i >] , )* T> {
@@ -743,7 +744,7 @@ macro_rules! binding_n {
                 }
 
                 impl<
-                    P: Convenient,
+                    P: Clone + 'static,
                     $( [< S $j >] : Source + 'static, )*
                     T: Convenient
                 > AnyHandler for [< Binding $n Source $i Handler >] <P, $( [< S $j >] , )* T >  {
@@ -756,7 +757,7 @@ macro_rules! binding_n {
                 }
 
                 impl<
-                    P: Convenient,
+                    P: Clone + 'static,
                     $( [< S $j >] : Source + 'static, )*
                     T: Convenient
                 > Handler< [< S $i >] ::Value > for [< Binding $n Source $i Handler >] <P, $( [< S $j >] , )* T >  {
