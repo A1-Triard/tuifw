@@ -144,7 +144,6 @@ struct TriggerChips {
     pub not_2: Chip,
 }
 
-#[derive(Debug)]
 struct TriggerState {
     bindings: Bindings,
     circuit: Circuit,

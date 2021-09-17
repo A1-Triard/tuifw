@@ -26,7 +26,7 @@ pub fn b_immediate(x: BYield<!>) {
     let _ = x;
 }
 
-pub trait Target<T: Convenient>: Debug + DynClone {
+pub trait Target<T: Convenient>: DynClone {
     fn execute(&self, state: &mut dyn State, value: T);
     fn clear(&self, state: &mut dyn State);
 }
@@ -34,14 +34,13 @@ pub trait Target<T: Convenient>: Debug + DynClone {
 clone_trait_object!(<T: Convenient> Target<T>);
 
 #[derive(Educe)]
-#[educe(Debug, Clone)]
-struct DispatchTarget<Context: Debug + Clone, T: Convenient> {
+#[educe(Clone)]
+struct DispatchTarget<Context: Clone, T: Convenient> {
     context: Context,
-    #[educe(Debug(ignore))]
     execute: fn(state: &mut dyn State, context: Context, value: T) -> BYield<!>,
 }
 
-impl<Context: Debug + Clone, T: Convenient> Target<T> for DispatchTarget<Context, T> {
+impl<Context: Clone, T: Convenient> Target<T> for DispatchTarget<Context, T> {
     fn execute(&self, state: &mut dyn State, value: T) {
         let _ = (self.execute)(state, self.context.clone(), value);
     }
@@ -50,14 +49,13 @@ impl<Context: Debug + Clone, T: Convenient> Target<T> for DispatchTarget<Context
 }
 
 #[derive(Educe)]
-#[educe(Debug, Clone)]
-struct FnTarget<Context: Debug + Clone, T: Convenient> {
+#[educe(Clone)]
+struct FnTarget<Context: Clone, T: Convenient> {
     context: Context,
-    #[educe(Debug(ignore))]
     execute: fn(state: &mut dyn State, context: Context, value: T)
 }
 
-impl<Context: Debug + Clone, T: Convenient> Target<T> for FnTarget<Context, T> {
+impl<Context: Clone, T: Convenient> Target<T> for FnTarget<Context, T> {
     fn execute(&self, state: &mut dyn State, value: T) {
         (self.execute)(state, self.context.clone(), value);
     }
@@ -134,7 +132,7 @@ pub struct HandledSource {
     pub init: Option<Box<dyn FnOnce(&mut dyn State)>>,
 }
 
-trait AnyBindingNode: Debug + Downcast {
+trait AnyBindingNode: Downcast {
     fn unhandle_sources_and_clear_target(&mut self, state: &mut dyn State);
 }
 
@@ -142,11 +140,10 @@ impl_downcast!(AnyBindingNode);
 
 macro_attr! {
     #[doc(hidden)]
-    #[derive(Debug, Component!)]
+    #[derive(Component!)]
     pub struct BoxedBindingNode(Box<dyn AnyBindingNode>);
 }
 
-#[derive(Debug)]
 pub struct Bindings(Arena<BoxedBindingNode>);
 
 impl SelfState for Bindings { }
@@ -172,10 +169,7 @@ trait AnyBindingNodeSources: Downcast {
 
 impl_downcast!(AnyBindingNodeSources assoc Value where Value: Convenient);
 
-#[derive(Educe)]
-#[educe(Debug)]
 struct BindingNode<T: Convenient> {
-    #[educe(Debug(ignore))]
     sources: Box<dyn AnyBindingNodeSources<Value=T>>,
     target: Option<Box<dyn Target<T>>>,
 }
@@ -215,7 +209,7 @@ impl<T: Convenient> BindingBase<T> {
         assert!(node.sources.is_empty(), "set_target/bind should be called before any set_source_*");
     }
 
-    pub fn dispatch<Context: Debug + Clone + 'static>(
+    pub fn dispatch<Context: Clone + 'static>(
         self,
         state: &mut dyn State,
         context: Context,
@@ -224,7 +218,7 @@ impl<T: Convenient> BindingBase<T> {
         self.set_target(state, Box::new(DispatchTarget { context, execute }));
     }
 
-    pub fn set_target_fn<Context: Debug + Clone + 'static>(
+    pub fn set_target_fn<Context: Clone + 'static>(
         self,
         state: &mut dyn State,
         context: Context,
@@ -236,7 +230,7 @@ impl<T: Convenient> BindingBase<T> {
     pub fn drop_binding(self, state: &mut dyn State) {
         let bindings: &mut Bindings = state.get_mut();
         let node = bindings.0.remove(self.0);
-        let mut node = node.0.downcast::<BindingNode<T>>().unwrap();
+        let mut node = node.0.downcast::<BindingNode<T>>().unwrap_or_else(|_| panic!("invalid cast"));
         node.unhandle_sources_and_clear_target(state);
     }
 }
@@ -264,7 +258,7 @@ impl<T: Convenient> Binding<T> {
         BindingBase::from(self).set_target(state, target);
     }
 
-    pub fn dispatch<Context: Debug + Clone + 'static>(
+    pub fn dispatch<Context: Clone + 'static>(
         self,
         state: &mut dyn State,
         context: Context,
@@ -273,7 +267,7 @@ impl<T: Convenient> Binding<T> {
         BindingBase::from(self).dispatch(state, context, execute);
     }
 
-    pub fn set_target_fn<Context: Debug + Clone + 'static>(
+    pub fn set_target_fn<Context: Clone + 'static>(
         self,
         state: &mut dyn State,
         context: Context,
@@ -428,7 +422,7 @@ macro_rules! binding_n {
                     BindingBase::from(self).set_target(state, target);
                 }
 
-                pub fn dispatch<Context: Debug + Clone + 'static>(
+                pub fn dispatch<Context: Clone + 'static>(
                     self,
                     state: &mut dyn State,
                     context: Context,
@@ -437,7 +431,7 @@ macro_rules! binding_n {
                     BindingBase::from(self).dispatch(state, context, execute);
                 }
 
-                pub fn set_target_fn<Context: Debug + Clone + 'static>(
+                pub fn set_target_fn<Context: Clone + 'static>(
                     self,
                     state: &mut dyn State,
                     context: Context,
@@ -654,7 +648,7 @@ macro_rules! binding_n {
                     BindingBase::from(self).set_target(state, target);
                 }
 
-                pub fn dispatch<Context: Debug + Clone + 'static>(
+                pub fn dispatch<Context: Clone + 'static>(
                     self,
                     state: &mut dyn State,
                     context: Context,
@@ -663,7 +657,7 @@ macro_rules! binding_n {
                     BindingBase::from(self).dispatch(state, context, execute);
                 }
 
-                pub fn set_target_fn<Context: Debug + Clone + 'static>(
+                pub fn set_target_fn<Context: Clone + 'static>(
                     self,
                     state: &mut dyn State,
                     context: Context,
