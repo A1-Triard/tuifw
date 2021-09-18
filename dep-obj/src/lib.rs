@@ -1693,7 +1693,7 @@ impl<Owner: DepType, ItemType: Convenient> Target<()> for DepVecItemInitialFinal
     fn clear(&self, state: &mut dyn State) {
         let mut obj = self.obj.get_mut(state);
         let entry = self.vec.entry_mut(&mut obj);
-        let ok = entry.handlers.item_initial_final_handler.take().is_some();
+        let ok = entry.handlers.item_initial_final_handler.as_mut().unwrap().update.take().is_some();
         debug_assert!(ok);
     }
 }
