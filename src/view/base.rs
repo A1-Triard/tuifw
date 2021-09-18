@@ -759,6 +759,11 @@ impl View {
         self.parent(tree).map(|parent| parent.invalidate_measure(state));
     }
 
+    pub fn invalidate_measure_and_render(self, state: &mut dyn State) {
+        self.invalidate_measure(state);
+        self.invalidate_render(state);
+    }
+
     pub fn invalidate_measure(self, state: &mut dyn State) {
         let tree: &mut ViewTree = state.get_mut();
         let mut view = self;

@@ -125,7 +125,7 @@ impl DecoratorBehavior for LabelDecoratorBehavior {
         bg.set_target_fn(state, view, |state, view, _| view.invalidate_render(state));
         fg.set_target_fn(state, view, |state, view, _| view.invalidate_render(state));
         attr.set_target_fn(state, view, |state, view, _| view.invalidate_render(state));
-        text.set_target_fn(state, view, |state, view, _| view.invalidate_measure(state));
+        text.set_target_fn(state, view, |state, view, _| view.invalidate_measure_and_render(state));
         bg.set_source_1(state, &mut ViewBase::BG.value_source(view.base()));
         fg.set_source_1(state, &mut ViewBase::FG.value_source(view.base()));
         attr.set_source_1(state, &mut ViewBase::ATTR.value_source(view.base()));
