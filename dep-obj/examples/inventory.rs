@@ -123,8 +123,8 @@ impl Npc {
         equipped.dispatch(state, (), |state, (), change|
             ItemProps::EQUIPPED.set(state, change.item.props(), change.is_insert())
         );
-        equipped.set_source_1(state, &mut NpcProps::EQUIPPED_ITEMS.item_source(npc.props()));
         npc.props().add_binding(state, equipped);
+        equipped.set_source_1(state, &mut NpcProps::EQUIPPED_ITEMS.item_source(npc.props()));
 
         let enhancement = BindingExt2::new(state, (), |state, _, enhancement, change: Option<ItemChange<Item>>| {
             if let Some(change) = change {
@@ -222,9 +222,9 @@ fn main() {
             let game: &mut Game = game.get_mut();
             writeln!(&mut game.log, "{} {}.", name, if equipped { "equipped" } else { "unequipped" }).unwrap();
         });
+        item.props().add_binding(game, equipped);
         equipped.set_source_1(game, &mut ItemProps::NAME.value_source(item.props()));
         equipped.set_source_2(game, &mut ItemProps::EQUIPPED.change_source(item.props()));
-        item.props().add_binding(game, equipped);
         let enhancement = Binding2::new(game, (), |(), name, enhancement: Option<Change<i8>>|
             enhancement.map(|enhancement| (name, enhancement))
         );
@@ -232,9 +232,9 @@ fn main() {
             let game: &mut Game = game.get_mut();
             writeln!(&mut game.log, "{} enhancement changed: {} -> {}.", name, enhancement.old, enhancement.new).unwrap();
         });
+        item.props().add_binding(game, enhancement);
         enhancement.set_source_1(game, &mut ItemProps::NAME.value_source(item.props()));
         enhancement.set_source_2(game, &mut ItemProps::ENHANCEMENT.change_source(item.props()));
-        item.props().add_binding(game, enhancement);
     }
     b_immediate(NpcProps::EQUIPPED_ITEMS.push(game, npc.props(), sword));
     b_immediate(NpcProps::EQUIPPED_ITEMS.push(game, npc.props(), shield));

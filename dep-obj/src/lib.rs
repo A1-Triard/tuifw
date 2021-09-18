@@ -481,10 +481,13 @@ impl<ItemType: Convenient> DepVecEntry<ItemType> {
     }
 
     #[doc(hidden)]
-    pub fn collect_all_bindings(&mut self, bindings: &mut Vec<AnyBindingBase>) {
-        for binding in self.handlers.item_handlers.items().values().filter_map(|x| x.update) {
-            bindings.push(binding.into());
-        }
+    pub fn collect_all_bindings(&self, bindings: &mut Vec<AnyBindingBase>) {
+        bindings.extend(
+            self.handlers.item_handlers.items().values().filter_map(|x| x.update).map(|x| {
+                let x: AnyBindingBase = x.into();
+                x
+            })
+        );
         if let Some(binding) = self.handlers.item_initial_final_handler.as_ref().and_then(|x| x.update) {
             bindings.push(binding.into());
         }
@@ -494,19 +497,21 @@ impl<ItemType: Convenient> DepVecEntry<ItemType> {
 #[derive(Debug)]
 pub struct BaseDepObjCore<Owner: DepType> {
     style: Option<Style<Owner>>,
-    added_bindings: Vec<AnyBindingBase>,
+    added_bindings: Arena<AnyBindingBase>,
 }
 
 impl<Owner: DepType> BaseDepObjCore<Owner> {
     pub const fn new() -> Self {
         BaseDepObjCore {
             style: None,
-            added_bindings: Vec::new(),
+            added_bindings: Arena::new(),
         }
     }
 
     #[doc(hidden)]
-    pub fn take_bindings(&mut self) -> Vec<AnyBindingBase> { take(&mut self.added_bindings) }
+    pub fn collect_bindings(&self) -> Vec<AnyBindingBase> {
+        self.added_bindings.items().values().copied().collect()
+    }
 }
 
 pub trait DepObjIdBase: ComponentId {
@@ -648,7 +653,7 @@ pub trait DepType: Debug {
     fn take_all_handlers(&mut self) -> Vec<Box<dyn AnyHandler>>;
 
     #[doc(hidden)]
-    fn take_added_bindings_and_collect_all(&mut self) -> Vec<AnyBindingBase>;
+    fn collect_all_bindings(&self) -> Vec<AnyBindingBase>;
 
     #[doc(hidden)]
     fn update_parent_children_has_handlers(state: &mut dyn State, obj: Glob<Self>) where Self: Sized;
@@ -903,6 +908,7 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         let entry_mut = self.entry_mut(&mut obj_mut);
         entry_mut.binding = Some(binding);
         binding.set_target(state, Box::new(DepPropSet { prop: self, obj }));
+        binding.set_holder(state, Box::new(DepPropSet { prop: self, obj }));
     }
 
     pub fn bind(
@@ -959,8 +965,10 @@ impl<Owner: DepType, PropType: Convenient> Target<PropType> for DepPropSet<Owner
     fn execute(&self, state: &mut dyn State, value: PropType) {
         b_immediate(self.prop.set(state, self.obj, value));
     }
+}
 
-    fn clear(&self, state: &mut dyn State) {
+impl<Owner: DepType, PropType: Convenient> Holder for DepPropSet<Owner, PropType> {
+    fn release(&self, state: &mut dyn State) {
         self.prop.clear_binding(state, self.obj);
     }
 }
@@ -1120,18 +1128,31 @@ impl<Owner: DepType, ItemType: Convenient> DepVec<Owner, ItemType> {
     }
 }
 
+struct AddedBindingHolder<Owner: DepType> {
+    obj: Glob<Owner>,
+    binding_id: Id<AnyBindingBase>,
+}
+
+impl<Owner: DepType> Holder for AddedBindingHolder<Owner> {
+    fn release(&self, state: &mut dyn State) {
+        let mut obj_mut = self.obj.get_mut(state);
+        obj_mut.core_base_priv_mut().added_bindings.remove(self.binding_id);
+    }
+}
+
 impl<Owner: DepType> Glob<Owner> {
     pub fn parent(self, state: &dyn State) -> Option<Self> {
         Owner::Id::from_raw(self.id).parent(state).map(|id| Glob { id: id.into_raw(), descriptor: self.descriptor })
     }
 
-    fn add_binding_raw(self, state: &mut dyn State, binding: AnyBindingBase) {
+    fn add_binding_raw<T: Convenient>(self, state: &mut dyn State, binding: BindingBase<T>) where Owner: 'static {
         let mut obj_mut = self.get_mut(state);
-        obj_mut.core_base_priv_mut().added_bindings.push(binding);
+        let binding_id = obj_mut.core_base_priv_mut().added_bindings.insert(|id| (binding.into(), id));
+        binding.set_holder(state, Box::new(AddedBindingHolder { obj: self, binding_id }));
     }
 
-    pub fn add_binding(self, state: &mut dyn State, binding: impl Into<AnyBindingBase>) {
-        self.add_binding_raw(state, binding.into());
+    pub fn add_binding<T: Convenient>(self, state: &mut dyn State, binding: impl Into<BindingBase<T>>) where Owner: 'static {
+        self.add_binding_raw(state, binding.into())
     }
 
     pub fn apply_style(
@@ -1689,8 +1710,10 @@ impl<Owner: DepType, ItemType: Convenient> Target<()> for DepVecItemInitialFinal
     fn execute(&self, state: &mut dyn State, (): ()) {
         self.vec.modify(state, self.obj, DepVecModification::Update(None));
     }
+}
 
-    fn clear(&self, state: &mut dyn State) {
+impl<Owner: DepType, ItemType: Convenient> Holder for DepVecItemInitialFinalSourceUpdate<Owner, ItemType> {
+    fn release(&self, state: &mut dyn State) {
         let mut obj = self.obj.get_mut(state);
         let entry = self.vec.entry_mut(&mut obj);
         let ok = entry.handlers.item_initial_final_handler.as_mut().unwrap().update.take().is_some();
@@ -1710,8 +1733,10 @@ impl<Owner: DepType, ItemType: Convenient> Target<()> for DepVecItemSourceUpdate
     fn execute(&self, state: &mut dyn State, (): ()) {
         self.vec.modify(state, self.obj, DepVecModification::Update(Some(self.handler_id)));
     }
+}
 
-    fn clear(&self, state: &mut dyn State) {
+impl<Owner: DepType, ItemType: Convenient> Holder for DepVecItemSourceUpdate<Owner, ItemType> {
+    fn release(&self, state: &mut dyn State) {
         let mut obj = self.obj.get_mut(state);
         let entry = self.vec.entry_mut(&mut obj);
         let ok = entry.handlers.item_handlers[self.handler_id].update.take().is_some();
@@ -1744,6 +1769,7 @@ impl<Owner: DepType + 'static, ItemType: Convenient> Source for DepVecItemSource
         );
         if let Some(update) = self.update {
             update.set_target(state, Box::new(DepVecItemSourceUpdate { obj: self.obj, vec: self.vec, handler_id }));
+            update.set_holder(state, Box::new(DepVecItemSourceUpdate { obj: self.obj, vec: self.vec, handler_id }));
         }
         let init = if items.is_empty() {
             None
@@ -1790,6 +1816,7 @@ impl<Owner: DepType + 'static, ItemType: Convenient> Source for DepVecItemInitia
         assert!(entry.handlers.item_initial_final_handler.replace(handler).is_none(), "duplicate initial handler");
         if let Some(update) = self.update {
             update.set_target(state, Box::new(DepVecItemInitialFinalSourceUpdate { obj: self.obj, vec: self.vec }));
+            update.set_holder(state, Box::new(DepVecItemInitialFinalSourceUpdate { obj: self.obj, vec: self.vec }));
         }
         let init = if items.is_empty() {
             None
@@ -2644,8 +2671,8 @@ macro_rules! dep_type_impl_raw {
                     $handlers
                 }
 
-                fn dep_type_core_take_added_bindings_and_collect_all(&mut self) -> $crate::std_vec_Vec<$crate::binding::AnyBindingBase> {
-                    let mut $bindings = self.dep_type_core_base.take_bindings();
+                fn dep_type_core_collect_all_bindings(&self) -> $crate::std_vec_Vec<$crate::binding::AnyBindingBase> {
+                    let mut $bindings = self.dep_type_core_base.collect_bindings();
                     let $this = self;
                     $($core_bindings)*
                     $bindings
@@ -2684,8 +2711,8 @@ macro_rules! dep_type_impl_raw {
                 }
 
                 #[doc(hidden)]
-                fn take_added_bindings_and_collect_all(&mut self) -> $crate::std_vec_Vec<$crate::binding::AnyBindingBase> {
-                    self.core.dep_type_core_take_added_bindings_and_collect_all()
+                fn collect_all_bindings(&self) -> $crate::std_vec_Vec<$crate::binding::AnyBindingBase> {
+                    self.core.dep_type_core_collect_all_bindings()
                 }
 
                 #[doc(hidden)]
@@ -2742,21 +2769,21 @@ macro_rules! dep_obj {
                 let $this = self;
                 let $arena: &mut $Arena = <dyn $crate::dyn_context_state_State as $crate::dyn_context_state_StateExt>::get_mut(state);
                 $(
-                    let bindings = <dyn $tr as $crate::DepType>::take_added_bindings_and_collect_all($field_mut);
+                    let bindings = <dyn $tr as $crate::DepType>::collect_all_bindings($field);
                 )?
                 $(
-                    let bindings = if let $crate::std_option_Option::Some(f) = $field_mut {
-                        <dyn $opt_tr as $crate::DepType>::take_added_bindings_and_collect_all(f)
+                    let bindings = if let $crate::std_option_Option::Some(f) = $field {
+                        <dyn $opt_tr as $crate::DepType>::collect_all_bindings(f)
                     } else {
                         $crate::std_vec_Vec::new()
                     };
                 )?
                 $(
-                    let bindings = <$ty as $crate::DepType>::take_added_bindings_and_collect_all($field_mut);
+                    let bindings = <$ty as $crate::DepType>::collect_all_bindings($field);
                 )?
                 $(
-                    let bindings = if let $crate::std_option_Option::Some(f) = $field_mut {
-                        <$opt_ty as $crate::DepType>::take_added_bindings_and_collect_all(f)
+                    let bindings = if let $crate::std_option_Option::Some(f) = $field {
+                        <$opt_ty as $crate::DepType>::collect_all_bindings(f)
                     } else {
                         $crate::std_vec_Vec::new()
                     };

@@ -28,10 +28,13 @@ pub fn b_immediate(x: BYield<!>) {
 
 pub trait Target<T: Convenient>: DynClone {
     fn execute(&self, state: &mut dyn State, value: T);
-    fn clear(&self, state: &mut dyn State);
 }
 
 clone_trait_object!(<T: Convenient> Target<T>);
+
+pub trait Holder {
+    fn release(&self, state: &mut dyn State);
+}
 
 #[derive(Educe)]
 #[educe(Clone)]
@@ -44,8 +47,6 @@ impl<Context: Clone, T: Convenient> Target<T> for DispatchTarget<Context, T> {
     fn execute(&self, state: &mut dyn State, value: T) {
         let _ = (self.execute)(state, self.context.clone(), value);
     }
-
-    fn clear(&self, _state: &mut dyn State) { }
 }
 
 #[derive(Educe)]
@@ -59,8 +60,6 @@ impl<Context: Clone, T: Convenient> Target<T> for FnTarget<Context, T> {
     fn execute(&self, state: &mut dyn State, value: T) {
         (self.execute)(state, self.context.clone(), value);
     }
-
-    fn clear(&self, _state: &mut dyn State) { }
 }
 
 pub trait AnyHandler: Debug {
@@ -133,7 +132,7 @@ pub struct HandledSource {
 }
 
 trait AnyBindingNode: Downcast {
-    fn unhandle_sources_and_clear_target(&mut self, state: &mut dyn State);
+    fn unhandle_sources_and_release_holder(&mut self, state: &mut dyn State);
 }
 
 impl_downcast!(AnyBindingNode);
@@ -172,17 +171,18 @@ impl_downcast!(AnyBindingNodeSources assoc Value where Value: Convenient);
 struct BindingNode<T: Convenient> {
     sources: Box<dyn AnyBindingNodeSources<Value=T>>,
     target: Option<Box<dyn Target<T>>>,
+    holder: Option<Box<dyn Holder>>,
 }
 
 impl<T: Convenient> AnyBindingNode for BindingNode<T> {
-    fn unhandle_sources_and_clear_target(&mut self, state: &mut dyn State) {
-        self.target.as_ref().map(|x| x.clear(state));
+    fn unhandle_sources_and_release_holder(&mut self, state: &mut dyn State) {
+        self.holder.as_ref().map(|x| x.release(state));
         self.sources.unhandle(state);
     }
 }
 
 macro_attr! {
-    #[derive(Educe, NewtypeComponentId!)]
+    #[derive(Educe, NewtypeComponentId!, Component!)]
     #[educe(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
     pub struct AnyBindingBase(Id<BoxedBindingNode>);
 }
@@ -191,7 +191,7 @@ impl AnyBindingBase {
     pub fn drop_binding(self, state: &mut dyn State) {
         let bindings: &mut Bindings = state.get_mut();
         let mut node = bindings.0.remove(self.0);
-        node.0.unhandle_sources_and_clear_target(state);
+        node.0.unhandle_sources_and_release_holder(state);
     }
 }
 
@@ -206,7 +206,14 @@ impl<T: Convenient> BindingBase<T> {
         let bindings: &mut Bindings = state.get_mut();
         let node = bindings.0[self.0].0.downcast_mut::<BindingNode<T>>().unwrap();
         node.target = Some(target);
-        assert!(node.sources.is_empty(), "set_target/bind should be called before any set_source_*");
+        assert!(node.sources.is_empty(), "set_target should be called before any set_source_*");
+    }
+
+    pub fn set_holder(self, state: &mut dyn State, holder: Box<dyn Holder>) {
+        let bindings: &mut Bindings = state.get_mut();
+        let node = bindings.0[self.0].0.downcast_mut::<BindingNode<T>>().unwrap();
+        node.holder = Some(holder);
+        assert!(node.sources.is_empty(), "set_holder should be called before any set_source_*");
     }
 
     pub fn dispatch<Context: Clone + 'static>(
@@ -231,7 +238,7 @@ impl<T: Convenient> BindingBase<T> {
         let bindings: &mut Bindings = state.get_mut();
         let node = bindings.0.remove(self.0);
         let mut node = node.0.downcast::<BindingNode<T>>().unwrap_or_else(|_| panic!("invalid cast"));
-        node.unhandle_sources_and_clear_target(state);
+        node.unhandle_sources_and_release_holder(state);
     }
 }
 
@@ -256,6 +263,10 @@ impl<T: Convenient> From<Binding<T>> for AnyBindingBase {
 impl<T: Convenient> Binding<T> {
     pub fn set_target(self, state: &mut dyn State, target: Box<dyn Target<T>>) {
         BindingBase::from(self).set_target(state, target);
+    }
+
+    pub fn set_holder(self, state: &mut dyn State, holder: Box<dyn Holder>) {
+        BindingBase::from(self).set_holder(state, holder);
     }
 
     pub fn dispatch<Context: Clone + 'static>(
@@ -389,6 +400,7 @@ macro_rules! binding_n {
                         let node: BindingNode<T> = BindingNode {
                             sources: Box::new(sources),
                             target: None,
+                            holder: None,
                         };
                         (BoxedBindingNode(Box::new(node)), id)
                     });
@@ -420,6 +432,10 @@ macro_rules! binding_n {
 
                 pub fn set_target(self, state: &mut dyn State, target: Box<dyn Target<T>>) {
                     BindingBase::from(self).set_target(state, target);
+                }
+
+                pub fn set_holder(self, state: &mut dyn State, holder: Box<dyn Holder>) {
+                    BindingBase::from(self).set_holder(state, holder);
                 }
 
                 pub fn dispatch<Context: Clone + 'static>(
@@ -638,6 +654,7 @@ macro_rules! binding_n {
                         let node: BindingNode<T> = BindingNode {
                             sources: Box::new(sources),
                             target: None,
+                            holder: None,
                         };
                         (BoxedBindingNode(Box::new(node)), id)
                     });
@@ -646,6 +663,10 @@ macro_rules! binding_n {
 
                 pub fn set_target(self, state: &mut dyn State, target: Box<dyn Target<T>>) {
                     BindingBase::from(self).set_target(state, target);
+                }
+
+                pub fn set_holder(self, state: &mut dyn State, holder: Box<dyn Holder>) {
+                    BindingBase::from(self).set_holder(state, holder);
                 }
 
                 pub fn dispatch<Context: Clone + 'static>(
