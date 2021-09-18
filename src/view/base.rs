@@ -885,7 +885,6 @@ impl View {
         let size_min_max = raw_align_bindings.size_min_max.get_value(state).unwrap_or_default();
         let h_align = raw_align_bindings.h_align.get_value(state).unwrap_or(HAlign::Center);
         let v_align = raw_align_bindings.v_align.get_value(state).unwrap_or(VAlign::Center);
-        self.invalidate_render(state);
         rect = margin.shrink_rect(rect);
         let mut size = size_min_max.min_size.max(rect.size);
         if let Some(max_w) = size_min_max.max_w {
