@@ -190,6 +190,7 @@ impl RequiresStateDrop for ViewTreeImpl {
 }
 
 impl ViewTree {
+    #[allow(clippy::new_ret_no_self)]
     pub fn new<Tag: ComponentId, T, F: FnOnce(Self) -> T>(
         screen: Box<dyn Screen>,
         bindings: &mut Bindings,
@@ -393,6 +394,7 @@ macro_attr! {
 }
 
 impl View {
+    #[allow(clippy::new_ret_no_self)]
     pub fn new<Tag: ComponentId, T>(
         state: &mut dyn State,
         parent: View,
@@ -646,7 +648,7 @@ impl View {
 
     pub fn parent(self, tree: &ViewTree) -> Option<View> { tree.0.get().arena[self.0].parent }
 
-    pub fn self_and_parents<'a>(self, tree: &'a ViewTree) -> impl Iterator<Item=View> + 'a {
+    pub fn self_and_parents(self, tree: &ViewTree) -> impl Iterator<Item=View> + '_ {
         let mut view = Some(self);
         iter::from_fn(move || {
             let parent = view.and_then(|view| view.parent(tree));
@@ -658,7 +660,7 @@ impl View {
 
     pub fn next(self, tree: &ViewTree) -> View { tree.0.get().arena[self.0].next }
 
-    pub fn children<'a>(self, tree: &'a ViewTree) -> impl Iterator<Item=View> + 'a {
+    pub fn children(self, tree: &ViewTree) -> impl Iterator<Item=View> + '_ {
         let last_child = self.last_child(tree);
         let mut view = last_child;
         iter::from_fn(move || {
@@ -809,7 +811,7 @@ impl View {
         let raw_align_bindings = node.raw_align_bindings.as_ref().unwrap();
         let margin = raw_align_bindings.margin;
         let size_min_max = raw_align_bindings.size_min_max;
-        let margin = margin.get_value(state).unwrap_or(Thickness::all(0));
+        let margin = margin.get_value(state).unwrap_or_default();
         let size_min_max = size_min_max.get_value(state).unwrap_or_default();
         size.0.as_mut().map(|w| *w = margin.shrink_band_w(*w));
         size.1.as_mut().map(|h| *h = margin.shrink_band_h(*h));
@@ -886,7 +888,7 @@ impl View {
         let panel = node.panel.as_ref().map(|x| x.behavior());
         let decorator = node.decorator.as_ref().map(|x| x.behavior());
         let raw_align_bindings = node.raw_align_bindings.clone().unwrap();
-        let margin = raw_align_bindings.margin.get_value(state).unwrap_or(Thickness::all(0));
+        let margin = raw_align_bindings.margin.get_value(state).unwrap_or_default();
         let size_min_max = raw_align_bindings.size_min_max.get_value(state).unwrap_or_default();
         let h_align = raw_align_bindings.h_align.get_value(state).unwrap_or(HAlign::Center);
         let v_align = raw_align_bindings.v_align.get_value(state).unwrap_or(VAlign::Center);
@@ -1061,7 +1063,7 @@ impl DecoratorBehavior for RootDecoratorBehavior {
         let bindings = view.decorator_bindings(tree).downcast_ref::<RootDecoratorBindings>().unwrap();
         let fg = bindings.fg.get_value(state).unwrap_or(Color::White);
         let bg = bindings.bg.get_value(state).unwrap_or(None);
-        let attr = bindings.attr.get_value(state).unwrap_or(Attr::empty());
+        let attr = bindings.attr.get_value(state).unwrap_or_else(Attr::empty);
         let fill = bindings.fill.get_value(state).unwrap_or(Cow::Borrowed(" "));
         port.fill(|port, p| port.out(p, fg, bg, attr, &fill));
     }

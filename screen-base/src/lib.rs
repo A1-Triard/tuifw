@@ -5,7 +5,7 @@
 #![doc(test(attr(deny(warnings))))]
 #![doc(test(attr(allow(dead_code))))]
 #![doc(test(attr(allow(unused_variables))))]
-
+#![allow(clippy::collapsible_else_if)]
 #![allow(clippy::collapsible_if)]
 #![allow(clippy::many_single_char_names)]
 #![allow(clippy::too_many_arguments)]
@@ -255,7 +255,7 @@ impl HBand {
     pub fn b(self) -> i16 { self.t.wrapping_add(self.h.get()) }
 }
 
-#[derive(Eq, PartialEq, Debug, Hash, Clone, Copy)]
+#[derive(Eq, PartialEq, Debug, Hash, Clone, Copy, Default)]
 pub struct Thickness {
     l: i32,
     r: i32,
@@ -272,6 +272,9 @@ impl Thickness {
         Thickness { l, t, r, b }
     }
 
+    /// # Safety
+    ///
+    /// All passed parameters should be in the `-(2¹⁶ - 1) ..= (2¹⁶ - 1)` range.
     pub const unsafe fn new_unchecked(l: i32, t: i32, r: i32, b: i32) -> Self {
         Thickness { l, t, r, b }
     }
@@ -422,12 +425,6 @@ impl Thickness {
                 other + this
             }
         }
-    }
-}
-
-impl Default for Thickness {
-    fn default() -> Self {
-        Thickness { l: 0, t: 0, r: 0, b: 0 }
     }
 }
 

@@ -84,6 +84,7 @@ impl WidgetBehavior for WindowBehavior {
 impl Window {
     const BEHAVIOR: WindowBehavior = WindowBehavior;
 
+    #[allow(clippy::new_ret_no_self)]
     pub fn new(state: &mut dyn State) -> Widget {
         Widget::new(state, Window::new_priv())
     }

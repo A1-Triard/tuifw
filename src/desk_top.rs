@@ -70,6 +70,7 @@ impl WidgetBehavior for DeskTopBehavior {
 impl DeskTop {
     const BEHAVIOR: DeskTopBehavior = DeskTopBehavior;
 
+    #[allow(clippy::new_ret_no_self)]
     pub fn new(state: &mut dyn State) -> Widget {
         Widget::new(state, DeskTop::new_priv())
     }

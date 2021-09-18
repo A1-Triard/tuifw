@@ -4,9 +4,10 @@
 #![doc(test(attr(deny(warnings))))]
 #![doc(test(attr(allow(dead_code))))]
 #![doc(test(attr(allow(unused_variables))))]
+#![allow(clippy::blocks_in_if_conditions)]
+#![allow(clippy::collapsible_else_if)]
 #![allow(clippy::collapsible_if)]
 #![allow(clippy::type_complexity)]
-#![allow(clippy::blocks_in_if_conditions)]
 
 use components_arena::{Arena, Component, ComponentId, Id, NewtypeComponentId, RawId};
 use dyn_context::state::State;

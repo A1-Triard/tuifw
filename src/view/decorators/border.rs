@@ -207,7 +207,7 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
         let bg = bindings.bg.get_value(state).unwrap_or_default();
         let attr = bindings.attr.get_value(state).unwrap_or_default();
         if !fill.is_empty() {
-            port.fill(|port, p| port.out(p, fg, bg, attr, &fill));
+            port.fill(|port, p| port.out(p, fg, bg, attr, fill));
         }
         if !l.is_empty() {
             for y in 0 .. size.y as u16 {

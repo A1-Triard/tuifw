@@ -333,8 +333,8 @@ impl Screen {
             VK_OEM_MINUS if ctrl => Some(Event::Key(count, Key::Ctrl(Ctrl::Underscore))),
             VK_OEM_2 if ctrl => Some(Event::Key(count, Key::Backspace)),
             _ => {
-                assert!(c < 0xD800 || c >= 0xDC00);
-                let c = if c >= 0xDC00 && c < 0xE000 {
+                assert!(!(0xD800 .. 0xDC00).contains(&c));
+                let c = if (0xDC00 .. 0xE000).contains(&c) {
                     assert_eq!(count.get(), 1);
                     let mut input = INPUT_RECORD {
                         EventType: 0,
@@ -351,7 +351,7 @@ impl Screen {
                     assert!(e.bKeyDown != 0);
                     assert_eq!(e.wRepeatCount, 1);
                     let h = *unsafe { e.uChar.UnicodeChar() };
-                    assert!(h >= 0xD800 && h < 0xDC00);
+                    assert!((0xD800 .. 0xDC00).contains(&h));
                     ((h as u32 - 0xD800) << 10) | (c as u32 - 0xDC00)
                 } else {
                     c as u32
@@ -372,6 +372,7 @@ impl Screen {
 }
 
 impl Drop for Screen {
+    #[allow(clippy::panicking_unwrap)]
     fn drop(&mut self) {
         let e = unsafe { self.drop_raw() };
         if e.is_err() && !thread::panicking() { e.unwrap(); }
