@@ -162,7 +162,6 @@ impl Npc {
     }
 }
 
-#[derive(Debug)]
 struct Game {
     items: Arena<ItemData>,
     npcs: Arena<NpcComponent>,
