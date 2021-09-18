@@ -91,7 +91,7 @@ fn main() {
                     -Vector { x: 0, y: n.get() as i16 },
                 (n, Key::Down) | (n, Key::Char('j')) =>
                     Vector { x: 0, y: n.get() as i16 },
-                (_, Key::Escape) => { input.mark_as_handled(); return ViewTree::quit(state); },
+                (_, Key::Escape) => { input.mark_as_handled(); ViewTree::quit(state); return b_continue(); },
                 _ => return b_continue(),
             };
             input.mark_as_handled();

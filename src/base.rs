@@ -1,4 +1,4 @@
-use crate::view::{Layout, View, ViewAlign, ViewBase, ViewTree, Decorator};
+use crate::view::{Layout, View, ViewAlign, ViewBase, ViewInput, ViewTree, Decorator};
 use components_arena::{Arena, Component, Id, NewtypeComponentId};
 use debug_panic::debug_panic;
 use dep_obj::{Change, DepObjId, DepType, dep_obj, dep_type, Convenient, DepProp, DepObjBaseBuilder};
@@ -98,6 +98,10 @@ impl WidgetTree {
         self.0.get().view_tree.root()
     }
 
+    pub fn quit(state: &mut dyn State) {
+        ViewTree::quit(state);
+    }
+
     pub fn update(state: &mut dyn State, wait: bool) -> Result<bool, Box<dyn Any>> {
         ViewTree::update(state, wait)
     }
@@ -150,6 +154,13 @@ impl Widget {
             assert!(tree.0.get_mut().widget_arena[self.0].view.replace(view).is_none(), "Widget already loaded");
         }
         init(state, view);
+
+        let input_binding = Binding1::new(state, (), |(), input: Option<ViewInput>| input);
+        input_binding.dispatch(state, self, |state, widget, input|
+            WidgetBase::VIEW_INPUT.raise(state, widget.base(), input)
+        );
+        input_binding.set_source_1(state, &mut ViewBase::INPUT.source(view.base()));
+
         WidgetBase::VIEW.set(state, self.base(), Some(view))
     }
 
@@ -311,5 +322,6 @@ dep_type! {
     #[derive(Debug)]
     pub struct WidgetBase in Widget {
         view: Option<View> = None,
+        view_input yield ViewInput,
     }
 }

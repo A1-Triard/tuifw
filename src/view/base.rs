@@ -1,7 +1,7 @@
 use components_arena::{Arena, Component, ComponentId, Id, NewtypeComponentId, RawId};
 use debug_panic::debug_panic;
 use dep_obj::{DepObjBaseBuilder, DepObjIdBase, DepType, dep_obj, dep_type_with_builder, DepEventArgs, Convenient, DepProp};
-use dep_obj::binding::{Binding, Binding0, Binding1, Binding5, Bindings, b_immediate, BYield, b_continue};
+use dep_obj::binding::{Binding, Binding0, Binding1, Binding5, Bindings, b_immediate};
 use downcast_rs::{Downcast, impl_downcast};
 use dyn_clone::{DynClone, clone_trait_object};
 use dyn_context::state::{SelfState, State, StateExt, StateRefMut, RequiresStateDrop, StateDrop};
@@ -266,10 +266,9 @@ impl ViewTree {
         <StateDrop<ViewTreeImpl>>::drop_self(state);
     }
 
-    pub fn quit<X: Convenient>(state: &mut dyn State) -> BYield<X> {
+    pub fn quit(state: &mut dyn State) {
         let tree: &mut ViewTree = state.get_mut();
         tree.0.get_mut().quit = true;
-        b_continue()
     }
 
     fn window_tree(&mut self) -> &mut WindowTree {
