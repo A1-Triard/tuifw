@@ -1322,7 +1322,7 @@ struct DepEventHandledSource<Owner: DepType, ArgsType: DepEventArgs> {
 }
 
 impl<Owner: DepType, ArgsType: DepEventArgs> HandlerId for DepEventHandledSource<Owner, ArgsType> {
-    fn unhandle(&self, state: &mut dyn State) {
+    fn unhandle(&self, state: &mut dyn State, _dropping_binding: AnyBindingBase) {
         let mut obj = self.obj.get_mut(state);
         let entry_mut = self.event.entry_mut(&mut obj);
         entry_mut.handlers.remove(self.handler_id);
@@ -1364,7 +1364,7 @@ struct DepPropHandledValueSource<Owner: DepType, PropType: Convenient> {
 }
 
 impl<Owner: DepType, PropType: Convenient> HandlerId for DepPropHandledValueSource<Owner, PropType> {
-    fn unhandle(&self, state: &mut dyn State) {
+    fn unhandle(&self, state: &mut dyn State, _dropping_binding: AnyBindingBase) {
         let mut obj = self.obj.get_mut(state);
         let entry_mut = self.prop.entry_mut(&mut obj);
         entry_mut.handlers.value_handlers.remove(self.handler_id);
@@ -1382,7 +1382,7 @@ struct DepPropHandledChangeInitialSource<Owner: DepType, PropType: Convenient> {
 }
 
 impl<Owner: DepType, PropType: Convenient> HandlerId for DepPropHandledChangeInitialSource<Owner, PropType> {
-    fn unhandle(&self, state: &mut dyn State) {
+    fn unhandle(&self, state: &mut dyn State, _dropping_binding: AnyBindingBase) {
         let mut obj = self.obj.get_mut(state);
         let entry_mut = self.prop.entry_mut(&mut obj);
         let handler = entry_mut.handlers.change_initial_handler.take();
@@ -1401,7 +1401,7 @@ struct DepPropHandledChangeFinalSource<Owner: DepType, PropType: Convenient> {
 }
 
 impl<Owner: DepType, PropType: Convenient> HandlerId for DepPropHandledChangeFinalSource<Owner, PropType> {
-    fn unhandle(&self, state: &mut dyn State) {
+    fn unhandle(&self, state: &mut dyn State, _dropping_binding: AnyBindingBase) {
         let mut obj = self.obj.get_mut(state);
         let entry_mut = self.prop.entry_mut(&mut obj);
         let handler = entry_mut.handlers.change_final_handler.take();
@@ -1421,7 +1421,7 @@ struct DepPropHandledChangeSource<Owner: DepType, PropType: Convenient> {
 }
 
 impl<Owner: DepType, PropType: Convenient> HandlerId for DepPropHandledChangeSource<Owner, PropType> {
-    fn unhandle(&self, state: &mut dyn State) {
+    fn unhandle(&self, state: &mut dyn State, _dropping_binding: AnyBindingBase) {
         let mut obj = self.obj.get_mut(state);
         let entry_mut = self.prop.entry_mut(&mut obj);
         entry_mut.handlers.change_handlers.remove(self.handler_id);
@@ -1621,7 +1621,7 @@ struct DepVecChangedHandledSource<Owner: DepType, ItemType: Convenient> {
 }
 
 impl<Owner: DepType, ItemType: Convenient> HandlerId for DepVecChangedHandledSource<Owner, ItemType> {
-    fn unhandle(&self, state: &mut dyn State) {
+    fn unhandle(&self, state: &mut dyn State, _dropping_binding: AnyBindingBase) {
         let mut obj = self.obj.get_mut(state);
         let entry_mut = self.vec.entry_mut(&mut obj);
         entry_mut.handlers.changed_handlers.remove(self.handler_id);
@@ -1636,11 +1636,14 @@ struct DepVecItemHandledInitialFinalSource<Owner: DepType, ItemType: Convenient>
 }
 
 impl<Owner: DepType, ItemType: Convenient> HandlerId for DepVecItemHandledInitialFinalSource<Owner, ItemType> {
-    fn unhandle(&self, state: &mut dyn State) {
+    fn unhandle(&self, state: &mut dyn State, dropping_binding: AnyBindingBase) {
         let mut obj = self.obj.get_mut(state);
         let entry_mut = self.vec.entry_mut(&mut obj);
-        let handler = entry_mut.handlers.item_initial_final_handler.take();
-        debug_assert!(handler.is_some());
+        let handler = entry_mut.handlers.item_initial_final_handler.take().unwrap();
+        handler.update.filter(|&x| {
+            let x: AnyBindingBase = x.into();
+            x != dropping_binding
+        }).map(|binding| binding.drop_binding(state));
     }
 }
 
@@ -1653,10 +1656,14 @@ struct DepVecItemHandledSource<Owner: DepType, ItemType: Convenient> {
 }
 
 impl<Owner: DepType, ItemType: Convenient> HandlerId for DepVecItemHandledSource<Owner, ItemType> {
-    fn unhandle(&self, state: &mut dyn State) {
+    fn unhandle(&self, state: &mut dyn State, dropping_binding: AnyBindingBase) {
         let mut obj = self.obj.get_mut(state);
         let entry_mut = self.vec.entry_mut(&mut obj);
-        entry_mut.handlers.item_handlers.remove(self.handler_id);
+        let handler = entry_mut.handlers.item_handlers.remove(self.handler_id);
+        handler.update.filter(|&x| {
+            let x: AnyBindingBase = x.into();
+            x != dropping_binding
+        }).map(|binding| binding.drop_binding(state));
     }
 }
 

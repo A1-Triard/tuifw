@@ -120,7 +120,7 @@ pub trait Source: Debug {
 }
 
 pub trait HandlerId: Debug {
-    fn unhandle(&self, state: &mut dyn State);
+    fn unhandle(&self, state: &mut dyn State, dropping_binding: AnyBindingBase);
 }
 
 #[derive(Educe)]
@@ -132,7 +132,7 @@ pub struct HandledSource {
 }
 
 trait AnyBindingNode: Downcast {
-    fn unhandle_sources_and_release_holder(&mut self, state: &mut dyn State);
+    fn unhandle_sources_and_release_holder(&mut self, state: &mut dyn State, dropping_binding: AnyBindingBase);
 }
 
 impl_downcast!(AnyBindingNode);
@@ -161,7 +161,7 @@ impl Drop for Bindings {
 
 trait AnyBindingNodeSources: Downcast {
     type Value: Convenient;
-    fn unhandle(&mut self, state: &mut dyn State);
+    fn unhandle(&mut self, state: &mut dyn State, dropping_binding: AnyBindingBase);
     fn get_value(&self) -> Option<Self::Value>;
     fn is_empty(&self) -> bool;
 }
@@ -175,9 +175,9 @@ struct BindingNode<T: Convenient> {
 }
 
 impl<T: Convenient> AnyBindingNode for BindingNode<T> {
-    fn unhandle_sources_and_release_holder(&mut self, state: &mut dyn State) {
+    fn unhandle_sources_and_release_holder(&mut self, state: &mut dyn State, dropping_binding: AnyBindingBase) {
         self.holder.as_ref().map(|x| x.release(state));
-        self.sources.unhandle(state);
+        self.sources.unhandle(state, dropping_binding);
     }
 }
 
@@ -191,7 +191,7 @@ impl AnyBindingBase {
     pub fn drop_binding(self, state: &mut dyn State) {
         let bindings: &mut Bindings = state.get_mut();
         let mut node = bindings.0.remove(self.0);
-        node.0.unhandle_sources_and_release_holder(state);
+        node.0.unhandle_sources_and_release_holder(state, self);
     }
 }
 
@@ -235,10 +235,7 @@ impl<T: Convenient> BindingBase<T> {
     }
 
     pub fn drop_binding(self, state: &mut dyn State) {
-        let bindings: &mut Bindings = state.get_mut();
-        let node = bindings.0.remove(self.0);
-        let mut node = node.0.downcast::<BindingNode<T>>().unwrap_or_else(|_| panic!("invalid cast"));
-        node.unhandle_sources_and_release_holder(state);
+        AnyBindingBase::from(self).drop_binding(state);
     }
 }
 
@@ -288,7 +285,7 @@ impl<T: Convenient> Binding<T> {
     }
 
     pub fn drop_binding(self, state: &mut dyn State) {
-        BindingBase::from(self).drop_binding(state);
+        AnyBindingBase::from(self).drop_binding(state);
     }
 
     pub fn get_value(self, state: &dyn State) -> Option<T> {
@@ -352,10 +349,10 @@ macro_rules! binding_n {
                 }
 
                 #[allow(unused_variables)]
-                fn unhandle(&mut self, state: &mut dyn State) {
+                fn unhandle(&mut self, state: &mut dyn State, dropping_binding: AnyBindingBase) {
                     $(
                         if let Some(source) = self. [< source_ $i >] .take() {
-                            source.0.unhandle(state);
+                            source.0.unhandle(state, dropping_binding);
                         }
                     )*
                 }
@@ -457,7 +454,7 @@ macro_rules! binding_n {
                 }
 
                 pub fn drop_binding(self, state: &mut dyn State) {
-                    BindingBase::from(self).drop_binding(state);
+                    AnyBindingBase::from(self).drop_binding(state);
                 }
 
                 $(
@@ -598,10 +595,10 @@ macro_rules! binding_n {
                 }
 
                 #[allow(unused_variables)]
-                fn unhandle(&mut self, state: &mut dyn State) {
+                fn unhandle(&mut self, state: &mut dyn State, dropping_binding: AnyBindingBase) {
                     $(
                         if let Some(source) = self. [< source_ $i >] .take() {
-                            source.0.unhandle(state);
+                            source.0.unhandle(state, dropping_binding);
                         }
                     )*
                 }
@@ -688,7 +685,7 @@ macro_rules! binding_n {
                 }
 
                 pub fn drop_binding(self, state: &mut dyn State) {
-                    BindingBase::from(self).drop_binding(state);
+                    AnyBindingBase::from(self).drop_binding(state);
                 }
 
                 pub fn get_value(self, state: &dyn State) -> Option<T> {
