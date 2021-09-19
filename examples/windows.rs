@@ -56,8 +56,8 @@ fn main() {
         input.mark_as_handled();
         window.focus(app);
     });
-    focus_1.set_source_1(app, &mut WidgetBase::VIEW_INPUT.source(desk_top.base()));
     desk_top.base().add_binding(app, focus_1);
+    focus_1.set_source_1(app, &mut WidgetBase::VIEW_INPUT.source(desk_top.base()));
 
     let quit = Binding1::new(app, (), |(), input: Option<ViewInput>|
         input.filter(|input| input.key().1 == Key::Escape)
@@ -66,8 +66,8 @@ fn main() {
         input.mark_as_handled();
         WidgetTree::quit(app);
     });
-    quit.set_source_1(app, &mut WidgetBase::VIEW_INPUT.source(desk_top.base()));
     desk_top.base().add_binding(app, quit);
+    quit.set_source_1(app, &mut WidgetBase::VIEW_INPUT.source(desk_top.base()));
     while WidgetTree::update(app, true).unwrap() { }
     WidgetTree::drop_self(app);
 }

@@ -71,6 +71,8 @@ impl DecoratorBindings for LineDecoratorBindings { }
 struct LineDecoratorBehavior;
 
 impl DecoratorBehavior for LineDecoratorBehavior {
+    fn ty(&self) -> &'static str { "Line" }
+
     fn children_measure_size(
         &self,
         _view: View,

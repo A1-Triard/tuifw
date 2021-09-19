@@ -66,6 +66,8 @@ impl DecoratorBindings for LabelDecoratorBindings { }
 struct LabelDecoratorBehavior;
 
 impl DecoratorBehavior for LabelDecoratorBehavior {
+    fn ty(&self) -> &'static str { "Label" }
+
     fn children_measure_size(
         &self,
         _view: View,

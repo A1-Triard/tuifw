@@ -62,7 +62,6 @@ impl WidgetBehavior for DeskTopBehavior {
         });
         windows.set_source_2(state, &mut DeskTop::WINDOWS.item_initial_final_source_with_update(windows, widget.obj()));
         windows.set_source_1(state, &mut WidgetBase::VIEW.change_initial_source(widget.base()));
-        widget.obj::<DeskTop>().add_binding(state, windows);
     }
 
     fn drop_bindings(&self, _widget: Widget, _state: &mut dyn State) { }

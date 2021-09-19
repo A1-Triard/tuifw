@@ -89,6 +89,8 @@ impl DecoratorBindings for BorderDecoratorBindings { }
 struct BorderDecoratorBehavior;
 
 impl DecoratorBehavior for BorderDecoratorBehavior {
+    fn ty(&self) -> &'static str { "Border" }
+
     fn children_measure_size(
         &self,
         view: View,

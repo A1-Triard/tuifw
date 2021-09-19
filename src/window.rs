@@ -74,8 +74,8 @@ impl WidgetBehavior for WindowBehavior {
                 Cow::Borrowed(if focused { "═" } else { "─" })
             );
         });
-        init_new_view.set_source_1(state, &mut WidgetBase::VIEW.change_initial_source(widget.base()));
         widget.obj::<Window>().add_binding(state, init_new_view);
+        init_new_view.set_source_1(state, &mut WidgetBase::VIEW.change_initial_source(widget.base()));
     }
 
     fn drop_bindings(&self, _widget: Widget, _state: &mut dyn State) { }

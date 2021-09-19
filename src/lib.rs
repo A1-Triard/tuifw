@@ -5,7 +5,7 @@
 #![feature(never_type)]
 #![feature(option_result_unwrap_unchecked)]
 
-#![deny(warnings)]
+//#![deny(warnings)]
 #![doc(test(attr(deny(warnings))))]
 #![doc(test(attr(allow(dead_code))))]
 #![doc(test(attr(allow(unused_variables))))]

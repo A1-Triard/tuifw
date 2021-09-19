@@ -191,7 +191,7 @@ impl Window {
         invalidate_rect(tree.invalidated(), screen_bounds);
     }
 
-    pub fn drop(self, tree: &mut WindowTree) {
+    pub fn drop_window(self, tree: &mut WindowTree) {
         let node = tree.arena.remove(self.0);
         let parent = node.parent.unwrap_or_else(|| unsafe { unreachable_unchecked() });
         if tree.arena[parent].last_child.unwrap_or_else(|| unsafe { unreachable_unchecked() }) == self.0 {

@@ -64,6 +64,8 @@ pub trait PanelBindings: Downcast + Debug + Send + Sync { }
 impl_downcast!(PanelBindings);
 
 pub trait DecoratorBehavior {
+    fn ty(&self) -> &'static str;
+
     fn children_measure_size(
         &self,
         view: View,
@@ -257,7 +259,8 @@ impl ViewTree {
             let decorator_bindings = decorator_behavior.init_bindings(root, state);
             {
                 let tree: &mut ViewTree = state.get_mut();
-                tree.0.get_mut().arena[root.0].decorator_bindings = Some(decorator_bindings);
+                let ok = tree.0.get_mut().arena[root.0].decorator_bindings.replace(decorator_bindings).is_none();
+                debug_assert!(ok);
             }
         }, &mut tree);
         result(tree)
@@ -485,7 +488,6 @@ impl View {
     }
 
     fn drop_bindings(self, state: &mut dyn State) {
-        self.drop_bindings_priv(state);
         self.drop_decorator_bindings(state);
         self.drop_layout_bindings(state);
         self.drop_panel_bindings(state);
@@ -494,25 +496,52 @@ impl View {
             tree.0.get_mut().arena[self.0].raw_align_bindings.take().unwrap()
         };
         raw_align_bindings.drop_bindings(state);
+        self.drop_bindings_priv(state);
+    }
+
+    fn drop_children(last_child: Option<View>, state: &mut dyn State) {
+        if let Some(last_child) = last_child {
+            let mut child = last_child;
+            loop {
+                let node = {
+                    let tree: &mut ViewTree = state.get_mut();
+                    tree.0.get_mut().arena.remove(child.0)
+                };
+                Self::drop_children(node.last_child, state);
+                child = node.next;
+                if child == last_child { break; }
+            }
+        }
     }
 
     pub fn drop_view(self, state: &mut dyn State) {
-        let tree: &ViewTree = state.get();
-        let parent = self.parent(tree).expect("root cannot be dropped");
-        self.drop_bindings(state);
+        self.drop_bindings_tree(state);
+        let node = {
+            let tree: &mut ViewTree = state.get_mut();
+            let node = tree.0.get_mut().arena.remove(self.0);
+            node.window.map(|window| window.drop_window(tree.window_tree()));
+            node
+        };
+        Self::drop_children(node.last_child, state);
+        let parent = node.parent.expect("root cannot be dropped");
         {
             let tree: &mut ViewTree = state.get_mut();
-            let last_child = tree.0.get_mut().arena[parent.0].last_child.unwrap();
-            let mut child = last_child;
-            loop {
-                child = tree.0.get().arena[child.0].next;
-                if tree.0.get().arena[child.0].next == self {
-                    tree.0.get_mut().arena[child.0].next = replace(&mut tree.0.get_mut().arena[self.0].next, self);
-                    break;
+            let parent = &mut tree.0.get_mut().arena[parent.0];
+            let last_parent_child = parent.last_child.unwrap();
+            if last_parent_child == self {
+                parent.last_child = None;
+            } else {
+                let mut parent_child = last_parent_child;
+                loop {
+                    let parent_child_node = &mut tree.0.get_mut().arena[parent_child.0];
+                    if parent_child_node.next == self {
+                        parent_child_node.next = node.next;
+                        break;
+                    }
+                    parent_child = parent_child_node.next;
+                    assert_ne!(parent_child, last_parent_child);
                 }
-                assert_ne!(child, last_child);
             }
-            tree.0.get_mut().arena.remove(self.0);
         }
     }
 
@@ -577,7 +606,7 @@ impl View {
         if let Some(decorator) = decorator {
             decorator.drop_bindings(self, state, bindings.unwrap());
         } else {
-            assert!(bindings.is_none());
+            debug_assert!(bindings.is_none());
         }
     }
 
@@ -604,7 +633,8 @@ impl View {
         let bindings = behavior.init_bindings(self, state);
         {
             let tree: &mut ViewTree = state.get_mut();
-            tree.0.get_mut().arena[self.0].decorator_bindings = Some(bindings);
+            let ok = tree.0.get_mut().arena[self.0].decorator_bindings.replace(bindings).is_none();
+            debug_assert!(ok);
         }
     }
 
@@ -1007,6 +1037,8 @@ impl Decorator for RootDecorator {
 struct RootDecoratorBehavior;
 
 impl DecoratorBehavior for RootDecoratorBehavior {
+    fn ty(&self) -> &'static str { "Root" }
+
     fn children_measure_size(
         &self,
         _view: View,
