@@ -163,6 +163,7 @@ impl Widget {
         input_binding.dispatch(state, self, |state, widget, input|
             WidgetBase::VIEW_INPUT.raise(state, widget.base(), input)
         );
+        self.base().add_binding(state, input_binding);
         input_binding.set_source_1(state, &mut ViewBase::INPUT.source(view.base()));
 
         WidgetBase::VIEW.set(state, self.base(), Some(view))
