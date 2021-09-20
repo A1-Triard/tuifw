@@ -151,23 +151,20 @@ macro_attr! {
 }
 
 impl Window {
-    #[allow(clippy::new_ret_no_self)]
-    pub fn new<Tag: ComponentId, T>(
+    pub fn new(
         tree: &mut WindowTree,
         parent: Option<Self>,
         bounds: Rect,
-        tag: impl FnOnce(Self) -> (Tag, T)
-    ) -> T {
+    ) -> Window {
         let parent = parent.map_or(tree.root, |w| w.0);
-        let (window, result) = tree.arena.insert(|window| {
-            let (tag, result) = tag(Window(window));
+        let window = tree.arena.insert(|window| {
             (WindowNode {
                 parent: Some(parent),
                 next: window,
                 last_child: None,
                 bounds,
-                tag: Some(tag.into_raw())
-            }, (window, result))
+                tag: None
+            }, window)
         });
         if let Some(prev) = tree.arena[parent].last_child.replace(window) {
             let next = replace(&mut tree.arena[prev].next, window);
@@ -175,11 +172,19 @@ impl Window {
         }
         let screen_bounds = bounds.offset(offset_from_root(parent, tree));
         invalidate_rect(tree.invalidated(), screen_bounds);
-        result
+        Window(window)
     }
 
-    pub fn tag<Tag: ComponentId>(self, tree: &WindowTree) -> Tag {
-        Tag::from_raw(tree.arena[self.0].tag.unwrap_or_else(|| unsafe { unreachable_unchecked() }))
+    pub fn set_tag<Tag: ComponentId>(self, tree: &mut WindowTree, tag: Tag) {
+        tree.arena[self.0].tag = Some(tag.into_raw());
+    }
+
+    pub fn reset_tag(self, tree: &mut WindowTree) {
+        tree.arena[self.0].tag = None;
+    }
+
+    pub fn tag<Tag: ComponentId>(self, tree: &WindowTree) -> Option<Tag> {
+        tree.arena[self.0].tag.map(Tag::from_raw)
     }
 
     pub fn move_(self, tree: &mut WindowTree, bounds: Rect) {

@@ -73,7 +73,7 @@ fn main() {
     let padding = Thickness::align(Vector { x: 13, y: 7 }, screen.size(), HAlign::Center, VAlign::Center);
     let bounds = padding.shrink_rect(Rect { tl: Point { x: 0, y: 0 }, size: screen.size() });
     let bindings = &mut Bindings::new();
-    let tree = &mut ViewTree::new(screen, bindings, |_| ((), |tree| tree));
+    let tree = &mut ViewTree::new(screen, bindings);
     tree.merge_mut_and_then(|state| {
         let border = build(state, bounds);
         let input_binding = BindingExt2::new(state, (), |

@@ -130,7 +130,7 @@ macro_attr! {
     #[derive(Debug)]
     #[derive(Component!)]
     struct ViewNode {
-        tag: RawId,
+        tag: Option<RawId>,
         decorator: Option<Box<dyn Decorator>>,
         decorator_bindings: Option<Box<dyn DecoratorBindings>>,
         window: Option<Window>,
@@ -192,21 +192,18 @@ impl RequiresStateDrop for ViewTreeImpl {
 }
 
 impl ViewTree {
-    #[allow(clippy::new_ret_no_self)]
-    pub fn new<Tag: ComponentId, T, F: FnOnce(Self) -> T>(
+    pub fn new(
         screen: Box<dyn Screen>,
         bindings: &mut Bindings,
-        root_tag: impl FnOnce(View) -> (Tag, F)
-    ) -> T {
+    ) -> ViewTree {
         let mut arena = Arena::new();
-        let (result, window_tree, root, decorator_behavior) = arena.insert(|view| {
+        let (window_tree, root, decorator_behavior) = arena.insert(|view| {
             let window_tree = WindowTree::new(screen, render_view);
             let screen_size = window_tree.screen_size();
             let decorator = RootDecorator::new_priv();
             let decorator_behavior = decorator.behavior();
-            let (tag, result) = root_tag(View(view));
             (ViewNode {
-                tag: tag.into_raw(),
+                tag: None,
                 base: ViewBase::new_priv(),
                 align: None,
                 decorator: Some(Box::new(decorator)),
@@ -224,7 +221,7 @@ impl ViewTree {
                 desired_size: screen_size,
                 arrange_bounds: Some(Rect { tl: Point { x: 0, y: 0 }, size: screen_size }),
                 render_bounds: Rect { tl: Point { x: 0, y: 0 }, size: screen_size },
-            }, (result, window_tree, View(view), decorator_behavior))
+            }, (window_tree, View(view), decorator_behavior))
         });
         let screen_size = window_tree.screen_size();
         let mut tree = ViewTree(StateDrop::new(ViewTreeImpl {
@@ -263,7 +260,7 @@ impl ViewTree {
                 debug_assert!(ok);
             }
         }, &mut tree);
-        result(tree)
+        tree
     }
 
     pub fn drop_self(state: &mut dyn State) {
@@ -375,7 +372,9 @@ fn render_view(
     state: &mut dyn State,
 ) {
     let view_tree: &ViewTree = state.get();
-    let view: View = window.map(|window| window.tag(tree)).unwrap_or(view_tree.0.get().root);
+    let view: View = window
+        .map(|window| window.tag(tree).expect("Window is not bound to a View"))
+        .unwrap_or(view_tree.0.get().root);
     view_tree.0.get().arena[view.0].decorator.as_ref().unwrap().behavior().render(view, state, port);
 }
 
@@ -397,18 +396,15 @@ macro_attr! {
 }
 
 impl View {
-    #[allow(clippy::new_ret_no_self)]
-    pub fn new<Tag: ComponentId, T>(
+    pub fn new(
         state: &mut dyn State,
         parent: View,
-        tag: impl FnOnce(View) -> (Tag, T)
-    ) -> T {
-        let (view, result) = {
+    ) -> View {
+        let view = {
             let tree: &mut ViewTree = state.get_mut();
-            let (view, result) = tree.0.get_mut().arena.insert(|view| {
-                let (tag, result) = tag(View(view));
+            let view = tree.0.get_mut().arena.insert(|view| {
                 (ViewNode {
-                    tag: tag.into_raw(),
+                    tag: None,
                     base: ViewBase::new_priv(),
                     align: Some(ViewAlign::new_priv()),
                     decorator: None,
@@ -426,14 +422,14 @@ impl View {
                     desired_size: Vector::null(),
                     arrange_bounds: Some(Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() }),
                     render_bounds: Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() },
-                }, (view, result))
+                }, view)
             });
             let view = View(view);
             if let Some(prev) = tree.0.get_mut().arena[parent.0].last_child.replace(view) {
                 let next = replace(&mut tree.0.get_mut().arena[prev.0].next, view);
                 tree.0.get_mut().arena[view.0].next = next;
             }
-            (view, result)
+            view
         };
         let size_min_max = Binding5::new(state, (), |(),
             w: Option<i16>,
@@ -470,7 +466,7 @@ impl View {
                 v_align: v_align.into(),
             });
         }
-        result
+        view
     }
 
     fn drop_bindings_tree(self, state: &mut dyn State) {
@@ -545,8 +541,18 @@ impl View {
         }
     }
 
-    pub fn tag<Tag: ComponentId>(self, tree: &ViewTree) -> Tag {
-        Tag::from_raw(tree.0.get().arena[self.0].tag)
+    pub fn set_tag<Tag: ComponentId>(self, state: &mut dyn State, tag: Tag) {
+        let tree: &mut ViewTree = state.get_mut();
+        tree.0.get_mut().arena[self.0].tag = Some(tag.into_raw());
+    }
+
+    pub fn reset_tag(self, state: &mut dyn State) {
+        let tree: &mut ViewTree = state.get_mut();
+        tree.0.get_mut().arena[self.0].tag = None;
+    }
+
+    pub fn tag<Tag: ComponentId>(self, tree: &ViewTree) -> Option<Tag> {
+        tree.0.get().arena[self.0].tag.map(Tag::from_raw)
     }
 
     pub fn build<'a>(
@@ -625,8 +631,8 @@ impl View {
                 tree.window_tree(),
                 parent_window,
                 render_bounds,
-                |window| (self, window)
             );
+            window.set_tag(tree.window_tree(), self);
             let ok = tree.0.get_mut().arena[self.0].window.replace(window).is_none();
             debug_assert!(ok);
         }
