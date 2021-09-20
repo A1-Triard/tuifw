@@ -298,19 +298,17 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
         bg.set_target_fn(state, view, |state, view, _| view.invalidate_render(state));
         fg.set_target_fn(state, view, |state, view, _| view.invalidate_render(state));
         attr.set_target_fn(state, view, |state, view, _| view.invalidate_render(state));
-        tl.set_target_fn(state, view, |state, view, _| {
-            view.invalidate_rect(state, Rect {
-                tl: Point { x: 0, y: 0 },
-                size: Vector { x: 1, y: 1 }
-            }).unwrap();
-        });
+        tl.set_target_fn(state, view, |state, view, _| view.invalidate_rect(state, Rect {
+            tl: Point { x: 0, y: 0 },
+            size: Vector { x: 1, y: 1 }
+        }));
         tr.set_target_fn(state, view, |state, view, _| {
             let tree: &ViewTree = state.get();
             let size = view.render_bounds(tree).size;
             view.invalidate_rect(state, Rect {
                 tl: Point { x: size.x.wrapping_sub(1), y: 0 },
                 size: Vector { x: 1, y: 1 }
-            }).unwrap();
+            });
         });
         bl.set_target_fn(state, view, |state, view, _| {
             let tree: &ViewTree = state.get();
@@ -318,7 +316,7 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
             view.invalidate_rect(state, Rect {
                 tl: Point { x: 0, y: size.y.wrapping_sub(1) },
                 size: Vector { x: 1, y: 1 }
-            }).unwrap();
+            });
         });
         br.set_target_fn(state, view, |state, view, _| {
             let tree: &ViewTree = state.get();
@@ -326,7 +324,7 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
             view.invalidate_rect(state, Rect {
                 tl: Point { x: size.x.wrapping_sub(1), y: size.y.wrapping_sub(1) },
                 size: Vector { x: 1, y: 1 }
-            }).unwrap();
+            });
         });
         l.set_target_fn(state, view, |state, view, _| {
             let tree: &ViewTree = state.get();
@@ -334,7 +332,7 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
             view.invalidate_rect(state, Rect {
                 tl: Point { x: 0, y: 0 },
                 size: Vector { x: 1, y: size.y }
-            }).unwrap();
+            });
         });
         t.set_target_fn(state, view, |state, view, _| {
             let tree: &ViewTree = state.get();
@@ -342,7 +340,7 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
             view.invalidate_rect(state, Rect {
                 tl: Point { x: 0, y: 0 },
                 size: Vector { x: size.x, y: 1 }
-            }).unwrap();
+            });
         });
         r.set_target_fn(state, view, |state, view, _| {
             let tree: &ViewTree = state.get();
@@ -350,7 +348,7 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
             view.invalidate_rect(state, Rect {
                 tl: Point { x: size.x.wrapping_sub(1), y: 0 },
                 size: Vector { x: 1, y: size.y }
-            }).unwrap();
+            });
         });
         b.set_target_fn(state, view, |state, view, _| {
             let tree: &ViewTree = state.get();
@@ -358,7 +356,7 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
             view.invalidate_rect(state, Rect {
                 tl: Point { x: 0, y: size.y.wrapping_sub(1) },
                 size: Vector { x: size.x, y: 1 }
-            }).unwrap();
+            });
         });
         fill.set_target_fn(state, view, |state, view, _| view.invalidate_render(state));
         has_l_padding.set_source_1(state, &mut BorderDecorator::L.value_source(view.decorator()));

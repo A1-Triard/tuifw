@@ -152,12 +152,10 @@ impl DecoratorBehavior for LineDecoratorBehavior {
         fg.set_target_fn(state, view, |state, view, _| view.invalidate_render(state));
         attr.set_target_fn(state, view, |state, view, _| view.invalidate_render(state));
         length.set_target_fn(state, view, |state, view, _| view.invalidate_measure(state));
-        near.set_target_fn(state, view, |state, view, _| {
-            view.invalidate_rect(state, Rect {
-                tl: Point { x: 0, y: 0 },
-                size: Vector { x: 1, y: 1 }
-            }).unwrap();
-        });
+        near.set_target_fn(state, view, |state, view, _| view.invalidate_rect(state, Rect {
+            tl: Point { x: 0, y: 0 },
+            size: Vector { x: 1, y: 1 }
+        }));
         stroke.set_target_fn(state, view, |state, view, _| view.invalidate_render(state));
         orient.set_target_fn(state, view, |state, view, _| view.invalidate_measure(state));
         far_orient.set_target_fn(state, view, |state, view, (_far, orient)| {
@@ -168,7 +166,7 @@ impl DecoratorBehavior for LineDecoratorBehavior {
             } else {
                 Rect { tl: Point { y: 0, x: size.x.wrapping_sub(1) }, size: Vector { x: 1, y: 1 } }
             };
-            view.invalidate_rect(state, invalidated).unwrap();
+            view.invalidate_rect(state, invalidated);
         });
         bg.set_source_1(state, &mut ViewBase::BG.value_source(view.base()));
         fg.set_source_1(state, &mut ViewBase::FG.value_source(view.base()));
