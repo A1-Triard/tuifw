@@ -83,7 +83,7 @@ impl State for WidgetTree {
 impl WidgetTree {
     pub fn new(screen: Box<dyn Screen>, bindings: &mut Bindings) -> Self {
         let widget_arena = Arena::new();
-        let view_tree = ViewTree::new(screen, bindings, |_| ((), |view_tree| view_tree));
+        let view_tree = ViewTree::new(screen, bindings);
         WidgetTree(StateDrop::new(WidgetTreeImpl {
             widget_arena,
             view_tree,
@@ -152,7 +152,8 @@ impl Widget {
     }
 
     pub fn load<X: Convenient>(self, state: &mut dyn State, parent: View, init: impl FnOnce(&mut dyn State, View)) -> BYield<X> {
-        let view = View::new(state, parent, |view| (self, view));
+        let view = View::new(state, parent);
+        view.set_tag(state, self);
         {
             let tree: &mut WidgetTree = state.get_mut();
             assert!(tree.0.get_mut().widget_arena[self.0].view.replace(view).is_none(), "Widget already loaded");

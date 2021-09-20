@@ -35,7 +35,8 @@ impl<'a> DockPanelBuilder<'a> {
         f: impl for<'b> FnOnce(ViewBuilder<'b>) -> ViewBuilder<'b>
     ) -> Self {
         let view = self.base_priv_ref().id();
-        let child = View::new(self.base_priv_mut().state_mut(), view, |child| (tag, child));
+        let child = View::new(self.base_priv_mut().state_mut(), view);
+        child.set_tag(self.base_priv_mut().state_mut(), tag);
         storage.map(|x| x.replace(child));
         DockLayout::new(self.base_priv_mut().state_mut(), child);
         child.build(self.base_priv_mut().state_mut(), |child_builder| {
