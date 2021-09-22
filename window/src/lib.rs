@@ -15,7 +15,6 @@ use educe::Educe;
 use macro_attr_2018::macro_attr;
 use std::any::Any;
 use std::cmp::{max, min};
-use std::hint::unreachable_unchecked;
 use std::mem::replace;
 use std::ops::Range;
 use tuifw_screen_base::{Attr, Color, Event, Point, Rect, Screen, Vector};
@@ -154,6 +153,7 @@ impl Window {
     pub fn new(
         tree: &mut WindowTree,
         parent: Option<Self>,
+        prev: Option<Self>,
         bounds: Rect,
     ) -> Window {
         let parent = parent.map_or(tree.root, |w| w.0);
@@ -164,15 +164,12 @@ impl Window {
                 last_child: None,
                 bounds,
                 tag: None
-            }, window)
+            }, Window(window))
         });
-        if let Some(prev) = tree.arena[parent].last_child.replace(window) {
-            let next = replace(&mut tree.arena[prev].next, window);
-            tree.arena[window].next = next;
-        }
+        window.attach(tree, parent, prev);
         let screen_bounds = bounds.offset(offset_from_root(parent, tree));
         invalidate_rect(tree.invalidated(), screen_bounds);
-        Window(window)
+        window
     }
 
     pub fn set_tag<Tag: ComponentId>(self, tree: &mut WindowTree, tag: Tag) {
@@ -187,8 +184,8 @@ impl Window {
         tree.arena[self.0].tag.map(Tag::from_raw)
     }
 
-    pub fn move_(self, tree: &mut WindowTree, bounds: Rect) {
-        let parent = tree.arena[self.0].parent.unwrap_or_else(|| unsafe { unreachable_unchecked() });
+    pub fn move_xy(self, tree: &mut WindowTree, bounds: Rect) {
+        let parent = tree.arena[self.0].parent.unwrap();
         let screen_bounds = bounds.offset(offset_from_root(parent, tree));
         invalidate_rect(tree.invalidated(), screen_bounds);
         let bounds = replace(&mut tree.arena[self.0].bounds, bounds);
@@ -196,24 +193,66 @@ impl Window {
         invalidate_rect(tree.invalidated(), screen_bounds);
     }
 
-    pub fn drop_window(self, tree: &mut WindowTree) {
-        let node = tree.arena.remove(self.0);
-        let parent = node.parent.unwrap_or_else(|| unsafe { unreachable_unchecked() });
-        if tree.arena[parent].last_child.unwrap_or_else(|| unsafe { unreachable_unchecked() }) == self.0 {
-            tree.arena[parent].last_child = if node.next == self.0 {
+    pub fn move_z(self, tree: &mut WindowTree, prev: Option<Window>) {
+        let parent = self.detach(tree);
+        self.attach(tree, parent, prev);
+        let bounds = tree.arena[self.0].bounds;
+        let screen_bounds = bounds.offset(offset_from_root(parent, tree));
+        invalidate_rect(tree.invalidated(), screen_bounds);
+    }
+
+    fn prev(self, tree: &WindowTree) -> Id<WindowNode> {
+        let node = &tree.arena[self.0];
+        let parent = node.parent.unwrap();
+        let parent_node = &tree.arena[parent];
+        let last_child = parent_node.last_child.unwrap();
+        let mut prev = last_child;
+        loop {
+            let prev_node = &tree.arena[prev];
+            if prev_node.next == self.0 { return prev; }
+            prev = prev_node.next;
+            debug_assert_ne!(prev, last_child);
+        }
+    }
+
+    fn detach(self, tree: &mut WindowTree) -> Id<WindowNode> {
+        let prev = self.prev(tree);
+        let node = &mut tree.arena[self.0];
+        let next = replace(&mut node.next, self.0);
+        let parent = node.parent.take().unwrap();
+        tree.arena[prev].next = next;
+        let parent_node = &mut tree.arena[parent];
+        if parent_node.last_child.unwrap() == self.0 {
+            parent_node.last_child = if prev == self.0 {
                 None
             } else {
-                Some(node.next)
+                Some(prev)
             };
         }
-        if let Some(mut prev) = tree.arena[parent].last_child {
-            loop {
-                let next = tree.arena[prev].next;
-                if next == self.0 { break; }
-                prev = next;
+        parent
+    }
+
+    fn attach(self, tree: &mut WindowTree, parent: Id<WindowNode>, prev: Option<Window>) {
+        let prev = if let Some(prev) = prev {
+            assert_eq!(tree.arena[prev.0].parent.unwrap(), parent);
+            let parent_node = &mut tree.arena[parent];
+            if parent_node.last_child.unwrap() == prev.0 {
+                parent_node.last_child = Some(self.0);
             }
-            tree.arena[prev].next = node.next;
-        }
+            Some(prev.0)
+        } else {
+            let parent_node = &mut tree.arena[parent];
+            parent_node.last_child.replace(self.0)
+        };
+        let next = prev.map_or(self.0, |prev| replace(&mut tree.arena[prev].next, self.0));
+        let node = &mut tree.arena[self.0];
+        node.parent = Some(parent);
+        node.next = next;
+    }
+
+    pub fn drop_window(self, tree: &mut WindowTree) {
+        let parent = self.detach(tree);
+        let node = tree.arena.remove(self.0);
         let screen_bounds = node.bounds.offset(offset_from_root(parent, tree));
         invalidate_rect(tree.invalidated(), screen_bounds);
         Self::drop_node_tree(node, tree);
@@ -234,14 +273,14 @@ impl Window {
     pub fn invalidate_rect(self, tree: &mut WindowTree, rect: Rect) {
         let bounds = tree.arena[self.0].bounds;
         let rect = rect.offset(bounds.tl.offset_from(Point { x: 0, y: 0 })).intersect(bounds);
-        let parent = tree.arena[self.0].parent.unwrap_or_else(|| unsafe { unreachable_unchecked() });
+        let parent = tree.arena[self.0].parent.unwrap();
         let screen_rect = rect.offset(offset_from_root(parent, tree));
         invalidate_rect(tree.invalidated(), screen_rect);
     }
  
     pub fn invalidate(self, tree: &mut WindowTree) {
         let bounds = tree.arena[self.0].bounds;
-        let parent = tree.arena[self.0].parent.unwrap_or_else(|| unsafe { unreachable_unchecked() });
+        let parent = tree.arena[self.0].parent.unwrap();
         let screen_bounds = bounds.offset(offset_from_root(parent, tree));
         invalidate_rect(tree.invalidated(), screen_bounds);
     }

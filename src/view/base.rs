@@ -199,7 +199,7 @@ impl ViewTree {
         let mut arena = Arena::new();
         let (window_tree, root, decorator_behavior) = arena.insert(|view| {
             let mut window_tree = WindowTree::new(screen, render_view);
-            let window = Window::new(&mut window_tree, None, Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() });
+            let window = Window::new(&mut window_tree, None, None, Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() });
             window.set_tag(&mut window_tree, view);
             let screen_size = window_tree.screen_size();
             let decorator = RootDecorator::new_priv();
@@ -410,6 +410,7 @@ impl View {
             let window = Window::new(
                 tree.window_tree(),
                 Some(parent_window),
+                None,
                 Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() }
             );
             let view = tree.0.get_mut().arena.insert(|view| {
@@ -635,7 +636,7 @@ impl View {
             assert!(self.last_child(tree).is_none(), "Decorator should be set before attaching children");
             let render_bounds = self.render_bounds(tree);
             let window = tree.0.get().arena[self.0].window;
-            window.move_(tree.window_tree(), render_bounds);
+            window.move_xy(tree.window_tree(), render_bounds);
         }
         let bindings = behavior.init_bindings(self, state);
         {
@@ -915,7 +916,7 @@ impl View {
                     );
                     arrange_bounds.tl = rect.tl;
                     let render_bounds = node.render_bounds;
-                    node.window.move_(tree.window_tree(), render_bounds);
+                    node.window.move_xy(tree.window_tree(), render_bounds);
                 }
                 return;
             }
@@ -974,7 +975,7 @@ impl View {
         {
             let tree: &mut ViewTree = state.get_mut();
             let window = tree.0.get().arena[self.0].window;
-            window.move_(tree.window_tree(), render_bounds);
+            window.move_xy(tree.window_tree(), render_bounds);
             tree.0.get_mut().arena[self.0].render_bounds = render_bounds;
         }
     }
