@@ -184,6 +184,19 @@ impl Window {
         tree.arena[self.0].tag.map(Tag::from_raw)
     }
 
+    pub fn parent(self, tree: &WindowTree) -> Option<Window> {
+        let parent = tree.arena[self.0].parent.unwrap();
+        if parent == tree.root { None } else { Some(Window(parent)) }
+    }
+
+    pub fn last_child(self, tree: &WindowTree) -> Option<Window> {
+        tree.arena[self.0].last_child.map(Window)
+    }
+
+    pub fn next(self, tree: &WindowTree) -> Window {
+        Window(tree.arena[self.0].next)
+    }
+
     pub fn move_xy(self, tree: &mut WindowTree, bounds: Rect) {
         let parent = tree.arena[self.0].parent.unwrap();
         let screen_bounds = bounds.offset(offset_from_root(parent, tree));

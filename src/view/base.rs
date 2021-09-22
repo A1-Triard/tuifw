@@ -10,7 +10,6 @@ use std::any::Any;
 use std::borrow::Cow;
 use std::cmp::{max, min};
 use std::fmt::Debug;
-use std::iter::{self};
 use std::mem::replace;
 use std::num::NonZeroU16;
 use tuifw_screen_base::{Attr, Color, Event, HAlign, Key, Point, Rect, Screen, Thickness, VAlign, Vector};
@@ -140,9 +139,6 @@ macro_attr! {
         layout_bindings: Option<Box<dyn LayoutBindings>>,
         base: ViewBase,
         align: Option<ViewAlign>,
-        parent: Option<View>,
-        next: View,
-        last_child: Option<View>,
         raw_align_bindings: Option<ViewRawAlignBindings>,
         measure_size: Option<(Option<i16>, Option<i16>)>,
         desired_size: Vector,
@@ -215,9 +211,6 @@ impl ViewTree {
                 layout_bindings: None,
                 panel: None,
                 panel_bindings: None,
-                parent: None,
-                next: View(view),
-                last_child: None,
                 raw_align_bindings: None,
                 measure_size: Some((Some(screen_size.x), Some(screen_size.y))),
                 desired_size: screen_size,
@@ -274,7 +267,11 @@ impl ViewTree {
         tree.0.get_mut().quit = true;
     }
 
-    fn window_tree(&mut self) -> &mut WindowTree {
+    fn window_tree(&self) -> &WindowTree {
+        self.0.get().window_tree.as_ref().expect("ViewTree is in invalid state")
+    }
+
+    fn window_tree_mut(&mut self) -> &mut WindowTree {
         self.0.get_mut().window_tree.as_mut().expect("ViewTree is in invalid state")
     }
 
@@ -408,7 +405,7 @@ impl View {
             let tree: &mut ViewTree = state.get_mut();
             let parent_window = tree.0.get().arena[parent.0].window;
             let window = Window::new(
-                tree.window_tree(),
+                tree.window_tree_mut(),
                 Some(parent_window),
                 None,
                 Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() }
@@ -425,9 +422,6 @@ impl View {
                     layout_bindings: None,
                     panel: None,
                     panel_bindings: None,
-                    parent: Some(parent),
-                    next: View(view),
-                    last_child: None,
                     raw_align_bindings: None,
                     measure_size: Some((None, None)),
                     desired_size: Vector::null(),
@@ -436,11 +430,7 @@ impl View {
                 }, view)
             });
             let view = View(view);
-            window.set_tag(tree.window_tree(), view);
-            if let Some(prev) = tree.0.get_mut().arena[parent.0].last_child.replace(view) {
-                let next = replace(&mut tree.0.get_mut().arena[prev.0].next, view);
-                tree.0.get_mut().arena[view.0].next = next;
-            }
+            window.set_tag(tree.window_tree_mut(), view);
             view
         };
         let size_min_max = Binding5::new(state, (), |(),
@@ -507,16 +497,16 @@ impl View {
         self.drop_bindings_priv(state);
     }
 
-    fn drop_children(last_child: Option<View>, state: &mut dyn State) {
-        if let Some(last_child) = last_child {
+    fn drop_children(window: Window, tree: &mut ViewTree) {
+        if let Some(last_child) = window.last_child(tree.window_tree()) {
             let mut child = last_child;
             loop {
                 let node = {
-                    let tree: &mut ViewTree = state.get_mut();
-                    tree.0.get_mut().arena.remove(child.0)
+                    let view: View = child.tag(tree.window_tree()).unwrap();
+                    tree.0.get_mut().arena.remove(view.0)
                 };
-                Self::drop_children(node.last_child, state);
-                child = node.next;
+                Self::drop_children(node.window, tree);
+                child = node.window.next(tree.window_tree());
                 if child == last_child { break; }
             }
         }
@@ -524,33 +514,10 @@ impl View {
 
     pub fn drop_view(self, state: &mut dyn State) {
         self.drop_bindings_tree(state);
-        let node = {
-            let tree: &mut ViewTree = state.get_mut();
-            let node = tree.0.get_mut().arena.remove(self.0);
-            node.window.drop_window(tree.window_tree());
-            node
-        };
-        Self::drop_children(node.last_child, state);
-        let parent = node.parent.expect("root cannot be dropped");
-        {
-            let tree: &mut ViewTree = state.get_mut();
-            let parent = &mut tree.0.get_mut().arena[parent.0];
-            let last_parent_child = parent.last_child.unwrap();
-            if last_parent_child == self {
-                parent.last_child = None;
-            } else {
-                let mut parent_child = last_parent_child;
-                loop {
-                    let parent_child_node = &mut tree.0.get_mut().arena[parent_child.0];
-                    if parent_child_node.next == self {
-                        parent_child_node.next = node.next;
-                        break;
-                    }
-                    parent_child = parent_child_node.next;
-                    assert_ne!(parent_child, last_parent_child);
-                }
-            }
-        }
+        let tree: &mut ViewTree = state.get_mut();
+        let node = tree.0.get_mut().arena.remove(self.0);
+        Self::drop_children(node.window, tree);
+        node.window.drop_window(tree.window_tree_mut());
     }
 
     pub fn set_tag<Tag: ComponentId>(self, state: &mut dyn State, tag: Tag) {
@@ -636,7 +603,7 @@ impl View {
             assert!(self.last_child(tree).is_none(), "Decorator should be set before attaching children");
             let render_bounds = self.render_bounds(tree);
             let window = tree.0.get().arena[self.0].window;
-            window.move_xy(tree.window_tree(), render_bounds);
+            window.move_xy(tree.window_tree_mut(), render_bounds);
         }
         let bindings = behavior.init_bindings(self, state);
         {
@@ -684,28 +651,19 @@ impl View {
         tree.0.get().arena[self.0].panel_bindings.as_ref().expect("Panel Bindings missing").as_ref()
     }
 
-    pub fn parent(self, tree: &ViewTree) -> Option<View> { tree.0.get().arena[self.0].parent }
-
-    pub fn self_and_parents(self, tree: &ViewTree) -> impl Iterator<Item=View> + '_ {
-        let mut view = Some(self);
-        iter::from_fn(move || {
-            let parent = view.and_then(|view| view.parent(tree));
-            replace(&mut view, parent)
-        })
+    pub fn last_child(self, tree: &ViewTree) -> Option<View> {
+        let window_tree = tree.window_tree();
+        tree.0.get().arena[self.0].window.last_child(window_tree).map(|x| x.tag(window_tree).unwrap())
     }
 
-    pub fn last_child(self, tree: &ViewTree) -> Option<View> { tree.0.get().arena[self.0].last_child }
+    pub fn next(self, tree: &ViewTree) -> View {
+        let window_tree = tree.window_tree();
+        tree.0.get().arena[self.0].window.next(window_tree).tag(window_tree).unwrap()
+    }
 
-    pub fn next(self, tree: &ViewTree) -> View { tree.0.get().arena[self.0].next }
-
-    pub fn children(self, tree: &ViewTree) -> impl Iterator<Item=View> + '_ {
-        let last_child = self.last_child(tree);
-        let mut view = last_child;
-        iter::from_fn(move || {
-            let item = view.map(|view| view.next(tree));
-            view = if item == last_child { None } else { item };
-            item
-        })
+    pub fn parent(self, tree: &ViewTree) -> Option<View> {
+        let window_tree = tree.window_tree();
+        tree.0.get().arena[self.0].window.parent(window_tree).map(|x| x.tag(window_tree).unwrap())
     }
 
     pub fn desired_size(self, tree: &ViewTree) -> Vector { tree.0.get().arena[self.0].desired_size }
@@ -781,16 +739,16 @@ impl View {
 
     pub fn invalidate_rect(self, state: &mut dyn State, rect: Rect) {
         let tree: &mut ViewTree = state.get_mut();
-        if self == tree.0.get().root { return tree.window_tree().invalidate_rect(rect); }
+        if self == tree.0.get().root { return tree.window_tree_mut().invalidate_rect(rect); }
         let window = tree.0.get().arena[self.0].window;
-        window.invalidate_rect(&mut tree.window_tree(), rect);
+        window.invalidate_rect(tree.window_tree_mut(), rect);
     }
 
     pub fn invalidate_render(self, state: &mut dyn State) {
         let tree: &mut ViewTree = state.get_mut();
-        if self == tree.0.get().root { return tree.window_tree().invalidate_screen(); }
+        if self == tree.0.get().root { return tree.window_tree_mut().invalidate_screen(); }
         let window = tree.0.get().arena[self.0].window;
-        window.invalidate(&mut tree.window_tree());
+        window.invalidate(tree.window_tree_mut());
     }
 
     pub fn invalidate_parent_measure(self, state: &mut dyn State) {
@@ -916,7 +874,7 @@ impl View {
                     );
                     arrange_bounds.tl = rect.tl;
                     let render_bounds = node.render_bounds;
-                    node.window.move_xy(tree.window_tree(), render_bounds);
+                    node.window.move_xy(tree.window_tree_mut(), render_bounds);
                 }
                 return;
             }
@@ -975,7 +933,7 @@ impl View {
         {
             let tree: &mut ViewTree = state.get_mut();
             let window = tree.0.get().arena[self.0].window;
-            window.move_xy(tree.window_tree(), render_bounds);
+            window.move_xy(tree.window_tree_mut(), render_bounds);
             tree.0.get_mut().arena[self.0].render_bounds = render_bounds;
         }
     }
