@@ -36,26 +36,27 @@ fn main() {
     let desk_top = DeskTop::build(app, |desk_top| desk_top
         .window(Some(&mut window_1), |window| window
             .header(Cow::Borrowed("1"))
-            .bounds(Rect::from_tl_br(Point { x: 5, y: 5}, Point { x: 25, y: 15 }))
+            .bounds(Rect::from_tl_br(Point { x: 5, y: 0}, Point { x: 40, y: 15 }))
         )
         .window(Some(&mut window_2), |window| window
             .header(Cow::Borrowed("2"))
-            .bounds(Rect::from_tl_br(Point { x: 42, y: 5}, Point { x: 62, y: 15 }))
+            .bounds(Rect::from_tl_br(Point { x: 30, y: 5}, Point { x: 62, y: 20 }))
         )
         .window(Some(&mut window_3), |window| window
             .header(Cow::Borrowed("3"))
-            .bounds(Rect::from_tl_br(Point { x: 79, y: 5}, Point { x: 99, y: 15 }))
+            .bounds(Rect::from_tl_br(Point { x: 20, y: 10}, Point { x: 50, y: 22 }))
         )
     );
-    b_immediate(desk_top.load(app, root, |_, _| { }));
+    b_immediate(desk_top.load(app, root, None, |_, _| { }));
     window_1.unwrap().focus(app);
 
     let focus_1 = Binding1::new(app, (), |(), input: Option<ViewInput>|
         input.filter(|input| input.key().1 == Key::Alt('1'))
     );
-    focus_1.set_target_fn(app, window_1.unwrap(), |app, window, input| {
+    focus_1.set_target_fn(app, (window_1.unwrap(), desk_top), |app, (window, desk_top), input| {
         input.mark_as_handled();
         window.focus(app);
+        b_immediate(DeskTop::WINDOWS.move_(app, desk_top.obj(), 0, 2));
     });
     desk_top.base().add_binding(app, focus_1);
     focus_1.set_source_1(app, &mut WidgetBase::VIEW_INPUT.source(desk_top.base()));

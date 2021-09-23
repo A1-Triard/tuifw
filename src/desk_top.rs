@@ -56,6 +56,12 @@ impl WidgetBehavior for DeskTopBehavior {
                             prev.view(tree).unwrap()
                         });
                         window.item.load(state, view, prev_view, |state, view| CanvasLayout::new(state, view))
+                    } else if let Some(prev) = window.as_move_insert_prev() {
+                        let tree: &WidgetTree = state.get();
+                        let view = window.item.view(tree).unwrap();
+                        let prev_view = prev.map(|prev| prev.view(tree).unwrap());
+                        view.move_z(state, prev_view);
+                        b_continue()
                     } else {
                         b_continue()
                     }
