@@ -474,13 +474,13 @@ impl View {
     fn drop_bindings_tree(self, state: &mut dyn State) {
         self.drop_bindings(state);
         let tree: &ViewTree = state.get();
-        if let Some(last_child) = self.last_child(tree) {
-            let mut child = last_child;
+        if let Some(first_child) = self.first_child(tree) {
+            let mut child = first_child;
             loop {
+                child.drop_bindings_tree(state);
                 let tree: &ViewTree = state.get();
                 child = child.next(tree);
-                child.drop_bindings_tree(state);
-                if child == last_child { break; }
+                if child == first_child { break; }
             }
         }
     }
@@ -498,8 +498,8 @@ impl View {
     }
 
     fn drop_children(window: Window, tree: &mut ViewTree) {
-        if let Some(last_child) = window.last_child(tree.window_tree()) {
-            let mut child = last_child;
+        if let Some(first_child) = window.first_child(tree.window_tree()) {
+            let mut child = first_child;
             loop {
                 let node = {
                     let view: View = child.tag(tree.window_tree()).unwrap();
@@ -507,7 +507,7 @@ impl View {
                 };
                 Self::drop_children(node.window, tree);
                 child = node.window.next(tree.window_tree());
-                if child == last_child { break; }
+                if child == first_child { break; }
             }
         }
     }
@@ -600,7 +600,7 @@ impl View {
         {
             let tree: &mut ViewTree = state.get_mut();
             assert!(tree.0.get_mut().arena[self.0].decorator.replace(Box::new(decorator)).is_none(), "Decorator is already set and cannot be changed");
-            assert!(self.last_child(tree).is_none(), "Decorator should be set before attaching children");
+            assert!(self.first_child(tree).is_none(), "Decorator should be set before attaching children");
             let render_bounds = self.render_bounds(tree);
             let window = tree.0.get().arena[self.0].window;
             window.move_xy(tree.window_tree_mut(), render_bounds);
@@ -651,9 +651,9 @@ impl View {
         tree.0.get().arena[self.0].panel_bindings.as_ref().expect("Panel Bindings missing").as_ref()
     }
 
-    pub fn last_child(self, tree: &ViewTree) -> Option<View> {
+    pub fn first_child(self, tree: &ViewTree) -> Option<View> {
         let window_tree = tree.window_tree();
-        tree.0.get().arena[self.0].window.last_child(window_tree).map(|x| x.tag(window_tree).unwrap())
+        tree.0.get().arena[self.0].window.first_child(window_tree).map(|x| x.tag(window_tree).unwrap())
     }
 
     pub fn prev(self, tree: &ViewTree) -> View {
@@ -835,16 +835,15 @@ impl View {
             panel.children_desired_size(self, state, children_measure_size)
         } else {
             let tree: &ViewTree = state.get();
-            if let Some(last_child) = self.last_child(tree) {
+            if let Some(first_child) = self.first_child(tree) {
                 let mut children_desired_size = Vector::null();
-                let mut child = last_child;
+                let mut child = first_child;
                 loop {
-                    let tree: &ViewTree = state.get();
-                    child = child.next(tree);
                     child.measure(state, children_measure_size);
                     let tree: &ViewTree = state.get();
                     children_desired_size = children_desired_size.max(child.desired_size(tree));
-                    if child == last_child { break children_desired_size; }
+                    child = child.next(tree);
+                    if child == first_child { break children_desired_size; }
                 }
             } else {
                 Vector::null()
@@ -910,19 +909,18 @@ impl View {
             panel.children_render_bounds(self, state, children_arrange_bounds)
         } else {
             let tree: &ViewTree = state.get();
-            if let Some(last_child) = self.last_child(tree) {
+            if let Some(first_child) = self.first_child(tree) {
                 let mut children_render_bounds = Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() };
-                let mut child = last_child;
+                let mut child = first_child;
                 loop {
-                    let tree: &ViewTree = state.get();
-                    child = child.next(tree);
                     child.arrange(state, children_arrange_bounds);
                     let tree: &ViewTree = state.get();
                     children_render_bounds = children_render_bounds.union_intersect(
                         child.render_bounds(tree),
                         children_arrange_bounds
                     );
-                    if child == last_child { break children_render_bounds; }
+                    child = child.next(tree);
+                    if child == first_child { break children_render_bounds; }
                 }
             } else {
                 children_arrange_bounds
@@ -954,9 +952,9 @@ impl DepObjIdBase for View {
         self.next(tree)
     }
 
-    fn last_child(self, state: &dyn State) -> Option<Self> {
+    fn first_child(self, state: &dyn State) -> Option<Self> {
         let tree: &ViewTree = state.get();
-        self.last_child(tree)
+        self.first_child(tree)
     }
 }
 

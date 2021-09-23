@@ -125,7 +125,7 @@ macro_attr! {
         parent: Option<Id<WindowNode>>,
         prev: Id<WindowNode>,
         next: Id<WindowNode>,
-        last_child: Option<Id<WindowNode>>,
+        first_child: Option<Id<WindowNode>>,
         bounds: Rect,
         tag: Option<RawId>,
     }
@@ -163,7 +163,7 @@ impl Window {
                 parent: Some(parent),
                 prev: window,
                 next: window,
-                last_child: None,
+                first_child: None,
                 bounds,
                 tag: None
             }, Window(window))
@@ -191,8 +191,8 @@ impl Window {
         if parent == tree.root { None } else { Some(Window(parent)) }
     }
 
-    pub fn last_child(self, tree: &WindowTree) -> Option<Window> {
-        tree.arena[self.0].last_child.map(Window)
+    pub fn first_child(self, tree: &WindowTree) -> Option<Window> {
+        tree.arena[self.0].first_child.map(Window)
     }
 
     pub fn prev(self, tree: &WindowTree) -> Window {
@@ -229,22 +229,26 @@ impl Window {
         tree.arena[prev].next = next;
         tree.arena[next].prev = prev;
         let parent_node = &mut tree.arena[parent];
-        if parent_node.last_child.unwrap() == self.0 {
-            parent_node.last_child = if prev == self.0 { None } else { Some(prev) };
+        if parent_node.first_child.unwrap() == self.0 {
+            parent_node.first_child = if next == self.0 { None } else { Some(next) };
         }
         parent
     }
 
     fn attach(self, tree: &mut WindowTree, parent: Id<WindowNode>, prev: Option<Window>) {
-        let prev = if let Some(prev) = prev {
+        let (prev, next) = if let Some(prev) = prev {
             assert_eq!(tree.arena[prev.0].parent.unwrap(), parent);
-            prev.0
+            let prev = prev.0;
+            let next = replace(&mut tree.arena[prev].next, self.0);
+            tree.arena[next].prev = self.0;
+            (prev, next)
         } else {
             let parent_node = &mut tree.arena[parent];
-            parent_node.last_child.replace(self.0).unwrap_or(self.0)
+            let next = parent_node.first_child.replace(self.0).unwrap_or(self.0);
+            let prev = replace(&mut tree.arena[next].prev, self.0);
+            tree.arena[prev].next = self.0;
+            (prev, next)
         };
-        let next = replace(&mut tree.arena[prev].next, self.0);
-        tree.arena[next].prev = self.0;
         let node = &mut tree.arena[self.0];
         node.parent = Some(parent);
         node.prev = prev;
@@ -260,13 +264,13 @@ impl Window {
     }
 
     fn drop_node_tree(node: WindowNode, tree: &mut WindowTree) {
-        if let Some(last_child) = node.last_child {
-            let mut child = last_child;
+        if let Some(first_child) = node.first_child {
+            let mut child = first_child;
             loop {
-                child = tree.arena[child].next;
                 let child_node = tree.arena.remove(child);
+                child = child_node.next;
                 Self::drop_node_tree(child_node, tree);
-                if child == last_child { break; }
+                if child == first_child { break; }
             }
         }
     }
@@ -320,7 +324,7 @@ impl WindowTree {
             parent: None,
             prev: window,
             next: window,
-            last_child: None,
+            first_child: None,
             bounds: Rect { tl: Point { x: 0, y: 0 }, size: screen.size() },
             tag: None
         }, window));
@@ -367,12 +371,12 @@ impl WindowTree {
         );
         self.screen.replace((port.screen, port.invalidated));
         self.cursor = port.cursor;
-        if let Some(last_child) = self.arena[window].last_child {
-            let mut child = last_child;
+        if let Some(first_child) = self.arena[window].first_child {
+            let mut child = first_child;
             loop {
-                child = self.arena[child].next;
                 self.render_window(child, offset, render_state);
-                if child == last_child { break; }
+                child = self.arena[child].next;
+                if child == first_child { break; }
             }
         }
     }

@@ -47,10 +47,10 @@ impl WidgetBehavior for DeskTopBehavior {
             window: Option<ItemChange<Widget>>
         | {
             if let Some(window) = window {
-                if window.is_remove() || window.is_update() && view.is_none() {
+                if window.is_remove() || window.is_update_remove() && view.is_none() {
                     window.item.unload(state)
                 } else if let Some(view) = view {
-                    if window.is_insert_or_after_update() {
+                    if window.is_insert() || window.is_update_insert() {
                         window.item.load(state, view, |state, view| CanvasLayout::new(state, view))
                     } else {
                         b_continue()

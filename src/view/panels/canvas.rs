@@ -153,13 +153,13 @@ impl PanelBehavior for CanvasPanelBehavior {
         children_measure_size: (Option<i16>, Option<i16>)
     ) -> Vector {
         let tree: &ViewTree = state.get();
-        if let Some(last_child) = view.last_child(tree) {
-            let mut child = last_child;
+        if let Some(first_child) = view.first_child(tree) {
+            let mut child = first_child;
             loop {
+                child.measure(state, (None, None));
                 let tree: &ViewTree = state.get();
                 child = child.next(tree);
-                child.measure(state, (None, None));
-                if child == last_child { break; }
+                if child == first_child { break; }
             }
         }
         Vector { x: children_measure_size.0.unwrap_or(0), y: children_measure_size.1.unwrap_or(0) }
@@ -172,11 +172,10 @@ impl PanelBehavior for CanvasPanelBehavior {
         children_arrange_bounds: Rect
     ) -> Rect {
         let tree: &ViewTree = state.get();
-        if let Some(last_child) = view.last_child(tree) {
-            let mut child = last_child;
+        if let Some(first_child) = view.first_child(tree) {
+            let mut child = first_child;
             loop {
                 let tree: &ViewTree = state.get();
-                child = child.next(tree);
                 let child_offset = child.layout_bindings(tree).downcast_ref::<CanvasLayoutBindings>().unwrap().tl
                     .get_value(state).map_or_else(Vector::null, |x| x.offset_from(Point { x: 0, y: 0 }));
                 let tree: &ViewTree = state.get();
@@ -185,7 +184,9 @@ impl PanelBehavior for CanvasPanelBehavior {
                     tl: children_arrange_bounds.tl.offset(child_offset),
                     size: child_size
                 });
-                if child == last_child { break; }
+                let tree: &ViewTree = state.get();
+                child = child.next(tree);
+                if child == first_child { break; }
             }
         }
         children_arrange_bounds
