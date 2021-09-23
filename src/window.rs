@@ -4,9 +4,9 @@ use crate::view::ViewBuilderViewAlignExt;
 use crate::view::decorators::{BorderDecorator, LabelDecorator};
 use crate::view::decorators::ViewBuilderBorderDecoratorExt;
 use crate::view::decorators::ViewBuilderLabelDecoratorExt;
-use crate::view::panels::{CanvasLayout, ViewBuilderDockPanelExt};
-use dep_obj::{dep_type_with_builder, Change};
-use dep_obj::binding::{Binding1};
+use crate::view::panels::{CanvasLayout, DockLayout, ViewBuilderDockPanelExt};
+use dep_obj::{dep_type_with_builder, Change, Glob};
+use dep_obj::binding::{Binding1, BindingExt2, b_continue, BYield};
 use dyn_context::state::State;
 use either::Right;
 use std::borrow::Cow;
@@ -16,6 +16,7 @@ dep_type_with_builder! {
     #[derive(Debug)]
     pub struct Window become obj in Widget {
         header: Cow<'static, str> = Cow::Borrowed(""),
+        content: Option<Widget> = None,
         bg: Option<Color> = Some(Color::Blue),
         bounds: Rect = Rect { tl: Point { x: 0, y: 0 }, size: Vector { x: 0, y: 0 } },
     }
@@ -76,6 +77,58 @@ impl WidgetBehavior for WindowBehavior {
         });
         widget.obj::<Window>().add_binding(state, init_new_view);
         init_new_view.set_source_1(state, &mut WidgetBase::VIEW.change_initial_source(widget.base()));
+
+        let load_content = BindingExt2::new(state, None, |
+            state,
+            content_cache: Glob<Option<Widget>>,
+            view: Option<View>,
+            content: Option<Change<Option<Widget>>>
+        | -> BYield<!> {
+            if let Some(content) = content {
+                *content_cache.get_mut(state) = content.new;
+                if let Some(view) = view {
+                    if let Some(content) = content.new {
+                        return content.load(state, view, |state, content_view| DockLayout::new(state, content_view));
+                    }
+                }
+            } else {
+                if let Some(view) = view {
+                    if let Some(content) = *content_cache.get(state) {
+                        return content.load(state, view, |state, content_view| DockLayout::new(state, content_view));
+                    }
+                }
+            }
+            b_continue()
+        });
+        widget.obj::<Window>().add_binding(state, load_content);
+        load_content.set_source_2(state, &mut Window::CONTENT.change_initial_source(widget.obj()));
+        load_content.set_source_1(state, &mut WidgetBase::VIEW.value_source(widget.base()));
+
+        let unload_content = BindingExt2::new(state, None, |
+            state,
+            content_cache: Glob<Option<Widget>>,
+            view: Option<View>,
+            content: Option<Change<Option<Widget>>>
+        | -> BYield<!> {
+            if let Some(content) = content {
+                *content_cache.get_mut(state) = content.new;
+                if view.is_some() {
+                    if let Some(content) = content.old {
+                        return content.unload(state);
+                    }
+                }
+            } else {
+                if view.is_none() {
+                    if let Some(content) = *content_cache.get(state) {
+                        return content.unload(state);
+                    }
+                }
+            }
+            b_continue()
+        });
+        widget.obj::<Window>().add_binding(state, unload_content);
+        unload_content.set_source_2(state, &mut Window::CONTENT.change_final_source(widget.obj()));
+        unload_content.set_source_1(state, &mut WidgetBase::VIEW.value_source(widget.base()));
     }
 
     fn drop_bindings(&self, _widget: Widget, _state: &mut dyn State) { }

@@ -933,8 +933,7 @@ impl View {
             |d| d.render_bounds(self, state, children_render_bounds)
         );
         let padding = Thickness::align(render_bounds.size, rect.size, h_align, v_align);
-        render_bounds = padding.expand_rect(render_bounds);
-        render_bounds.tl = rect.tl.offset(Point { x: 0, y: 0 }.offset_from(render_bounds.tl));
+        render_bounds.tl = rect.tl.offset(Point { x: 0, y: 0 }.offset_from(padding.expand_rect(render_bounds).tl));
         {
             let tree: &mut ViewTree = state.get_mut();
             let window = tree.0.get().arena[self.0].window;

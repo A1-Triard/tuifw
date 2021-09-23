@@ -2,8 +2,8 @@ use crate::base::*;
 use crate::view::View;
 use crate::view::panels::{CanvasLayout, CanvasPanel};
 use crate::window::{Window, WindowBuilder};
-use dep_obj::{DepObjBaseBuilder, dep_type_with_builder, ItemChange, Change, Glob};
-use dep_obj::binding::{BindingExt2, b_continue, b_yield, b_immediate};
+use dep_obj::{DepObjBaseBuilder, dep_type_with_builder, ItemChange, Change};
+use dep_obj::binding::{Binding1, BindingExt2, b_continue, b_yield, b_immediate};
 use dyn_context::state::State;
 
 dep_type_with_builder! {
@@ -33,18 +33,20 @@ struct DeskTopBehavior;
 
 impl WidgetBehavior for DeskTopBehavior {
     fn init_bindings(&self, widget: Widget, state: &mut dyn State) {
-        let windows = BindingExt2::new(state, None, |
+        let init_new_view = Binding1::new(state, (), |(), change: Option<Change<Option<View>>>|
+            change.and_then(|change| change.new)
+        );
+        init_new_view.set_target_fn(state, (), |state, (), view: View| CanvasPanel::new(state, view));
+        widget.obj::<DeskTop>().add_binding(state, init_new_view);
+        init_new_view.set_source_1(state, &mut WidgetBase::VIEW.change_initial_source(widget.base()));
+
+        let windows = BindingExt2::new(state, (), |
             state,
-            view_cache: Glob<Option<View>>,
-            view_change: Option<Change<Option<View>>>,
+            _,
+            view: Option<View>,
             window: Option<ItemChange<Widget>>
         | {
-            if let Some(view_change) = view_change {
-                *view_cache.get_mut(state) = view_change.new;
-                view_change.new.map(|view| CanvasPanel::new(state, view));
-                b_yield(())
-            } else if let Some(window) = window {
-                let view = *view_cache.get(state);
+            if let Some(window) = window {
                 if window.is_remove() || window.is_update() && view.is_none() {
                     window.item.unload(state)
                 } else if let Some(view) = view {
@@ -57,11 +59,11 @@ impl WidgetBehavior for DeskTopBehavior {
                     b_continue()
                 }
             } else {
-                unreachable!()
+                b_yield(())
             }
         });
         windows.set_source_2(state, &mut DeskTop::WINDOWS.item_initial_final_source_with_update(windows, widget.obj()));
-        windows.set_source_1(state, &mut WidgetBase::VIEW.change_initial_source(widget.base()));
+        windows.set_source_1(state, &mut WidgetBase::VIEW.value_source(widget.base()));
     }
 
     fn drop_bindings(&self, _widget: Widget, _state: &mut dyn State) { }
