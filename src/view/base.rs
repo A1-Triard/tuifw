@@ -656,6 +656,11 @@ impl View {
         tree.0.get().arena[self.0].window.last_child(window_tree).map(|x| x.tag(window_tree).unwrap())
     }
 
+    pub fn prev(self, tree: &ViewTree) -> View {
+        let window_tree = tree.window_tree();
+        tree.0.get().arena[self.0].window.prev(window_tree).tag(window_tree).unwrap()
+    }
+
     pub fn next(self, tree: &ViewTree) -> View {
         let window_tree = tree.window_tree();
         tree.0.get().arena[self.0].window.next(window_tree).tag(window_tree).unwrap()

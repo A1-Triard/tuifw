@@ -123,6 +123,7 @@ macro_attr! {
     #[derive(Debug)]
     struct WindowNode {
         parent: Option<Id<WindowNode>>,
+        prev: Id<WindowNode>,
         next: Id<WindowNode>,
         last_child: Option<Id<WindowNode>>,
         bounds: Rect,
@@ -160,6 +161,7 @@ impl Window {
         let window = tree.arena.insert(|window| {
             (WindowNode {
                 parent: Some(parent),
+                prev: window,
                 next: window,
                 last_child: None,
                 bounds,
@@ -193,6 +195,10 @@ impl Window {
         tree.arena[self.0].last_child.map(Window)
     }
 
+    pub fn prev(self, tree: &WindowTree) -> Window {
+        Window(tree.arena[self.0].prev)
+    }
+
     pub fn next(self, tree: &WindowTree) -> Window {
         Window(tree.arena[self.0].next)
     }
@@ -214,33 +220,17 @@ impl Window {
         invalidate_rect(tree.invalidated(), screen_bounds);
     }
 
-    fn prev(self, tree: &WindowTree) -> Id<WindowNode> {
-        let node = &tree.arena[self.0];
-        let parent = node.parent.unwrap();
-        let parent_node = &tree.arena[parent];
-        let last_child = parent_node.last_child.unwrap();
-        let mut prev = last_child;
-        loop {
-            let prev_node = &tree.arena[prev];
-            if prev_node.next == self.0 { return prev; }
-            prev = prev_node.next;
-            debug_assert_ne!(prev, last_child);
-        }
-    }
 
     fn detach(self, tree: &mut WindowTree) -> Id<WindowNode> {
-        let prev = self.prev(tree);
         let node = &mut tree.arena[self.0];
+        let prev = replace(&mut node.prev, self.0);
         let next = replace(&mut node.next, self.0);
         let parent = node.parent.take().unwrap();
         tree.arena[prev].next = next;
+        tree.arena[next].prev = prev;
         let parent_node = &mut tree.arena[parent];
         if parent_node.last_child.unwrap() == self.0 {
-            parent_node.last_child = if prev == self.0 {
-                None
-            } else {
-                Some(prev)
-            };
+            parent_node.last_child = if prev == self.0 { None } else { Some(prev) };
         }
         parent
     }
@@ -252,14 +242,16 @@ impl Window {
             if parent_node.last_child.unwrap() == prev.0 {
                 parent_node.last_child = Some(self.0);
             }
-            Some(prev.0)
+            prev.0
         } else {
             let parent_node = &mut tree.arena[parent];
-            parent_node.last_child.replace(self.0)
+            parent_node.last_child.replace(self.0).unwrap_or(self.0)
         };
-        let next = prev.map_or(self.0, |prev| replace(&mut tree.arena[prev].next, self.0));
+        let next = replace(&mut tree.arena[prev].next, self.0);
+        tree.arena[next].prev = self.0;
         let node = &mut tree.arena[self.0];
         node.parent = Some(parent);
+        node.prev = prev;
         node.next = next;
     }
 
@@ -330,6 +322,7 @@ impl WindowTree {
         let mut arena = Arena::new();
         let root = arena.insert(|window| (WindowNode {
             parent: None,
+            prev: window,
             next: window,
             last_child: None,
             bounds: Rect { tl: Point { x: 0, y: 0 }, size: screen.size() },
