@@ -117,9 +117,7 @@ impl Npc {
         let game: &mut Game = state.get_mut();
         let npc = game.npcs.insert(|id| (NpcComponent { props: NpcProps::new_priv() }, Npc(id)));
 
-        let equipped = Binding1::new(state, (), |(), change: Option<ItemChange<Item>>|
-            change.filter(|change| !change.is_update())
-        );
+        let equipped = Binding1::new(state, (), |(), change: Option<ItemChange<Item>>| change);
         equipped.dispatch(state, (), |state, (), change|
             ItemProps::EQUIPPED.set(state, change.item.props(), change.is_insert())
         );
@@ -130,7 +128,7 @@ impl Npc {
             if let Some(change) = change {
                 if change.is_remove() {
                     ItemProps::ENHANCEMENT.unset(state, change.item.props())
-                } else if change.is_insert_or_after_update() {
+                } else if change.is_insert() || change.is_update_insert() {
                     ItemProps::ENHANCEMENT.set(state, change.item.props(), enhancement)
                 } else {
                     b_continue()

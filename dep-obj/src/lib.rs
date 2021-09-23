@@ -190,6 +190,7 @@ use alloc::collections::{TryReserveError, VecDeque};
 use alloc::vec::Vec;
 use components_arena::{Arena, ArenaItemsIntoValues, Component, ComponentId, Id};
 use core::fmt::Debug;
+use core::iter::once;
 use core::mem::{replace, take};
 use dyn_clone::{DynClone, clone_trait_object};
 use dyn_context::state::State;
@@ -212,44 +213,85 @@ macro_attr! {
     struct BoxedHandler<T>(Box<dyn Handler<T>>);
 }
 
-#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct Change<PropType: Convenient> {
     pub old: PropType,
     pub new: PropType,
 }
 
-#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
-pub enum ItemChangeAction {
-    Insert,
+#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
+pub enum ItemChangeAction<ItemType: Convenient> {
+    Insert { prev: Option<ItemType> },
     Remove,
-    Update,
-    AfterUpdate,
+    UpdateInsert { prev: Option<ItemType> },
+    UpdateRemove,
+    Move { prev: Option<ItemType> },
 }
 
-#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
+impl<ItemType: Convenient> ItemChangeAction<ItemType> {
+    pub fn is_insert(&self) -> bool {
+        if let ItemChangeAction::Insert { .. } = self { true } else { false }
+    }
+
+    pub fn is_remove(&self) -> bool { self == &ItemChangeAction::Remove }
+
+    pub fn is_update_insert(&self) -> bool {
+        if let ItemChangeAction::UpdateInsert { .. } = self { true } else { false }
+    }
+
+    pub fn is_update_remove(&self) -> bool { self == &ItemChangeAction::UpdateRemove }
+
+    pub fn is_move(&self) -> bool {
+        if let ItemChangeAction::Move { .. } = self { true } else { false }
+    }
+
+    pub fn as_insert_prev(&self) -> Option<&Option<ItemType>> {
+        if let ItemChangeAction::Insert { prev } = self { Some(prev) } else { None }
+    }
+
+    pub fn as_update_insert_prev(&self) -> Option<&Option<ItemType>> {
+        if let ItemChangeAction::UpdateInsert { prev } = self { Some(prev) } else { None }
+    }
+
+    pub fn as_insert_or_update_insert_prev(&self) -> Option<&Option<ItemType>> {
+        match self {
+            ItemChangeAction::Insert { prev } => Some(prev),
+            ItemChangeAction::UpdateInsert { prev } => Some(prev),
+            _ => None
+        }
+    }
+
+    pub fn as_move_prev(&self) -> Option<&Option<ItemType>> {
+        if let ItemChangeAction::Move { prev } = self { Some(prev) } else { None }
+    }
+}
+
+#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct ItemChange<ItemType: Convenient> {
     pub item: ItemType,
-    pub action: ItemChangeAction,
+    pub action: ItemChangeAction<ItemType>,
 }
 
 impl<ItemType: Convenient> ItemChange<ItemType> {
-    pub fn is_update(&self) -> bool { self.action == ItemChangeAction::Update }
+    pub fn is_insert(&self) -> bool { self.action.is_insert() }
 
-    pub fn is_insert_or_remove(&self) -> bool {
-        self.action == ItemChangeAction::Insert || self.action == ItemChangeAction::Remove
+    pub fn is_remove(&self) -> bool { self.action.is_remove() }
+
+    pub fn is_update_insert(&self) -> bool { self.action.is_update_insert() }
+
+    pub fn is_update_remove(&self) -> bool { self.action.is_update_remove() }
+
+    pub fn is_move(&self) -> bool { self.action.is_move() }
+
+    pub fn as_insert_prev(&self) -> Option<&Option<ItemType>> { self.action.as_insert_prev() }
+
+    pub fn as_update_insert_prev(&self) -> Option<&Option<ItemType>> { self.action.as_update_insert_prev() }
+
+    pub fn as_insert_or_update_insert_prev(&self) -> Option<&Option<ItemType>> {
+        self.action.as_insert_or_update_insert_prev()
     }
 
-    pub fn is_insert(&self) -> bool { self.action == ItemChangeAction::Insert }
-
-    pub fn is_insert_or_after_update(&self) -> bool {
-        self.action == ItemChangeAction::Insert || self.action == ItemChangeAction::AfterUpdate
-    }
-
-    pub fn is_remove(&self) -> bool { self.action == ItemChangeAction::Remove }
-
-    pub fn is_remove_or_update(&self) -> bool {
-        self.action == ItemChangeAction::Remove || self.action == ItemChangeAction::Update
-    }
+    pub fn as_move_prev(&self) -> Option<&Option<ItemType>> { self.action.as_move_prev() }
 }
 
 #[derive(Debug)]
@@ -430,26 +472,26 @@ struct DepVecHandlersCopy<ItemType: Convenient> {
 }
 
 impl<ItemType: Convenient> DepVecHandlersCopy<ItemType> {
-    fn execute(self, state: &mut dyn State, action: ItemChangeAction, items: &[ItemType]) {
-        debug_assert!(action == ItemChangeAction::Insert || action == ItemChangeAction::Remove);
-        if action == ItemChangeAction::Insert {
-            if let Some(item_initial_final_handler) = self.item_initial_final_handler.as_ref() {
-                for item in items {
-                    item_initial_final_handler.execute(state, ItemChange { action, item: item.clone() });
+    fn execute(self, state: &mut dyn State, action: ItemChangeAction<ItemType>, items: &[ItemType]) {
+        match action {
+            ItemChangeAction::Insert { prev } => {
+                for handler in self.item_initial_final_handler.into_iter().chain(self.item_handlers) {
+                    for (item, prev) in items.iter().zip(once(prev.as_ref()).chain(items.iter().skip(1).map(Some))) {
+                        handler.execute(state, ItemChange {
+                            action: ItemChangeAction::Insert { prev: prev.cloned() },
+                            item: item.clone()
+                        });
+                    }
                 }
-            }
-        }
-        for handler in self.item_handlers {
-            for item in items {
-                handler.execute(state, ItemChange { action, item: item.clone() });
-            }
-        }
-        if action == ItemChangeAction::Remove {
-            if let Some(item_initial_final_handler) = self.item_initial_final_handler.as_ref() {
-                for item in items {
-                    item_initial_final_handler.execute(state, ItemChange { action, item: item.clone() });
+            },
+            ItemChangeAction::Remove => {
+                for handler in self.item_handlers.into_iter().chain(self.item_initial_final_handler.into_iter()) {
+                    for item in items {
+                        handler.execute(state, ItemChange { action: ItemChangeAction::Remove, item: item.clone() });
+                    }
                 }
-            }
+            },
+            _ => unreachable!()
         }
         for handler in self.changed_handlers {
             handler.0.execute(state, ());
@@ -1036,14 +1078,16 @@ impl<Owner: DepType, ItemType: Convenient> DepVec<Owner, ItemType> {
                     handlers.execute(state, ItemChangeAction::Remove, &items);
                 },
                 DepVecModification::Push(item) => {
+                    let prev = entry_mut.items.last().cloned();
                     entry_mut.items.push(item.clone());
                     let handlers = entry_mut.handlers.clone();
-                    handlers.execute(state, ItemChangeAction::Insert, &[item]);
+                    handlers.execute(state, ItemChangeAction::Insert { prev }, &[item]);
                 },
                 DepVecModification::Insert(index, item) => {
+                    let prev = if index == 0 { None } else { Some(entry_mut.items[index - 1].clone()) };
                     entry_mut.items.insert(index, item.clone());
                     let handlers = entry_mut.handlers.clone();
-                    handlers.execute(state, ItemChangeAction::Insert, &[item]);
+                    handlers.execute(state, ItemChangeAction::Insert { prev }, &[item]);
                 },
                 DepVecModification::Remove(index) => {
                     let item = entry_mut.items.remove(index);
@@ -1051,9 +1095,10 @@ impl<Owner: DepType, ItemType: Convenient> DepVec<Owner, ItemType> {
                     handlers.execute(state, ItemChangeAction::Remove, &[item]);
                 },
                 DepVecModification::ExtendFrom(vec) => {
+                    let prev = entry_mut.items.last().cloned();
                     entry_mut.items.extend_from_slice(&vec);
                     let handlers = entry_mut.handlers.clone();
-                    handlers.execute(state, ItemChangeAction::Insert, &vec);
+                    handlers.execute(state, ItemChangeAction::Insert { prev }, &vec);
                 },
                 DepVecModification::Update(handler_id) => {
                     let items = entry_mut.items.clone();
@@ -1062,10 +1107,13 @@ impl<Owner: DepType, ItemType: Convenient> DepVec<Owner, ItemType> {
                         |handler_id| entry_mut.handlers.item_handlers[handler_id].handler.clone()
                     );
                     for item in &items {
-                        handler.execute(state, ItemChange { action: ItemChangeAction::Update, item: item.clone() });
+                        handler.execute(state, ItemChange { action: ItemChangeAction::UpdateRemove, item: item.clone() });
                     }
-                    for item in items {
-                        handler.execute(state, ItemChange { action: ItemChangeAction::AfterUpdate, item });
+                    for (item, prev) in items.iter().zip(once(None).chain(items.iter().skip(1).map(Some))) {
+                        handler.execute(state, ItemChange {
+                            action: ItemChangeAction::UpdateInsert { prev: prev.cloned() },
+                            item: item.clone()
+                        });
                     }
                 },
             };
@@ -1787,8 +1835,11 @@ impl<Owner: DepType + 'static, ItemType: Convenient> Source for DepVecItemSource
                 let obj = obj.get(state);
                 let entry = vec.entry(&obj);
                 let handler = entry.handlers.item_handlers[handler_id].handler.clone();
-                for item in items {
-                    handler.execute(state, ItemChange { action: ItemChangeAction::Insert, item });
+                for (item, prev) in items.iter().zip(once(None).chain(items.iter().skip(1).map(Some))) {
+                    handler.execute(state, ItemChange {
+                        action: ItemChangeAction::Insert { prev: prev.cloned() },
+                        item: item.clone()
+                    });
                 }
             }) as _)
         };
@@ -1834,8 +1885,11 @@ impl<Owner: DepType + 'static, ItemType: Convenient> Source for DepVecItemInitia
                 let obj = obj.get(state);
                 let entry = vec.entry(&obj);
                 let handler = entry.handlers.item_initial_final_handler.as_ref().unwrap().handler.clone();
-                for item in items {
-                    handler.execute(state, ItemChange { action: ItemChangeAction::Insert, item });
+                for (item, prev) in items.iter().zip(once(None).chain(items.iter().skip(1).map(Some))) {
+                    handler.execute(state, ItemChange {
+                        action: ItemChangeAction::Insert { prev: prev.cloned() },
+                        item: item.clone()
+                    });
                 }
             }) as _)
         };
