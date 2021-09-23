@@ -479,7 +479,7 @@ struct DepVecHandlersCopy<ItemType: Convenient> {
 impl<ItemType: Convenient> DepVecHandlersCopy<ItemType> {
     fn execute_insert(self, state: &mut dyn State, prev: Option<ItemType>, items: &[ItemType]) {
         for handler in self.item_initial_final_handler.into_iter().chain(self.item_handlers) {
-            for (item, prev) in items.iter().zip(once(prev.as_ref()).chain(items.iter().skip(1).map(Some))) {
+            for (item, prev) in items.iter().zip(once(prev.as_ref()).chain(items.iter().map(Some))) {
                 handler.execute(state, ItemChange {
                     action: ItemChangeAction::Insert { prev: prev.cloned() },
                     item: item.clone()
@@ -1136,7 +1136,7 @@ impl<Owner: DepType, ItemType: Convenient> DepVec<Owner, ItemType> {
                     for item in &items {
                         handler.execute(state, ItemChange { action: ItemChangeAction::UpdateRemove, item: item.clone() });
                     }
-                    for (item, prev) in items.iter().zip(once(None).chain(items.iter().skip(1).map(Some))) {
+                    for (item, prev) in items.iter().zip(once(None).chain(items.iter().map(Some))) {
                         handler.execute(state, ItemChange {
                             action: ItemChangeAction::UpdateInsert { prev: prev.cloned() },
                             item: item.clone()
@@ -1867,7 +1867,7 @@ impl<Owner: DepType + 'static, ItemType: Convenient> Source for DepVecItemSource
                 let obj = obj.get(state);
                 let entry = vec.entry(&obj);
                 let handler = entry.handlers.item_handlers[handler_id].handler.clone();
-                for (item, prev) in items.iter().zip(once(None).chain(items.iter().skip(1).map(Some))) {
+                for (item, prev) in items.iter().zip(once(None).chain(items.iter().map(Some))) {
                     handler.execute(state, ItemChange {
                         action: ItemChangeAction::Insert { prev: prev.cloned() },
                         item: item.clone()
@@ -1917,7 +1917,7 @@ impl<Owner: DepType + 'static, ItemType: Convenient> Source for DepVecItemInitia
                 let obj = obj.get(state);
                 let entry = vec.entry(&obj);
                 let handler = entry.handlers.item_initial_final_handler.as_ref().unwrap().handler.clone();
-                for (item, prev) in items.iter().zip(once(None).chain(items.iter().skip(1).map(Some))) {
+                for (item, prev) in items.iter().zip(once(None).chain(items.iter().map(Some))) {
                     handler.execute(state, ItemChange {
                         action: ItemChangeAction::Insert { prev: prev.cloned() },
                         item: item.clone()
