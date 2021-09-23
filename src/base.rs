@@ -151,8 +151,8 @@ impl Widget {
         self.drop_bindings_priv(state);
     }
 
-    pub fn load<X: Convenient>(self, state: &mut dyn State, parent: View, init: impl FnOnce(&mut dyn State, View)) -> BYield<X> {
-        let view = View::new(state, parent);
+    pub fn load<X: Convenient>(self, state: &mut dyn State, parent: View, prev: Option<View>, init: impl FnOnce(&mut dyn State, View)) -> BYield<X> {
+        let view = View::new(state, parent, prev);
         view.set_tag(state, self);
         {
             let tree: &mut WidgetTree = state.get_mut();
@@ -178,7 +178,7 @@ impl Widget {
         WidgetBase::VIEW.set(state, self.base(), None)
     }
 
-    fn view(self, tree: &WidgetTree) -> Option<View> {
+    pub fn view(self, tree: &WidgetTree) -> Option<View> {
         tree.0.get().widget_arena[self.0].view
     }
 

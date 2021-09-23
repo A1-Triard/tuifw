@@ -400,14 +400,16 @@ impl View {
     pub fn new(
         state: &mut dyn State,
         parent: View,
+        prev: Option<View>,
     ) -> View {
         let view = {
             let tree: &mut ViewTree = state.get_mut();
             let parent_window = tree.0.get().arena[parent.0].window;
+            let prev_window = prev.map(|prev| tree.0.get().arena[prev.0].window);
             let window = Window::new(
                 tree.window_tree_mut(),
                 Some(parent_window),
-                None,
+                prev_window,
                 Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() }
             );
             let view = tree.0.get_mut().arena.insert(|view| {
@@ -468,6 +470,7 @@ impl View {
                 v_align: v_align.into(),
             });
         }
+        view.invalidate_parent_measure(state);
         view
     }
 
@@ -654,6 +657,10 @@ impl View {
     pub fn first_child(self, tree: &ViewTree) -> Option<View> {
         let window_tree = tree.window_tree();
         tree.0.get().arena[self.0].window.first_child(window_tree).map(|x| x.tag(window_tree).unwrap())
+    }
+
+    pub fn last_child(self, tree: &ViewTree) -> Option<View> {
+        self.first_child(tree).map(|first_child| first_child.prev(tree))
     }
 
     pub fn prev(self, tree: &ViewTree) -> View {

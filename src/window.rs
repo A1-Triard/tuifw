@@ -1,5 +1,5 @@
 use crate::base::*;
-use crate::view::{View, ViewAlign, ViewBase};
+use crate::view::{View, ViewAlign, ViewBase, ViewTree};
 use crate::view::ViewBuilderViewAlignExt;
 use crate::view::decorators::{BorderDecorator, LabelDecorator};
 use crate::view::decorators::ViewBuilderBorderDecoratorExt;
@@ -7,7 +7,7 @@ use crate::view::decorators::ViewBuilderLabelDecoratorExt;
 use crate::view::panels::{CanvasLayout, DockLayout, ViewBuilderDockPanelExt};
 use dep_obj::{dep_type_with_builder, Change, Glob};
 use dep_obj::binding::{Binding1, BindingExt3, b_continue, BYield};
-use dyn_context::state::State;
+use dyn_context::state::{State, StateExt};
 use either::Right;
 use std::borrow::Cow;
 use tuifw_screen_base::*;
@@ -89,9 +89,15 @@ impl WidgetBehavior for WindowBehavior {
                 content_cache.get_mut(state).0 = content.new;
                 if let Some(view) = view {
                     if let Some(content) = content.new {
-                        return content.load(state, view, |state, content_view| DockLayout::new(state, content_view));
+                        let view_tree: &ViewTree = state.get();
+                        let prev = view.last_child(view_tree);
+                        return content.load(state, view, prev, |state, content_view|
+                            DockLayout::new(state, content_view)
+                        );
                     } else {
-                        let content_view = View::new(state, view);
+                        let view_tree: &ViewTree = state.get();
+                        let prev = view.last_child(view_tree);
+                        let content_view = View::new(state, view, prev);
                         DockLayout::new(state, content_view);
                         let ok = content_cache.get_mut(state).1.replace(content_view).is_none();
                         debug_assert!(ok);
@@ -108,13 +114,19 @@ impl WidgetBehavior for WindowBehavior {
             } else {
                 if let Some(content) = content_cache.get(state).0 {
                     if let Some(view) = view {
-                        return content.load(state, view, |state, content_view| DockLayout::new(state, content_view));
+                        let view_tree: &ViewTree = state.get();
+                        let prev = view.last_child(view_tree);
+                        return content.load(state, view, prev, |state, content_view|
+                            DockLayout::new(state, content_view)
+                        );
                     } else {
                         return content.unload(state);
                     }
                 } else {
                     if let Some(view) = view {
-                        let content_view = View::new(state, view);
+                        let view_tree: &ViewTree = state.get();
+                        let prev = view.last_child(view_tree);
+                        let content_view = View::new(state, view, prev);
                         DockLayout::new(state, content_view);
                         let ok = content_cache.get_mut(state).1.replace(content_view).is_none();
                         debug_assert!(ok);

@@ -4,7 +4,7 @@ use crate::view::panels::{CanvasLayout, CanvasPanel};
 use crate::window::{Window, WindowBuilder};
 use dep_obj::{DepObjBaseBuilder, dep_type_with_builder, ItemChange, Change};
 use dep_obj::binding::{Binding1, BindingExt2, b_continue, b_yield, b_immediate};
-use dyn_context::state::State;
+use dyn_context::state::{State, StateExt};
 
 dep_type_with_builder! {
     #[derive(Debug)]
@@ -50,8 +50,12 @@ impl WidgetBehavior for DeskTopBehavior {
                 if window.is_remove() || window.is_update_remove() && view.is_none() {
                     window.item.unload(state)
                 } else if let Some(view) = view {
-                    if window.is_insert() || window.is_update_insert() {
-                        window.item.load(state, view, |state, view| CanvasLayout::new(state, view))
+                    if let Some(prev) = window.as_insert_or_update_insert_prev() {
+                        let prev_view = prev.map(|prev| {
+                            let tree: &WidgetTree = state.get();
+                            prev.view(tree).unwrap()
+                        });
+                        window.item.load(state, view, prev_view, |state, view| CanvasLayout::new(state, view))
                     } else {
                         b_continue()
                     }

@@ -35,7 +35,9 @@ impl<'a> CanvasPanelBuilder<'a> {
         f: impl for<'b> FnOnce(ViewBuilder<'b>) -> ViewBuilder<'b>
     ) -> Self {
         let view = self.0.id();
-        let child = View::new(self.0.state_mut(), view);
+        let tree: &ViewTree = self.0.state().get();
+        let child_prev = view.last_child(tree);
+        let child = View::new(self.0.state_mut(), view, child_prev);
         child.set_tag(self.0.state_mut(), tag);
         storage.map(|x| x.replace(child));
         CanvasLayout::new(self.0.state_mut(), child);
