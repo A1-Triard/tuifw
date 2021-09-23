@@ -517,7 +517,7 @@ impl<Owner: DepType> BaseDepObjCore<Owner> {
 pub trait DepObjIdBase: ComponentId {
     fn parent(self, state: &dyn State) -> Option<Self>;
     fn next(self, state: &dyn State) -> Self;
-    fn last_child(self, state: &dyn State) -> Option<Self>;
+    fn first_child(self, state: &dyn State) -> Option<Self>;
 }
 
 pub trait DepObjId: ComponentId { }
@@ -527,7 +527,7 @@ impl<T: DepObjId> DepObjIdBase for T {
 
     fn next(self, _state: &dyn State) -> Self { self }
 
-    fn last_child(self, _state: &dyn State) -> Option<Self> { None }
+    fn first_child(self, _state: &dyn State) -> Option<Self> { None }
 }
 
 /// A dependency type.
@@ -792,16 +792,16 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
     pub fn update_parent_children_has_handlers(self, state: &mut dyn State, mut obj: Glob<Owner>) {
         while let Some(parent) = obj.parent(state) {
             obj = parent;
-            let children_has_handlers = if let Some(last_child) = Owner::Id::from_raw(obj.id).last_child(state) {
-                let mut child = last_child;
+            let children_has_handlers = if let Some(first_child) = Owner::Id::from_raw(obj.id).first_child(state) {
+                let mut child = first_child;
                 loop {
-                    child = child.next(state);
                     let child_obj = Glob { id: child.into_raw(), descriptor: obj.descriptor };
                     let obj = child_obj.get(state);
                     let entry = self.entry(&obj);
                     debug_assert!(entry.inherits());
                     if !entry.handlers.is_empty() { break true; }
-                    if child == last_child { break false; }
+                    child = child.next(state);
+                    if child == first_child { break false; }
                 }
             } else {
                 false
@@ -819,10 +819,9 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
         obj: Glob<Owner>,
         change: &Change<PropType>,
     ) {
-        if let Some(last_child) = Owner::Id::from_raw(obj.id).last_child(state) {
-            let mut child = last_child;
+        if let Some(first_child) = Owner::Id::from_raw(obj.id).first_child(state) {
+            let mut child = first_child;
             loop {
-                child = child.next(state);
                 let child_obj = Glob { id: child.into_raw(), descriptor: obj.descriptor };
                 let mut obj_mut = child_obj.get_mut(state);
                 let entry_mut = self.entry_mut(&mut obj_mut);
@@ -831,7 +830,8 @@ impl<Owner: DepType, PropType: Convenient> DepProp<Owner, PropType> {
                     let handlers = entry_mut.handlers.clone();
                     handlers.execute(state, change, child_obj, self);
                 }
-                if child == last_child { break; }
+                child = child.next(state);
+                if child == first_child { break; }
             }
         }
     }
