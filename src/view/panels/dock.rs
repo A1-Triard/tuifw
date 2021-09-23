@@ -156,6 +156,8 @@ impl PanelBindings for DockPanelBindings { }
 struct DockPanelBehavior;
 
 impl PanelBehavior for DockPanelBehavior {
+    fn children_order_aware(&self) -> bool { true }
+
     fn children_desired_size(
         &self,
         view: View,

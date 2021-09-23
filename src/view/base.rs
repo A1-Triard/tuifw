@@ -33,6 +33,8 @@ pub trait LayoutBindings: Downcast + Debug + Send + Sync { }
 impl_downcast!(LayoutBindings);
 
 pub trait PanelBehavior {
+    fn children_order_aware(&self) -> bool;
+
     fn children_desired_size(
         &self,
         view: View,
@@ -521,6 +523,19 @@ impl View {
         let node = tree.0.get_mut().arena.remove(self.0);
         Self::drop_children(node.window, tree);
         node.window.drop_window(tree.window_tree_mut());
+    }
+
+    pub fn move_z(self, state: &mut dyn State, prev: Option<View>) {
+        let tree: &mut ViewTree = state.get_mut();
+        let window = tree.0.get().arena[self.0].window;
+        let prev_window = prev.map(|prev| tree.0.get().arena[prev.0].window);
+        window.move_z(tree.window_tree_mut(), prev_window);
+        let parent = self.parent(tree).expect("root view cannot be moved in z direction");
+        if let Some(panel) = tree.0.get().arena[parent.0].panel.as_ref().map(|x| x.behavior()) {
+            if panel.children_order_aware() {
+                parent.invalidate_measure(state);
+            }
+        }
     }
 
     pub fn set_tag<Tag: ComponentId>(self, state: &mut dyn State, tag: Tag) {

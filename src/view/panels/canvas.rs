@@ -148,6 +148,8 @@ impl PanelBindings for CanvasPanelBindings { }
 struct CanvasPanelBehavior;
 
 impl PanelBehavior for CanvasPanelBehavior {
+    fn children_order_aware(&self) -> bool { false }
+
     fn children_desired_size(
         &self,
         view: View,
