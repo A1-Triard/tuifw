@@ -238,10 +238,6 @@ impl Window {
     fn attach(self, tree: &mut WindowTree, parent: Id<WindowNode>, prev: Option<Window>) {
         let prev = if let Some(prev) = prev {
             assert_eq!(tree.arena[prev.0].parent.unwrap(), parent);
-            let parent_node = &mut tree.arena[parent];
-            if parent_node.last_child.unwrap() == prev.0 {
-                parent_node.last_child = Some(self.0);
-            }
             prev.0
         } else {
             let parent_node = &mut tree.arena[parent];
