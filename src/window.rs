@@ -6,7 +6,7 @@ use crate::view::decorators::ViewBuilderBorderDecoratorExt;
 use crate::view::decorators::ViewBuilderLabelDecoratorExt;
 use crate::view::panels::{CanvasLayout, DockLayout, ViewBuilderDockPanelExt};
 use dep_obj::{dep_type_with_builder, Change, Glob};
-use dep_obj::binding::{Binding1, BindingExt2, b_continue, BYield};
+use dep_obj::binding::{Binding1, BindingExt3, b_continue, BYield};
 use dyn_context::state::State;
 use either::Right;
 use std::borrow::Cow;
@@ -78,57 +78,57 @@ impl WidgetBehavior for WindowBehavior {
         widget.obj::<Window>().add_binding(state, init_new_view);
         init_new_view.set_source_1(state, &mut WidgetBase::VIEW.change_initial_source(widget.base()));
 
-        let load_content = BindingExt2::new(state, None, |
+        let content = BindingExt3::new(state, (None, None), |
             state,
-            content_cache: Glob<Option<Widget>>,
+            content_cache: Glob<(Option<Widget>, Option<View>)>,
             view: Option<View>,
-            content: Option<Change<Option<Widget>>>
+            new_content: Option<Change<Option<Widget>>>,
+            old_content: Option<Change<Option<Widget>>>,
         | -> BYield<!> {
-            if let Some(content) = content {
-                *content_cache.get_mut(state) = content.new;
+            if let Some(content) = new_content {
+                content_cache.get_mut(state).0 = content.new;
                 if let Some(view) = view {
                     if let Some(content) = content.new {
                         return content.load(state, view, |state, content_view| DockLayout::new(state, content_view));
+                    } else {
+                        let content_view = View::new(state, view);
+                        DockLayout::new(state, content_view);
+                        let ok = content_cache.get_mut(state).1.replace(content_view).is_none();
+                        debug_assert!(ok);
                     }
                 }
-            } else {
-                if let Some(view) = view {
-                    if let Some(content) = *content_cache.get(state) {
-                        return content.load(state, view, |state, content_view| DockLayout::new(state, content_view));
-                    }
-                }
-            }
-            b_continue()
-        });
-        widget.obj::<Window>().add_binding(state, load_content);
-        load_content.set_source_2(state, &mut Window::CONTENT.change_initial_source(widget.obj()));
-        load_content.set_source_1(state, &mut WidgetBase::VIEW.value_source(widget.base()));
-
-        let unload_content = BindingExt2::new(state, None, |
-            state,
-            content_cache: Glob<Option<Widget>>,
-            view: Option<View>,
-            content: Option<Change<Option<Widget>>>
-        | -> BYield<!> {
-            if let Some(content) = content {
-                *content_cache.get_mut(state) = content.new;
+            } else if let Some(content) = old_content {
                 if view.is_some() {
                     if let Some(content) = content.old {
                         return content.unload(state);
+                    } else {
+                        content_cache.get_mut(state).1.take().unwrap().drop_view(state);
                     }
                 }
             } else {
-                if view.is_none() {
-                    if let Some(content) = *content_cache.get(state) {
+                if let Some(content) = content_cache.get(state).0 {
+                    if let Some(view) = view {
+                        return content.load(state, view, |state, content_view| DockLayout::new(state, content_view));
+                    } else {
                         return content.unload(state);
+                    }
+                } else {
+                    if let Some(view) = view {
+                        let content_view = View::new(state, view);
+                        DockLayout::new(state, content_view);
+                        let ok = content_cache.get_mut(state).1.replace(content_view).is_none();
+                        debug_assert!(ok);
+                    } else {
+                        content_cache.get_mut(state).1.take().unwrap().drop_view(state);
                     }
                 }
             }
             b_continue()
         });
-        widget.obj::<Window>().add_binding(state, unload_content);
-        unload_content.set_source_2(state, &mut Window::CONTENT.change_final_source(widget.obj()));
-        unload_content.set_source_1(state, &mut WidgetBase::VIEW.value_source(widget.base()));
+        widget.obj::<Window>().add_binding(state, content);
+        content.set_source_1(state, &mut WidgetBase::VIEW.value_source(widget.base()));
+        content.set_source_2(state, &mut Window::CONTENT.change_initial_source(widget.obj()));
+        content.set_source_3(state, &mut Window::CONTENT.change_final_source(widget.obj()));
     }
 
     fn drop_bindings(&self, _widget: Widget, _state: &mut dyn State) { }
