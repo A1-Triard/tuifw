@@ -1,6 +1,6 @@
 use crate::base::*;
 use crate::view::{View, ViewBase};
-use crate::view::decorators::LabelDecorator;
+use crate::view::decorators::TextDecorator;
 use dep_obj::{dep_type_with_builder, Change};
 use dep_obj::binding::Binding1;
 use dyn_context::state::State;
@@ -27,11 +27,11 @@ impl WidgetBehavior for StaticTextBehavior {
             change.and_then(|change| change.new)
         );
         init_new_view.set_target_fn(state, widget, |state, widget, view: View| {
-            LabelDecorator::new(state, view);
+            TextDecorator::new(state, view);
             view.bind_base_to_widget_option(state, ViewBase::BG, widget, StaticText::BG, |x| x);
             view.bind_base_to_widget_option(state, ViewBase::FG, widget, StaticText::FG, |x| x);
             view.bind_base_to_widget_option(state, ViewBase::ATTR, widget, StaticText::ATTR, |x| x);
-            view.bind_decorator_to_widget(state, LabelDecorator::TEXT, widget, StaticText::TEXT, |x| x);
+            view.bind_decorator_to_widget(state, TextDecorator::TEXT, widget, StaticText::TEXT, |x| x);
         });
         widget.obj::<StaticText>().add_binding(state, init_new_view);
         init_new_view.set_source_1(state, &mut WidgetBase::VIEW.change_initial_source(widget.base()));

@@ -1,9 +1,8 @@
 use crate::base::*;
 use crate::view::{View, ViewAlign, ViewBase, ViewTree};
-use crate::view::ViewBuilderViewAlignExt;
-use crate::view::decorators::{BorderDecorator, LabelDecorator};
+use crate::view::decorators::{BorderDecorator, TextDecorator};
 use crate::view::decorators::ViewBuilderBorderDecoratorExt;
-use crate::view::decorators::ViewBuilderLabelDecoratorExt;
+use crate::view::decorators::ViewBuilderTextDecoratorExt;
 use crate::view::panels::{CanvasLayout, DockLayout, ViewBuilderDockPanelExt};
 use dep_obj::{DepObjBaseBuilder, dep_type_with_builder, Change, Glob};
 use dep_obj::binding::{BYield, Binding1, BindingExt3, b_continue, b_immediate};
@@ -55,12 +54,11 @@ impl WidgetBehavior for WindowBehavior {
                 )
                 .dock_panel(|panel| panel
                     .child(Some(&mut header), (), |layout| layout.dock(Right(Side::Top)), |child| child
-                        .label_decorator(|decorator| decorator)
-                        .align(|align| align.h_align(HAlign::Center))
+                        .text_decorator(|decorator| decorator)
                     )
                 )
             );
-            header.unwrap().bind_decorator_to_widget(state, LabelDecorator::TEXT, widget, Window::HEADER, |x| x);
+            header.unwrap().bind_decorator_to_widget(state, TextDecorator::TEXT, widget, Window::HEADER, |x| x);
             view.bind_base_to_widget(state, ViewBase::BG, widget, Window::BG, |x| x);
             view.bind_layout_to_widget(state, CanvasLayout::TL, widget, Window::BOUNDS, |x| x.tl);
             view.bind_align_to_widget(state, ViewAlign::W, widget, Window::BOUNDS, |x| Some(x.w()));

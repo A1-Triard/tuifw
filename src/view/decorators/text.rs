@@ -10,63 +10,63 @@ use tuifw_window::RenderPort;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthChar;
 
-pub trait ViewBuilderLabelDecoratorExt {
-    fn label_decorator(
+pub trait ViewBuilderTextDecoratorExt {
+    fn text_decorator(
         self,
-        f: impl for<'a> FnOnce(LabelDecoratorBuilder<'a>) -> LabelDecoratorBuilder<'a>
+        f: impl for<'a> FnOnce(TextDecoratorBuilder<'a>) -> TextDecoratorBuilder<'a>
     ) -> Self;
 }
 
-impl<'a> ViewBuilderLabelDecoratorExt for ViewBuilder<'a> {
-    fn label_decorator(
+impl<'a> ViewBuilderTextDecoratorExt for ViewBuilder<'a> {
+    fn text_decorator(
         mut self,
-        f: impl for<'b> FnOnce(LabelDecoratorBuilder<'b>) -> LabelDecoratorBuilder<'b>
+        f: impl for<'b> FnOnce(TextDecoratorBuilder<'b>) -> TextDecoratorBuilder<'b>
     ) -> Self {
         let view = self.id();
-        LabelDecorator::new(self.state_mut(), view);
-        f(LabelDecoratorBuilder::new_priv(self)).base_priv()
+        TextDecorator::new(self.state_mut(), view);
+        f(TextDecoratorBuilder::new_priv(self)).base_priv()
     }
 }
 
 dep_type_with_builder! {
     #[derive(Debug)]
-    pub struct LabelDecorator become decorator in View {
+    pub struct TextDecorator become decorator in View {
         text: Cow<'static, str> = Cow::Borrowed(""),
     }
 
     type BaseBuilder<'a> = ViewBuilder<'a>;
 }
 
-impl LabelDecorator {
-    const BEHAVIOR: LabelDecoratorBehavior = LabelDecoratorBehavior;
+impl TextDecorator {
+    const BEHAVIOR: TextDecoratorBehavior = TextDecoratorBehavior;
 
     #[allow(clippy::new_ret_no_self)]
     pub fn new(
         state: &mut dyn State,
         view: View,
     ) {
-        view.set_decorator(state, LabelDecorator::new_priv());
+        view.set_decorator(state, TextDecorator::new_priv());
     }
 }
 
-impl Decorator for LabelDecorator {
+impl Decorator for TextDecorator {
     fn behavior(&self) -> &'static dyn DecoratorBehavior { &Self::BEHAVIOR }
 }
 
 #[derive(Debug)]
-struct LabelDecoratorBindings {
+struct TextDecoratorBindings {
     fg: Binding<Color>,
     bg: Binding<Option<Color>>,
     attr: Binding<Attr>,
     text: Binding<Cow<'static, str>>,
 }
 
-impl DecoratorBindings for LabelDecoratorBindings { }
+impl DecoratorBindings for TextDecoratorBindings { }
 
-struct LabelDecoratorBehavior;
+struct TextDecoratorBehavior;
 
-impl DecoratorBehavior for LabelDecoratorBehavior {
-    fn ty(&self) -> &'static str { "Label" }
+impl DecoratorBehavior for TextDecoratorBehavior {
+    fn ty(&self) -> &'static str { "Text" }
 
     fn children_measure_size(
         &self,
@@ -79,7 +79,7 @@ impl DecoratorBehavior for LabelDecoratorBehavior {
 
     fn desired_size(&self, view: View, state: &mut dyn State, _children_desired_size: Vector) -> Vector {
         let tree: &ViewTree = state.get();
-        let bindings = view.decorator_bindings(tree).downcast_ref::<LabelDecoratorBindings>().unwrap();
+        let bindings = view.decorator_bindings(tree).downcast_ref::<TextDecoratorBindings>().unwrap();
         let width = bindings.text.get_value(state).unwrap_or(Cow::Borrowed(""))
             .graphemes(true)
             .map(|g| g
@@ -97,7 +97,7 @@ impl DecoratorBehavior for LabelDecoratorBehavior {
 
     fn render_bounds(&self, view: View, state: &mut dyn State, _children_render_bounds: Rect) -> Rect {
         let tree: &ViewTree = state.get();
-        let bindings = view.decorator_bindings(tree).downcast_ref::<LabelDecoratorBindings>().unwrap();
+        let bindings = view.decorator_bindings(tree).downcast_ref::<TextDecoratorBindings>().unwrap();
         let width = bindings.text.get_value(state).unwrap_or(Cow::Borrowed(""))
             .graphemes(true)
             .map(|g| g
@@ -111,7 +111,7 @@ impl DecoratorBehavior for LabelDecoratorBehavior {
 
     fn render(&self, view: View, state: &dyn State, port: &mut RenderPort) {
         let tree: &ViewTree = state.get();
-        let bindings = view.decorator_bindings(tree).downcast_ref::<LabelDecoratorBindings>().unwrap();
+        let bindings = view.decorator_bindings(tree).downcast_ref::<TextDecoratorBindings>().unwrap();
         let fg = bindings.fg.get_value(state).unwrap_or(Color::White);
         let bg = bindings.bg.get_value(state).unwrap_or_default();
         let attr = bindings.attr.get_value(state).unwrap_or_default();
@@ -131,8 +131,8 @@ impl DecoratorBehavior for LabelDecoratorBehavior {
         bg.set_source_1(state, &mut ViewBase::BG.value_source(view.base()));
         fg.set_source_1(state, &mut ViewBase::FG.value_source(view.base()));
         attr.set_source_1(state, &mut ViewBase::ATTR.value_source(view.base()));
-        text.set_source_1(state, &mut LabelDecorator::TEXT.value_source(view.decorator()));
-        Box::new(LabelDecoratorBindings {
+        text.set_source_1(state, &mut TextDecorator::TEXT.value_source(view.decorator()));
+        Box::new(TextDecoratorBindings {
             bg: bg.into(),
             fg: fg.into(),
             attr: attr.into(),
@@ -141,7 +141,7 @@ impl DecoratorBehavior for LabelDecoratorBehavior {
     }
 
     fn drop_bindings(&self, _view: View, state: &mut dyn State, bindings: Box<dyn DecoratorBindings>) {
-        let bindings = bindings.downcast::<LabelDecoratorBindings>().unwrap();
+        let bindings = bindings.downcast::<TextDecoratorBindings>().unwrap();
         bindings.bg.drop_binding(state);
         bindings.fg.drop_binding(state);
         bindings.attr.drop_binding(state);
