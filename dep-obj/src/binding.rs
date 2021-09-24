@@ -73,7 +73,7 @@ pub trait Handler<T>: Debug + DynClone + Send + Sync {
 
 clone_trait_object!(<T> Handler<T>);
 
-pub trait SourceCache<T: Convenient>: Default + Debug + Send + Sync {
+pub trait SourceCache<T: Convenient>: Default + Debug {
     type Value: Convenient;
     fn update(&mut self, value: T);
     fn get(&self, current: Option<T>) -> Option<Self::Value>;

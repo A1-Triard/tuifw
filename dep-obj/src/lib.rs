@@ -1347,7 +1347,7 @@ struct Setter<Owner: DepType, PropType: Convenient> {
     value: PropType,
 }
 
-trait AnySetter<Owner: DepType>: Debug + DynClone + Send + Sync {
+trait AnySetter<Owner: DepType>: Debug + DynClone {
     fn prop_offset(&self) -> usize;
     fn un_apply(
         &self,
