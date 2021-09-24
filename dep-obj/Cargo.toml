@@ -1,7 +1,7 @@
 [package]
 edition = "2018"
 name = "dep-obj"
-version = "0.34.0"
+version = "0.34.1"
 authors = ["warlock <internalmike@gmail.com>"]
 description = "Dependency object: effective reactive heterogeneous container."
 readme = "README.md"
@@ -17,7 +17,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 components-arena = "2.1.5"
-downcast-rs = "1.2.0"
+downcast-rs = { version = "1.2.0", default-features = false }
 dyn-clone = "1.0.2"
 dyn-context = "0.10.7"
 educe = "0.4.13"
