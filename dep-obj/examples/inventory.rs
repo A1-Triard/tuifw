@@ -6,7 +6,7 @@
 #![feature(const_raw_ptr_deref)]
 
 use components_arena::{Arena, Component, NewtypeComponentId, Id};
-use dep_obj::{Change, DepObjBaseBuilder, DepObjId, dep_obj, dep_type, dep_type_with_builder, ItemChange};
+use dep_obj::{Change, DepObjBaseBuilder, DepObjId, dep_obj, dep_type, dep_type_with_builder, ItemChange, DepVecItemPos};
 use macro_attr_2018::macro_attr;
 use dep_obj::binding::{Binding1, Binding2, BindingExt2, Bindings, b_yield, b_immediate, b_continue};
 use dyn_context::state::{State, StateExt};
@@ -237,7 +237,7 @@ fn main() {
     b_immediate(NpcProps::EQUIPPED_ITEMS.push(game, npc.props(), sword));
     b_immediate(NpcProps::EQUIPPED_ITEMS.push(game, npc.props(), shield));
     b_immediate(NpcProps::ITEMS_ENHANCEMENT.set(game, npc.props(), 4));
-    b_immediate(NpcProps::EQUIPPED_ITEMS.remove(game, npc.props(), 0));
+    b_immediate(NpcProps::EQUIPPED_ITEMS.remove(game, npc.props(), DepVecItemPos::FirstItem));
     b_immediate(NpcProps::ITEMS_ENHANCEMENT.set(game, npc.props(), 5));
     npc.drop_npc(game);
     sword.drop_item(game);

@@ -1037,12 +1037,65 @@ impl<Owner: DepType, PropType: Convenient> Holder for DepPropSet<Owner, PropType
 #[derive(Debug)]
 enum DepVecModification<ItemType: Convenient> {
     Clear,
-    Push(ItemType),
-    Insert(usize, ItemType),
-    Remove(usize),
-    Move(usize, usize),
+    Insert(DepVecInsertPos<ItemType>, ItemType),
+    Remove(DepVecItemPos<ItemType>),
+    Move(DepVecItemPos<ItemType>, DepVecInsertPos<ItemType>),
     ExtendFrom(Vec<ItemType>),
     Update(Option<Id<ItemHandler<ItemType>>>),
+}
+
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Hash)]
+pub enum DepVecItemPos<ItemType: Convenient> {
+    FirstItem,
+    LastItem,
+    Item(ItemType),
+}
+
+impl<ItemType: Convenient> DepVecItemPos<ItemType> {
+    fn find(&self, items: &[ItemType]) -> usize {
+        match self {
+            DepVecItemPos::FirstItem => {
+                assert!(!items.is_empty(), "item position not found");
+                0
+            },
+            DepVecItemPos::LastItem => {
+                assert!(!items.is_empty(), "item position not found");
+                items.len() - 1
+            }
+            DepVecItemPos::Item(item) => {
+                items.iter().enumerate()
+                    .find_map(|(i, x)| if x == item { Some(i) } else { None })
+                    .expect("item position not found")
+            }
+        }
+    }
+}
+
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Hash)]
+pub enum DepVecInsertPos<ItemType: Convenient> {
+    BeforeFirstItem,
+    AfterLastItem,
+    Before(ItemType),
+    After(ItemType)
+}
+
+impl<ItemType: Convenient> DepVecInsertPos<ItemType> {
+    fn find(&self, items: &[ItemType]) -> usize {
+        match self {
+            DepVecInsertPos::BeforeFirstItem => 0,
+            DepVecInsertPos::AfterLastItem => items.len(),
+            DepVecInsertPos::Before(item) => {
+                items.iter().enumerate()
+                    .find_map(|(i, x)| if x == item { Some(i) } else { None })
+                    .expect("insert position not found")
+            },
+            DepVecInsertPos::After(item) => {
+                1 + items.iter().enumerate()
+                    .find_map(|(i, x)| if x == item { Some(i) } else { None })
+                    .expect("insert position not found")
+            },
+        }
+    }
 }
 
 #[derive(Educe)]
@@ -1097,24 +1150,22 @@ impl<Owner: DepType, ItemType: Convenient> DepVec<Owner, ItemType> {
                     let handlers = entry_mut.handlers.clone();
                     handlers.execute_remove(state, &items);
                 },
-                DepVecModification::Push(item) => {
-                    let prev = entry_mut.items.last().cloned();
-                    entry_mut.items.push(item.clone());
-                    let handlers = entry_mut.handlers.clone();
-                    handlers.execute_insert(state, prev, &[item]);
-                },
-                DepVecModification::Insert(index, item) => {
+                DepVecModification::Insert(pos, item) => {
+                    let index = pos.find(&entry_mut.items);
                     let prev = if index == 0 { None } else { Some(entry_mut.items[index - 1].clone()) };
                     entry_mut.items.insert(index, item.clone());
                     let handlers = entry_mut.handlers.clone();
                     handlers.execute_insert(state, prev, &[item]);
                 },
-                DepVecModification::Remove(index) => {
+                DepVecModification::Remove(pos) => {
+                    let index = pos.find(&entry_mut.items);
                     let item = entry_mut.items.remove(index);
                     let handlers = entry_mut.handlers.clone();
                     handlers.execute_remove(state, &[item]);
                 },
-                DepVecModification::Move(old_index, new_index) => {
+                DepVecModification::Move(old_pos, new_pos) => {
+                    let old_index = old_pos.find(&entry_mut.items);
+                    let new_index = new_pos.find(&entry_mut.items);
                     let item = entry_mut.items.remove(old_index);
                     let prev = if new_index == 0 { None } else { Some(entry_mut.items[new_index - 1].clone()) };
                     entry_mut.items.insert(new_index, item.clone());
@@ -1163,22 +1214,38 @@ impl<Owner: DepType, ItemType: Convenient> DepVec<Owner, ItemType> {
     }
 
     pub fn push<X: Convenient>(self, state: &mut dyn State, obj: Glob<Owner>, item: ItemType) -> BYield<X> {
-        self.modify(state, obj, DepVecModification::Push(item));
+        self.insert(state, obj, DepVecInsertPos::AfterLastItem, item)
+    }
+
+    pub fn insert<X: Convenient>(
+        self,
+        state: &mut dyn State,
+        obj: Glob<Owner>,
+        pos: DepVecInsertPos<ItemType>,
+        item: ItemType
+    ) -> BYield<X> {
+        self.modify(state, obj, DepVecModification::Insert(pos, item));
         b_continue()
     }
 
-    pub fn insert<X: Convenient>(self, state: &mut dyn State, obj: Glob<Owner>, index: usize, item: ItemType) -> BYield<X> {
-        self.modify(state, obj, DepVecModification::Insert(index, item));
+    pub fn move_<X: Convenient>(
+        self,
+        state: &mut dyn State,
+        obj: Glob<Owner>,
+        old_pos: DepVecItemPos<ItemType>,
+        new_pos: DepVecInsertPos<ItemType>
+    ) -> BYield<X> {
+        self.modify(state, obj, DepVecModification::Move(old_pos, new_pos));
         b_continue()
     }
 
-    pub fn move_<X: Convenient>(self, state: &mut dyn State, obj: Glob<Owner>, old_index: usize, new_index: usize) -> BYield<X> {
-        self.modify(state, obj, DepVecModification::Move(old_index, new_index));
-        b_continue()
-    }
-
-    pub fn remove<X: Convenient>(self, state: &mut dyn State, obj: Glob<Owner>, index: usize) -> BYield<X> {
-        self.modify(state, obj, DepVecModification::Remove(index));
+    pub fn remove<X: Convenient>(
+        self,
+        state: &mut dyn State,
+        obj: Glob<Owner>,
+        pos: DepVecItemPos<ItemType>
+    ) -> BYield<X> {
+        self.modify(state, obj, DepVecModification::Remove(pos));
         b_continue()
     }
 
