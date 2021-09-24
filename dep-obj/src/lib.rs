@@ -1165,8 +1165,8 @@ impl<Owner: DepType, ItemType: Convenient> DepVec<Owner, ItemType> {
                 },
                 DepVecModification::Move(old_pos, new_pos) => {
                     let old_index = old_pos.find(&entry_mut.items);
-                    let new_index = new_pos.find(&entry_mut.items);
                     let item = entry_mut.items.remove(old_index);
+                    let new_index = new_pos.find(&entry_mut.items);
                     let prev = if new_index == 0 { None } else { Some(entry_mut.items[new_index - 1].clone()) };
                     entry_mut.items.insert(new_index, item.clone());
                     let handlers = entry_mut.handlers.clone();
