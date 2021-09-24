@@ -31,6 +31,9 @@ fn main() {
     let widgets = WidgetTree::new(screen, &mut bindings);
     let root = widgets.root();
     let app = &mut App { bindings, widgets };
+    let content_1 = StaticText::build(app, |static_text| static_text
+        .text(Cow::Borrowed("First Window"))
+    );
     let mut window_1 = None;
     let mut window_2 = None;
     let mut window_3 = None;
@@ -38,6 +41,7 @@ fn main() {
         .window(Some(&mut window_1), |window| window
             .header(Cow::Borrowed("1"))
             .bounds(Rect::from_tl_br(Point { x: 5, y: 0}, Point { x: 40, y: 15 }))
+            .content(Some(content_1))
         )
         .window(Some(&mut window_2), |window| window
             .header(Cow::Borrowed("2"))

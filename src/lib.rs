@@ -27,3 +27,6 @@ pub use desk_top::*;
 
 mod window;
 pub use window::*;
+
+mod static_text;
+pub use static_text::*;

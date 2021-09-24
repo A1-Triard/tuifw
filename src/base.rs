@@ -30,7 +30,7 @@ macro_attr! {
 macro_attr! {
     #[derive(Debug, Component!)]
     struct WidgetNode {
-        view: Option<View>,
+        view: Option<(View, bool)>,
         base: WidgetBase,
         obj: Box<dyn WidgetObj>,
     }
@@ -57,6 +57,13 @@ impl RequiresStateDrop for WidgetTreeImpl {
     fn before_drop(state: &mut dyn State) {
         let tree: &WidgetTree = state.get();
         let widgets = tree.0.get().widget_arena.items().ids().collect::<Vec<_>>();
+        for &widget in &widgets {
+            let tree: &WidgetTree = state.get();
+            let node = &tree.0.get().widget_arena[widget];
+            if node.view.map_or(false, |view| view.1) {
+                b_immediate(Widget(widget).unload(state));
+            }
+        }
         for widget in widgets {
             Widget(widget).drop_bindings(state);
         }
@@ -144,19 +151,46 @@ impl Widget {
         let tree: &WidgetTree = state.get();
         let node = &tree.0.get().widget_arena[self.0];
         let behavior = node.obj.behavior();
-        if node.view.is_some() {
-            b_immediate(self.unload(state));
-        }
         behavior.drop_bindings(self, state);
         self.drop_bindings_priv(state);
     }
 
-    pub fn load<X: Convenient>(self, state: &mut dyn State, parent: View, prev: Option<View>, init: impl FnOnce(&mut dyn State, View)) -> BYield<X> {
+    pub fn load_independent<X: Convenient>(
+        self,
+        state: &mut dyn State,
+        parent: View,
+        prev: Option<View>,
+        init: impl FnOnce(&mut dyn State, View)
+    ) -> BYield<X> {
+        self.load_raw(state, parent, prev, init, true)
+    }
+
+    pub fn load<X: Convenient>(
+        self,
+        state: &mut dyn State,
+        parent: View,
+        prev: Option<View>,
+        init: impl FnOnce(&mut dyn State, View)
+    ) -> BYield<X> {
+        self.load_raw(state, parent, prev, init, false)
+    }
+
+    fn load_raw<X: Convenient>(
+        self,
+        state: &mut dyn State,
+        parent: View,
+        prev: Option<View>,
+        init: impl FnOnce(&mut dyn State, View),
+        independent: bool,
+    ) -> BYield<X> {
         let view = View::new(state, parent, prev);
         view.set_tag(state, self);
         {
             let tree: &mut WidgetTree = state.get_mut();
-            assert!(tree.0.get_mut().widget_arena[self.0].view.replace(view).is_none(), "Widget already loaded");
+            assert!(
+                tree.0.get_mut().widget_arena[self.0].view.replace((view, independent)).is_none(),
+                "Widget already loaded"
+            );
         }
         init(state, view);
 
@@ -173,13 +207,16 @@ impl Widget {
     pub fn unload<X: Convenient>(self, state: &mut dyn State) -> BYield<X> {
         {
             let tree: &mut WidgetTree = state.get_mut();
-            assert!(tree.0.get_mut().widget_arena[self.0].view.take().is_some(), "Widget is not loaded");
+            assert!(
+                tree.0.get_mut().widget_arena[self.0].view.take().is_some(),
+                "Widget is not loaded"
+            );
         }
         WidgetBase::VIEW.set(state, self.base(), None)
     }
 
     pub fn view(self, tree: &WidgetTree) -> Option<View> {
-        tree.0.get().widget_arena[self.0].view
+        tree.0.get().widget_arena[self.0].view.map(|x| x.0)
     }
 
     pub fn focus(self, state: &mut dyn State) {
@@ -205,15 +242,18 @@ impl Widget {
         }
     }
 
-    fn bind_view<O: WidgetObj, P: Clone + 'static, T: Convenient, U: Convenient>(
+    fn bind_view<O: WidgetObj, M: Clone + 'static, P: Clone + 'static, T: Convenient, U: Convenient>(
         self,
         state: &mut dyn State,
         widget_prop: DepProp<O, T>,
-        map: fn(T) -> U,
+        map_param: M,
+        map: fn(M, T) -> U,
         param: P,
         bind: fn(&mut dyn State, P, Binding<U>)
     ) {
-        let binding = Binding1::new(state, map, |map, value: T| Some(map(value)));
+        let binding = Binding1::new(state, (map_param, map), |(map_param, map), value: T|
+            Some(map(map_param, value))
+        );
         bind(state, param, binding.into());
         binding.set_source_1(state, &mut widget_prop.value_source(self.obj()));
     }
@@ -233,6 +273,15 @@ impl<'a> DepObjBaseBuilder<Widget> for WidgetBuilder<'a> {
 }
 
 pub trait ViewWidgetExt {
+    fn bind_base_to_widget_option<O: WidgetObj, T: Convenient, U: Convenient>(
+        self,
+        state: &mut dyn State,
+        view_base_prop: DepProp<ViewBase, U>,
+        widget: Widget,
+        widget_prop: DepProp<O, Option<T>>,
+        map: fn(T) -> U,
+    );
+
     fn bind_base_to_widget<O: WidgetObj, T: Convenient, U: Convenient>(
         self,
         state: &mut dyn State,
@@ -271,6 +320,28 @@ pub trait ViewWidgetExt {
 }
 
 impl ViewWidgetExt for View {
+    fn bind_base_to_widget_option<O: WidgetObj, T: Convenient, U: Convenient>(
+        self,
+        state: &mut dyn State,
+        view_base_prop: DepProp<ViewBase, U>,
+        widget: Widget,
+        widget_prop: DepProp<O, Option<T>>,
+        map: fn(T) -> U,
+    ) {
+        widget.bind_view(state, widget_prop, map, |map, x| x.map(map), (view_base_prop, self),
+            |state, (view_base_prop, view), binding| {
+                binding.dispatch(state, (view_base_prop, view), |state, (view_base_prop, view), value| {
+                    if let Some(value) = value {
+                        view_base_prop.set(state, view.base(), value)
+                    } else {
+                        view_base_prop.unset(state, view.base())
+                    }
+                });
+                view.base().add_binding(state, binding);
+            }
+        );
+    }
+
     fn bind_base_to_widget<O: WidgetObj, T: Convenient, U: Convenient>(
         self,
         state: &mut dyn State,
@@ -279,8 +350,9 @@ impl ViewWidgetExt for View {
         widget_prop: DepProp<O, T>,
         map: fn(T) -> U
     ) {
-        widget.bind_view(state, widget_prop, map, (view_base_prop, self), |state, (view_base_prop, view), binding|
-            view_base_prop.bind(state, view.base(), binding)
+        widget.bind_view(state, widget_prop, map, |map, x| map(x), (view_base_prop, self),
+            |state, (view_base_prop, view), binding|
+                view_base_prop.bind(state, view.base(), binding)
         );
     }
 
@@ -292,8 +364,9 @@ impl ViewWidgetExt for View {
         widget_prop: DepProp<O, T>,
         map: fn(T) -> U,
     ) {
-        widget.bind_view(state, widget_prop, map, (view_align_prop, self), |state, (view_align_prop, view), binding|
-            view_align_prop.bind(state, view.align(), binding)
+        widget.bind_view(state, widget_prop, map, |map, x| map(x), (view_align_prop, self),
+            |state, (view_align_prop, view), binding|
+                view_align_prop.bind(state, view.align(), binding)
         );
     }
 
@@ -305,8 +378,9 @@ impl ViewWidgetExt for View {
         widget_prop: DepProp<O, T>,
         map: fn(T) -> U,
     ) {
-        widget.bind_view(state, widget_prop, map, (layout_prop, self), |state, (layout_prop, view), binding|
-            layout_prop.bind(state, view.layout(), binding)
+        widget.bind_view(state, widget_prop, map, |map, x| map(x), (layout_prop, self),
+            |state, (layout_prop, view), binding|
+                layout_prop.bind(state, view.layout(), binding)
         );
     }
 
@@ -318,8 +392,9 @@ impl ViewWidgetExt for View {
         widget_prop: DepProp<O, T>,
         map: fn(T) -> U,
     ) {
-        widget.bind_view(state, widget_prop, map, (decorator_prop, self), |state, (decorator_prop, view), binding|
-            decorator_prop.bind(state, view.decorator(), binding)
+        widget.bind_view(state, widget_prop, map, |map, x| map(x),
+            (decorator_prop, self), |state, (decorator_prop, view), binding|
+                decorator_prop.bind(state, view.decorator(), binding)
         );
     }
 }
