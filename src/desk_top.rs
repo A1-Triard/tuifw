@@ -19,7 +19,7 @@ impl<'a> DeskTopBuilder<'a> {
     pub fn window(
         mut self,
         storage: Option<&mut Option<Widget>>,
-        f: impl for<'b> FnOnce(WindowBuilder<'b>) -> WindowBuilder<'b>
+        f: impl for<'b> FnOnce(WindowBuilder<'b>)
     ) -> Self {
         let desk_top = self.base_priv_ref().id();
         let window = Window::build(self.base_priv_mut().state_mut(), f);
@@ -89,7 +89,7 @@ impl DeskTop {
 
     pub fn build<'a>(
         state: &'a mut dyn State,
-        f: impl FnOnce(DeskTopBuilder<'a>) -> DeskTopBuilder<'a>
+        f: impl FnOnce(DeskTopBuilder<'a>)
     ) -> Widget {
         let desk_top = DeskTop::new(state);
         f(DeskTopBuilder::new_priv(WidgetBuilder { widget: desk_top, state }));

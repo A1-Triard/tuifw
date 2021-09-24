@@ -31,27 +31,32 @@ fn main() {
     let widgets = WidgetTree::new(screen, &mut bindings);
     let root = widgets.root();
     let app = &mut App { bindings, widgets };
-    let content_1 = StaticText::build(app, |static_text| static_text
-        .text(Cow::Borrowed("First Window"))
-    );
     let mut window_1 = None;
     let mut window_2 = None;
     let mut window_3 = None;
-    let desk_top = DeskTop::build(app, |desk_top| desk_top
-        .window(Some(&mut window_1), |window| window
+    let desk_top = DeskTop::build(app, |desk_top| { desk_top
+        .window(Some(&mut window_1), |window| { window
             .header(Cow::Borrowed("1"))
             .bounds(Rect::from_tl_br(Point { x: 5, y: 0}, Point { x: 40, y: 15 }))
-            .content(Some(content_1))
-        )
-        .window(Some(&mut window_2), |window| window
+            .content::<StaticText, _>(None, |static_text| { static_text
+                .text(Cow::Borrowed("First Window"))
+            ;})
+        ;})
+        .window(Some(&mut window_2), |window| { window
             .header(Cow::Borrowed("2"))
             .bounds(Rect::from_tl_br(Point { x: 30, y: 5}, Point { x: 62, y: 20 }))
-        )
-        .window(Some(&mut window_3), |window| window
+            .content::<StaticText, _>(None, |static_text| { static_text
+                .text(Cow::Borrowed("Second Window"))
+            ;})
+        ;})
+        .window(Some(&mut window_3), |window| { window
             .header(Cow::Borrowed("3"))
             .bounds(Rect::from_tl_br(Point { x: 20, y: 10}, Point { x: 50, y: 22 }))
-        )
-    );
+            .content::<StaticText, _>(None, |static_text| { static_text
+                .text(Cow::Borrowed("Third Window"))
+            ;})
+        ;})
+    ;});
     b_immediate(desk_top.load(app, root, None, |_, _| { }));
     window_1.unwrap().focus(app);
 

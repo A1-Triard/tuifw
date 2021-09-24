@@ -50,11 +50,22 @@ impl StaticText {
 
     pub fn build<'a>(
         state: &'a mut dyn State,
-        f: impl FnOnce(StaticTextBuilder<'a>) -> StaticTextBuilder<'a>
+        f: impl FnOnce(StaticTextBuilder<'a>)
     ) -> Widget {
         let static_text = StaticText::new(state);
         f(StaticTextBuilder::new_priv(WidgetBuilder { widget: static_text, state }));
         static_text
+    }
+}
+
+impl WidgetObjWithBuilder for StaticText {
+    type Builder<'a> = StaticTextBuilder<'a>;
+
+    fn build<'a>(
+        state: &'a mut dyn State,
+        f: impl FnOnce(StaticTextBuilder<'a>)
+    ) -> Widget {
+        StaticText::build(state, f)
     }
 }
 

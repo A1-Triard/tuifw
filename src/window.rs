@@ -5,8 +5,8 @@ use crate::view::decorators::{BorderDecorator, LabelDecorator};
 use crate::view::decorators::ViewBuilderBorderDecoratorExt;
 use crate::view::decorators::ViewBuilderLabelDecoratorExt;
 use crate::view::panels::{CanvasLayout, DockLayout, ViewBuilderDockPanelExt};
-use dep_obj::{dep_type_with_builder, Change, Glob};
-use dep_obj::binding::{Binding1, BindingExt3, b_continue, BYield};
+use dep_obj::{DepObjBaseBuilder, dep_type_with_builder, Change, Glob};
+use dep_obj::binding::{Binding1, BindingExt3, b_continue, b_immediate, BYield};
 use dyn_context::state::{State, StateExt};
 use either::Right;
 use std::borrow::Cow;
@@ -16,12 +16,27 @@ dep_type_with_builder! {
     #[derive(Debug)]
     pub struct Window become obj in Widget {
         header: Cow<'static, str> = Cow::Borrowed(""),
+        #[ref]
         content: Option<Widget> = None,
         bg: Option<Color> = Some(Color::Blue),
         bounds: Rect = Rect { tl: Point { x: 0, y: 0 }, size: Vector { x: 0, y: 0 } },
     }
 
     type BaseBuilder<'a> = WidgetBuilder<'a>;
+}
+
+impl<'a> WindowBuilder<'a> {
+    pub fn content<T: WidgetObjWithBuilder, F: for<'b> FnOnce(T::Builder<'b>)>(
+        mut self,
+        storage: Option<&mut Option<Widget>>,
+        f: F
+    ) -> Self {
+        let window = self.base_priv_ref().id();
+        let content = T::build(self.base_priv_mut().state_mut(), f);
+        storage.map(|x| x.replace(content));
+        b_immediate(Window::CONTENT.set(self.base_priv_mut().state_mut(), window.obj(), Some(content)));
+        self
+    }
 }
 
 struct WindowBehavior;
@@ -156,7 +171,7 @@ impl Window {
 
     pub fn build<'a>(
         state: &'a mut dyn State,
-        f: impl FnOnce(WindowBuilder<'a>) -> WindowBuilder<'a>
+        f: impl FnOnce(WindowBuilder<'a>)
     ) -> Widget {
         let window = Window::new(state);
         f(WindowBuilder::new_priv(WidgetBuilder { widget: window, state }));
