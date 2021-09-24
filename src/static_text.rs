@@ -47,15 +47,6 @@ impl StaticText {
     pub fn new(state: &mut dyn State) -> Widget {
         Widget::new(state, StaticText::new_priv())
     }
-
-    pub fn build<'a>(
-        state: &'a mut dyn State,
-        f: impl FnOnce(StaticTextBuilder<'a>)
-    ) -> Widget {
-        let static_text = StaticText::new(state);
-        f(StaticTextBuilder::new_priv(WidgetBuilder { widget: static_text, state }));
-        static_text
-    }
 }
 
 impl WidgetObjWithBuilder for StaticText {
@@ -65,7 +56,9 @@ impl WidgetObjWithBuilder for StaticText {
         state: &'a mut dyn State,
         f: impl FnOnce(StaticTextBuilder<'a>)
     ) -> Widget {
-        StaticText::build(state, f)
+        let static_text = StaticText::new(state);
+        f(StaticTextBuilder::new_priv(WidgetBuilder { widget: static_text, state }));
+        static_text
     }
 }
 

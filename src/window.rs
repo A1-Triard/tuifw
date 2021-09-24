@@ -168,8 +168,12 @@ impl Window {
     pub fn new(state: &mut dyn State) -> Widget {
         Widget::new(state, Window::new_priv())
     }
+}
 
-    pub fn build<'a>(
+impl WidgetObjWithBuilder for Window {
+    type Builder<'a> = WindowBuilder<'a>;
+
+    fn build<'a>(
         state: &'a mut dyn State,
         f: impl FnOnce(WindowBuilder<'a>)
     ) -> Widget {

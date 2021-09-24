@@ -86,8 +86,12 @@ impl DeskTop {
     pub fn new(state: &mut dyn State) -> Widget {
         Widget::new(state, DeskTop::new_priv())
     }
+}
 
-    pub fn build<'a>(
+impl WidgetObjWithBuilder for DeskTop {
+    type Builder<'a> = DeskTopBuilder<'a>;
+
+    fn build<'a>(
         state: &'a mut dyn State,
         f: impl FnOnce(DeskTopBuilder<'a>)
     ) -> Widget {
