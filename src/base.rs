@@ -2,7 +2,7 @@ use crate::view::{Layout, View, ViewAlign, ViewBase, ViewInput, ViewTree, Decora
 use components_arena::{Arena, Component, Id, NewtypeComponentId};
 use debug_panic::debug_panic;
 use dep_obj::{Change, DepObjId, DepType, dep_obj, dep_type, Convenient, DepProp, DepObjBaseBuilder};
-use dep_obj::binding::{Binding1, Bindings, BYield, Binding, b_immediate};
+use dep_obj::binding::{Binding1, Bindings, BYield, Binding};
 use downcast_rs::{Downcast, impl_downcast};
 use dyn_context::state::{RequiresStateDrop, State, StateDrop, StateExt};
 use macro_attr_2018::macro_attr;
@@ -30,7 +30,7 @@ macro_attr! {
 macro_attr! {
     #[derive(Debug, Component!)]
     struct WidgetNode {
-        view: Option<(View, bool)>,
+        view: Option<View>,
         base: WidgetBase,
         obj: Box<dyn WidgetObj>,
     }
@@ -57,13 +57,6 @@ impl RequiresStateDrop for WidgetTreeImpl {
     fn before_drop(state: &mut dyn State) {
         let tree: &WidgetTree = state.get();
         let widgets = tree.0.get().widget_arena.items().ids().collect::<Vec<_>>();
-        for &widget in &widgets {
-            let tree: &WidgetTree = state.get();
-            let node = &tree.0.get().widget_arena[widget];
-            if node.view.map_or(false, |view| view.1) {
-                b_immediate(Widget(widget).unload(state));
-            }
-        }
         for widget in widgets {
             Widget(widget).drop_bindings(state);
         }
@@ -155,40 +148,19 @@ impl Widget {
         self.drop_bindings_priv(state);
     }
 
-    pub fn load_independent<X: Convenient>(
-        self,
-        state: &mut dyn State,
-        parent: View,
-        prev: Option<View>,
-        init: impl FnOnce(&mut dyn State, View)
-    ) -> BYield<X> {
-        self.load_raw(state, parent, prev, init, true)
-    }
-
     pub fn load<X: Convenient>(
         self,
         state: &mut dyn State,
         parent: View,
         prev: Option<View>,
-        init: impl FnOnce(&mut dyn State, View)
-    ) -> BYield<X> {
-        self.load_raw(state, parent, prev, init, false)
-    }
-
-    fn load_raw<X: Convenient>(
-        self,
-        state: &mut dyn State,
-        parent: View,
-        prev: Option<View>,
         init: impl FnOnce(&mut dyn State, View),
-        independent: bool,
     ) -> BYield<X> {
         let view = View::new(state, parent, prev);
         view.set_tag(state, self);
         {
             let tree: &mut WidgetTree = state.get_mut();
             assert!(
-                tree.0.get_mut().widget_arena[self.0].view.replace((view, independent)).is_none(),
+                tree.0.get_mut().widget_arena[self.0].view.replace(view).is_none(),
                 "Widget already loaded"
             );
         }
@@ -216,7 +188,7 @@ impl Widget {
     }
 
     pub fn view(self, tree: &WidgetTree) -> Option<View> {
-        tree.0.get().widget_arena[self.0].view.map(|x| x.0)
+        tree.0.get().widget_arena[self.0].view
     }
 
     pub fn focus(self, state: &mut dyn State) {
