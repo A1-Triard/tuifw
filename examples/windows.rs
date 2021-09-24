@@ -4,6 +4,7 @@ use dyn_context::state::State;
 use std::any::{TypeId, Any};
 use std::borrow::Cow;
 use tuifw::view::ViewInput;
+use dep_obj::{DepVecItemPos, DepVecInsertPos};
 
 struct App {
     bindings: Bindings,
@@ -56,7 +57,7 @@ fn main() {
     focus_1.set_target_fn(app, (window_1.unwrap(), desk_top), |app, (window, desk_top), input| {
         input.mark_as_handled();
         window.focus(app);
-        b_immediate(DeskTop::WINDOWS.move_(app, desk_top.obj(), 0, 2));
+        b_immediate(DeskTop::WINDOWS.move_(app, desk_top.obj(), DepVecItemPos::Item(window), DepVecInsertPos::AfterLastItem));
     });
     desk_top.base().add_binding(app, focus_1);
     focus_1.set_source_1(app, &mut WidgetBase::VIEW_INPUT.source(desk_top.base()));
@@ -64,9 +65,10 @@ fn main() {
     let focus_2 = Binding1::new(app, (), |(), input: Option<ViewInput>|
         input.filter(|input| input.key().1 == Key::Alt('2'))
     );
-    focus_2.set_target_fn(app, window_2.unwrap(), |app, window, input| {
+    focus_2.set_target_fn(app, (window_2.unwrap(), desk_top), |app, (window, desk_top), input| {
         input.mark_as_handled();
         window.focus(app);
+        b_immediate(DeskTop::WINDOWS.move_(app, desk_top.obj(), DepVecItemPos::Item(window), DepVecInsertPos::AfterLastItem));
     });
     desk_top.base().add_binding(app, focus_2);
     focus_2.set_source_1(app, &mut WidgetBase::VIEW_INPUT.source(desk_top.base()));
@@ -74,9 +76,10 @@ fn main() {
     let focus_3 = Binding1::new(app, (), |(), input: Option<ViewInput>|
         input.filter(|input| input.key().1 == Key::Alt('3'))
     );
-    focus_3.set_target_fn(app, window_3.unwrap(), |app, window, input| {
+    focus_3.set_target_fn(app, (window_3.unwrap(), desk_top), |app, (window, desk_top), input| {
         input.mark_as_handled();
         window.focus(app);
+        b_immediate(DeskTop::WINDOWS.move_(app, desk_top.obj(), DepVecItemPos::Item(window), DepVecInsertPos::AfterLastItem));
     });
     desk_top.base().add_binding(app, focus_3);
     focus_3.set_source_1(app, &mut WidgetBase::VIEW_INPUT.source(desk_top.base()));
