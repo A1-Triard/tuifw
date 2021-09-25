@@ -1,11 +1,12 @@
 use crate::view::base::*;
+use alloc::boxed::Box;
 use components_arena::ComponentId;
 use dep_obj::{DepObjBaseBuilder, Style, dep_type_with_builder};
 use dep_obj::binding::{Binding, Binding1};
 use dyn_context::state::{State, StateExt};
 use either::{Either, Left, Right};
-use std::cmp::{max, min};
-use std::fmt::Debug;
+use core::cmp::{max, min};
+use core::fmt::Debug;
 use tuifw_screen_base::{Orient, Rect, Side, Thickness, Vector};
 
 pub trait ViewBuilderDockPanelExt {

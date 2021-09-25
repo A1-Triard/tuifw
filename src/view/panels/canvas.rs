@@ -1,9 +1,10 @@
 use crate::view::base::*;
+use alloc::boxed::Box;
 use components_arena::ComponentId;
 use dep_obj::{DepObjBaseBuilder, Style, dep_type, dep_type_with_builder};
 use dep_obj::binding::{Binding, Binding1};
 use dyn_context::state::{State, StateExt};
-use std::fmt::Debug;
+use core::fmt::Debug;
 use tuifw_screen_base::{Point, Rect, Vector};
 
 pub trait ViewBuilderCanvasPanelExt {

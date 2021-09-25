@@ -59,6 +59,7 @@ fn main() {
     ;});
     b_immediate(desk_top.load(app, root, None, |_, _| { }));
     window_1.unwrap().focus(app);
+    b_immediate(DeskTop::WINDOWS.move_(app, desk_top.obj(), DepVecItemPos::Item(window_1.unwrap()), DepVecInsertPos::AfterLastItem));
 
     let focus_1 = Binding1::new(app, (), |(), input: Option<ViewInput>|
         input.filter(|input| input.key().1 == Key::Alt('1'))

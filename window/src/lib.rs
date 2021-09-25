@@ -9,14 +9,21 @@
 #![allow(clippy::collapsible_if)]
 #![allow(clippy::type_complexity)]
 
+#![no_std]
+
+extern crate alloc;
+
+use alloc::boxed::Box;
+use alloc::vec;
+use alloc::vec::Vec;
 use components_arena::{Arena, Component, ComponentId, Id, NewtypeComponentId, RawId};
 use dyn_context::state::State;
 use educe::Educe;
 use macro_attr_2018::macro_attr;
-use std::any::Any;
-use std::cmp::{max, min};
-use std::mem::replace;
-use std::ops::Range;
+use core::any::Any;
+use core::cmp::{max, min};
+use core::mem::replace;
+use core::ops::Range;
 use tuifw_screen_base::{Attr, Color, Event, Point, Rect, Screen, Vector};
 
 fn invalidate_rect(invalidated: (&mut Vec<Range<i16>>, Vector), rect: Rect) {

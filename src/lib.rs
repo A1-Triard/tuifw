@@ -10,11 +10,14 @@
 #![doc(test(attr(deny(warnings))))]
 #![doc(test(attr(allow(dead_code))))]
 #![doc(test(attr(allow(unused_variables))))]
-
 #![allow(clippy::collapsible_if)]
 #![allow(clippy::many_single_char_names)]
 #![allow(clippy::unit_arg)]
 #![allow(clippy::option_map_unit_fn)]
+
+#![no_std]
+
+extern crate alloc;
 
 pub use tuifw_screen_base::*;
 

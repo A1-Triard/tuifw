@@ -3,9 +3,15 @@
 #![doc(test(attr(allow(dead_code))))]
 #![doc(test(attr(allow(unused_variables))))]
 
-use std::any::Any;
-use std::cmp::{min, max};
-use std::ops::Range;
+#![no_std]
+
+extern crate alloc;
+
+use alloc::boxed::Box;
+use alloc::vec::Vec;
+use core::any::Any;
+use core::cmp::{min, max};
+use core::ops::Range;
 use tuifw_screen_base::*;
 use tuifw_screen_base::Screen as base_Screen;
 use unicode_segmentation::UnicodeSegmentation;

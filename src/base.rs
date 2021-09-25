@@ -1,4 +1,6 @@
 use crate::view::{Layout, View, ViewAlign, ViewBase, ViewInput, ViewTree, Decorator};
+use alloc::boxed::Box;
+use alloc::vec::Vec;
 use components_arena::{Arena, Component, Id, NewtypeComponentId};
 use debug_panic::debug_panic;
 use dep_obj::{Change, DepObjId, DepType, dep_obj, dep_type, Convenient, DepProp, DepObjBaseBuilder};
@@ -6,8 +8,8 @@ use dep_obj::binding::{Binding1, Bindings, BYield, Binding};
 use downcast_rs::{Downcast, impl_downcast};
 use dyn_context::state::{RequiresStateDrop, State, StateDrop, StateExt};
 use macro_attr_2018::macro_attr;
-use std::any::{Any, TypeId};
-use std::fmt::Debug;
+use core::any::{Any, TypeId};
+use core::fmt::Debug;
 use tuifw_screen_base::Screen;
 
 pub trait WidgetBehavior {
@@ -15,7 +17,7 @@ pub trait WidgetBehavior {
     fn drop_bindings(&self, widget: Widget, state: &mut dyn State);
 }
 
-pub trait WidgetObj: Downcast + DepType<Id=Widget> + Send + Sync {
+pub trait WidgetObj: Downcast + DepType<Id=Widget> {
     fn behavior(&self) -> &'static dyn WidgetBehavior;
 }
 

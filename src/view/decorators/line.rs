@@ -1,9 +1,10 @@
 use crate::view::base::*;
+use alloc::boxed::Box;
 use dep_obj::{DepObjBaseBuilder, dep_type_with_builder};
 use dep_obj::binding::{Binding, Binding1, Binding2};
 use dyn_context::state::{State, StateExt};
-use std::borrow::Cow;
-use std::fmt::Debug;
+use alloc::borrow::Cow;
+use core::fmt::Debug;
 use tuifw_screen_base::{Attr, Color, Orient, Point, Rect, Vector};
 use tuifw_window::RenderPort;
 

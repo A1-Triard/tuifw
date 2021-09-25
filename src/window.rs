@@ -8,7 +8,7 @@ use dep_obj::{DepObjBaseBuilder, dep_type_with_builder, Change, Glob};
 use dep_obj::binding::{BYield, Binding1, BindingExt3, b_continue, b_immediate};
 use dyn_context::state::{State, StateExt};
 use either::Right;
-use std::borrow::Cow;
+use alloc::borrow::Cow;
 use tuifw_screen_base::*;
 
 dep_type_with_builder! {

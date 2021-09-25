@@ -1,3 +1,4 @@
+use alloc::boxed::Box;
 use components_arena::{Arena, Component, ComponentId, Id, NewtypeComponentId, RawId};
 use debug_panic::debug_panic;
 use dep_obj::{DepObjBaseBuilder, DepObjIdBase, DepType, dep_obj, dep_type_with_builder, DepEventArgs, Convenient, DepProp};
@@ -6,17 +7,18 @@ use downcast_rs::{Downcast, impl_downcast};
 use dyn_clone::{DynClone, clone_trait_object};
 use dyn_context::state::{SelfState, State, StateExt, StateRefMut, RequiresStateDrop, StateDrop};
 use macro_attr_2018::macro_attr;
-use std::any::Any;
-use std::borrow::Cow;
-use std::cmp::{max, min};
-use std::fmt::Debug;
-use std::mem::replace;
-use std::num::NonZeroU16;
+use core::any::Any;
+use alloc::borrow::Cow;
+use core::cmp::{max, min};
+use core::fmt::Debug;
+use core::mem::replace;
+use core::num::NonZeroU16;
 use tuifw_screen_base::{Attr, Color, Event, HAlign, Key, Point, Rect, Screen, Thickness, VAlign, Vector};
 use tuifw_window::{RenderPort, Window, WindowTree};
-use std::sync::{Arc, Mutex};
+use core::cell::RefCell;
+use alloc::rc::Rc;
 
-pub trait Layout: Downcast + DepType<Id=View> + Send + Sync {
+pub trait Layout: Downcast + DepType<Id=View> {
     fn behavior(&self) -> &'static dyn LayoutBehavior;
 }
 
@@ -28,7 +30,7 @@ pub trait LayoutBehavior {
     fn drop_bindings(&self, view: View, state: &mut dyn State, bindings: Box<dyn LayoutBindings>);
 }
 
-pub trait LayoutBindings: Downcast + Debug + Send + Sync { }
+pub trait LayoutBindings: Downcast + Debug { }
 
 impl_downcast!(LayoutBindings);
 
@@ -54,13 +56,13 @@ pub trait PanelBehavior {
     fn drop_bindings(&self, view: View, state: &mut dyn State, bindings: Box<dyn PanelBindings>);
 }
 
-pub trait Panel: Downcast + DepType<Id=View> + Send + Sync {
+pub trait Panel: Downcast + DepType<Id=View> {
     fn behavior(&self) -> &'static dyn PanelBehavior;
 }
 
 impl_downcast!(Panel);
 
-pub trait PanelBindings: Downcast + Debug + Send + Sync { }
+pub trait PanelBindings: Downcast + Debug { }
 
 impl_downcast!(PanelBindings);
 
@@ -91,7 +93,7 @@ pub trait DecoratorBindings: Downcast + Debug + Sync + Send { }
 
 impl_downcast!(DecoratorBindings);
 
-pub trait Decorator: Downcast + DepType<Id=View> + Sync + Send {
+pub trait Decorator: Downcast + DepType<Id=View> {
     fn behavior(&self) -> &'static dyn DecoratorBehavior;
 }
 
@@ -305,7 +307,7 @@ impl ViewTree {
         }
         let event = event?;
         if let Some(Event::Key(n, key)) = event {
-            let input = ViewInput(Arc::new(Mutex::new(ViewInputInstance { key: (n, key), handled: false })));
+            let input = ViewInput(Rc::new(RefCell::new(ViewInputInstance { key: (n, key), handled: false })));
             let tree: &ViewTree = state.get();
             let view = tree.0.get().actual_focused;
             b_immediate(ViewBase::INPUT.raise(state, view.base(), input));
@@ -1090,7 +1092,7 @@ impl DecoratorBehavior for RootDecoratorBehavior {
     }
 }
 
-pub trait PanelTemplate: Debug + DynClone + Send + Sync {
+pub trait PanelTemplate: Debug + DynClone {
     fn apply_panel(&self, state: &mut dyn State, view: View);
     fn apply_layout(&self, state: &mut dyn State, view: View);
 }
@@ -1104,22 +1106,22 @@ struct ViewInputInstance {
 }
 
 #[derive(Debug, Clone)]
-pub struct ViewInput(Arc<Mutex<ViewInputInstance>>);
+pub struct ViewInput(Rc<RefCell<ViewInputInstance>>);
 
 impl PartialEq for ViewInput {
     fn eq(&self, _other: &Self) -> bool { false }
 }
 
 impl ViewInput {
-    pub fn key(&self) -> (NonZeroU16, Key) { self.0.lock().unwrap().key }
+    pub fn key(&self) -> (NonZeroU16, Key) { self.0.borrow_mut().key }
 
     pub fn mark_as_handled(&self) {
-        self.0.lock().unwrap().handled = true;
+        self.0.borrow_mut().handled = true;
     }
 }
 
 impl DepEventArgs for ViewInput {
-    fn handled(&self) -> bool { self.0.lock().unwrap().handled }
+    fn handled(&self) -> bool { self.0.borrow().handled }
 }
 
 pub trait ViewBuilderViewBaseExt {

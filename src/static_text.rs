@@ -4,7 +4,7 @@ use crate::view::decorators::TextDecorator;
 use dep_obj::{dep_type_with_builder, Change};
 use dep_obj::binding::Binding1;
 use dyn_context::state::State;
-use std::borrow::Cow;
+use alloc::borrow::Cow;
 use tuifw_screen_base::*;
 
 dep_type_with_builder! {

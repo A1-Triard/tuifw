@@ -4,18 +4,24 @@
 #![doc(test(attr(deny(warnings))))]
 #![doc(test(attr(allow(dead_code))))]
 #![doc(test(attr(allow(unused_variables))))]
-
 #![allow(clippy::collapsible_if)]
 #![allow(clippy::many_single_char_names)]
-use std::char::{self};
-use std::cmp::min;
-use std::io::{self};
-use std::mem::{size_of, MaybeUninit};
-use std::num::NonZeroU16;
-use std::ops::Range;
-use std::ptr::{null, null_mut};
-use std::str::{self};
-use std::thread::{self};
+
+#![no_std]
+
+extern crate alloc;
+
+use alloc::boxed::Box;
+use alloc::vec;
+use alloc::vec::Vec;
+use core::char::{self};
+use core::cmp::min;
+use core::mem::{size_of, MaybeUninit};
+use core::num::NonZeroU16;
+use core::ops::Range;
+use core::ptr::{null, null_mut};
+use core::str::{self};
+use panicking::panicking;
 use tuifw_screen_base::*;
 use tuifw_screen_base::Screen as base_Screen;
 use either::{Either, Right, Left};
@@ -28,6 +34,7 @@ use winapi::um::wincon::*;
 use winapi::um::winnt::*;
 use winapi::um::fileapi::*;
 use winapi::um::consoleapi::*;
+use winapi::um::errhandlingapi::GetLastError;
 use winapi::um::handleapi::*;
 use winapi::um::stringapiset::WideCharToMultiByte;
 use winapi::um::winnls::*;
@@ -35,17 +42,17 @@ use winapi::um::winuser::*;
 use num_traits::identities::Zero;
 use unicode_segmentation::UnicodeSegmentation;
 
-fn no_zero<Z: Zero>(r: Z) -> io::Result<Z> {
+fn no_zero<Z: Zero>(r: Z) -> Result<Z, DWORD> {
     if r.is_zero() {
-        Err(io::Error::last_os_error())
+        Err(unsafe { GetLastError() })
     } else {
         Ok(r)
     }
 }
 
-fn valid_handle(h: HANDLE) -> io::Result<HANDLE> {
+fn valid_handle(h: HANDLE) -> Result<HANDLE, DWORD> {
     if h == INVALID_HANDLE_VALUE {
-        Err(io::Error::last_os_error())
+        Err(unsafe { GetLastError() })
     } else {
         Ok(h)
     }
@@ -62,7 +69,7 @@ pub struct Screen {
 }
 
 impl Screen {
-    pub fn new() -> io::Result<Self> {
+    pub fn new() -> Result<Self, DWORD> {
         unsafe { FreeConsole() };
         no_zero(unsafe { AllocConsole() })?;
         let mut s = Screen {
@@ -113,7 +120,7 @@ impl Screen {
         Ok(s)
     }
     
-    fn init_screen_buffer(&mut self) -> io::Result<()> {
+    fn init_screen_buffer(&mut self) -> Result<(), DWORD> {
         let mut ci = CONSOLE_SCREEN_BUFFER_INFO {
             dwSize: COORD { X: 0, Y: 0 },
             dwCursorPosition: COORD { X: 0, Y: 0 },
@@ -133,7 +140,7 @@ impl Screen {
         Ok(())
     }
 
-    fn resize(&mut self) -> io::Result<()> {
+    fn resize(&mut self) -> Result<(), DWORD> {
         let mut ci = CONSOLE_SCREEN_BUFFER_INFO {
             dwSize: COORD { X: 0, Y: 0 },
             dwCursorPosition: COORD { X: 0, Y: 0 },
@@ -200,7 +207,7 @@ impl Screen {
         }
     }
 
-    unsafe fn drop_raw(&mut self) -> io::Result<()> {
+    unsafe fn drop_raw(&mut self) -> Result<(), DWORD> {
         if self.h_input != INVALID_HANDLE_VALUE {
             no_zero(CloseHandle(self.h_input))?;
         }
@@ -211,7 +218,7 @@ impl Screen {
         Ok(())
     }
 
-    fn update_raw(&mut self, cursor: Option<Point>, wait: bool) -> io::Result<Option<Event>> {
+    fn update_raw(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, DWORD> {
         if !self.invalidated.is_empty() {
             let mut region = SMALL_RECT {
                 Top: self.invalidated.t(),
@@ -375,7 +382,7 @@ impl Drop for Screen {
     #[allow(clippy::panicking_unwrap)]
     fn drop(&mut self) {
         let e = unsafe { self.drop_raw() };
-        if e.is_err() && !thread::panicking() { e.unwrap(); }
+        if e.is_err() && !panicking() { e.unwrap(); }
     }
 }
 
