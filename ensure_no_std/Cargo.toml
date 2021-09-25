@@ -15,3 +15,4 @@ dyn-context = "0.10.8"
 libc_alloc = "1.0.3"
 tuifw = { path = ".." }
 tuifw-screen = { path = "../screen" }
+winapi = { version = "0.3.9", features = ["processthreadsapi"] }

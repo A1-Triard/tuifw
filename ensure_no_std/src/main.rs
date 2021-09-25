@@ -10,18 +10,25 @@ use dep_obj::binding::Bindings;
 use dyn_context::state::State;
 use libc_alloc::LibcAlloc;
 use tuifw::WidgetTree;
+use winapi::um::processthreadsapi::ExitProcess;
 
-#[link(name = "msvcrt")]
+#[link(name="msvcrt")]
 extern { }
 
 #[global_allocator]
 static ALLOCATOR: LibcAlloc = LibcAlloc;
 
 #[panic_handler]
-pub extern fn panic(_info: &PanicInfo) -> ! { loop { } }
+pub extern fn panic(_info: &PanicInfo) -> ! {
+    unsafe { ExitProcess(99); }
+    loop { }
+}
 
 #[no_mangle]
-pub fn rust_oom(_layout: Layout) -> ! { loop { } }
+pub fn rust_oom(_layout: Layout) -> ! {
+    unsafe { ExitProcess(98); }
+    loop { }
+}
 
 struct App {
     bindings: Bindings,
