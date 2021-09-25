@@ -72,6 +72,10 @@ impl Screen {
     pub fn new() -> Result<Self, DWORD> {
         unsafe { FreeConsole() };
         no_zero(unsafe { AllocConsole() })?;
+        let window = unsafe { GetConsoleWindow() };
+        assert_ne!(window, null_mut());
+        let system_menu = unsafe { GetSystemMenu(window, FALSE) };
+        no_zero(unsafe { DeleteMenu(system_menu, SC_CLOSE as UINT, MF_BYCOMMAND) })?;
         let mut s = Screen {
             h_input: INVALID_HANDLE_VALUE,
             h_output: INVALID_HANDLE_VALUE,
