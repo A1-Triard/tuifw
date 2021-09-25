@@ -7,6 +7,7 @@ use dyn_context::state::{State, StateExt};
 use either::{Either, Left, Right};
 use core::cmp::{max, min};
 use core::fmt::Debug;
+use num_traits::float::FloatCore;
 use tuifw_screen_base::{Orient, Rect, Side, Thickness, Vector};
 
 pub trait ViewBuilderDockPanelExt {
@@ -462,5 +463,5 @@ impl PanelBehavior for DockPanelBehavior {
 fn frac(numerator: f32, denominator: f32, scale: i16) -> i16 {
     let frac = numerator * (scale as u16 as f32) / denominator;
     if !frac.is_finite() || frac < 0. || frac > scale as u16 as f32 { return 0; }
-    frac.round() as u16 as i16
+    <f32 as FloatCore>::round(frac) as u16 as i16
 }
