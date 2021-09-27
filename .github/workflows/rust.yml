@@ -24,30 +24,18 @@ jobs:
         toolchain: ${{ matrix.rust }}
         override: true
     - name: build
-      uses: actions-rs/cargo@v1
-      with:
-        command: build
-        args: "--verbose --workspace"
+      run: "cargo build --verbose --workspace"
     - name: test --tests
-      uses: actions-rs/cargo@v1
-      with:
-        command: test
-        args: "--verbose --workspace --tests"
+      run: "cargo test --verbose --workspace --tests"
     - name: test --doc
-      uses: actions-rs/cargo@v1
-      with:
-        command: test
-        args: "--verbose --workspace --doc"
+      run: "cargo test --verbose --workspace --doc"
     - name: doc
-      uses: actions-rs/cargo@v1
-      with:
-        command: doc
-        args: "--verbose --workspace"
+      run: "cargo doc --verbose --workspace"
     - name: build --release
-      uses: actions-rs/cargo@v1
-      with:
-        command: build
-        args: "--verbose --workspace --release"
+      run: "cargo build --verbose --workspace --release"
     - name: ensure_no_std build
       working-directory: "ensure_no_std"
       run: "cargo build --verbose"
+    - name: ensure_no_std run
+      working-directory: "ensure_no_std"
+      run: "cargo run --verbose"

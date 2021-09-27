@@ -2,6 +2,7 @@
 edition = "2021"
 name = "ensure_no_std"
 version = "0.0.1"
+publish = false
 
 [profile.dev]
 panic = "abort"
