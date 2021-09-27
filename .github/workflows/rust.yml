@@ -14,8 +14,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macOS-latest]
-        rust: [nightly]
+        include:
+        - os: ubuntu-latest
+          rust: nightly
+          triple: x86_64-unknown-linux-gnu
+        - os: windows-latest
+          rust: nightly
+          triple: x86_64-pc-windows-msvs
+        - os: macOS-latest
+          rust: nightly
+          triple: x86_64-apple-darwin
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v2
@@ -42,7 +50,4 @@ jobs:
       run: "xargo clean --verbose"
     - name: ensure_no_std build
       working-directory: "ensure_no_std"
-      run: "xargo build --verbose --target x86_64-unknown-linux-gnu"
-    - name: ensure_no_std run
-      working-directory: "ensure_no_std"
-      run: "xargo run --verbose --target x86_64-unknown-linux-gnu"
+      run: "xargo build --verbose --target ${{ matrix.triple }}"
