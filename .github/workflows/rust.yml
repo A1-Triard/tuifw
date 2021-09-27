@@ -23,6 +23,8 @@ jobs:
       with:
         toolchain: ${{ matrix.rust }}
         override: true
+    - name: install rust-src
+      run: "rustup component add rust-src"
     - name: install xargo
       run: "cargo install --verbose xargo"
     - name: build
