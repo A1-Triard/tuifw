@@ -8,6 +8,7 @@
 extern crate alloc;
 
 use alloc::boxed::Box;
+use errno::Errno;
 
 pub use tuifw_screen_base::*;
 
@@ -20,7 +21,7 @@ pub use tuifw_screen_base::*;
 /// It is impossible to garantee this conditions on a library level.
 /// So this unsafity should be propagated through all wrappers to the final application.
 #[cfg(windows)]
-pub unsafe fn init() -> Result<Box<dyn Screen>, u32> {
+pub unsafe fn init() -> Result<Box<dyn Screen>, Errno> {
     Ok(Box::new(tuifw_screen_winapi::Screen::new()?) as _)
 }
 
@@ -33,6 +34,6 @@ pub unsafe fn init() -> Result<Box<dyn Screen>, u32> {
 /// It is impossible to garantee this conditions on a library level.
 /// So this unsafity should be propagated through all wrappers to the final application.
 #[cfg(not(windows))]
-pub unsafe fn init() -> io::Result<Box<dyn Screen>> {
+pub unsafe fn init() -> Result<Box<dyn Screen>, Errno> {
     tuifw_screen_ncurses::init()
 }

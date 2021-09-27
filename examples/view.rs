@@ -8,7 +8,7 @@ use tuifw::view::{View, ViewBase, ViewTree, ViewBuilderViewAlignExt, ViewInput, 
 use tuifw::view::panels::{CanvasLayout, ViewBuilderCanvasPanelExt};
 use tuifw::view::panels::{ViewBuilderDockPanelExt};
 use tuifw::view::decorators::{ViewBuilderBorderDecoratorExt};
-use tuifw::view::decorators::{ViewBuilderLabelDecoratorExt};
+use tuifw::view::decorators::{ViewBuilderTextDecoratorExt};
 
 fn build(state: &mut dyn State, bounds: Rect) -> View {
     let tree: &ViewTree = state.get();
@@ -36,30 +36,30 @@ fn build(state: &mut dyn State, bounds: Rect) -> View {
                 )
                 .dock_panel(|panel| panel
                     .child(None, (), |layout| layout.dock(Right(Side::Top)), |view| view
-                        .label_decorator(|label| label.text(Cow::Borrowed("↑")))
+                        .text_decorator(|text| text.text(Cow::Borrowed("↑")))
                     )
                     .child(None, (), |layout| layout.dock(Right(Side::Top)), |view| view
-                        .label_decorator(|label| label.text(Cow::Borrowed("k")))
+                        .text_decorator(|text| text.text(Cow::Borrowed("k")))
                     )
                     .child(None, (), |layout| layout.dock(Right(Side::Bottom)), |view| view
-                        .label_decorator(|label| label.text(Cow::Borrowed("↓")))
+                        .text_decorator(|text| text.text(Cow::Borrowed("↓")))
                     )
                     .child(None, (), |layout| layout.dock(Right(Side::Bottom)), |view| view
-                        .label_decorator(|label| label.text(Cow::Borrowed("j")))
+                        .text_decorator(|text| text.text(Cow::Borrowed("j")))
                     )
                     .child(None, (), |layout| layout.dock(Right(Side::Left)), |view| view
                         .align(|align| align.margin(Thickness::new(1, 0, 0, 0)))
-                        .label_decorator(|label| label.text(Cow::Borrowed("←")))
+                        .text_decorator(|text| text.text(Cow::Borrowed("←")))
                     )
                     .child(None, (), |layout| layout.dock(Right(Side::Left)), |view| view
-                        .label_decorator(|label| label.text(Cow::Borrowed("h")))
+                        .text_decorator(|text| text.text(Cow::Borrowed("h")))
                     )
                     .child(None, (), |layout| layout.dock(Right(Side::Right)), |view| view
                         .align(|align| align.margin(Thickness::new(0, 0, 1, 0)))
-                        .label_decorator(|label| label.text(Cow::Borrowed("→")))
+                        .text_decorator(|text| text.text(Cow::Borrowed("→")))
                     )
                     .child(None, (), |layout| layout.dock(Right(Side::Right)), |view| view
-                        .label_decorator(|label| label.text(Cow::Borrowed("l")))
+                        .text_decorator(|text| text.text(Cow::Borrowed("l")))
                     )
                 )
             )

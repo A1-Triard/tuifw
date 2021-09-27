@@ -7,11 +7,10 @@
 
 extern crate alloc;
 
-use alloc::boxed::Box;
 use alloc::vec::Vec;
-use core::any::Any;
 use core::cmp::{min, max};
 use core::ops::Range;
+use errno::Errno;
 use tuifw_screen_base::*;
 use tuifw_screen_base::Screen as base_Screen;
 use unicode_segmentation::UnicodeSegmentation;
@@ -99,7 +98,7 @@ impl base_Screen for Screen {
         x0 .. x
     }
 
-    fn update(&mut self, cursor: Option<Point>, _wait: bool) -> Result<Option<Event>, Box<dyn Any>> {
+    fn update(&mut self, cursor: Option<Point>, _wait: bool) -> Result<Option<Event>, Errno> {
         for y in self.invalidated.t() .. self.invalidated.b() {
             let line = (y as u16 as usize) * (self.size.x as u16 as usize);
             let s = line + self.invalidated.l() as u16 as usize;

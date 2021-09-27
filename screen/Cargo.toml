@@ -12,6 +12,7 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/A1-Triard/tuifw"
 
 [dependencies]
+errno = { git = "https://github.com/A1-Triard/rust-errno.git", default-features = false }
 tuifw-screen-base = { path = "../screen-base", version = "0.10.0" }
 
 [target.'cfg(not(windows))'.dependencies]

@@ -1,17 +1,17 @@
+use crate::ncurses::*;
+use core::ptr::NonNull;
+use core::num::NonZeroU16;
+use either::{Either, Left, Right};
+use errno::Errno;
 use libc::*;
 use tuifw_screen_base::*;
-use crate::ncurses::*;
-use std::ptr::NonNull;
-use std::io::{self};
-use std::num::NonZeroU16;
-use either::{Either, Left, Right};
 
-pub fn no_err(r: c_int) -> io::Result<c_int> {
-    if r == ERR { Err(io::ErrorKind::Other.into()) } else { Ok(r) }
+pub fn no_err(r: c_int) -> Result<c_int, Errno> {
+    if r == ERR { Err(Errno(EINVAL)) } else { Ok(r) }
 }
 
-pub fn no_null<T: ?Sized>(r: *mut T) -> io::Result<NonNull<T>> {
-    NonNull::new(r).ok_or_else(|| io::ErrorKind::Other.into())
+pub fn no_null<T: ?Sized>(r: *mut T) -> Result<NonNull<T>, Errno> {
+    NonNull::new(r).ok_or(Errno(EINVAL))
 }
 
 fn colors_count() -> i16 {
@@ -31,7 +31,7 @@ fn color_index(c: Color) -> i16 {
     }
 }
 
-pub unsafe fn init_settings() -> io::Result<()> {
+pub unsafe fn init_settings() -> Result<(), Errno> {
     no_err(cbreak())?; 
     no_err(noecho())?; 
     nonl(); 
@@ -41,7 +41,7 @@ pub unsafe fn init_settings() -> io::Result<()> {
     Ok(())
 }
 
-unsafe fn register_colors() -> io::Result<()> {
+unsafe fn register_colors() -> Result<(), Errno> {
     no_err(start_color())?;
     no_err(assume_default_colors(0, -1))?;
     for fg in Color::iter_variants().map(color_index) {
@@ -85,7 +85,7 @@ const ONCE: NonZeroU16 = unsafe { NonZeroU16::new_unchecked(1) };
 pub fn read_event(
     window: NonNull<WINDOW>,
     getch: impl Fn(NonNull<WINDOW>
-) -> Option<Either<c_int, char>>) -> io::Result<Option<Event>> {
+) -> Option<Either<c_int, char>>) -> Result<Option<Event>, Errno> {
     let e = if let Some(e) = getch(window) {
         e
     } else {

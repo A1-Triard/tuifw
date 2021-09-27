@@ -12,12 +12,14 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/A1-Triard/tuifw"
 
 [dependencies]
-tuifw-screen-base = { path = "../screen-base", version = "0.10.0" }
+either = { version = "1.6.1", default-features = false }
+errno = { git = "https://github.com/A1-Triard/rust-errno.git", default-features = false }
 libc = { version = "0.2.101", default-features = false }
+panicking = { version = "0.0.1", default-features = false }
+tuifw-screen-base = { path = "../screen-base", version = "0.10.0" }
 unicode-width = "0.1.8"
 unicode-normalization = { version = "0.1.19", default-features = false }
 unicode-segmentation = "1.8.0"
-either = { version = "1.6.1", default-features = false }
 
 [build-dependencies]
 pkg-config = "0.3.19"

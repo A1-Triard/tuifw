@@ -16,14 +16,14 @@ extern crate alloc;
 use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
-use components_arena::{Arena, Component, ComponentId, Id, NewtypeComponentId, RawId};
-use dyn_context::state::State;
-use educe::Educe;
-use macro_attr_2018::macro_attr;
-use core::any::Any;
 use core::cmp::{max, min};
 use core::mem::replace;
 use core::ops::Range;
+use components_arena::{Arena, Component, ComponentId, Id, NewtypeComponentId, RawId};
+use dyn_context::state::State;
+use educe::Educe;
+use errno::Errno;
+use macro_attr_2018::macro_attr;
 use tuifw_screen_base::{Attr, Color, Event, Point, Rect, Screen, Vector};
 
 fn invalidate_rect(invalidated: (&mut Vec<Range<i16>>, Vector), rect: Rect) {
@@ -388,7 +388,7 @@ impl WindowTree {
         }
     }
 
-    pub fn update(&mut self, wait: bool, render_state: &mut dyn State) -> Result<Option<Event>, Box<dyn Any>> {
+    pub fn update(&mut self, wait: bool, render_state: &mut dyn State) -> Result<Option<Event>, Errno> {
         if let Some(cursor) = self.cursor {
             let (invalidated, screen_size) = self.invalidated();
             if rect_invalidated((invalidated, screen_size), Rect { tl: cursor, size: Vector { x: 1, y: 1 } }) {

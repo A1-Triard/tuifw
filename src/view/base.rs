@@ -1,22 +1,22 @@
+use alloc::borrow::Cow;
 use alloc::boxed::Box;
+use alloc::rc::Rc;
 use components_arena::{Arena, Component, ComponentId, Id, NewtypeComponentId, RawId};
+use core::cell::RefCell;
+use core::cmp::{max, min};
+use core::fmt::Debug;
+use core::mem::replace;
+use core::num::NonZeroU16;
 use debug_panic::debug_panic;
 use dep_obj::{DepObjBaseBuilder, DepObjIdBase, DepType, dep_obj, dep_type_with_builder, DepEventArgs, Convenient, DepProp};
 use dep_obj::binding::{Binding, Binding0, Binding1, Binding5, Bindings, b_immediate};
 use downcast_rs::{Downcast, impl_downcast};
 use dyn_clone::{DynClone, clone_trait_object};
 use dyn_context::state::{SelfState, State, StateExt, StateRefMut, RequiresStateDrop, StateDrop};
+use errno::Errno;
 use macro_attr_2018::macro_attr;
-use core::any::Any;
-use alloc::borrow::Cow;
-use core::cmp::{max, min};
-use core::fmt::Debug;
-use core::mem::replace;
-use core::num::NonZeroU16;
 use tuifw_screen_base::{Attr, Color, Event, HAlign, Key, Point, Rect, Screen, Thickness, VAlign, Vector};
 use tuifw_window::{RenderPort, Window, WindowTree};
-use core::cell::RefCell;
-use alloc::rc::Rc;
 
 pub trait Layout: Downcast + DepType<Id=View> {
     fn behavior(&self) -> &'static dyn LayoutBehavior;
@@ -281,7 +281,7 @@ impl ViewTree {
 
     pub fn root(&self) -> View { self.0.get().root }
 
-    pub fn update(state: &mut dyn State, wait: bool) -> Result<bool, Box<dyn Any>> {
+    pub fn update(state: &mut dyn State, wait: bool) -> Result<bool, Errno> {
         let tree: &ViewTree = state.get();
         if tree.0.get().quit { return Ok(false); }
         Self::update_actual_focused(state);

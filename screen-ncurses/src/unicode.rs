@@ -1,19 +1,20 @@
-use std::any::Any;
-use std::char::{self};
-use std::cmp::{max, min};
-use std::io::{self};
-use std::mem::{size_of};
-use std::ops::Range;
-use std::ptr::NonNull;
-use std::thread::{self};
+use crate::common::*;
+use crate::ncurses::*;
+use alloc::vec;
+use alloc::vec::Vec;
+use core::char::{self};
+use core::cmp::{max, min};
+use core::mem::{size_of};
+use core::ops::Range;
+use core::ptr::NonNull;
+use either::{Left, Right};
+use errno::Errno;
 use libc::*;
+use panicking::panicking;
 use tuifw_screen_base::*;
 use tuifw_screen_base::Screen as base_Screen;
-use crate::ncurses::*;
-use crate::common::*;
 use unicode_width::UnicodeWidthChar;
 use unicode_segmentation::UnicodeSegmentation;
-use either::{Left, Right};
 
 struct Line {
     window: NonNull<WINDOW>,
@@ -29,8 +30,8 @@ impl !Sync for Screen { }
 impl !Send for Screen { }
 
 impl Screen {
-    pub unsafe fn new() -> io::Result<Self> {
-        if no_null(initscr()).is_err() { return Err(io::ErrorKind::Other.into()); }
+    pub unsafe fn new() -> Result<Self, Errno> {
+        if no_null(initscr()).is_err() { return Err(Errno(EINVAL)); }
         let mut s = Screen {
             lines: Vec::with_capacity(max(0, min(LINES, i16::MAX as _)) as i16 as u16 as usize),
         };
@@ -39,7 +40,7 @@ impl Screen {
         Ok(s)
     }
 
-    fn resize(&mut self) -> io::Result<()> {
+    fn resize(&mut self) -> Result<(), Errno> {
         for line in &self.lines {
             no_err(unsafe { delwin(line.window.as_ptr()) })?;
         }
@@ -90,7 +91,7 @@ impl Screen {
         }
     }
 
-    fn update_raw(&mut self, cursor: Option<Point>, wait: bool) -> io::Result<Option<Event>> {
+    fn update_raw(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Errno> {
         no_err(unsafe { curs_set(0) })?;
         assert_eq!(size_of::<char>(), size_of::<wchar_t>());
         for line in self.lines.iter_mut().filter(|l| l.invalidated) {
@@ -150,7 +151,7 @@ impl Drop for Screen {
     #![allow(clippy::panicking_unwrap)]
     fn drop(&mut self) {
         let e = unsafe { no_err(endwin()) };
-        if e.is_err() && !thread::panicking() { e.unwrap(); }
+        if e.is_err() && !panicking() { e.unwrap(); }
     }
 }
 
@@ -267,7 +268,7 @@ impl base_Screen for Screen {
         }
     }
 
-    fn update(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Box<dyn Any>> {
-        self.update_raw(cursor, wait).map_err(|e| Box::new(e) as _)
+    fn update(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Errno> {
+        self.update_raw(cursor, wait)
     }
 }

@@ -11,21 +11,19 @@
 #![allow(clippy::too_many_arguments)]
 
 #![no_std]
-extern crate alloc;
 
 #[macro_use]
 mod bitflags_ext;
 
-use alloc::boxed::Box;
-use core::any::Any;
 use core::cmp::{min, max};
 use core::num::{NonZeroU16, NonZeroI16};
 use core::ops::{Add, AddAssign, Sub, SubAssign, Neg, Range, Index, IndexMut};
 use core::option::{Option};
-use num_traits::Zero;
 use either::{Either, Left, Right};
-use macro_attr_2018::macro_attr;
+use errno::Errno;
 use enum_derive_2018::{EnumDisplay, EnumFromStr, IterVariants};
+use macro_attr_2018::macro_attr;
+use num_traits::Zero;
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 
@@ -660,6 +658,7 @@ impl Arbitrary for Rect {
 
 pub trait Screen {
     fn size(&self) -> Vector;
+
     fn out(
         &mut self,
         p: Point,
@@ -670,7 +669,8 @@ pub trait Screen {
         hard: Range<i16>,
         soft: Range<i16>,
     ) -> Range<i16>;
-    fn update(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Box<dyn Any>>;
+
+    fn update(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Errno>;
 }
 
 #[cfg(test)]
