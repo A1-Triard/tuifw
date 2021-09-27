@@ -50,7 +50,4 @@ jobs:
         args: "--verbose --workspace --release"
     - name: ensure_no_std build
       working-directory: "ensure_no_std"
-      uses: actions-rs/cargo@v1
-      with:
-        command: build
-        args: "--verbose"
+      run: "cargo build --verbose"
