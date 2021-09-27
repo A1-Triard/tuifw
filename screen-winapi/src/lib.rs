@@ -11,7 +11,6 @@
 
 extern crate alloc;
 
-use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::char::{self};
@@ -21,10 +20,13 @@ use core::num::NonZeroU16;
 use core::ops::Range;
 use core::ptr::{null, null_mut};
 use core::str::{self};
+use either::{Either, Right, Left};
+use errno::{Errno, errno};
+use num_traits::identities::Zero;
 use panicking::panicking;
 use tuifw_screen_base::*;
 use tuifw_screen_base::Screen as base_Screen;
-use either::{Either, Right, Left};
+use unicode_segmentation::UnicodeSegmentation;
 use winapi::ctypes::*;
 use winapi::shared::minwindef::*;
 use winapi::shared::ntdef::{CHAR, HANDLE};
@@ -34,25 +36,22 @@ use winapi::um::wincon::*;
 use winapi::um::winnt::*;
 use winapi::um::fileapi::*;
 use winapi::um::consoleapi::*;
-use winapi::um::errhandlingapi::GetLastError;
 use winapi::um::handleapi::*;
 use winapi::um::stringapiset::WideCharToMultiByte;
 use winapi::um::winnls::*;
 use winapi::um::winuser::*;
-use num_traits::identities::Zero;
-use unicode_segmentation::UnicodeSegmentation;
 
-fn no_zero<Z: Zero>(r: Z) -> Result<Z, DWORD> {
+fn no_zero<Z: Zero>(r: Z) -> Result<Z, Errno> {
     if r.is_zero() {
-        Err(unsafe { GetLastError() })
+        Err(errno())
     } else {
         Ok(r)
     }
 }
 
-fn valid_handle(h: HANDLE) -> Result<HANDLE, DWORD> {
+fn valid_handle(h: HANDLE) -> Result<HANDLE, Errno> {
     if h == INVALID_HANDLE_VALUE {
-        Err(unsafe { GetLastError() })
+        Err(errno())
     } else {
         Ok(h)
     }
@@ -69,7 +68,7 @@ pub struct Screen {
 }
 
 impl Screen {
-    pub fn new() -> Result<Self, DWORD> {
+    pub fn new() -> Result<Self, Errno> {
         unsafe { FreeConsole() };
         no_zero(unsafe { AllocConsole() })?;
         let window = unsafe { GetConsoleWindow() };
@@ -124,7 +123,7 @@ impl Screen {
         Ok(s)
     }
     
-    fn init_screen_buffer(&mut self) -> Result<(), DWORD> {
+    fn init_screen_buffer(&mut self) -> Result<(), Errno> {
         let mut ci = CONSOLE_SCREEN_BUFFER_INFO {
             dwSize: COORD { X: 0, Y: 0 },
             dwCursorPosition: COORD { X: 0, Y: 0 },
@@ -144,7 +143,7 @@ impl Screen {
         Ok(())
     }
 
-    fn resize(&mut self) -> Result<(), DWORD> {
+    fn resize(&mut self) -> Result<(), Errno> {
         let mut ci = CONSOLE_SCREEN_BUFFER_INFO {
             dwSize: COORD { X: 0, Y: 0 },
             dwCursorPosition: COORD { X: 0, Y: 0 },
@@ -211,7 +210,7 @@ impl Screen {
         }
     }
 
-    unsafe fn drop_raw(&mut self) -> Result<(), DWORD> {
+    unsafe fn drop_raw(&mut self) -> Result<(), Errno> {
         if self.h_input != INVALID_HANDLE_VALUE {
             no_zero(CloseHandle(self.h_input))?;
         }
@@ -222,7 +221,7 @@ impl Screen {
         Ok(())
     }
 
-    fn update_raw(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, DWORD> {
+    fn update_raw(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Errno> {
         if !self.invalidated.is_empty() {
             let mut region = SMALL_RECT {
                 Top: self.invalidated.t(),
@@ -514,7 +513,7 @@ impl base_Screen for Screen {
         }
     }
 
-    fn update(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Box<dyn core::any::Any>> {
-        self.update_raw(cursor, wait).map_err(|e| Box::new(e) as _)
+    fn update(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Errno> {
+        self.update_raw(cursor, wait)
     }
 }
