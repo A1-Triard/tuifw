@@ -8,26 +8,34 @@ use core::any::{Any, TypeId};
 use core::panic::PanicInfo;
 use dep_obj::binding::Bindings;
 use dyn_context::state::State;
+#[cfg(not(windows))]
+use libc::exit;
 use libc_alloc::LibcAlloc;
 use tuifw::WidgetTree;
+#[cfg(windows)]
 use winapi::um::processthreadsapi::ExitProcess;
 
+#[cfg(windows)]
 #[link(name="msvcrt")]
 extern { }
 
 #[global_allocator]
 static ALLOCATOR: LibcAlloc = LibcAlloc;
 
+#[cfg(windows)]
+unsafe fn exit(code: UINT) -> ! {
+    unsafe { ExitProcess(code); }
+    loop { }
+}
+
 #[panic_handler]
 pub extern fn panic(_info: &PanicInfo) -> ! {
-    unsafe { ExitProcess(99); }
-    loop { }
+    unsafe { exit(99) }
 }
 
 #[no_mangle]
 pub fn rust_oom(_layout: Layout) -> ! {
-    unsafe { ExitProcess(98); }
-    loop { }
+    unsafe { exit(98) }
 }
 
 struct App {

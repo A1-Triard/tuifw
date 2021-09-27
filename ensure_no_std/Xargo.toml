@@ -1,0 +1,8 @@
+[build.x86_64-unknown-linux-gnu.dependencies]
+alloc = { }
+core = { }
+std = { features = ["panic_unwind"] }
+
+[target.x86_64-unknown-linux-gnu.dependencies]
+alloc = { }
+core = { }
