@@ -23,6 +23,8 @@ jobs:
       with:
         toolchain: ${{ matrix.rust }}
         override: true
+    - name: install xargo
+      run: "cargo install --verbose xargo"
     - name: build
       run: "cargo build --verbose --workspace"
     - name: test --tests
@@ -33,9 +35,12 @@ jobs:
       run: "cargo doc --verbose --workspace"
     - name: build --release
       run: "cargo build --verbose --workspace --release"
+    - name: ensure_no_std clean
+      working-directory: "ensure_no_std"
+      run: "xargo clean --verbose"
     - name: ensure_no_std build
       working-directory: "ensure_no_std"
-      run: "cargo build --verbose"
+      run: "xargo build --verbose --target x86_64-unknown-linux-gnu"
     - name: ensure_no_std run
       working-directory: "ensure_no_std"
-      run: "cargo run --verbose"
+      run: "xargo run --verbose --target x86_64-unknown-linux-gnu"

@@ -1,6 +1,8 @@
 #![feature(default_alloc_error_handler)]
 #![feature(start)]
 
+#![deny(warnings)]
+
 #![no_std]
 
 use core::alloc::Layout;
@@ -13,6 +15,8 @@ use libc::exit;
 use libc_alloc::LibcAlloc;
 use tuifw::WidgetTree;
 #[cfg(windows)]
+use winapi::shared::minwindef::UINT;
+#[cfg(windows)]
 use winapi::um::processthreadsapi::ExitProcess;
 
 #[cfg(windows)]
@@ -24,7 +28,7 @@ static ALLOCATOR: LibcAlloc = LibcAlloc;
 
 #[cfg(windows)]
 unsafe fn exit(code: UINT) -> ! {
-    unsafe { ExitProcess(code); }
+    ExitProcess(code);
     loop { }
 }
 
