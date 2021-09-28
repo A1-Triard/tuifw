@@ -65,7 +65,7 @@ impl Screen {
     fn start_text(line: &mut Line, x: i16) {
         if x <= 0 { return; }
         let mut x = x as u16;
-        if let Some(ref col) = line.cols.get(x as usize) {
+        if let Some(col) = line.cols.get(x as usize) {
             if col.0[0] != '\0' { return; }
         } else {
             return;

@@ -122,18 +122,11 @@ pub fn read_event(
         Right(c) => Ok(match c {
             '\x1B' => {
                 unsafe { no_err(nodelay(window.as_ptr(), true)) }?;
-                if let Some(e) = getch(window) {
-                    if let Right(c) = e {
-                        if c < ' ' || c == '\x7F' {
-                            None
-                        } else {
-                            Some(Event::Key(ONCE, Key::Alt(c)))
-                        }
-                    } else {
-                        Some(Event::Key(ONCE, Key::Escape))
-                    }
-                } else {
-                    Some(Event::Key(ONCE, Key::Escape))
+                match getch(window) {
+                    Some(Right(c)) if c < ' ' || c == '\x7F' => None,
+                    Some(Right(c)) => Some(Event::Key(ONCE, Key::Alt(c))),
+                    Some(Left(_)) => Some(Event::Key(ONCE, Key::Escape)),
+                    None => Some(Event::Key(ONCE, Key::Escape)),
                 }
             },
             '\0' => Some(Event::Key(ONCE, Key::Ctrl(Ctrl::At))),

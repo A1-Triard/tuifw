@@ -6,6 +6,7 @@ include!(concat!(env!("OUT_DIR"), "/curses_types.rs"));
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct IconvT(IconvIntT);
 
+#[allow(clippy::transmutes_expressible_as_ptr_casts)]
 impl IconvT {
     pub const ERROR: IconvT = IconvT(-1);
 

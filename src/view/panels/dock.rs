@@ -176,6 +176,7 @@ impl PanelBehavior for DockPanelBehavior {
             let mut breadth = 0;
             let mut child = first_child;
             loop {
+                #[allow(clippy::never_loop)]
                 loop {
                     let tree: &ViewTree = state.get();
                     let dock = child.layout_bindings(tree).downcast_ref::<DockLayoutBindings>().unwrap().dock;
@@ -241,6 +242,7 @@ impl PanelBehavior for DockPanelBehavior {
                 let mut size = (size.0.map(|w| (w, w)), size.1.map(|h| (h, h)));
                 let mut child = first_child;
                 loop {
+                    #[allow(clippy::never_loop)]
                     loop {
                         let tree: &ViewTree = state.get();
                         let dock = child.layout_bindings(tree).downcast_ref::<DockLayoutBindings>().unwrap().dock
@@ -320,6 +322,7 @@ impl PanelBehavior for DockPanelBehavior {
             let mut factor_sum = 0.;
             let mut child = first_child;
             loop {
+                #[allow(clippy::never_loop)]
                 loop {
                     let tree: &ViewTree = state.get();
                     let dock = child.layout_bindings(tree).downcast_ref::<DockLayoutBindings>().unwrap().dock;
@@ -385,6 +388,7 @@ impl PanelBehavior for DockPanelBehavior {
                 let dock = dock.get_value(state).unwrap_or(Side::Top);
                 let mut child = first_child;
                 loop {
+                    #[allow(clippy::never_loop)]
                     loop {
                         let tree: &ViewTree = state.get();
                         let factor = child.layout_bindings(tree).downcast_ref::<DockLayoutBindings>().unwrap().dock
