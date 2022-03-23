@@ -1,0 +1,29 @@
+[package]
+edition = "2018"
+name = "dep-obj"
+version = "0.34.1"
+authors = ["warlock <internalmike@gmail.com>"]
+description = "Dependency object: effective reactive heterogeneous container."
+readme = "README.md"
+documentation = "https://docs.rs/dep-obj/"
+keywords = ["property", "reactive", "dependency", "runtime", "type"]
+categories = ["rust-patterns", "no-std"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/A1-Triard/dep-obj"
+
+[package.metadata.docs.rs]
+rustc-args = ["--cfg", "docsrs"]
+rustdoc-args = ["--cfg", "docsrs"]
+
+[dependencies]
+components-arena = "2.1.5"
+downcast-rs = { version = "1.2.0", default-features = false }
+dyn-clone = "1.0.2"
+dyn-context = "0.10.7"
+educe = "0.4.13"
+generics = "0.3.2"
+macro-attr-2018 = "1.1.1"
+memoffset = { version = "0.6.1", features = ["unstable_const"] }
+panicking = { version = "0.0.1", default-features = false }
+paste = "1.0.0"
+phantom-type = { version = "0.3.1", default-features = false }
