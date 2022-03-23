@@ -1,10 +1,6 @@
-#![feature(const_fn_trait_bound)]
-#![feature(const_maybe_uninit_as_ptr)]
 #![feature(const_ptr_offset_from)]
-#![feature(const_raw_ptr_deref)]
 #![feature(generic_associated_types)]
 #![feature(never_type)]
-#![feature(option_result_unwrap_unchecked)]
 
 #![deny(warnings)]
 #![doc(test(attr(deny(warnings))))]

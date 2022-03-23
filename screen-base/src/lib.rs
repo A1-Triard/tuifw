@@ -1,4 +1,3 @@
-#![feature(const_panic)]
 #![feature(stmt_expr_attributes)]
 
 #![deny(warnings)]

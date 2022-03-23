@@ -23,7 +23,7 @@ dyn-context = "0.10.7"
 educe = "0.4.13"
 generics = "0.3.2"
 macro-attr-2018 = "1.1.1"
-memoffset = { version = "0.6.1", features = ["unstable_const"] }
+memoffset = { version = "0.6.5", features = ["unstable_const"] }
 panicking = { version = "0.0.1", default-features = false }
 paste = "1.0.0"
 phantom-type = { version = "0.3.1", default-features = false }
