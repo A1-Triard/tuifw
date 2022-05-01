@@ -11,7 +11,7 @@ panic = "abort"
 panic = "abort"
 
 [dependencies]
-dep-obj = "0.34.1"
+dep-obj = "0.34.2"
 dyn-context = "0.10.8"
 libc_alloc = "1.0.3"
 tuifw = { path = ".." }

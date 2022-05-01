@@ -2,7 +2,7 @@ use crate::ncurses::*;
 use core::ptr::NonNull;
 use core::num::NonZeroU16;
 use either::{Either, Left, Right};
-use errno::Errno;
+use errno_no_std::Errno;
 use libc::*;
 use tuifw_screen_base::*;
 

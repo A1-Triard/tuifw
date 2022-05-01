@@ -22,7 +22,7 @@ use core::ops::Range;
 use components_arena::{Arena, Component, ComponentId, Id, NewtypeComponentId, RawId};
 use dyn_context::state::State;
 use educe::Educe;
-use errno::Errno;
+use errno_no_std::Errno;
 use macro_attr_2018::macro_attr;
 use tuifw_screen_base::{Attr, Color, Event, Point, Rect, Screen, Vector};
 

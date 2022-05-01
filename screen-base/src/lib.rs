@@ -19,7 +19,7 @@ use core::num::{NonZeroU16, NonZeroI16};
 use core::ops::{Add, AddAssign, Sub, SubAssign, Neg, Range, Index, IndexMut};
 use core::option::{Option};
 use either::{Either, Left, Right};
-use errno::Errno;
+use errno_no_std::Errno;
 use enum_derive_2018::{EnumDisplay, EnumFromStr, IterVariants};
 use macro_attr_2018::macro_attr;
 use num_traits::Zero;

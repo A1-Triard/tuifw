@@ -31,11 +31,11 @@ debug_panic = "0.2.1"
 downcast-rs = { version = "1.2.0", default-features = false }
 dyn-clone = "1.0.4"
 dyn-context = "0.10.8"
-dep-obj = { path = "dep-obj", version = "0.34.1" }
+dep-obj = { path = "dep-obj", version = "0.34.2" }
 educe = "0.4.18"
 either = { version = "1.6.1", default-features = false }
 enum-derive-2018 = { version = "1.0.2", default-features = false }
-errno = { git = "https://github.com/A1-Triard/rust-errno.git", default-features = false }
+errno-no-std = { version = "0.0.3", default-features = false }
 macro-attr-2018 = "1.1.1"
 num-traits = { version = "0.2.14", default-features = false }
 panicking = { version = "0.0.1", default-features = false }

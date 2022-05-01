@@ -24,7 +24,7 @@ mod non_unicode;
 mod unicode;
 
 use alloc::boxed::Box;
-use errno::Errno;
+use errno_no_std::Errno;
 use libc::{CODESET, setlocale, strcmp, nl_langinfo, LC_ALL};
 use tuifw_screen_base::{Screen};
 

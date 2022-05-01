@@ -8,7 +8,7 @@
 extern crate alloc;
 
 use alloc::boxed::Box;
-use errno::Errno;
+use errno_no_std::Errno;
 
 pub use tuifw_screen_base::*;
 

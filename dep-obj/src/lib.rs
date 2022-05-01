@@ -592,9 +592,7 @@ impl<T: DepObjId> DepObjIdBase for T {
 /// # Examples
 ///
 /// ```rust
-/// # #![feature(const_maybe_uninit_as_ptr)]
 /// # #![feature(const_ptr_offset_from)]
-/// # #![feature(const_raw_ptr_deref)]
 /// use components_arena::{Arena, Component, NewtypeComponentId, Id};
 /// use dep_obj::{DepObjId, dep_obj, dep_type};
 /// use dep_obj::binding::{Bindings, Binding, Binding1};

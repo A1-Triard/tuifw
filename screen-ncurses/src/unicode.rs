@@ -8,7 +8,7 @@ use core::mem::{size_of};
 use core::ops::Range;
 use core::ptr::NonNull;
 use either::{Left, Right};
-use errno::Errno;
+use errno_no_std::Errno;
 use libc::*;
 use panicking::panicking;
 use tuifw_screen_base::*;

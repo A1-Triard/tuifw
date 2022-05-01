@@ -10,7 +10,7 @@ extern crate alloc;
 use alloc::vec::Vec;
 use core::cmp::{min, max};
 use core::ops::Range;
-use errno::Errno;
+use errno_no_std::Errno;
 use tuifw_screen_base::*;
 use tuifw_screen_base::Screen as base_Screen;
 use unicode_segmentation::UnicodeSegmentation;

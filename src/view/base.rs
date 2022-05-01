@@ -13,7 +13,7 @@ use dep_obj::binding::{Binding, Binding0, Binding1, Binding5, Bindings, b_immedi
 use downcast_rs::{Downcast, impl_downcast};
 use dyn_clone::{DynClone, clone_trait_object};
 use dyn_context::state::{SelfState, State, StateExt, StateRefMut, RequiresStateDrop, StateDrop};
-use errno::Errno;
+use errno_no_std::Errno;
 use macro_attr_2018::macro_attr;
 use tuifw_screen_base::{Attr, Color, Event, HAlign, Key, Point, Rect, Screen, Thickness, VAlign, Vector};
 use tuifw_window::{RenderPort, Window, WindowTree};

@@ -7,7 +7,7 @@ use core::ops::Range;
 use core::ptr::NonNull;
 use core::str::{self};
 use either::{Right, Left};
-use errno::{Errno, errno};
+use errno_no_std::{Errno, errno};
 use libc::*;
 use panicking::panicking;
 use tuifw_screen_base::*;

@@ -13,7 +13,7 @@ repository = "https://github.com/A1-Triard/tuifw"
 
 [dependencies]
 either = { version = "1.6.1", default-features = false }
-errno = { git = "https://github.com/A1-Triard/rust-errno.git", default-features = false }
+errno-no-std = { version = "0.0.3", default-features = false }
 libc = { version = "0.2.101", default-features = false }
 panicking = { version = "0.0.1", default-features = false }
 tuifw-screen-base = { path = "../screen-base", version = "0.10.0" }

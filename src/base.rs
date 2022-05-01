@@ -9,7 +9,7 @@ use dep_obj::{Change, DepObjId, DepType, dep_obj, dep_type, Convenient, DepProp,
 use dep_obj::binding::{Binding1, Bindings, BYield, Binding};
 use downcast_rs::{Downcast, impl_downcast};
 use dyn_context::state::{RequiresStateDrop, State, StateDrop, StateExt};
-use errno::Errno;
+use errno_no_std::Errno;
 use macro_attr_2018::macro_attr;
 use tuifw_screen_base::Screen;
 

@@ -1,9 +1,7 @@
 #![deny(warnings)]
 #![allow(dead_code)]
 
-#![feature(const_maybe_uninit_as_ptr)]
 #![feature(const_ptr_offset_from)]
-#![feature(const_raw_ptr_deref)]
 
 use components_arena::{Arena, Component, NewtypeComponentId, Id};
 use dep_obj::{Change, DepObjBaseBuilder, DepObjId, dep_obj, dep_type, dep_type_with_builder, ItemChange, DepVecItemPos};
