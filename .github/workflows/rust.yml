@@ -45,9 +45,10 @@ jobs:
       run: "cargo doc --verbose --workspace"
     - name: build --release
       run: "cargo build --verbose --workspace --release"
-    - name: ensure_no_std clean
-      working-directory: "ensure_no_std"
-      run: "xargo clean --verbose"
+    - name: rustup component add rust-src
+      run: "rustup component add rust-src --toolchain nightly-${{ matrix.triple }}"
     - name: ensure_no_std build
-      working-directory: "ensure_no_std"
-      run: "xargo build --verbose --target ${{ matrix.triple }}"
+      run: "cargo +nightly build --verbose -Z build-std=core,alloc,panic_abort --target ${{ matrix.triple }} --release"
+      working-directory: ensure_no_std
+    - name: ensure_no_std run
+      run: "./ensure_no_std/target/${{ matrix.triple }}/release/ensure_no_std"
