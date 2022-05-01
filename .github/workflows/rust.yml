@@ -46,5 +46,3 @@ jobs:
     - name: ensure_no_std build
       run: "cargo +nightly build --verbose -Z build-std=core,alloc,panic_abort --target ${{ matrix.triple }} --release"
       working-directory: ensure_no_std
-    - name: ensure_no_std run
-      run: "./ensure_no_std/target/${{ matrix.triple }}/release/ensure_no_std"
