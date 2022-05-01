@@ -21,7 +21,7 @@ use core::ops::Range;
 use core::ptr::{null, null_mut};
 use core::str::{self};
 use either::{Either, Right, Left};
-use errno::{Errno, errno};
+use errno_no_std::{Errno, errno};
 use num_traits::identities::Zero;
 use panicking::panicking;
 use tuifw_screen_base::*;
