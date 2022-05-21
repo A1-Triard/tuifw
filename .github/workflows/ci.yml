@@ -1,10 +1,12 @@
-name: Rust
+name: CI
 
 on:
   push:
     branches: [ master ]
   pull_request:
     branches: [ master ]
+  schedule:
+  - cron: '0 0 * * *'
 
 env:
   CARGO_TERM_COLOR: always
@@ -26,11 +28,11 @@ jobs:
           triple: x86_64-apple-darwin
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v2
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: ${{ matrix.rust }}
         override: true
+    - uses: actions/checkout@v2
     - name: build
       run: "cargo build --verbose --workspace"
     - name: test --tests

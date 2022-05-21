@@ -6,10 +6,9 @@
 #![no_std]
 
 use core::alloc::Layout;
-use core::any::{Any, TypeId};
 use core::panic::PanicInfo;
 use dep_obj::binding::Bindings;
-use dyn_context::state::State;
+use dyn_context::{State, Stop};
 #[cfg(not(windows))]
 use libc::exit;
 use libc_alloc::LibcAlloc;
@@ -42,23 +41,12 @@ pub fn rust_oom(_layout: Layout) -> ! {
     unsafe { exit(98) }
 }
 
+#[derive(State, Stop)]
 struct App {
+    #[state(part)]
     bindings: Bindings,
+    #[state]
     widgets: WidgetTree,
-}
-
-impl State for App {
-    fn get_raw(&self, ty: TypeId) -> Option<&dyn Any> {
-        if let Some(res) = self.bindings.get_raw(ty) { return Some(res); }
-        if let Some(res) = self.widgets.get_raw(ty) { return Some(res); }
-        None
-    }
-
-    fn get_mut_raw(&mut self, ty: TypeId) -> Option<&mut dyn Any> {
-        if let Some(res) = self.bindings.get_mut_raw(ty) { return Some(res); }
-        if let Some(res) = self.widgets.get_mut_raw(ty) { return Some(res); }
-        None
-    }
 }
 
 #[start]
@@ -67,6 +55,6 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
     let mut bindings = Bindings::new();
     let widgets = WidgetTree::new(screen, &mut bindings);
     let app = &mut App { bindings, widgets };
-    WidgetTree::drop_self(app);
+    App::stop(app);
     0
 }
