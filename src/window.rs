@@ -1,31 +1,34 @@
 use crate::base::*;
 use crate::view::{View, ViewAlign, ViewBase, ViewTree};
 use crate::view::decorators::{BorderDecorator, TextDecorator};
-use crate::view::decorators::ViewBuilderBorderDecoratorExt;
-use crate::view::decorators::ViewBuilderTextDecoratorExt;
-use crate::view::panels::{CanvasLayout, DockLayout, ViewBuilderDockPanelExt};
-use dep_obj::{DepObjBaseBuilder, dep_type_with_builder, Change, Glob};
-use dep_obj::binding::{BYield, Binding1, BindingExt3, b_continue, b_immediate};
-use dyn_context::state::{State, StateExt};
+use crate::view::decorators::BuilderViewBorderDecoratorExt;
+use crate::view::decorators::BuilderViewTextDecoratorExt;
+use crate::view::panels::{CanvasLayout, DockLayout, BuilderViewDockPanelExt};
+use dep_obj::{Builder, Change, DepObjId, dep_type, ext_builder};
+use dep_obj::binding::{Re, Binding1, BindingExt3, Param};
+use dyn_context::{State, StateExt};
 use either::Right;
 use alloc::borrow::Cow;
 use tuifw_screen_base::*;
 
-dep_type_with_builder! {
+dep_type! {
     #[derive(Debug)]
-    pub struct Window become obj in Widget {
+    pub struct Window = Widget[WidgetObjKey] {
         header: Cow<'static, str> = Cow::Borrowed(""),
         #[ref]
         content: Option<Widget> = None,
         bg: Option<Color> = Some(Color::Blue),
         bounds: Rect = Rect { tl: Point { x: 0, y: 0 }, size: Vector { x: 0, y: 0 } },
     }
-
-    type BaseBuilder<'a> = WidgetBuilder<'a>;
 }
 
-impl<'a> WindowBuilder<'a> {
-    pub fn content<T: WidgetObjWithBuilder, F: for<'b> FnOnce(T::Builder<'b>)>(
+ext_builder!(<'a> Builder<'a, Widget> as BuilderWidgetWindowExt[Widget] {
+    window -> (Window)
+});
+
+/*
+impl<B: DepObjBuilder<Id=Widget>> WindowBuilder<B> {
+    pub fn content<T: WidgetObjWithBuilder<B>, F: FnOnce(T::Builder)>(
         mut self,
         storage: Option<&mut Option<Widget>>,
         f: F
@@ -33,10 +36,11 @@ impl<'a> WindowBuilder<'a> {
         let window = self.base_priv_ref().id();
         let content = T::build(self.base_priv_mut().state_mut(), f);
         storage.map(|x| x.replace(content));
-        b_immediate(Window::CONTENT.set(self.base_priv_mut().state_mut(), window.obj(), Some(content)));
+        Window::CONTENT.set(self.base_priv_mut().state_mut(), window, Some(content)).immediate();
         self
     }
 }
+*/
 
 struct WindowBehavior;
 
@@ -88,16 +92,16 @@ impl WidgetBehavior for WindowBehavior {
                 Cow::Borrowed(if focused { "═" } else { "─" })
             );
         });
-        widget.obj::<Window>().add_binding(state, init_new_view);
-        init_new_view.set_source_1(state, &mut WidgetBase::VIEW.change_initial_source(widget.base()));
+        widget.add_binding::<Window, _>(state, init_new_view);
+        init_new_view.set_source_1(state, &mut WidgetBase::VIEW.change_initial_source(widget));
 
         let content = BindingExt3::new(state, (None, None), |
             state,
-            content_cache: Glob<(Option<Widget>, Option<View>)>,
+            content_cache: Param<(Option<Widget>, Option<View>)>,
             view: Option<View>,
             new_content: Option<Change<Option<Widget>>>,
             old_content: Option<Change<Option<Widget>>>,
-        | -> BYield<!> {
+        | -> Re<!> {
             if let Some(content) = new_content {
                 content_cache.get_mut(state).0 = content.new;
                 if let Some(view) = view {
@@ -148,12 +152,12 @@ impl WidgetBehavior for WindowBehavior {
                     }
                 }
             }
-            b_continue()
+            Re::Continue
         });
-        widget.obj::<Window>().add_binding(state, content);
-        content.set_source_1(state, &mut WidgetBase::VIEW.value_source(widget.base()));
-        content.set_source_2(state, &mut Window::CONTENT.change_initial_source(widget.obj()));
-        content.set_source_3(state, &mut Window::CONTENT.change_final_source(widget.obj()));
+        widget.add_binding::<Window, _>(state, content);
+        content.set_source_1(state, &mut WidgetBase::VIEW.value_source(widget));
+        content.set_source_2(state, &mut Window::CONTENT.change_initial_source(widget));
+        content.set_source_3(state, &mut Window::CONTENT.change_final_source(widget));
     }
 
     fn drop_bindings(&self, _widget: Widget, _state: &mut dyn State) { }
@@ -168,18 +172,20 @@ impl Window {
     }
 }
 
-impl WidgetObjWithBuilder for Window {
-    type Builder<'a> = WindowBuilder<'a>;
+/*
+impl<T: DepObjBuilder<Id=Widget>> WidgetObjWithBuilder<T> for Window {
+    type Builder = WindowBuilder<T>;
 
     fn build<'a>(
         state: &'a mut dyn State,
-        f: impl FnOnce(WindowBuilder<'a>)
+        f: impl FnOnce(WindowBuilder<T>)
     ) -> Widget {
         let window = Window::new(state);
-        f(WindowBuilder::new_priv(WidgetBuilder { widget: window, state }));
+        f(WindowBuilder::new_priv(Builder { id: window, state }));
         window
     }
 }
+*/
 
 impl WidgetObj for Window {
     fn behavior(&self) -> &'static dyn WidgetBehavior { &Self::BEHAVIOR }

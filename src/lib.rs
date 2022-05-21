@@ -1,4 +1,6 @@
 #![feature(const_ptr_offset_from)]
+#![feature(const_type_id)]
+#![feature(explicit_generic_args_with_impl_trait)]
 #![feature(generic_associated_types)]
 #![feature(never_type)]
 

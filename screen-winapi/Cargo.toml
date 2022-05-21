@@ -1,5 +1,5 @@
 [package]
-edition = "2018"
+edition = "2021"
 name = "tuifw-screen-winapi"
 version = "0.10.0"
 authors = ["warlock <internalmike@gmail.com>"]
@@ -13,9 +13,9 @@ repository = "https://github.com/A1-Triard/tuifw"
 
 [dependencies]
 either = { version = "1.6.1", default-features = false }
-errno-no-std = { version = "0.0.3", default-features = false }
+errno-no-std = { version = "0.0.4", default-features = false }
 num-traits = { version = "0.2.14", default-features = false }
-panicking = { version = "0.0.1", default-features = false }
+panicking = { version = "0.1.0", default-features = false }
 tuifw-screen-base = { path = "../screen-base", version = "0.10.0" }
 unicode-segmentation = "1.8.0"
 winapi = { version = "0.3.9", features = [

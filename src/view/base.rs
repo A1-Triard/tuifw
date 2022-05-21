@@ -1,24 +1,28 @@
 use alloc::borrow::Cow;
 use alloc::boxed::Box;
 use alloc::rc::Rc;
-use components_arena::{Arena, Component, ComponentId, Id, NewtypeComponentId, RawId};
+use components_arena::{Arena, Component, ComponentId, ComponentStop, Id, NewtypeComponentId, RawId};
+use components_arena::with_arena_in_state_part;
 use core::cell::RefCell;
 use core::cmp::{max, min};
 use core::fmt::Debug;
 use core::mem::replace;
 use core::num::NonZeroU16;
-use debug_panic::debug_panic;
-use dep_obj::{DepObjBaseBuilder, DepObjIdBase, DepType, dep_obj, dep_type_with_builder, DepEventArgs, Convenient, DepProp};
-use dep_obj::binding::{Binding, Binding0, Binding1, Binding5, Bindings, b_immediate};
+use dep_obj::{Builder, DepObjId, DepType, DepEventArgs, Convenient, DepProp};
+use dep_obj::{dep_obj, dep_type, ext_builder, with_builder};
+use dep_obj::binding::{Binding, Bindings};
+use dep_obj::binding::n::{Binding0, Binding1, Binding5};
 use downcast_rs::{Downcast, impl_downcast};
 use dyn_clone::{DynClone, clone_trait_object};
-use dyn_context::state::{SelfState, State, StateExt, StateRefMut, RequiresStateDrop, StateDrop};
+use dyn_context::{SelfState, State, StateExt, StateRefMut, Stop};
 use errno_no_std::Errno;
 use macro_attr_2018::macro_attr;
 use tuifw_screen_base::{Attr, Color, Event, HAlign, Key, Point, Rect, Screen, Thickness, VAlign, Vector};
 use tuifw_window::{RenderPort, Window, WindowTree};
 
-pub trait Layout: Downcast + DepType<Id=View> {
+pub enum LayoutKey { }
+
+pub trait Layout: Downcast + DepType<Id=View, DepObjKey=LayoutKey> {
     fn behavior(&self) -> &'static dyn LayoutBehavior;
 }
 
@@ -56,7 +60,9 @@ pub trait PanelBehavior {
     fn drop_bindings(&self, view: View, state: &mut dyn State, bindings: Box<dyn PanelBindings>);
 }
 
-pub trait Panel: Downcast + DepType<Id=View> {
+pub enum PanelKey { }
+
+pub trait Panel: Downcast + DepType<Id=View, DepObjKey=PanelKey> {
     fn behavior(&self) -> &'static dyn PanelBehavior;
 }
 
@@ -93,7 +99,9 @@ pub trait DecoratorBindings: Downcast + Debug + Sync + Send { }
 
 impl_downcast!(DecoratorBindings);
 
-pub trait Decorator: Downcast + DepType<Id=View> {
+pub enum DecoratorKey { }
+
+pub trait Decorator: Downcast + DepType<Id=View, DepObjKey=DecoratorKey> {
     fn behavior(&self) -> &'static dyn DecoratorBehavior;
 }
 
@@ -122,16 +130,16 @@ struct ViewRawAlignBindings {
 
 impl ViewRawAlignBindings {
     fn drop_bindings(self, state: &mut dyn State) {
-        self.size_min_max.drop_binding(state);
-        self.margin.drop_binding(state);
-        self.h_align.drop_binding(state);
-        self.v_align.drop_binding(state);
+        self.size_min_max.drop_self(state);
+        self.margin.drop_self(state);
+        self.h_align.drop_self(state);
+        self.v_align.drop_self(state);
     }
 }
 
 macro_attr! {
     #[derive(Debug)]
-    #[derive(Component!)]
+    #[derive(Component!(stop=ViewStop))]
     struct ViewNode {
         tag: Option<RawId>,
         decorator: Option<Box<dyn Decorator>>,
@@ -151,11 +159,9 @@ macro_attr! {
     }
 }
 
-#[derive(Debug)]
-pub struct ViewTree(StateDrop<ViewTreeImpl>);
-
-#[derive(Debug)]
-struct ViewTreeImpl {
+#[derive(Debug, Stop)]
+pub struct ViewTree {
+    #[stop]
     arena: Arena<ViewNode>,
     window_tree: Option<WindowTree>,
     screen_size: Vector,
@@ -169,25 +175,11 @@ struct ViewTreeImpl {
 
 impl SelfState for ViewTree { }
 
-impl RequiresStateDrop for ViewTreeImpl {
-    fn get(state: &dyn State) -> &StateDrop<Self> {
-        let tree: &ViewTree = state.get();
-        &tree.0
-    }
+impl ComponentStop for ViewStop {
+    with_arena_in_state_part!(ViewTree { .arena });
 
-    fn get_mut(state: &mut dyn State) -> &mut StateDrop<Self> {
-        let tree: &mut ViewTree = state.get_mut();
-        &mut tree.0
-    }
-
-    fn before_drop(state: &mut dyn State) {
-        let tree: &ViewTree = state.get();
-        let root = tree.0.get().root;
-        root.drop_bindings_tree(state);
-    }
-
-    fn drop_incorrectly(self) {
-        debug_panic!("ViewTree should be dropped with the drop_self method");
+    fn stop(&self, state: &mut dyn State, id: Id<ViewNode>) {
+        View(id).drop_bindings(state);
     }
 }
 
@@ -223,7 +215,7 @@ impl ViewTree {
             }, (window_tree, View(view), decorator_behavior))
         });
         let screen_size = window_tree.screen_size();
-        let mut tree = ViewTree(StateDrop::new(ViewTreeImpl {
+        let mut tree = ViewTree {
             arena,
             window_tree: Some(window_tree),
             screen_size,
@@ -233,7 +225,7 @@ impl ViewTree {
             quit: false,
             update_actual_focused_queue: 0,
             update_actual_focused_enqueue: false,
-        }));
+        };
         bindings.merge_mut_and_then(|state| {
             let size_min_max = Binding0::new(state, (), |()| Some(ViewSizeMinMax {
                 min_size: Vector::null(),
@@ -245,7 +237,7 @@ impl ViewTree {
             let v_align = Binding0::new(state, (), |()| Some(VAlign::Top));
             {
                 let tree: &mut ViewTree = state.get_mut();
-                tree.0.get_mut().arena[root.0].raw_align_bindings = Some(ViewRawAlignBindings {
+                tree.arena[root.0].raw_align_bindings = Some(ViewRawAlignBindings {
                     size_min_max: size_min_max.into(),
                     margin: margin.into(),
                     h_align: h_align.into(),
@@ -255,73 +247,69 @@ impl ViewTree {
             let decorator_bindings = decorator_behavior.init_bindings(root, state);
             {
                 let tree: &mut ViewTree = state.get_mut();
-                let ok = tree.0.get_mut().arena[root.0].decorator_bindings.replace(decorator_bindings).is_none();
+                let ok = tree.arena[root.0].decorator_bindings.replace(decorator_bindings).is_none();
                 debug_assert!(ok);
             }
         }, &mut tree);
         tree
     }
 
-    pub fn drop_self(state: &mut dyn State) {
-        <StateDrop<ViewTreeImpl>>::drop_self(state);
-    }
-
     pub fn quit(state: &mut dyn State) {
         let tree: &mut ViewTree = state.get_mut();
-        tree.0.get_mut().quit = true;
+        tree.quit = true;
     }
 
     fn window_tree(&self) -> &WindowTree {
-        self.0.get().window_tree.as_ref().expect("ViewTree is in invalid state")
+        self.window_tree.as_ref().expect("ViewTree is in invalid state")
     }
 
     fn window_tree_mut(&mut self) -> &mut WindowTree {
-        self.0.get_mut().window_tree.as_mut().expect("ViewTree is in invalid state")
+        self.window_tree.as_mut().expect("ViewTree is in invalid state")
     }
 
-    pub fn root(&self) -> View { self.0.get().root }
+    pub fn root(&self) -> View { self.root }
 
     pub fn update(state: &mut dyn State, wait: bool) -> Result<bool, Errno> {
         let tree: &ViewTree = state.get();
-        if tree.0.get().quit { return Ok(false); }
+        if tree.quit { return Ok(false); }
         Self::update_actual_focused(state);
         let tree: &ViewTree = state.get();
-        let screen_size = tree.0.get().screen_size;
-        let root = tree.0.get().root;
+        let screen_size = tree.screen_size;
+        let root = tree.root;
         root.measure(state, (Some(screen_size.x), Some(screen_size.y)));
         root.arrange(state, Rect { tl: Point { x: 0, y: 0 }, size: screen_size });
         let mut window_tree = {
             let tree: &mut ViewTree = state.get_mut();
-            tree.0.get_mut().window_tree.take().expect("ViewTree is in invalid state")
+            tree.window_tree.take().expect("ViewTree is in invalid state")
         };
         let event = window_tree.update(wait, state);
         if let Ok(event) = &event {
             if event == &Some(Event::Resize) {
                 let tree: &mut ViewTree = state.get_mut();
-                tree.0.get_mut().screen_size = window_tree.screen_size();
+                tree.screen_size = window_tree.screen_size();
             }
         }
         {
             let tree: &mut ViewTree = state.get_mut();
-            tree.0.get_mut().window_tree.replace(window_tree);
+            tree.window_tree.replace(window_tree);
         }
         let event = event?;
         if let Some(Event::Key(n, key)) = event {
             let input = ViewInput(Rc::new(RefCell::new(ViewInputInstance { key: (n, key), handled: false })));
             let tree: &ViewTree = state.get();
-            let view = tree.0.get().actual_focused;
-            b_immediate(ViewBase::INPUT.raise(state, view.base(), input));
+            let view = tree.actual_focused;
+            ViewBase::INPUT.raise(state, view, input).immediate();
         }
         Ok(true)
     }
 
-    pub fn focused(&self) -> View { self.0.get().focused }
+    pub fn focused(&self) -> View { self.focused }
 
     fn update_actual_focused(state: &mut dyn State) {
         {
             let tree: &mut ViewTree = state.get_mut();
-            if replace(&mut tree.0.get_mut().update_actual_focused_enqueue, true) {
-                let update_actual_focused_queue = &mut tree.0.get_mut().update_actual_focused_queue;
+            if replace(&mut tree.update_actual_focused_enqueue, true) {
+                let update_actual_focused_queue = &mut tree.update_actual_focused_queue;
                 *update_actual_focused_queue = update_actual_focused_queue.checked_add(1).unwrap();
                 return;
             }
@@ -331,14 +319,14 @@ impl ViewTree {
             let actual_focused;
             {
                 let tree: &mut ViewTree = state.get_mut();
-                focused = tree.0.get().focused;
-                actual_focused = tree.0.get().actual_focused;
+                focused = tree.focused;
+                actual_focused = tree.actual_focused;
                 if focused == actual_focused { break; }
-                tree.0.get_mut().actual_focused = focused;
+                tree.actual_focused = focused;
             }
             let mut view = actual_focused;
             loop {
-                b_immediate(ViewBase::IS_FOCUSED.set(state, view.base(), false));
+                ViewBase::IS_FOCUSED.set(state, view, false).immediate();
                 let tree: &ViewTree = state.get();
                 if let Some(parent) = view.parent(tree) {
                     view = parent;
@@ -348,7 +336,7 @@ impl ViewTree {
             }
             let mut view = focused;
             loop {
-                b_immediate(ViewBase::IS_FOCUSED.set(state, view.base(), true));
+                ViewBase::IS_FOCUSED.set(state, view, true).immediate();
                 let tree: &ViewTree = state.get();
                 if let Some(parent) = view.parent(tree) {
                     view = parent;
@@ -357,13 +345,13 @@ impl ViewTree {
                 }
             }
             let tree: &mut ViewTree = state.get_mut();
-            let update_actual_focused_queue = &mut tree.0.get_mut().update_actual_focused_queue;
+            let update_actual_focused_queue = &mut tree.update_actual_focused_queue;
             if *update_actual_focused_queue == 0 { break; }
             *update_actual_focused_queue -= 1;
         }
         {
             let tree: &mut ViewTree = state.get_mut();
-            tree.0.get_mut().update_actual_focused_enqueue = false;
+            tree.update_actual_focused_enqueue = false;
         }
     }
 }
@@ -377,27 +365,60 @@ fn render_view(
     let view_tree: &ViewTree = state.get();
     let view: View = window
         .map(|window| window.tag(tree).expect("Window is not bound to a View"))
-        .unwrap_or(view_tree.0.get().root);
-    view_tree.0.get().arena[view.0].decorator.as_ref().map(|decorator|
+        .unwrap_or(view_tree.root);
+    view_tree.arena[view.0].decorator.as_ref().map(|decorator|
         decorator.behavior().render(view, state, port)
     );
-}
-
-pub struct ViewBuilder<'a> {
-    view: View,
-    state: &'a mut dyn State,
-}
-
-impl<'a> DepObjBaseBuilder<View> for ViewBuilder<'a> {
-    fn id(&self) -> View { self.view }
-    fn state(&self) -> &dyn State { self.state }
-    fn state_mut(&mut self) -> &mut dyn State { self.state }
 }
 
 macro_attr! {
     #[derive(NewtypeComponentId!)]
     #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
     pub struct View(Id<ViewNode>);
+}
+
+dep_obj! {
+    impl View {
+        fn<ViewBase>(self as this, tree: ViewTree) -> (ViewBase) {
+            if mut {
+                &mut tree.arena[this.0].base
+            } else {
+                &tree.arena[this.0].base
+            }
+        }
+
+        fn<ViewAlign>(self as this, tree: ViewTree) -> optional(ViewAlign) {
+            if mut {
+                tree.arena[this.0].align.as_mut()
+            } else {
+                tree.arena[this.0].align.as_ref()
+            }
+        }
+
+        fn<DecoratorKey>(self as this, tree: ViewTree) -> optional dyn(Decorator) {
+            if mut {
+                tree.arena[this.0].decorator.as_deref_mut()
+            } else {
+                tree.arena[this.0].decorator.as_deref()
+            }
+        }
+
+        fn<LayoutKey>(self as this, tree: ViewTree) -> optional dyn(Layout) {
+            if mut {
+                tree.arena[this.0].layout.as_deref_mut()
+            } else {
+                tree.arena[this.0].layout.as_deref()
+            }
+        }
+
+        fn<PanelKey>(self as this, tree: ViewTree) -> optional dyn(Panel) {
+            if mut {
+                tree.arena[this.0].panel.as_deref_mut()
+            } else {
+                tree.arena[this.0].panel.as_deref()
+            }
+        }
+    }
 }
 
 impl View {
@@ -408,15 +429,15 @@ impl View {
     ) -> View {
         let view = {
             let tree: &mut ViewTree = state.get_mut();
-            let parent_window = tree.0.get().arena[parent.0].window;
-            let prev_window = prev.map(|prev| tree.0.get().arena[prev.0].window);
+            let parent_window = tree.arena[parent.0].window;
+            let prev_window = prev.map(|prev| tree.arena[prev.0].window);
             let window = Window::new(
                 tree.window_tree_mut(),
                 Some(parent_window),
                 prev_window,
                 Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() }
             );
-            let view = tree.0.get_mut().arena.insert(|view| {
+            let view = tree.arena.insert(|view| {
                 (ViewNode {
                     tag: None,
                     base: ViewBase::new_priv(),
@@ -451,23 +472,23 @@ impl View {
             max_h: h.or(max_h),
         }));
         size_min_max.set_target_fn(state, view, |state, view, _| view.invalidate_measure(state));
-        size_min_max.set_source_1(state, &mut ViewAlign::W.value_source(view.align()));
-        size_min_max.set_source_2(state, &mut ViewAlign::H.value_source(view.align()));
-        size_min_max.set_source_3(state, &mut ViewAlign::MIN_SIZE.value_source(view.align()));
-        size_min_max.set_source_4(state, &mut ViewAlign::MAX_W.value_source(view.align()));
-        size_min_max.set_source_5(state, &mut ViewAlign::MAX_H.value_source(view.align()));
+        size_min_max.set_source_1(state, &mut ViewAlign::W.value_source(view));
+        size_min_max.set_source_2(state, &mut ViewAlign::H.value_source(view));
+        size_min_max.set_source_3(state, &mut ViewAlign::MIN_SIZE.value_source(view));
+        size_min_max.set_source_4(state, &mut ViewAlign::MAX_W.value_source(view));
+        size_min_max.set_source_5(state, &mut ViewAlign::MAX_H.value_source(view));
         let margin = Binding1::new(state, (), |(), margin| Some(margin));
         margin.set_target_fn(state, view, |state, view, _| view.invalidate_measure(state));
-        margin.set_source_1(state, &mut ViewAlign::MARGIN.value_source(view.align()));
+        margin.set_source_1(state, &mut ViewAlign::MARGIN.value_source(view));
         let h_align = Binding1::new(state, (), |(), h_align| Some(h_align));
         h_align.set_target_fn(state, view, |state, view, _| view.invalidate_arrange(state));
-        h_align.set_source_1(state, &mut ViewAlign::H_ALIGN.value_source(view.align()));
+        h_align.set_source_1(state, &mut ViewAlign::H_ALIGN.value_source(view));
         let v_align = Binding1::new(state, (), |(), v_align| Some(v_align));
         v_align.set_target_fn(state, view, |state, view, _| view.invalidate_arrange(state));
-        v_align.set_source_1(state, &mut ViewAlign::V_ALIGN.value_source(view.align()));
+        v_align.set_source_1(state, &mut ViewAlign::V_ALIGN.value_source(view));
         {
             let tree: &mut ViewTree = state.get_mut();
-            tree.0.get_mut().arena[view.0].raw_align_bindings = Some(ViewRawAlignBindings {
+            tree.arena[view.0].raw_align_bindings = Some(ViewRawAlignBindings {
                 size_min_max: size_min_max.into(),
                 margin: margin.into(),
                 h_align: h_align.into(),
@@ -498,7 +519,7 @@ impl View {
         self.drop_panel_bindings(state);
         let raw_align_bindings = {
             let tree: &mut ViewTree = state.get_mut();
-            tree.0.get_mut().arena[self.0].raw_align_bindings.take().unwrap()
+            tree.arena[self.0].raw_align_bindings.take().unwrap()
         };
         raw_align_bindings.drop_bindings(state);
         self.drop_bindings_priv(state);
@@ -510,7 +531,7 @@ impl View {
             loop {
                 let node = {
                     let view: View = child.tag(tree.window_tree()).unwrap();
-                    tree.0.get_mut().arena.remove(view.0)
+                    tree.arena.remove(view.0)
                 };
                 Self::drop_children(node.window, tree);
                 child = node.window.next(tree.window_tree());
@@ -522,18 +543,18 @@ impl View {
     pub fn drop_view(self, state: &mut dyn State) {
         self.drop_bindings_tree(state);
         let tree: &mut ViewTree = state.get_mut();
-        let node = tree.0.get_mut().arena.remove(self.0);
+        let node = tree.arena.remove(self.0);
         Self::drop_children(node.window, tree);
         node.window.drop_window(tree.window_tree_mut());
     }
 
     pub fn move_z(self, state: &mut dyn State, prev: Option<View>) {
         let tree: &mut ViewTree = state.get_mut();
-        let window = tree.0.get().arena[self.0].window;
-        let prev_window = prev.map(|prev| tree.0.get().arena[prev.0].window);
+        let window = tree.arena[self.0].window;
+        let prev_window = prev.map(|prev| tree.arena[prev.0].window);
         window.move_z(tree.window_tree_mut(), prev_window);
         let parent = self.parent(tree).expect("root view cannot be moved in z direction");
-        if let Some(panel) = tree.0.get().arena[parent.0].panel.as_ref().map(|x| x.behavior()) {
+        if let Some(panel) = tree.arena[parent.0].panel.as_ref().map(|x| x.behavior()) {
             if panel.children_order_aware() {
                 parent.invalidate_measure(state);
             }
@@ -542,29 +563,23 @@ impl View {
 
     pub fn set_tag<Tag: ComponentId>(self, state: &mut dyn State, tag: Tag) {
         let tree: &mut ViewTree = state.get_mut();
-        tree.0.get_mut().arena[self.0].tag = Some(tag.into_raw());
+        tree.arena[self.0].tag = Some(tag.into_raw());
     }
 
     pub fn reset_tag(self, state: &mut dyn State) {
         let tree: &mut ViewTree = state.get_mut();
-        tree.0.get_mut().arena[self.0].tag = None;
+        tree.arena[self.0].tag = None;
     }
 
     pub fn tag<Tag: ComponentId>(self, tree: &ViewTree) -> Option<Tag> {
-        tree.0.get().arena[self.0].tag.map(Tag::from_raw)
+        tree.arena[self.0].tag.map(Tag::from_raw)
     }
 
-    pub fn build<'a>(
-        self,
-        state: &'a mut dyn State,
-        f: impl FnOnce(ViewBuilder<'a>) -> ViewBuilder<'a>
-    ) {
-        f(ViewBuilder { view: self, state });
-    }
+    with_builder!();
 
     pub fn focus(self, state: &mut dyn State) -> View {
         let tree: &mut ViewTree = state.get_mut();
-        replace(&mut tree.0.get_mut().focused, self)
+        replace(&mut tree.focused, self)
     }
 
     fn drop_layout_bindings(self, state: &mut dyn State) {
@@ -572,7 +587,7 @@ impl View {
         let layout;
         {
             let tree: &mut ViewTree = state.get_mut();
-            let node = &mut tree.0.get_mut().arena[self.0];
+            let node = &mut tree.arena[self.0];
             bindings = node.layout_bindings.take();
             layout = node.layout.as_ref().map(|x| x.behavior());
         }
@@ -588,7 +603,7 @@ impl View {
         let panel;
         {
             let tree: &mut ViewTree = state.get_mut();
-            let node = &mut tree.0.get_mut().arena[self.0];
+            let node = &mut tree.arena[self.0];
             bindings = node.panel_bindings.take();
             panel = node.panel.as_ref().map(|x| x.behavior());
         }
@@ -604,7 +619,7 @@ impl View {
         let decorator;
         {
             let tree: &mut ViewTree = state.get_mut();
-            let node = &mut tree.0.get_mut().arena[self.0];
+            let node = &mut tree.arena[self.0];
             bindings = node.decorator_bindings.take();
             decorator = node.decorator.as_ref().map(|x| x.behavior());
         }
@@ -619,16 +634,16 @@ impl View {
         let behavior = decorator.behavior();
         {
             let tree: &mut ViewTree = state.get_mut();
-            assert!(tree.0.get_mut().arena[self.0].decorator.replace(Box::new(decorator)).is_none(), "Decorator is already set and cannot be changed");
+            assert!(tree.arena[self.0].decorator.replace(Box::new(decorator)).is_none(), "Decorator is already set and cannot be changed");
             assert!(self.first_child(tree).is_none(), "Decorator should be set before attaching children");
             let render_bounds = self.render_bounds(tree);
-            let window = tree.0.get().arena[self.0].window;
+            let window = tree.arena[self.0].window;
             window.move_xy(tree.window_tree_mut(), render_bounds);
         }
         let bindings = behavior.init_bindings(self, state);
         {
             let tree: &mut ViewTree = state.get_mut();
-            let ok = tree.0.get_mut().arena[self.0].decorator_bindings.replace(bindings).is_none();
+            let ok = tree.arena[self.0].decorator_bindings.replace(bindings).is_none();
             debug_assert!(ok);
         }
     }
@@ -637,12 +652,12 @@ impl View {
         let behavior = layout.behavior();
         {
             let tree: &mut ViewTree = state.get_mut();
-            assert!(tree.0.get_mut().arena[self.0].layout.replace(Box::new(layout)).is_none(), "Layout is already set and cannot be changed");
+            assert!(tree.arena[self.0].layout.replace(Box::new(layout)).is_none(), "Layout is already set and cannot be changed");
         }
         let bindings = behavior.init_bindings(self, state);
         {
             let tree: &mut ViewTree = state.get_mut();
-            tree.0.get_mut().arena[self.0].layout_bindings = Some(bindings);
+            tree.arena[self.0].layout_bindings = Some(bindings);
         }
     }
 
@@ -650,30 +665,30 @@ impl View {
         let behavior = panel.behavior();
         {
             let tree: &mut ViewTree = state.get_mut();
-            assert!(tree.0.get_mut().arena[self.0].panel.replace(Box::new(panel)).is_none(), "Panel is already set and cannot be changed");
+            assert!(tree.arena[self.0].panel.replace(Box::new(panel)).is_none(), "Panel is already set and cannot be changed");
         }
         let bindings = behavior.init_bindings(self, state);
         {
             let tree: &mut ViewTree = state.get_mut();
-            tree.0.get_mut().arena[self.0].panel_bindings = Some(bindings);
+            tree.arena[self.0].panel_bindings = Some(bindings);
         }
     }
 
     pub fn decorator_bindings(self, tree: &ViewTree) -> &dyn DecoratorBindings {
-        tree.0.get().arena[self.0].decorator_bindings.as_ref().expect("Decorator Bindings missing").as_ref()
+        tree.arena[self.0].decorator_bindings.as_ref().expect("Decorator Bindings missing").as_ref()
     }
 
     pub fn layout_bindings(self, tree: &ViewTree) -> &dyn LayoutBindings {
-        tree.0.get().arena[self.0].layout_bindings.as_ref().expect("Layout Bindings missing").as_ref()
+        tree.arena[self.0].layout_bindings.as_ref().expect("Layout Bindings missing").as_ref()
     }
 
     pub fn panel_bindings(self, tree: &ViewTree) -> &dyn PanelBindings {
-        tree.0.get().arena[self.0].panel_bindings.as_ref().expect("Panel Bindings missing").as_ref()
+        tree.arena[self.0].panel_bindings.as_ref().expect("Panel Bindings missing").as_ref()
     }
 
     pub fn first_child(self, tree: &ViewTree) -> Option<View> {
         let window_tree = tree.window_tree();
-        tree.0.get().arena[self.0].window.first_child(window_tree).map(|x| x.tag(window_tree).unwrap())
+        tree.arena[self.0].window.first_child(window_tree).map(|x| x.tag(window_tree).unwrap())
     }
 
     pub fn last_child(self, tree: &ViewTree) -> Option<View> {
@@ -682,22 +697,22 @@ impl View {
 
     pub fn prev(self, tree: &ViewTree) -> View {
         let window_tree = tree.window_tree();
-        tree.0.get().arena[self.0].window.prev(window_tree).tag(window_tree).unwrap()
+        tree.arena[self.0].window.prev(window_tree).tag(window_tree).unwrap()
     }
 
     pub fn next(self, tree: &ViewTree) -> View {
         let window_tree = tree.window_tree();
-        tree.0.get().arena[self.0].window.next(window_tree).tag(window_tree).unwrap()
+        tree.arena[self.0].window.next(window_tree).tag(window_tree).unwrap()
     }
 
     pub fn parent(self, tree: &ViewTree) -> Option<View> {
         let window_tree = tree.window_tree();
-        tree.0.get().arena[self.0].window.parent(window_tree).map(|x| x.tag(window_tree).unwrap())
+        tree.arena[self.0].window.parent(window_tree).map(|x| x.tag(window_tree).unwrap())
     }
 
-    pub fn desired_size(self, tree: &ViewTree) -> Vector { tree.0.get().arena[self.0].desired_size }
+    pub fn desired_size(self, tree: &ViewTree) -> Vector { tree.arena[self.0].desired_size }
 
-    pub fn render_bounds(self, tree: &ViewTree) -> Rect { tree.0.get().arena[self.0].render_bounds }
+    pub fn render_bounds(self, tree: &ViewTree) -> Rect { tree.arena[self.0].render_bounds }
 
     fn bind_raw<P: Clone + 'static, T: Convenient, U: Convenient>(
         self,
@@ -709,7 +724,7 @@ impl View {
     ) {
         let binding = Binding1::new(state, map, |map, value: T| Some(map(value)));
         bind(state, param, self, binding.into());
-        binding.set_source_1(state, &mut view_base_prop.value_source(self.base()));
+        binding.set_source_1(state, &mut view_base_prop.value_source(self));
     }
 
     pub fn bind_decorator_to_base<D: Decorator, T: Convenient, U: Convenient>(
@@ -720,63 +735,21 @@ impl View {
         map: fn(T) -> U,
     ) {
         self.bind_raw(state, view_base_prop, map, decorator_prop, |state, decorator_prop, view, binding|
-            decorator_prop.bind(state, view.decorator(), binding)
+            decorator_prop.bind(state, view, binding)
         );
-    }
-
-    dep_obj! {
-        pub fn base(self as this, tree: ViewTree) -> (ViewBase) {
-            if mut {
-                &mut tree.0.get_mut().arena[this.0].base
-            } else {
-                &tree.0.get().arena[this.0].base
-            }
-        }
-
-        pub fn align(self as this, tree: ViewTree) -> optional(ViewAlign) {
-            if mut {
-                tree.0.get_mut().arena[this.0].align.as_mut()
-            } else {
-                tree.0.get().arena[this.0].align.as_ref()
-            }
-        }
-
-        pub fn decorator(self as this, tree: ViewTree) -> optional(trait Decorator) {
-            if mut {
-                tree.0.get_mut().arena[this.0].decorator.as_deref_mut()
-            } else {
-                tree.0.get().arena[this.0].decorator.as_deref()
-            }
-        }
-
-        pub fn layout(self as this, tree: ViewTree) -> optional(trait Layout) {
-            if mut {
-                tree.0.get_mut().arena[this.0].layout.as_deref_mut()
-            } else {
-                tree.0.get().arena[this.0].layout.as_deref()
-            }
-        }
-
-        pub fn panel(self as this, tree: ViewTree) -> optional(trait Panel) {
-            if mut {
-                tree.0.get_mut().arena[this.0].panel.as_deref_mut()
-            } else {
-                tree.0.get().arena[this.0].panel.as_deref()
-            }
-        }
     }
 
     pub fn invalidate_rect(self, state: &mut dyn State, rect: Rect) {
         let tree: &mut ViewTree = state.get_mut();
-        if self == tree.0.get().root { return tree.window_tree_mut().invalidate_rect(rect); }
-        let window = tree.0.get().arena[self.0].window;
+        if self == tree.root { return tree.window_tree_mut().invalidate_rect(rect); }
+        let window = tree.arena[self.0].window;
         window.invalidate_rect(tree.window_tree_mut(), rect);
     }
 
     pub fn invalidate_render(self, state: &mut dyn State) {
         let tree: &mut ViewTree = state.get_mut();
-        if self == tree.0.get().root { return tree.window_tree_mut().invalidate_screen(); }
-        let window = tree.0.get().arena[self.0].window;
+        if self == tree.root { return tree.window_tree_mut().invalidate_screen(); }
+        let window = tree.arena[self.0].window;
         window.invalidate(tree.window_tree_mut());
     }
 
@@ -794,11 +767,11 @@ impl View {
         let tree: &mut ViewTree = state.get_mut();
         let mut view = self;
         loop {
-            if replace(&mut tree.0.get_mut().arena[view.0].measure_size, None).is_none() {
-                debug_assert!(tree.0.get().arena[view.0].arrange_bounds.is_none());
+            if replace(&mut tree.arena[view.0].measure_size, None).is_none() {
+                debug_assert!(tree.arena[view.0].arrange_bounds.is_none());
                 break;
             }
-            tree.0.get_mut().arena[view.0].arrange_bounds = None;
+            tree.arena[view.0].arrange_bounds = None;
             if let Some(parent) = view.parent(tree) {
                 view = parent;
             } else {
@@ -816,7 +789,7 @@ impl View {
         let tree: &mut ViewTree = state.get_mut();
         let mut view = self;
         loop {
-            if replace(&mut tree.0.get_mut().arena[view.0].arrange_bounds, None).is_none() {
+            if replace(&mut tree.arena[view.0].arrange_bounds, None).is_none() {
                 break;
             }
             if let Some(parent) = view.parent(tree) {
@@ -829,7 +802,7 @@ impl View {
 
     pub fn measure(self, state: &mut dyn State, mut size: (Option<i16>, Option<i16>)) {
         let tree: &mut ViewTree = state.get_mut();
-        let node = &mut tree.0.get_mut().arena[self.0];
+        let node = &mut tree.arena[self.0];
         if node.measure_size == Some(size) { return; }
         node.measure_size = Some(size);
         let raw_align_bindings = node.raw_align_bindings.as_ref().unwrap();
@@ -848,7 +821,7 @@ impl View {
             Some(size_min_max.max_h.map_or(h, |max_h| min(h, max_h as u16)) as i16)
         });
         let tree: &ViewTree = state.get();
-        let node = &tree.0.get().arena[self.0];
+        let node = &tree.arena[self.0];
         let panel = node.panel.as_ref().map(|x| x.behavior());
         let decorator = node.decorator.as_ref().map(|x| x.behavior());
         let children_measure_size = decorator.as_ref().map_or(
@@ -886,14 +859,14 @@ impl View {
         }
         {
             let tree: &mut ViewTree = state.get_mut();
-            let node = &mut tree.0.get_mut().arena[self.0];
+            let node = &mut tree.arena[self.0];
             node.desired_size = margin.expand_rect_size(desired_size);
         }
     }
 
     pub fn arrange(self, state: &mut dyn State, mut rect: Rect) {
         let tree: &mut ViewTree = state.get_mut();
-        let node = &mut tree.0.get_mut().arena[self.0];
+        let node = &mut tree.arena[self.0];
         if let Some(arrange_bounds) = node.arrange_bounds.as_mut() {
             if arrange_bounds.size == rect.size {
                 if rect.tl != arrange_bounds.tl {
@@ -958,14 +931,14 @@ impl View {
         render_bounds.tl = rect.tl.offset(Point { x: 0, y: 0 }.offset_from(padding.expand_rect(render_bounds).tl));
         {
             let tree: &mut ViewTree = state.get_mut();
-            let window = tree.0.get().arena[self.0].window;
+            let window = tree.arena[self.0].window;
             window.move_xy(tree.window_tree_mut(), render_bounds);
-            tree.0.get_mut().arena[self.0].render_bounds = render_bounds;
+            tree.arena[self.0].render_bounds = render_bounds;
         }
     }
 }
 
-impl DepObjIdBase for View {
+impl DepObjId for View {
     fn parent(self, state: &dyn State) -> Option<Self> {
         let tree: &ViewTree = state.get();
         self.parent(tree)
@@ -982,21 +955,9 @@ impl DepObjIdBase for View {
     }
 }
 
-pub trait ViewBuilderRootDecoratorExt {
-    fn root_decorator(
-        self,
-        f: impl for<'a> FnOnce(RootDecoratorBuilder<'a>) -> RootDecoratorBuilder<'a>
-    ) -> Self;
-}
-
-impl<'a> ViewBuilderRootDecoratorExt for ViewBuilder<'a> {
-    fn root_decorator(
-        self,
-        f: impl for<'b> FnOnce(RootDecoratorBuilder<'b>) -> RootDecoratorBuilder<'b>
-    ) -> Self {
-        f(RootDecoratorBuilder::new_priv(self)).base_priv()
-    }
-}
+ext_builder!(<'a> Builder<'a, View> as BuilderViewRootDecoratorExt[View] {
+    root_decorator -> (RootDecorator)
+});
 
 #[derive(Debug)]
 struct RootDecoratorBindings {
@@ -1008,13 +969,11 @@ struct RootDecoratorBindings {
 
 impl DecoratorBindings for RootDecoratorBindings { }
 
-dep_type_with_builder! {
+dep_type! {
     #[derive(Debug)]
-    pub struct RootDecorator become decorator in View {
+    pub struct RootDecorator = View[DecoratorKey] {
         fill: Cow<'static, str> = Cow::Borrowed(" ")
     }
-
-    type BaseBuilder<'a> = ViewBuilder<'a>;
 }
 
 impl RootDecorator {
@@ -1049,7 +1008,7 @@ impl DecoratorBehavior for RootDecoratorBehavior {
 
     fn render_bounds(&self, _view: View, state: &mut dyn State, _children_render_bounds: Rect) -> Rect {
         let tree: &ViewTree = state.get();
-        Rect { tl: Point { x: 0, y: 0 }, size: tree.0.get().screen_size }
+        Rect { tl: Point { x: 0, y: 0 }, size: tree.screen_size }
     }
 
     fn init_bindings(&self, view: View, state: &mut dyn State) -> Box<dyn DecoratorBindings> {
@@ -1061,10 +1020,10 @@ impl DecoratorBehavior for RootDecoratorBehavior {
         fg.set_target_fn(state, view, |state, view, _| view.invalidate_render(state));
         attr.set_target_fn(state, view, |state, view, _| view.invalidate_render(state));
         fill.set_target_fn(state, view, |state, view, _| view.invalidate_render(state));
-        bg.set_source_1(state, &mut ViewBase::BG.value_source(view.base()));
-        fg.set_source_1(state, &mut ViewBase::FG.value_source(view.base()));
-        attr.set_source_1(state, &mut ViewBase::ATTR.value_source(view.base()));
-        fill.set_source_1(state, &mut RootDecorator::FILL.value_source(view.decorator()));
+        bg.set_source_1(state, &mut ViewBase::BG.value_source(view));
+        fg.set_source_1(state, &mut ViewBase::FG.value_source(view));
+        attr.set_source_1(state, &mut ViewBase::ATTR.value_source(view));
+        fill.set_source_1(state, &mut RootDecorator::FILL.value_source(view));
         Box::new(RootDecoratorBindings {
             bg: bg.into(),
             fg: fg.into(),
@@ -1075,10 +1034,10 @@ impl DecoratorBehavior for RootDecoratorBehavior {
 
     fn drop_bindings(&self, _view: View, state: &mut dyn State, bindings: Box<dyn DecoratorBindings>) {
         let bindings = bindings.downcast::<RootDecoratorBindings>().unwrap();
-        bindings.fg.drop_binding(state);
-        bindings.bg.drop_binding(state);
-        bindings.attr.drop_binding(state);
-        bindings.fill.drop_binding(state);
+        bindings.fg.drop_self(state);
+        bindings.bg.drop_self(state);
+        bindings.attr.drop_self(state);
+        bindings.fill.drop_self(state);
     }
 
     fn render(&self, view: View, state: &dyn State, port: &mut RenderPort) {
@@ -1124,25 +1083,13 @@ impl DepEventArgs for ViewInput {
     fn handled(&self) -> bool { self.0.borrow().handled }
 }
 
-pub trait ViewBuilderViewBaseExt {
-    fn base(
-        self,
-        f: impl for<'a> FnOnce(ViewBaseBuilder<'a>) -> ViewBaseBuilder<'a>
-    ) -> Self;
-}
+ext_builder!(<'a> Builder<'a, View> as BuilderViewBaseExt[View] {
+    base -> (ViewBase)
+});
 
-impl<'a> ViewBuilderViewBaseExt for ViewBuilder<'a> {
-    fn base(
-        self,
-        f: impl for<'b> FnOnce(ViewBaseBuilder<'b>) -> ViewBaseBuilder<'b>
-    ) -> Self {
-        f(ViewBaseBuilder::new_priv(self)).base_priv()
-    }
-}
-
-dep_type_with_builder! {
+dep_type! {
     #[derive(Debug)]
-    pub struct ViewBase become base in View {
+    pub struct ViewBase = View[ViewBase] {
         #[inherits]
         fg: Color = Color::White,
         #[inherits]
@@ -1153,29 +1100,15 @@ dep_type_with_builder! {
         #[bubble]
         input yield ViewInput,
     }
-
-    type BaseBuilder<'a> = ViewBuilder<'a>;
 }
 
-pub trait ViewBuilderViewAlignExt {
-    fn align(
-        self,
-        f: impl for<'a> FnOnce(ViewAlignBuilder<'a>) -> ViewAlignBuilder<'a>
-    ) -> Self;
-}
+ext_builder!(<'a> Builder<'a, View> as BuilderViewAlignExt[View] {
+    align -> (ViewAlign)
+});
 
-impl<'a> ViewBuilderViewAlignExt for ViewBuilder<'a> {
-    fn align(
-        self,
-        f: impl for<'b> FnOnce(ViewAlignBuilder<'b>) -> ViewAlignBuilder<'b>
-    ) -> Self {
-        f(ViewAlignBuilder::new_priv(self)).base_priv()
-    }
-}
-
-dep_type_with_builder! {
+dep_type! {
     #[derive(Debug)]
-    pub struct ViewAlign become align in View {
+    pub struct ViewAlign = View[ViewAlign] {
         h_align: HAlign = HAlign::Center,
         v_align: VAlign = VAlign::Center,
         min_size: Vector = Vector::null(),
@@ -1185,6 +1118,4 @@ dep_type_with_builder! {
         h: Option<i16> = None,
         margin: Thickness = Thickness::all(0),
     }
-
-    type BaseBuilder<'a> = ViewBuilder<'a>;
 }

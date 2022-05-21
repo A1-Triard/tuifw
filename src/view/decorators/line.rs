@@ -1,42 +1,28 @@
 use crate::view::base::*;
 use alloc::boxed::Box;
-use dep_obj::{DepObjBaseBuilder, dep_type_with_builder};
+use dep_obj::{Builder, dep_type, ext_builder};
 use dep_obj::binding::{Binding, Binding1, Binding2};
-use dyn_context::state::{State, StateExt};
+use dyn_context::{State, StateExt};
 use alloc::borrow::Cow;
 use core::fmt::Debug;
 use tuifw_screen_base::{Attr, Color, Orient, Point, Rect, Vector};
 use tuifw_window::RenderPort;
 
-pub trait ViewBuilderLineDecoratorExt {
-    fn line_decorator(
-        self,
-        f: impl for<'a> FnOnce(LineDecoratorBuilder<'a>) -> LineDecoratorBuilder<'a>
-    ) -> Self;
-}
-
-impl<'a> ViewBuilderLineDecoratorExt for ViewBuilder<'a> {
-    fn line_decorator(
-        mut self,
-        f: impl for<'b> FnOnce(LineDecoratorBuilder<'b>) -> LineDecoratorBuilder<'b>
-    ) -> Self {
-        let view = self.id();
-        LineDecorator::new(self.state_mut(), view);
-        f(LineDecoratorBuilder::new_priv(self)).base_priv()
+ext_builder!(<'a> Builder<'a, View> as BuilderViewLineDecoratorExt[View] {
+    fn line_decorator(state: &mut dyn State, view: View) -> (LineDecorator) {
+        LineDecorator::new(state, view);
     }
-}
+});
 
-dep_type_with_builder! {
+dep_type! {
     #[derive(Debug)]
-    pub struct LineDecorator become decorator in View {
+    pub struct LineDecorator = View[DecoratorKey] {
         orient: Orient = Orient::Hor,
         length: i16 = 3,
         near: Cow<'static, str> = Cow::Borrowed(""),
         stroke: Cow<'static, str> = Cow::Borrowed(""),
         far: Cow<'static, str> = Cow::Borrowed(""),
     }
-
-    type BaseBuilder<'a> = ViewBuilder<'a>;
 }
 
 impl LineDecorator {
@@ -169,15 +155,15 @@ impl DecoratorBehavior for LineDecoratorBehavior {
             };
             view.invalidate_rect(state, invalidated);
         });
-        bg.set_source_1(state, &mut ViewBase::BG.value_source(view.base()));
-        fg.set_source_1(state, &mut ViewBase::FG.value_source(view.base()));
-        attr.set_source_1(state, &mut ViewBase::ATTR.value_source(view.base()));
-        length.set_source_1(state, &mut LineDecorator::LENGTH.value_source(view.decorator()));
-        near.set_source_1(state, &mut LineDecorator::NEAR.value_source(view.decorator()));
-        stroke.set_source_1(state, &mut LineDecorator::STROKE.value_source(view.decorator()));
-        orient.set_source_1(state, &mut LineDecorator::ORIENT.value_source(view.decorator()));
-        far_orient.set_source_1(state, &mut LineDecorator::FAR.value_source(view.decorator()));
-        far_orient.set_source_2(state, &mut LineDecorator::ORIENT.value_source(view.decorator()));
+        bg.set_source_1(state, &mut ViewBase::BG.value_source(view));
+        fg.set_source_1(state, &mut ViewBase::FG.value_source(view));
+        attr.set_source_1(state, &mut ViewBase::ATTR.value_source(view));
+        length.set_source_1(state, &mut LineDecorator::LENGTH.value_source(view));
+        near.set_source_1(state, &mut LineDecorator::NEAR.value_source(view));
+        stroke.set_source_1(state, &mut LineDecorator::STROKE.value_source(view));
+        orient.set_source_1(state, &mut LineDecorator::ORIENT.value_source(view));
+        far_orient.set_source_1(state, &mut LineDecorator::FAR.value_source(view));
+        far_orient.set_source_2(state, &mut LineDecorator::ORIENT.value_source(view));
         Box::new(LineDecoratorBindings {
             fg: fg.into(),
             bg: bg.into(),
@@ -192,13 +178,13 @@ impl DecoratorBehavior for LineDecoratorBehavior {
 
     fn drop_bindings(&self, _view: View, state: &mut dyn State, bindings: Box<dyn DecoratorBindings>) {
         let bindings = bindings.downcast::<LineDecoratorBindings>().unwrap();
-        bindings.bg.drop_binding(state);
-        bindings.fg.drop_binding(state);
-        bindings.attr.drop_binding(state);
-        bindings.length.drop_binding(state);
-        bindings.near.drop_binding(state);
-        bindings.stroke.drop_binding(state);
-        bindings.orient.drop_binding(state);
-        bindings.far_orient.drop_binding(state);
+        bindings.bg.drop_self(state);
+        bindings.fg.drop_self(state);
+        bindings.attr.drop_self(state);
+        bindings.length.drop_self(state);
+        bindings.near.drop_self(state);
+        bindings.stroke.drop_self(state);
+        bindings.orient.drop_self(state);
+        bindings.far_orient.drop_self(state);
     }
 }

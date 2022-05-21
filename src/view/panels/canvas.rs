@@ -1,48 +1,34 @@
 use crate::view::base::*;
 use alloc::boxed::Box;
 use components_arena::ComponentId;
-use dep_obj::{DepObjBaseBuilder, Style, dep_type, dep_type_with_builder};
+use dep_obj::{Builder, DepObjBuilder, DepObjId, Style, dep_type, ext_builder};
 use dep_obj::binding::{Binding, Binding1};
-use dyn_context::state::{State, StateExt};
+use dyn_context::{State, StateExt};
 use core::fmt::Debug;
 use tuifw_screen_base::{Point, Rect, Vector};
 
-pub trait ViewBuilderCanvasPanelExt {
-    fn canvas_panel(
-        self,
-        f: impl for<'a> FnOnce(CanvasPanelBuilder<'a>) -> CanvasPanelBuilder<'a>
-    ) -> Self;
-}
-
-impl<'a> ViewBuilderCanvasPanelExt for ViewBuilder<'a> {
-    fn canvas_panel(
-        mut self,
-        f: impl for<'b> FnOnce(CanvasPanelBuilder<'b>) -> CanvasPanelBuilder<'b>
-    ) -> Self {
-        let view = self.id();
-        CanvasPanel::new(self.state_mut(), view);
-        f(CanvasPanelBuilder(self)).0
+ext_builder!(<'a> Builder<'a, View> as BuilderViewCanvasPanelExt[View] {
+    fn canvas_panel(state: &mut dyn State, view: View) -> (CanvasPanel) {
+        CanvasPanel::new(state, view);
     }
-}
+});
 
-pub struct CanvasPanelBuilder<'a>(ViewBuilder<'a>);
-
-impl<'a> CanvasPanelBuilder<'a> {
+impl<'a> CanvasPanelBuilder<Builder<'a, View>> {
     pub fn child<Tag: ComponentId>(
         mut self,
         storage: Option<&mut Option<View>>,
         tag: Tag,
-        layout: impl for<'b> FnOnce(CanvasLayoutBuilder<'b>) -> CanvasLayoutBuilder<'b>,
-        f: impl for<'b> FnOnce(ViewBuilder<'b>) -> ViewBuilder<'b>
+        layout: impl for<'b> FnOnce(CanvasLayoutBuilder<Builder<'b, View>>) -> CanvasLayoutBuilder<Builder<'b, View>>,
+        f: impl for<'b> FnOnce(Builder<'b, View>) -> Builder<'b, View>
     ) -> Self {
-        let view = self.0.id();
-        let tree: &ViewTree = self.0.state().get();
+        let view = self.id();
+        let tree: &ViewTree = self.state().get();
         let child_prev = view.last_child(tree);
-        let child = View::new(self.0.state_mut(), view, child_prev);
-        child.set_tag(self.0.state_mut(), tag);
+        let child = View::new(self.state_mut(), view, child_prev);
+        child.set_tag(self.state_mut(), tag);
         storage.map(|x| x.replace(child));
-        CanvasLayout::new(self.0.state_mut(), child);
-        child.build(self.0.state_mut(), |child_builder| {
+        CanvasLayout::new(self.state_mut(), child);
+        child.build(self.state_mut(), |child_builder| {
             let child_builder = layout(CanvasLayoutBuilder::new_priv(child_builder)).base_priv();
             f(child_builder)
         });
@@ -50,13 +36,11 @@ impl<'a> CanvasPanelBuilder<'a> {
     }
 }
 
-dep_type_with_builder! {
+dep_type! {
     #[derive(Debug)]
-    pub struct CanvasLayout become layout in View {
+    pub struct CanvasLayout = View[LayoutKey] {
         tl: Point = Point { x: 0, y: 0 },
     }
-
-    type BaseBuilder<'a> = ViewBuilder<'a>;
 }
 
 impl CanvasLayout {
@@ -81,7 +65,7 @@ impl LayoutBehavior for CanvasLayoutBehavior {
     fn init_bindings(&self, view: View, state: &mut dyn State) -> Box<dyn LayoutBindings> {
         let tl = Binding1::new(state, (), |(), tl| Some(tl));
         tl.set_target_fn(state, view, |state, view, _| view.invalidate_parent_arrange(state));
-        tl.set_source_1(state, &mut CanvasLayout::TL.value_source(view.layout()));
+        tl.set_source_1(state, &mut CanvasLayout::TL.value_source(view));
         Box::new(CanvasLayoutBindings {
             tl: tl.into()
         })
@@ -89,7 +73,7 @@ impl LayoutBehavior for CanvasLayoutBehavior {
 
     fn drop_bindings(&self, _view: View, state: &mut dyn State, bindings: Box<dyn LayoutBindings>) {
         let bindings = bindings.downcast::<CanvasLayoutBindings>().unwrap();
-        bindings.tl.drop_binding(state);
+        bindings.tl.drop_self(state);
     }
 }
 
@@ -112,13 +96,13 @@ impl PanelTemplate for CanvasPanelTemplate {
 
     fn apply_layout(&self, state: &mut dyn State, view: View) {
         CanvasLayout::new(state, view);
-        view.layout().apply_style(state, Some(self.layout.clone()));
+        view.apply_style::<CanvasLayout>(state, Some(self.layout.clone()));
     }
 }
 
 dep_type! {
     #[derive(Debug)]
-    pub struct CanvasPanel in View { }
+    pub struct CanvasPanel = View[PanelKey] { }
 }
 
 impl CanvasPanel {

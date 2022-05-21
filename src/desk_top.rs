@@ -1,30 +1,29 @@
 use crate::base::*;
 use crate::view::View;
 use crate::view::panels::{CanvasLayout, CanvasPanel};
-use crate::window::{Window, WindowBuilder};
-use dep_obj::{DepObjBaseBuilder, dep_type_with_builder, ItemChange, Change};
-use dep_obj::binding::{Binding1, BindingExt2, b_continue, b_yield, b_immediate};
-use dyn_context::state::{State, StateExt};
+use crate::window::Window;
+use dep_obj::{Builder, Change, DepObjBuilder, DepObjId, ItemChange, dep_type};
+use dep_obj::binding::{Binding1, BindingExt2, Re};
+use dyn_context::{State, StateExt};
 
-dep_type_with_builder! {
+dep_type! {
     #[derive(Debug)]
-    pub struct DeskTop become obj in Widget {
+    pub struct DeskTop = Widget[WidgetObjKey] {
         windows [Widget],
     }
-
-    type BaseBuilder<'a> = WidgetBuilder<'a>;
 }
 
-impl<'a> DeskTopBuilder<'a> {
+impl<T: DepObjBuilder<Id=Widget>> DeskTopBuilder<T> {
     pub fn window(
         mut self,
         storage: Option<&mut Option<Widget>>,
-        f: impl for<'b> FnOnce(WindowBuilder<'b>)
+        f: impl for<'a> FnOnce(Builder<'a, Widget>) -> Builder<'a, Widget>
     ) -> Self {
-        let desk_top = self.base_priv_ref().id();
-        let window = Window::build(self.base_priv_mut().state_mut(), f);
+        let desk_top = self.id();
+        let window = Window::new(self.state_mut());
+        window.build(self.state_mut(), f);
         storage.map(|x| x.replace(window));
-        b_immediate(DeskTop::WINDOWS.push(self.base_priv_mut().state_mut(), desk_top.obj(), window));
+        DeskTop::WINDOWS.push(self.state_mut(), desk_top, window).immediate();
         self
     }
 }
@@ -37,8 +36,8 @@ impl WidgetBehavior for DeskTopBehavior {
             change.and_then(|change| change.new)
         );
         init_new_view.set_target_fn(state, (), |state, (), view: View| CanvasPanel::new(state, view));
-        widget.obj::<DeskTop>().add_binding(state, init_new_view);
-        init_new_view.set_source_1(state, &mut WidgetBase::VIEW.change_initial_source(widget.base()));
+        widget.add_binding::<DeskTop, _>(state, init_new_view);
+        init_new_view.set_source_1(state, &mut WidgetBase::VIEW.change_initial_source(widget));
 
         let windows = BindingExt2::new(state, (), |
             state,
@@ -61,19 +60,19 @@ impl WidgetBehavior for DeskTopBehavior {
                         let view = window.item.view(tree).unwrap();
                         let prev_view = prev.map(|prev| prev.view(tree).unwrap());
                         view.move_z(state, prev_view);
-                        b_continue()
+                        Re::Continue
                     } else {
-                        b_continue()
+                        Re::Continue
                     }
                 } else {
-                    b_continue()
+                    Re::Continue
                 }
             } else {
-                b_yield(())
+                Re::Yield(())
             }
         });
-        windows.set_source_2(state, &mut DeskTop::WINDOWS.item_initial_final_source_with_update(windows, widget.obj()));
-        windows.set_source_1(state, &mut WidgetBase::VIEW.value_source(widget.base()));
+        windows.set_source_2(state, &mut DeskTop::WINDOWS.item_initial_final_source_with_update(windows, widget));
+        windows.set_source_1(state, &mut WidgetBase::VIEW.value_source(widget));
     }
 
     fn drop_bindings(&self, _widget: Widget, _state: &mut dyn State) { }
@@ -88,18 +87,20 @@ impl DeskTop {
     }
 }
 
-impl WidgetObjWithBuilder for DeskTop {
-    type Builder<'a> = DeskTopBuilder<'a>;
+/*
+impl<'b> WidgetObjWithBuilder<Builder<'b, Widget>> for DeskTop {
+    type Builder = DeskTopBuilder<Builder<'b, Widget>>;
 
-    fn build<'a>(
-        state: &'a mut dyn State,
-        f: impl FnOnce(DeskTopBuilder<'a>)
+    fn build(
+        state: &mut dyn State,
+        f: impl for<'a> FnOnce(DeskTopBuilder<Builder<'a, Widget>>)
     ) -> Widget {
         let desk_top = DeskTop::new(state);
-        f(DeskTopBuilder::new_priv(WidgetBuilder { widget: desk_top, state }));
+        f(DeskTopBuilder::new_priv(Builder { id: desk_top, state }));
         desk_top
     }
 }
+*/
 
 impl WidgetObj for DeskTop {
     fn behavior(&self) -> &'static dyn WidgetBehavior { &Self::BEHAVIOR }

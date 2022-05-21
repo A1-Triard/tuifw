@@ -1,8 +1,8 @@
 use crate::view::base::*;
 use alloc::boxed::Box;
-use dep_obj::{DepObjBaseBuilder, dep_type_with_builder};
+use dep_obj::{Builder, dep_type, ext_builder};
 use dep_obj::binding::{Binding, Binding1};
-use dyn_context::state::{State, StateExt};
+use dyn_context::{State, StateExt};
 use alloc::borrow::Cow;
 use core::fmt::Debug;
 use core::num::NonZeroI16;
@@ -11,31 +11,17 @@ use tuifw_window::RenderPort;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthChar;
 
-pub trait ViewBuilderTextDecoratorExt {
-    fn text_decorator(
-        self,
-        f: impl for<'a> FnOnce(TextDecoratorBuilder<'a>) -> TextDecoratorBuilder<'a>
-    ) -> Self;
-}
-
-impl<'a> ViewBuilderTextDecoratorExt for ViewBuilder<'a> {
-    fn text_decorator(
-        mut self,
-        f: impl for<'b> FnOnce(TextDecoratorBuilder<'b>) -> TextDecoratorBuilder<'b>
-    ) -> Self {
-        let view = self.id();
-        TextDecorator::new(self.state_mut(), view);
-        f(TextDecoratorBuilder::new_priv(self)).base_priv()
+ext_builder!(<'a> Builder<'a, View> as BuilderViewTextDecoratorExt[View] {
+    fn text_decorator(state: &mut dyn State, view: View) -> (TextDecorator) {
+        TextDecorator::new(state, view);
     }
-}
+});
 
-dep_type_with_builder! {
+dep_type! {
     #[derive(Debug)]
-    pub struct TextDecorator become decorator in View {
+    pub struct TextDecorator = View[DecoratorKey] {
         text: Cow<'static, str> = Cow::Borrowed(""),
     }
-
-    type BaseBuilder<'a> = ViewBuilder<'a>;
 }
 
 impl TextDecorator {
@@ -129,10 +115,10 @@ impl DecoratorBehavior for TextDecoratorBehavior {
         fg.set_target_fn(state, view, |state, view, _| view.invalidate_render(state));
         attr.set_target_fn(state, view, |state, view, _| view.invalidate_render(state));
         text.set_target_fn(state, view, |state, view, _| view.invalidate_measure_and_render(state));
-        bg.set_source_1(state, &mut ViewBase::BG.value_source(view.base()));
-        fg.set_source_1(state, &mut ViewBase::FG.value_source(view.base()));
-        attr.set_source_1(state, &mut ViewBase::ATTR.value_source(view.base()));
-        text.set_source_1(state, &mut TextDecorator::TEXT.value_source(view.decorator()));
+        bg.set_source_1(state, &mut ViewBase::BG.value_source(view));
+        fg.set_source_1(state, &mut ViewBase::FG.value_source(view));
+        attr.set_source_1(state, &mut ViewBase::ATTR.value_source(view));
+        text.set_source_1(state, &mut TextDecorator::TEXT.value_source(view));
         Box::new(TextDecoratorBindings {
             bg: bg.into(),
             fg: fg.into(),
@@ -143,9 +129,9 @@ impl DecoratorBehavior for TextDecoratorBehavior {
 
     fn drop_bindings(&self, _view: View, state: &mut dyn State, bindings: Box<dyn DecoratorBindings>) {
         let bindings = bindings.downcast::<TextDecoratorBindings>().unwrap();
-        bindings.bg.drop_binding(state);
-        bindings.fg.drop_binding(state);
-        bindings.attr.drop_binding(state);
-        bindings.text.drop_binding(state);
+        bindings.bg.drop_self(state);
+        bindings.fg.drop_self(state);
+        bindings.attr.drop_self(state);
+        bindings.text.drop_self(state);
     }
 }

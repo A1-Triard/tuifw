@@ -1,23 +1,25 @@
 use crate::base::*;
 use crate::view::{View, ViewBase};
 use crate::view::decorators::TextDecorator;
-use dep_obj::{dep_type_with_builder, Change};
+use dep_obj::{Builder, Change, DepObjId, dep_type, ext_builder};
 use dep_obj::binding::Binding1;
-use dyn_context::state::State;
+use dyn_context::State;
 use alloc::borrow::Cow;
 use tuifw_screen_base::*;
 
-dep_type_with_builder! {
+dep_type! {
     #[derive(Debug)]
-    pub struct StaticText become obj in Widget {
+    pub struct StaticText = Widget[WidgetObjKey] {
         text: Cow<'static, str> = Cow::Borrowed(""),
         bg: Option<Option<Color>> = None,
         fg: Option<Color> = None,
         attr: Option<Attr> = None,
     }
-
-    type BaseBuilder<'a> = WidgetBuilder<'a>;
 }
+
+ext_builder!(<'a> Builder<'a, Widget> as BuilderWidgetStaticTextExt[Widget] {
+    static_text -> (StaticText)
+});
 
 struct StaticTextBehavior;
 
@@ -33,8 +35,8 @@ impl WidgetBehavior for StaticTextBehavior {
             view.bind_base_to_widget_option(state, ViewBase::ATTR, widget, StaticText::ATTR, |x| x);
             view.bind_decorator_to_widget(state, TextDecorator::TEXT, widget, StaticText::TEXT, |x| x);
         });
-        widget.obj::<StaticText>().add_binding(state, init_new_view);
-        init_new_view.set_source_1(state, &mut WidgetBase::VIEW.change_initial_source(widget.base()));
+        widget.add_binding::<StaticText, _>(state, init_new_view);
+        init_new_view.set_source_1(state, &mut WidgetBase::VIEW.change_initial_source(widget));
     }
 
     fn drop_bindings(&self, _widget: Widget, _state: &mut dyn State) { }
@@ -49,18 +51,20 @@ impl StaticText {
     }
 }
 
-impl WidgetObjWithBuilder for StaticText {
-    type Builder<'a> = StaticTextBuilder<'a>;
+/*
+impl<B: DepObjBuilder<Id=Widget>> WidgetObjWithBuilder<B> for StaticText {
+    type Builder = StaticTextBuilder<B>;
 
     fn build<'a>(
         state: &'a mut dyn State,
-        f: impl FnOnce(StaticTextBuilder<'a>)
+        f: impl FnOnce(StaticTextBuilder<B>)
     ) -> Widget {
         let static_text = StaticText::new(state);
-        f(StaticTextBuilder::new_priv(WidgetBuilder { widget: static_text, state }));
+        f(StaticTextBuilder::new_priv(Builder { id: static_text, state }));
         static_text
     }
 }
+*/
 
 impl WidgetObj for StaticText {
     fn behavior(&self) -> &'static dyn WidgetBehavior { &Self::BEHAVIOR }

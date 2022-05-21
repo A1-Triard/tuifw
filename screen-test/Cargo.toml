@@ -1,5 +1,5 @@
 [package]
-edition = "2018"
+edition = "2021"
 name = "tuifw-screen-test"
 version = "0.10.0"
 authors = ["warlock <internalmike@gmail.com>"]
@@ -12,6 +12,6 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/A1-Triard/tuifw"
 
 [dependencies]
-errno-no-std = { version = "0.0.3", default-features = false }
+errno-no-std = { version = "0.0.4", default-features = false }
 tuifw-screen-base = { path = "../screen-base", version = "0.10.0" }
 unicode-segmentation = "1.8.0"

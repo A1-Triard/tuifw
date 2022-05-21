@@ -1,14 +1,14 @@
 use crate::view::{Layout, View, ViewAlign, ViewBase, ViewInput, ViewTree, Decorator};
 use alloc::boxed::Box;
-use alloc::vec::Vec;
-use components_arena::{Arena, Component, Id, NewtypeComponentId};
+use components_arena::{Arena, Component, ComponentStop, Id, NewtypeComponentId};
+use components_arena::with_arena_in_state_part;
 use core::any::{Any, TypeId};
 use core::fmt::Debug;
-use debug_panic::debug_panic;
-use dep_obj::{Change, DepObjId, DepType, dep_obj, dep_type, Convenient, DepProp, DepObjBaseBuilder};
-use dep_obj::binding::{Binding1, Bindings, BYield, Binding};
+use dep_obj::{Change, DepObjId, DepType, DetachedDepObjId, Convenient, DepProp};
+use dep_obj::{dep_obj, dep_type, with_builder};
+use dep_obj::binding::{Binding1, Bindings, Re, Binding};
 use downcast_rs::{Downcast, impl_downcast};
-use dyn_context::state::{RequiresStateDrop, State, StateDrop, StateExt};
+use dyn_context::{State, StateExt, Stop};
 use errno_no_std::Errno;
 use macro_attr_2018::macro_attr;
 use tuifw_screen_base::Screen;
@@ -18,20 +18,24 @@ pub trait WidgetBehavior {
     fn drop_bindings(&self, widget: Widget, state: &mut dyn State);
 }
 
-pub trait WidgetObj: Downcast + DepType<Id=Widget> {
+pub enum WidgetObjKey { }
+
+pub trait WidgetObj: Downcast + DepType<Id=Widget, DepObjKey=WidgetObjKey> {
     fn behavior(&self) -> &'static dyn WidgetBehavior;
 }
 
 impl_downcast!(WidgetObj);
 
+/*
 pub trait WidgetObjWithBuilder {
-    type Builder<'a>;
+    trait Build;
 
-    fn build<'a>(
-        state: &'a mut dyn State,
-        f: impl FnOnce(Self::Builder<'a>)
+    fn build(
+        state: &mut dyn State,
+        f: impl Self::Build
     ) -> Widget;
 }
+*/
 
 macro_attr! {
     #[derive(NewtypeComponentId!)]
@@ -40,7 +44,7 @@ macro_attr! {
 }
 
 macro_attr! {
-    #[derive(Debug, Component!)]
+    #[derive(Debug, Component!(stop=WidgetStop))]
     struct WidgetNode {
         view: Option<View>,
         base: WidgetBase,
@@ -48,47 +52,31 @@ macro_attr! {
     }
 }
 
-pub struct WidgetTree(StateDrop<WidgetTreeImpl>);
-
-struct WidgetTreeImpl {
+#[derive(Stop)]
+pub struct WidgetTree {
+    #[stop]
     widget_arena: Arena<WidgetNode>,
+    #[stop]
     view_tree: ViewTree,
 }
 
-impl RequiresStateDrop for WidgetTreeImpl {
-    fn get(state: &dyn State) -> &StateDrop<Self> {
-        let tree: &WidgetTree = state.get();
-        &tree.0
-    }
+impl ComponentStop for WidgetStop {
+    with_arena_in_state_part!(WidgetTree { .widget_arena });
 
-    fn get_mut(state: &mut dyn State) -> &mut StateDrop<Self> {
-        let tree: &mut WidgetTree = state.get_mut();
-        &mut tree.0
-    }
-
-    fn before_drop(state: &mut dyn State) {
-        let tree: &WidgetTree = state.get();
-        let widgets = tree.0.get().widget_arena.items().ids().collect::<Vec<_>>();
-        for widget in widgets {
-            Widget(widget).drop_bindings(state);
-        }
-        ViewTree::drop_self(state);
-    }
-
-    fn drop_incorrectly(self) {
-        debug_panic!("WidgetTree should be dropped with the drop_self method");
+    fn stop(&self, state: &mut dyn State, id: Id<WidgetNode>) {
+        Widget(id).drop_bindings(state);
     }
 }
 
 impl State for WidgetTree {
     fn get_raw(&self, ty: TypeId) -> Option<&dyn Any> {
         if ty == TypeId::of::<WidgetTree>() { return Some(self); }
-        self.0.get().view_tree.get_raw(ty)
+        self.view_tree.get_raw(ty)
     }
 
     fn get_mut_raw(&mut self, ty: TypeId) -> Option<&mut dyn Any> {
         if ty == TypeId::of::<WidgetTree>() { return Some(self); }
-        self.0.get_mut().view_tree.get_mut_raw(ty)
+        self.view_tree.get_mut_raw(ty)
     }
 }
 
@@ -96,18 +84,14 @@ impl WidgetTree {
     pub fn new(screen: Box<dyn Screen>, bindings: &mut Bindings) -> Self {
         let widget_arena = Arena::new();
         let view_tree = ViewTree::new(screen, bindings);
-        WidgetTree(StateDrop::new(WidgetTreeImpl {
+        WidgetTree {
             widget_arena,
             view_tree,
-        }))
-    }
-
-    pub fn drop_self(state: &mut dyn State) {
-        <StateDrop<WidgetTreeImpl>>::drop_self(state);
+        }
     }
 
     pub fn root(&self) -> View {
-        self.0.get().view_tree.root()
+        self.view_tree.root()
     }
 
     pub fn quit(state: &mut dyn State) {
@@ -119,7 +103,29 @@ impl WidgetTree {
     }
 }
 
+dep_obj! {
+    impl Widget {
+        fn<WidgetBase>(self as this, tree: WidgetTree) -> (WidgetBase) {
+            if mut {
+                &mut tree.widget_arena[this.0].base
+            } else {
+                &tree.widget_arena[this.0].base
+            }
+        }
+
+        fn<WidgetObjKey>(self as this, tree: WidgetTree) -> dyn(WidgetObj) {
+            if mut {
+                tree.widget_arena[this.0].obj.as_mut()
+            } else {
+                tree.widget_arena[this.0].obj.as_ref()
+            }
+        }
+    }
+}
+
 impl Widget {
+    with_builder!();
+
     pub fn new<O: WidgetObj>(
         state: &mut dyn State,
         obj: O,
@@ -127,7 +133,7 @@ impl Widget {
         let behavior = obj.behavior();
         let widget = {
             let tree: &mut WidgetTree = state.get_mut();
-            tree.0.get_mut().widget_arena.insert(|widget| (WidgetNode {
+            tree.widget_arena.insert(|widget| (WidgetNode {
                 view: None,
                 base: WidgetBase::new_priv(),
                 obj: Box::new(obj),
@@ -137,8 +143,8 @@ impl Widget {
             change.and_then(|change| change.old)
         );
         drop_old_view.set_target_fn(state, (), |state, (), view: View| view.drop_view(state));
-        widget.base().add_binding(state, drop_old_view);
-        drop_old_view.set_source_1(state, &mut WidgetBase::VIEW.change_final_source(widget.base()));
+        widget.add_binding::<WidgetBase, _>(state, drop_old_view);
+        drop_old_view.set_source_1(state, &mut WidgetBase::VIEW.change_final_source(widget));
         behavior.init_bindings(widget, state);
         widget
     }
@@ -147,14 +153,14 @@ impl Widget {
         self.drop_bindings(state);
         {
             let tree: &mut WidgetTree = state.get_mut();
-            let node = tree.0.get_mut().widget_arena.remove(self.0);
+            let node = tree.widget_arena.remove(self.0);
             assert!(node.view.is_none(), "Loaded widget dropped");
         }
     }
 
     fn drop_bindings(self, state: &mut dyn State) {
         let tree: &WidgetTree = state.get();
-        let node = &tree.0.get().widget_arena[self.0];
+        let node = &tree.widget_arena[self.0];
         let behavior = node.obj.behavior();
         behavior.drop_bindings(self, state);
         self.drop_bindings_priv(state);
@@ -166,13 +172,13 @@ impl Widget {
         parent: View,
         prev: Option<View>,
         init: impl FnOnce(&mut dyn State, View),
-    ) -> BYield<X> {
+    ) -> Re<X> {
         let view = View::new(state, parent, prev);
         view.set_tag(state, self);
         {
             let tree: &mut WidgetTree = state.get_mut();
             assert!(
-                tree.0.get_mut().widget_arena[self.0].view.replace(view).is_none(),
+                tree.widget_arena[self.0].view.replace(view).is_none(),
                 "Widget already loaded"
             );
         }
@@ -180,50 +186,32 @@ impl Widget {
 
         let input_binding = Binding1::new(state, (), |(), input: Option<ViewInput>| input);
         input_binding.dispatch(state, self, |state, widget, input|
-            WidgetBase::VIEW_INPUT.raise(state, widget.base(), input)
+            WidgetBase::VIEW_INPUT.raise(state, widget, input)
         );
-        self.base().add_binding(state, input_binding);
-        input_binding.set_source_1(state, &mut ViewBase::INPUT.source(view.base()));
+        self.add_binding::<WidgetBase, _>(state, input_binding);
+        input_binding.set_source_1(state, &mut ViewBase::INPUT.source(view));
 
-        WidgetBase::VIEW.set(state, self.base(), Some(view))
+        WidgetBase::VIEW.set(state, self, Some(view))
     }
 
-    pub fn unload<X: Convenient>(self, state: &mut dyn State) -> BYield<X> {
+    pub fn unload<X: Convenient>(self, state: &mut dyn State) -> Re<X> {
         {
             let tree: &mut WidgetTree = state.get_mut();
             assert!(
-                tree.0.get_mut().widget_arena[self.0].view.take().is_some(),
+                tree.widget_arena[self.0].view.take().is_some(),
                 "Widget is not loaded"
             );
         }
-        WidgetBase::VIEW.set(state, self.base(), None)
+        WidgetBase::VIEW.set(state, self, None)
     }
 
     pub fn view(self, tree: &WidgetTree) -> Option<View> {
-        tree.0.get().widget_arena[self.0].view
+        tree.widget_arena[self.0].view
     }
 
     pub fn focus(self, state: &mut dyn State) {
         let tree: &WidgetTree = state.get();
         self.view(tree).map(|view| view.focus(state));
-    }
-
-    dep_obj! {
-        pub fn base(self as this, tree: WidgetTree) -> (WidgetBase) {
-            if mut {
-                &mut tree.0.get_mut().widget_arena[this.0].base
-            } else {
-                &tree.0.get().widget_arena[this.0].base
-            }
-        }
-
-        pub fn obj(self as this, tree: WidgetTree) -> (trait WidgetObj) {
-            if mut {
-                tree.0.get_mut().widget_arena[this.0].obj.as_mut()
-            } else {
-                tree.0.get().widget_arena[this.0].obj.as_ref()
-            }
-        }
     }
 
     fn bind_view<O: WidgetObj, M: Clone + 'static, P: Clone + 'static, T: Convenient, U: Convenient>(
@@ -239,22 +227,11 @@ impl Widget {
             Some(map(map_param, value))
         );
         bind(state, param, binding.into());
-        binding.set_source_1(state, &mut widget_prop.value_source(self.obj()));
+        binding.set_source_1(state, &mut widget_prop.value_source(self));
     }
 }
 
-impl DepObjId for Widget { }
-
-pub struct WidgetBuilder<'a> {
-    pub widget: Widget,
-    pub state: &'a mut dyn State,
-}
-
-impl<'a> DepObjBaseBuilder<Widget> for WidgetBuilder<'a> {
-    fn id(&self) -> Widget { self.widget }
-    fn state(&self) -> &dyn State { self.state }
-    fn state_mut(&mut self) -> &mut dyn State { self.state }
-}
+impl DetachedDepObjId for Widget { }
 
 pub trait ViewWidgetExt {
     fn bind_base_to_widget_option<O: WidgetObj, T: Convenient, U: Convenient>(
@@ -316,12 +293,12 @@ impl ViewWidgetExt for View {
             |state, (view_base_prop, view), binding| {
                 binding.dispatch(state, (view_base_prop, view), |state, (view_base_prop, view), value| {
                     if let Some(value) = value {
-                        view_base_prop.set(state, view.base(), value)
+                        view_base_prop.set(state, view, value)
                     } else {
-                        view_base_prop.unset(state, view.base())
+                        view_base_prop.unset(state, view)
                     }
                 });
-                view.base().add_binding(state, binding);
+                view.add_binding::<ViewBase, _>(state, binding);
             }
         );
     }
@@ -336,7 +313,7 @@ impl ViewWidgetExt for View {
     ) {
         widget.bind_view(state, widget_prop, map, |map, x| map(x), (view_base_prop, self),
             |state, (view_base_prop, view), binding|
-                view_base_prop.bind(state, view.base(), binding)
+                view_base_prop.bind(state, view, binding)
         );
     }
 
@@ -350,7 +327,7 @@ impl ViewWidgetExt for View {
     ) {
         widget.bind_view(state, widget_prop, map, |map, x| map(x), (view_align_prop, self),
             |state, (view_align_prop, view), binding|
-                view_align_prop.bind(state, view.align(), binding)
+                view_align_prop.bind(state, view, binding)
         );
     }
 
@@ -364,7 +341,7 @@ impl ViewWidgetExt for View {
     ) {
         widget.bind_view(state, widget_prop, map, |map, x| map(x), (layout_prop, self),
             |state, (layout_prop, view), binding|
-                layout_prop.bind(state, view.layout(), binding)
+                layout_prop.bind(state, view, binding)
         );
     }
 
@@ -378,14 +355,14 @@ impl ViewWidgetExt for View {
     ) {
         widget.bind_view(state, widget_prop, map, |map, x| map(x),
             (decorator_prop, self), |state, (decorator_prop, view), binding|
-                decorator_prop.bind(state, view.decorator(), binding)
+                decorator_prop.bind(state, view, binding)
         );
     }
 }
 
 dep_type! {
     #[derive(Debug)]
-    pub struct WidgetBase in Widget {
+    pub struct WidgetBase = Widget[WidgetBase] {
         view: Option<View> = None,
         view_input yield ViewInput,
     }

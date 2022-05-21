@@ -20,7 +20,7 @@ use core::cmp::{max, min};
 use core::mem::replace;
 use core::ops::Range;
 use components_arena::{Arena, Component, ComponentId, Id, NewtypeComponentId, RawId};
-use dyn_context::state::State;
+use dyn_context::State;
 use educe::Educe;
 use errno_no_std::Errno;
 use macro_attr_2018::macro_attr;

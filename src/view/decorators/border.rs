@@ -1,35 +1,24 @@
 use crate::view::base::*;
 use alloc::boxed::Box;
-use dep_obj::{DepObjBaseBuilder, dep_type_with_builder};
-use dep_obj::binding::{Binding, Binding1, Binding4};
-use dyn_context::state::{State, StateExt};
+use dep_obj::{Builder, dep_type, ext_builder};
+use dep_obj::binding::{Binding};
+use dep_obj::binding::n::{Binding1, Binding4};
+use dyn_context::{State, StateExt};
 use either::{Left, Right};
 use alloc::borrow::Cow;
 use core::fmt::Debug;
 use tuifw_screen_base::{Attr, Color, Point, Rect, Vector};
 use tuifw_window::RenderPort;
 
-pub trait ViewBuilderBorderDecoratorExt {
-    fn border_decorator(
-        self,
-        f: impl for<'a> FnOnce(BorderDecoratorBuilder<'a>) -> BorderDecoratorBuilder<'a>
-    ) -> Self;
-}
-
-impl<'a> ViewBuilderBorderDecoratorExt for ViewBuilder<'a> {
-    fn border_decorator(
-        mut self,
-        f: impl for<'b> FnOnce(BorderDecoratorBuilder<'b>) -> BorderDecoratorBuilder<'b>
-    ) -> Self {
-        let view = self.id();
-        BorderDecorator::new(self.state_mut(), view);
-        f(BorderDecoratorBuilder::new_priv(self)).base_priv()
+ext_builder!(<'a> Builder<'a, View> as BuilderViewBorderDecoratorExt[View] {
+    fn border_decorator(state: &mut dyn State, view: View) -> (BorderDecorator) {
+        BorderDecorator::new(state, view);
     }
-}
+});
 
-dep_type_with_builder! {
+dep_type! {
     #[derive(Debug)]
-    pub struct BorderDecorator become decorator in View {
+    pub struct BorderDecorator = View[DecoratorKey] {
         enable_l_padding: bool = true,
         enable_t_padding: bool = true,
         enable_r_padding: bool = true,
@@ -44,8 +33,6 @@ dep_type_with_builder! {
         b: Cow<'static, str> = Cow::Borrowed(""),
         fill: Cow<'static, str> = Cow::Borrowed(""),
     }
-
-    type BaseBuilder<'a> = ViewBuilder<'a>;
 }
 
 impl BorderDecorator {
@@ -360,34 +347,34 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
             });
         });
         fill.set_target_fn(state, view, |state, view, _| view.invalidate_render(state));
-        has_l_padding.set_source_1(state, &mut BorderDecorator::L.value_source(view.decorator()));
-        has_l_padding.set_source_2(state, &mut BorderDecorator::TL.value_source(view.decorator()));
-        has_l_padding.set_source_3(state, &mut BorderDecorator::BL.value_source(view.decorator()));
-        has_l_padding.set_source_4(state, &mut BorderDecorator::ENABLE_L_PADDING.value_source(view.decorator()));
-        has_t_padding.set_source_1(state, &mut BorderDecorator::T.value_source(view.decorator()));
-        has_t_padding.set_source_2(state, &mut BorderDecorator::TL.value_source(view.decorator()));
-        has_t_padding.set_source_3(state, &mut BorderDecorator::TR.value_source(view.decorator()));
-        has_t_padding.set_source_4(state, &mut BorderDecorator::ENABLE_T_PADDING.value_source(view.decorator()));
-        has_r_padding.set_source_1(state, &mut BorderDecorator::R.value_source(view.decorator()));
-        has_r_padding.set_source_2(state, &mut BorderDecorator::TR.value_source(view.decorator()));
-        has_r_padding.set_source_3(state, &mut BorderDecorator::BR.value_source(view.decorator()));
-        has_r_padding.set_source_4(state, &mut BorderDecorator::ENABLE_R_PADDING.value_source(view.decorator()));
-        has_b_padding.set_source_1(state, &mut BorderDecorator::B.value_source(view.decorator()));
-        has_b_padding.set_source_2(state, &mut BorderDecorator::BL.value_source(view.decorator()));
-        has_b_padding.set_source_3(state, &mut BorderDecorator::BR.value_source(view.decorator()));
-        has_b_padding.set_source_4(state, &mut BorderDecorator::ENABLE_B_PADDING.value_source(view.decorator()));
-        bg.set_source_1(state, &mut ViewBase::BG.value_source(view.base()));
-        fg.set_source_1(state, &mut ViewBase::FG.value_source(view.base()));
-        attr.set_source_1(state, &mut ViewBase::ATTR.value_source(view.base()));
-        tl.set_source_1(state, &mut BorderDecorator::TL.value_source(view.decorator()));
-        tr.set_source_1(state, &mut BorderDecorator::TR.value_source(view.decorator()));
-        bl.set_source_1(state, &mut BorderDecorator::BL.value_source(view.decorator()));
-        br.set_source_1(state, &mut BorderDecorator::BR.value_source(view.decorator()));
-        l.set_source_1(state, &mut BorderDecorator::L.value_source(view.decorator()));
-        t.set_source_1(state, &mut BorderDecorator::T.value_source(view.decorator()));
-        r.set_source_1(state, &mut BorderDecorator::R.value_source(view.decorator()));
-        b.set_source_1(state, &mut BorderDecorator::B.value_source(view.decorator()));
-        fill.set_source_1(state, &mut BorderDecorator::FILL.value_source(view.decorator()));
+        has_l_padding.set_source_1(state, &mut BorderDecorator::L.value_source(view));
+        has_l_padding.set_source_2(state, &mut BorderDecorator::TL.value_source(view));
+        has_l_padding.set_source_3(state, &mut BorderDecorator::BL.value_source(view));
+        has_l_padding.set_source_4(state, &mut BorderDecorator::ENABLE_L_PADDING.value_source(view));
+        has_t_padding.set_source_1(state, &mut BorderDecorator::T.value_source(view));
+        has_t_padding.set_source_2(state, &mut BorderDecorator::TL.value_source(view));
+        has_t_padding.set_source_3(state, &mut BorderDecorator::TR.value_source(view));
+        has_t_padding.set_source_4(state, &mut BorderDecorator::ENABLE_T_PADDING.value_source(view));
+        has_r_padding.set_source_1(state, &mut BorderDecorator::R.value_source(view));
+        has_r_padding.set_source_2(state, &mut BorderDecorator::TR.value_source(view));
+        has_r_padding.set_source_3(state, &mut BorderDecorator::BR.value_source(view));
+        has_r_padding.set_source_4(state, &mut BorderDecorator::ENABLE_R_PADDING.value_source(view));
+        has_b_padding.set_source_1(state, &mut BorderDecorator::B.value_source(view));
+        has_b_padding.set_source_2(state, &mut BorderDecorator::BL.value_source(view));
+        has_b_padding.set_source_3(state, &mut BorderDecorator::BR.value_source(view));
+        has_b_padding.set_source_4(state, &mut BorderDecorator::ENABLE_B_PADDING.value_source(view));
+        bg.set_source_1(state, &mut ViewBase::BG.value_source(view));
+        fg.set_source_1(state, &mut ViewBase::FG.value_source(view));
+        attr.set_source_1(state, &mut ViewBase::ATTR.value_source(view));
+        tl.set_source_1(state, &mut BorderDecorator::TL.value_source(view));
+        tr.set_source_1(state, &mut BorderDecorator::TR.value_source(view));
+        bl.set_source_1(state, &mut BorderDecorator::BL.value_source(view));
+        br.set_source_1(state, &mut BorderDecorator::BR.value_source(view));
+        l.set_source_1(state, &mut BorderDecorator::L.value_source(view));
+        t.set_source_1(state, &mut BorderDecorator::T.value_source(view));
+        r.set_source_1(state, &mut BorderDecorator::R.value_source(view));
+        b.set_source_1(state, &mut BorderDecorator::B.value_source(view));
+        fill.set_source_1(state, &mut BorderDecorator::FILL.value_source(view));
         Box::new(BorderDecoratorBindings {
             has_l_padding: has_l_padding.into(),
             has_t_padding: has_t_padding.into(),
@@ -410,21 +397,21 @@ impl DecoratorBehavior for BorderDecoratorBehavior {
 
     fn drop_bindings(&self, _view: View, state: &mut dyn State, bindings: Box<dyn DecoratorBindings>) {
         let bindings = bindings.downcast::<BorderDecoratorBindings>().unwrap();
-        bindings.has_l_padding.drop_binding(state);
-        bindings.has_t_padding.drop_binding(state);
-        bindings.has_r_padding.drop_binding(state);
-        bindings.has_b_padding.drop_binding(state);
-        bindings.bg.drop_binding(state);
-        bindings.fg.drop_binding(state);
-        bindings.attr.drop_binding(state);
-        bindings.tl.drop_binding(state);
-        bindings.tr.drop_binding(state);
-        bindings.bl.drop_binding(state);
-        bindings.br.drop_binding(state);
-        bindings.l.drop_binding(state);
-        bindings.t.drop_binding(state);
-        bindings.r.drop_binding(state);
-        bindings.b.drop_binding(state);
-        bindings.fill.drop_binding(state);
+        bindings.has_l_padding.drop_self(state);
+        bindings.has_t_padding.drop_self(state);
+        bindings.has_r_padding.drop_self(state);
+        bindings.has_b_padding.drop_self(state);
+        bindings.bg.drop_self(state);
+        bindings.fg.drop_self(state);
+        bindings.attr.drop_self(state);
+        bindings.tl.drop_self(state);
+        bindings.tr.drop_self(state);
+        bindings.bl.drop_self(state);
+        bindings.br.drop_self(state);
+        bindings.l.drop_self(state);
+        bindings.t.drop_self(state);
+        bindings.r.drop_self(state);
+        bindings.b.drop_self(state);
+        bindings.fill.drop_self(state);
     }
 }

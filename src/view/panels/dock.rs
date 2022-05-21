@@ -1,40 +1,28 @@
 use crate::view::base::*;
 use alloc::boxed::Box;
 use components_arena::ComponentId;
-use dep_obj::{DepObjBaseBuilder, Style, dep_type_with_builder};
+use dep_obj::{Builder, DepObjBuilder, DepObjId, Style, dep_type, ext_builder};
 use dep_obj::binding::{Binding, Binding1};
-use dyn_context::state::{State, StateExt};
+use dyn_context::{State, StateExt};
 use either::{Either, Left, Right};
 use core::cmp::{max, min};
 use core::fmt::Debug;
 use num_traits::float::FloatCore;
 use tuifw_screen_base::{Orient, Rect, Side, Thickness, Vector};
 
-pub trait ViewBuilderDockPanelExt {
-    fn dock_panel(
-        self,
-        f: impl for<'a> FnOnce(DockPanelBuilder<'a>) -> DockPanelBuilder<'a>
-    ) -> Self;
-}
-
-impl<'a> ViewBuilderDockPanelExt for ViewBuilder<'a> {
-    fn dock_panel(
-        mut self,
-        f: impl for<'b> FnOnce(DockPanelBuilder<'b>) -> DockPanelBuilder<'b>
-    ) -> Self {
-        let view = self.id();
-        DockPanel::new(self.state_mut(), view);
-        f(DockPanelBuilder::new_priv(self)).base_priv()
+ext_builder!(<'a> Builder<'a, View> as BuilderViewDockPanelExt[View] {
+    fn dock_panel(state: &mut dyn State, view: View) -> (DockPanel) {
+        DockPanel::new(state, view);
     }
-}
+});
 
-impl<'a> DockPanelBuilder<'a> {
+impl<'a> DockPanelBuilder<Builder<'a, View>> {
     pub fn child<Tag: ComponentId>(
         mut self,
         storage: Option<&mut Option<View>>,
         tag: Tag,
-        layout: impl for<'b> FnOnce(DockLayoutBuilder<'b>) -> DockLayoutBuilder<'b>,
-        f: impl for<'b> FnOnce(ViewBuilder<'b>) -> ViewBuilder<'b>
+        layout: impl for<'b> FnOnce(DockLayoutBuilder<Builder<'b, View>>) -> DockLayoutBuilder<Builder<'b, View>>,
+        f: impl for<'b> FnOnce(Builder<'b, View>) -> Builder<'b, View>
     ) -> Self {
         let view = self.base_priv_ref().id();
         let tree: &ViewTree = self.base_priv_ref().state().get();
@@ -51,13 +39,11 @@ impl<'a> DockPanelBuilder<'a> {
     }
 }
 
-dep_type_with_builder! {
+dep_type! {
     #[derive(Debug)]
-    pub struct DockLayout become layout in View {
+    pub struct DockLayout = View[LayoutKey] {
         dock: Either<f32, Side> = Either::Left(1.),
     }
-
-    type BaseBuilder<'a> = ViewBuilder<'a>;
 }
 
 impl DockLayout {
@@ -82,7 +68,7 @@ impl LayoutBehavior for DockLayoutBehavior {
     fn init_bindings(&self, view: View, state: &mut dyn State) -> Box<dyn LayoutBindings> {
         let dock = Binding1::new(state, (), |(), dock| Some(dock));
         dock.set_target_fn(state, view, |state, view, _| view.invalidate_parent_measure(state));
-        dock.set_source_1(state, &mut DockLayout::DOCK.value_source(view.layout()));
+        dock.set_source_1(state, &mut DockLayout::DOCK.value_source(view));
         Box::new(DockLayoutBindings {
             dock: dock.into()
         })
@@ -90,7 +76,7 @@ impl LayoutBehavior for DockLayoutBehavior {
 
     fn drop_bindings(&self, _view: View, state: &mut dyn State, bindings: Box<dyn LayoutBindings>) {
         let bindings = bindings.downcast::<DockLayoutBindings>().unwrap();
-        bindings.dock.drop_binding(state);
+        bindings.dock.drop_self(state);
     }
 }
 
@@ -101,13 +87,11 @@ struct DockLayoutBindings {
 
 impl LayoutBindings for DockLayoutBindings { }
 
-dep_type_with_builder! {
+dep_type! {
     #[derive(Debug)]
-    pub struct DockPanel become panel in View {
+    pub struct DockPanel = View[PanelKey] {
         base: Side = Side::Top,
     }
-
-    type BaseBuilder<'a> = ViewBuilder<'a>;
 }
 
 impl DockPanel {
@@ -139,12 +123,12 @@ struct DockPanelTemplate {
 impl PanelTemplate for DockPanelTemplate {
     fn apply_panel(&self, state: &mut dyn State, view: View) {
         DockPanel::new(state, view);
-        view.panel().apply_style(state, Some(self.panel.clone()));
+        view.apply_style::<DockPanel>(state, Some(self.panel.clone()));
     }
 
     fn apply_layout(&self, state: &mut dyn State, view: View) {
         DockLayout::new(state, view);
-        view.layout().apply_style(state, Some(self.layout.clone()));
+        view.apply_style::<DockLayout>(state, Some(self.layout.clone()));
     }
 }
 
@@ -452,7 +436,7 @@ impl PanelBehavior for DockPanelBehavior {
     fn init_bindings(&self, view: View, state: &mut dyn State) -> Box<dyn PanelBindings> {
         let base = Binding1::new(state, (), |(), base| Some(base));
         base.set_target_fn(state, view, |state, view, _| view.invalidate_measure(state));
-        base.set_source_1(state, &mut DockPanel::BASE.value_source(view.panel()));
+        base.set_source_1(state, &mut DockPanel::BASE.value_source(view));
         Box::new(DockPanelBindings {
             base: base.into()
         })
@@ -460,7 +444,7 @@ impl PanelBehavior for DockPanelBehavior {
 
     fn drop_bindings(&self, _view: View, state: &mut dyn State, bindings: Box<dyn PanelBindings>) {
         let bindings = bindings.downcast::<DockPanelBindings>().unwrap();
-        bindings.base.drop_binding(state);
+        bindings.base.drop_self(state);
     }
 }
 
