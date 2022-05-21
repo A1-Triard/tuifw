@@ -378,44 +378,24 @@ macro_attr! {
 }
 
 impl_dep_obj!(View {
-    fn<ViewBase>(self as this, tree: ViewTree) -> (ViewBase) {
-        if mut {
-            &mut tree.arena[this.0].base
-        } else {
-            &tree.arena[this.0].base
-        }
+    fn<ViewBase>() -> (ViewBase) {
+        ViewTree { .arena } | .base
     }
 
-    fn<ViewAlign>(self as this, tree: ViewTree) -> optional(ViewAlign) {
-        if mut {
-            tree.arena[this.0].align.as_mut()
-        } else {
-            tree.arena[this.0].align.as_ref()
-        }
+    fn<ViewAlign>() -> optional(ViewAlign) {
+        ViewTree { .arena } | .align
     }
 
-    fn<DecoratorKey>(self as this, tree: ViewTree) -> optional dyn(Decorator) {
-        if mut {
-            tree.arena[this.0].decorator.as_deref_mut()
-        } else {
-            tree.arena[this.0].decorator.as_deref()
-        }
+    fn<DecoratorKey>() -> optional dyn(Decorator) {
+        ViewTree { .arena } | .decorator
     }
 
-    fn<LayoutKey>(self as this, tree: ViewTree) -> optional dyn(Layout) {
-        if mut {
-            tree.arena[this.0].layout.as_deref_mut()
-        } else {
-            tree.arena[this.0].layout.as_deref()
-        }
+    fn<LayoutKey>() -> optional dyn(Layout) {
+        ViewTree { .arena } | .layout
     }
 
-    fn<PanelKey>(self as this, tree: ViewTree) -> optional dyn(Panel) {
-        if mut {
-            tree.arena[this.0].panel.as_deref_mut()
-        } else {
-            tree.arena[this.0].panel.as_deref()
-        }
+    fn<PanelKey>() -> optional dyn(Panel) {
+        ViewTree { .arena } | .panel
     }
 });
 

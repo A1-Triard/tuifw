@@ -93,20 +93,12 @@ impl WidgetTree {
 }
 
 impl_dep_obj!(Widget {
-    fn<WidgetBase>(self as this, tree: WidgetTree) -> (WidgetBase) {
-        if mut {
-            &mut tree.widget_arena[this.0].base
-        } else {
-            &tree.widget_arena[this.0].base
-        }
+    fn<WidgetBase>() -> (WidgetBase) {
+        WidgetTree { .widget_arena } | .base
     }
 
-    fn<WidgetObjKey>(self as this, tree: WidgetTree) -> dyn(WidgetObj) {
-        if mut {
-            tree.widget_arena[this.0].obj.as_mut()
-        } else {
-            tree.widget_arena[this.0].obj.as_ref()
-        }
+    fn<WidgetObjKey>() -> dyn(WidgetObj) {
+        WidgetTree { .widget_arena } | .obj
     }
 });
 
