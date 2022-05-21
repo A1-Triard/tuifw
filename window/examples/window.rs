@@ -2,7 +2,7 @@
 
 #![deny(warnings)]
 
-use dyn_context::state::State;
+use dyn_context::State;
 use tuifw_screen::{Attr, Color, Event, HAlign, Key, Point, Rect, Thickness, VAlign, Vector};
 use tuifw_window::{RenderPort, Window, WindowTree};
 
