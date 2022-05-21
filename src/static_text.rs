@@ -18,7 +18,7 @@ dep_type! {
 }
 
 ext_builder!(<'a> Builder<'a, Widget> as BuilderWidgetStaticTextExt[Widget] {
-    static_text -> (StaticText)
+    fn static_text() -> (StaticText);
 });
 
 struct StaticTextBehavior;

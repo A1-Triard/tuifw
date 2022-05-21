@@ -29,7 +29,7 @@ impl<'a> CanvasPanelBuilder<Builder<'a, View>> {
         storage.map(|x| x.replace(child));
         CanvasLayout::new(self.state_mut(), child);
         child.build(self.state_mut(), |child_builder| {
-            let child_builder = layout(CanvasLayoutBuilder::new_priv(child_builder)).base_priv();
+            let child_builder = layout(CanvasLayoutBuilder(child_builder)).0;
             f(child_builder)
         });
         self

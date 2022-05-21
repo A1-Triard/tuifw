@@ -15,7 +15,7 @@ dep_type! {
 }
 
 ext_builder!(<'a> Builder<'a, Widget> as BuilderWidgetDeskTopExt[Widget] {
-    desk_top -> (DeskTop)
+    fn desk_top() -> (DeskTop);
 });
 
 impl<T: DepObjBuilder<Id=Widget>> DeskTopBuilder<T> {

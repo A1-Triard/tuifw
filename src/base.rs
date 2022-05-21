@@ -5,7 +5,7 @@ use components_arena::with_arena_in_state_part;
 use core::any::{Any, TypeId};
 use core::fmt::Debug;
 use dep_obj::{Change, DepObjId, DepType, DetachedDepObjId, Convenient, DepProp};
-use dep_obj::{dep_obj, dep_type, with_builder};
+use dep_obj::{dep_type, impl_dep_obj, with_builder};
 use dep_obj::binding::{Binding1, Bindings, Re, Binding};
 use downcast_rs::{Downcast, impl_downcast};
 use dyn_context::{State, StateExt, Stop};
@@ -92,25 +92,23 @@ impl WidgetTree {
     }
 }
 
-dep_obj! {
-    impl Widget {
-        fn<WidgetBase>(self as this, tree: WidgetTree) -> (WidgetBase) {
-            if mut {
-                &mut tree.widget_arena[this.0].base
-            } else {
-                &tree.widget_arena[this.0].base
-            }
-        }
-
-        fn<WidgetObjKey>(self as this, tree: WidgetTree) -> dyn(WidgetObj) {
-            if mut {
-                tree.widget_arena[this.0].obj.as_mut()
-            } else {
-                tree.widget_arena[this.0].obj.as_ref()
-            }
+impl_dep_obj!(Widget {
+    fn<WidgetBase>(self as this, tree: WidgetTree) -> (WidgetBase) {
+        if mut {
+            &mut tree.widget_arena[this.0].base
+        } else {
+            &tree.widget_arena[this.0].base
         }
     }
-}
+
+    fn<WidgetObjKey>(self as this, tree: WidgetTree) -> dyn(WidgetObj) {
+        if mut {
+            tree.widget_arena[this.0].obj.as_mut()
+        } else {
+            tree.widget_arena[this.0].obj.as_ref()
+        }
+    }
+});
 
 impl Widget {
     with_builder!();

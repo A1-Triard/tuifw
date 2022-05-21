@@ -9,7 +9,7 @@ use core::fmt::Debug;
 use core::mem::replace;
 use core::num::NonZeroU16;
 use dep_obj::{Builder, DepObjId, DepType, DepEventArgs, Convenient, DepProp};
-use dep_obj::{dep_obj, dep_type, ext_builder, with_builder};
+use dep_obj::{dep_type, ext_builder, impl_dep_obj, with_builder};
 use dep_obj::binding::{Binding, Bindings};
 use dep_obj::binding::n::{Binding0, Binding1, Binding5};
 use downcast_rs::{Downcast, impl_downcast};
@@ -377,49 +377,47 @@ macro_attr! {
     pub struct View(Id<ViewNode>);
 }
 
-dep_obj! {
-    impl View {
-        fn<ViewBase>(self as this, tree: ViewTree) -> (ViewBase) {
-            if mut {
-                &mut tree.arena[this.0].base
-            } else {
-                &tree.arena[this.0].base
-            }
-        }
-
-        fn<ViewAlign>(self as this, tree: ViewTree) -> optional(ViewAlign) {
-            if mut {
-                tree.arena[this.0].align.as_mut()
-            } else {
-                tree.arena[this.0].align.as_ref()
-            }
-        }
-
-        fn<DecoratorKey>(self as this, tree: ViewTree) -> optional dyn(Decorator) {
-            if mut {
-                tree.arena[this.0].decorator.as_deref_mut()
-            } else {
-                tree.arena[this.0].decorator.as_deref()
-            }
-        }
-
-        fn<LayoutKey>(self as this, tree: ViewTree) -> optional dyn(Layout) {
-            if mut {
-                tree.arena[this.0].layout.as_deref_mut()
-            } else {
-                tree.arena[this.0].layout.as_deref()
-            }
-        }
-
-        fn<PanelKey>(self as this, tree: ViewTree) -> optional dyn(Panel) {
-            if mut {
-                tree.arena[this.0].panel.as_deref_mut()
-            } else {
-                tree.arena[this.0].panel.as_deref()
-            }
+impl_dep_obj!(View {
+    fn<ViewBase>(self as this, tree: ViewTree) -> (ViewBase) {
+        if mut {
+            &mut tree.arena[this.0].base
+        } else {
+            &tree.arena[this.0].base
         }
     }
-}
+
+    fn<ViewAlign>(self as this, tree: ViewTree) -> optional(ViewAlign) {
+        if mut {
+            tree.arena[this.0].align.as_mut()
+        } else {
+            tree.arena[this.0].align.as_ref()
+        }
+    }
+
+    fn<DecoratorKey>(self as this, tree: ViewTree) -> optional dyn(Decorator) {
+        if mut {
+            tree.arena[this.0].decorator.as_deref_mut()
+        } else {
+            tree.arena[this.0].decorator.as_deref()
+        }
+    }
+
+    fn<LayoutKey>(self as this, tree: ViewTree) -> optional dyn(Layout) {
+        if mut {
+            tree.arena[this.0].layout.as_deref_mut()
+        } else {
+            tree.arena[this.0].layout.as_deref()
+        }
+    }
+
+    fn<PanelKey>(self as this, tree: ViewTree) -> optional dyn(Panel) {
+        if mut {
+            tree.arena[this.0].panel.as_deref_mut()
+        } else {
+            tree.arena[this.0].panel.as_deref()
+        }
+    }
+});
 
 impl View {
     pub fn new(
@@ -956,7 +954,7 @@ impl DepObjId for View {
 }
 
 ext_builder!(<'a> Builder<'a, View> as BuilderViewRootDecoratorExt[View] {
-    root_decorator -> (RootDecorator)
+    fn root_decorator() -> (RootDecorator);
 });
 
 #[derive(Debug)]
@@ -1084,7 +1082,7 @@ impl DepEventArgs for ViewInput {
 }
 
 ext_builder!(<'a> Builder<'a, View> as BuilderViewBaseExt[View] {
-    base -> (ViewBase)
+    fn base() -> (ViewBase);
 });
 
 dep_type! {
@@ -1103,7 +1101,7 @@ dep_type! {
 }
 
 ext_builder!(<'a> Builder<'a, View> as BuilderViewAlignExt[View] {
-    align -> (ViewAlign)
+    fn align() -> (ViewAlign);
 });
 
 dep_type! {

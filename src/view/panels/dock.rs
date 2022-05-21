@@ -24,15 +24,15 @@ impl<'a> DockPanelBuilder<Builder<'a, View>> {
         layout: impl for<'b> FnOnce(DockLayoutBuilder<Builder<'b, View>>) -> DockLayoutBuilder<Builder<'b, View>>,
         f: impl for<'b> FnOnce(Builder<'b, View>) -> Builder<'b, View>
     ) -> Self {
-        let view = self.base_priv_ref().id();
-        let tree: &ViewTree = self.base_priv_ref().state().get();
+        let view = self.id();
+        let tree: &ViewTree = self.state().get();
         let child_prev = view.last_child(tree);
-        let child = View::new(self.base_priv_mut().state_mut(), view, child_prev);
-        child.set_tag(self.base_priv_mut().state_mut(), tag);
+        let child = View::new(self.state_mut(), view, child_prev);
+        child.set_tag(self.state_mut(), tag);
         storage.map(|x| x.replace(child));
-        DockLayout::new(self.base_priv_mut().state_mut(), child);
-        child.build(self.base_priv_mut().state_mut(), |child_builder| {
-            let child_builder = layout(DockLayoutBuilder::new_priv(child_builder)).base_priv();
+        DockLayout::new(self.state_mut(), child);
+        child.build(self.state_mut(), |child_builder| {
+            let child_builder = layout(DockLayoutBuilder(child_builder)).0;
             f(child_builder)
         });
         self

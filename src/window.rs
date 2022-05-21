@@ -23,7 +23,7 @@ dep_type! {
 }
 
 ext_builder!(<'a> Builder<'a, Widget> as BuilderWidgetWindowExt[Widget] {
-    window -> (Window)
+    fn window() -> (Window);
 });
 
 impl<T: DepObjBuilder<Id=Widget>> WindowBuilder<T> {
