@@ -48,3 +48,17 @@ jobs:
     - name: ensure_no_std build
       run: "cargo +nightly build --verbose -Z build-std=core,alloc,panic_abort --target ${{ matrix.triple }} --release"
       working-directory: ensure_no_std
+    - name: test --examples
+      run: "cargo test --verbose --workspace --examples"
+    - name: outdated
+      uses: actions-rs/cargo@v1
+      with:
+        command: outdated
+        args: "--verbose --aggresssive --root-deps-only --exit-code 1"
+    - name: rustup component add clippy
+      run: "rustup component add clippy"
+    - name: clippy
+      uses: actions-rs/cargo@v1
+      with:
+        command: clippy
+        args: "--verbose"
