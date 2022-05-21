@@ -2,7 +2,8 @@ use crate::base::*;
 use crate::view::View;
 use crate::view::panels::{CanvasLayout, CanvasPanel};
 use crate::window::Window;
-use dep_obj::{Builder, Change, DepObjBuilder, DepObjId, ItemChange, dep_type};
+use dep_obj::{Builder, Change, DepObjBuilder, DepObjId, ItemChange};
+use dep_obj::{dep_type, ext_builder};
 use dep_obj::binding::{Binding1, BindingExt2, Re};
 use dyn_context::{State, StateExt};
 
@@ -13,15 +14,19 @@ dep_type! {
     }
 }
 
+ext_builder!(<'a> Builder<'a, Widget> as BuilderWidgetDeskTopExt[Widget] {
+    desk_top -> (DeskTop)
+});
+
 impl<T: DepObjBuilder<Id=Widget>> DeskTopBuilder<T> {
     pub fn window(
         mut self,
         storage: Option<&mut Option<Widget>>,
-        f: impl for<'a> FnOnce(Builder<'a, Widget>) -> Builder<'a, Widget>
+        build: impl for<'a> FnOnce(Builder<'a, Widget>) -> Builder<'a, Widget>
     ) -> Self {
         let desk_top = self.id();
         let window = Window::new(self.state_mut());
-        window.build(self.state_mut(), f);
+        window.build(self.state_mut(), build);
         storage.map(|x| x.replace(window));
         DeskTop::WINDOWS.push(self.state_mut(), desk_top, window).immediate();
         self
@@ -86,21 +91,6 @@ impl DeskTop {
         Widget::new(state, DeskTop::new_priv())
     }
 }
-
-/*
-impl<'b> WidgetObjWithBuilder<Builder<'b, Widget>> for DeskTop {
-    type Builder = DeskTopBuilder<Builder<'b, Widget>>;
-
-    fn build(
-        state: &mut dyn State,
-        f: impl for<'a> FnOnce(DeskTopBuilder<Builder<'a, Widget>>)
-    ) -> Widget {
-        let desk_top = DeskTop::new(state);
-        f(DeskTopBuilder::new_priv(Builder { id: desk_top, state }));
-        desk_top
-    }
-}
-*/
 
 impl WidgetObj for DeskTop {
     fn behavior(&self) -> &'static dyn WidgetBehavior { &Self::BEHAVIOR }

@@ -26,17 +26,6 @@ pub trait WidgetObj: Downcast + DepType<Id=Widget, DepObjKey=WidgetObjKey> {
 
 impl_downcast!(WidgetObj);
 
-/*
-pub trait WidgetObjWithBuilder {
-    trait Build;
-
-    fn build(
-        state: &mut dyn State,
-        f: impl Self::Build
-    ) -> Widget;
-}
-*/
-
 macro_attr! {
     #[derive(NewtypeComponentId!)]
     #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]

@@ -4,7 +4,7 @@ use crate::view::decorators::{BorderDecorator, TextDecorator};
 use crate::view::decorators::BuilderViewBorderDecoratorExt;
 use crate::view::decorators::BuilderViewTextDecoratorExt;
 use crate::view::panels::{CanvasLayout, DockLayout, BuilderViewDockPanelExt};
-use dep_obj::{Builder, Change, DepObjId, dep_type, ext_builder};
+use dep_obj::{Builder, Change, DepObjBuilder, DepObjId, dep_type, ext_builder};
 use dep_obj::binding::{Re, Binding1, BindingExt3, Param};
 use dyn_context::{State, StateExt};
 use either::Right;
@@ -26,21 +26,19 @@ ext_builder!(<'a> Builder<'a, Widget> as BuilderWidgetWindowExt[Widget] {
     window -> (Window)
 });
 
-/*
-impl<B: DepObjBuilder<Id=Widget>> WindowBuilder<B> {
-    pub fn content<T: WidgetObjWithBuilder<B>, F: FnOnce(T::Builder)>(
+impl<T: DepObjBuilder<Id=Widget>> WindowBuilder<T> {
+    pub fn content(
         mut self,
         storage: Option<&mut Option<Widget>>,
-        f: F
+        new: impl FnOnce(&mut dyn State) -> Widget,
     ) -> Self {
-        let window = self.base_priv_ref().id();
-        let content = T::build(self.base_priv_mut().state_mut(), f);
+        let window = self.id();
+        let content = new(self.state_mut());
         storage.map(|x| x.replace(content));
-        Window::CONTENT.set(self.base_priv_mut().state_mut(), window, Some(content)).immediate();
+        Window::CONTENT.set(self.state_mut(), window, Some(content)).immediate();
         self
     }
 }
-*/
 
 struct WindowBehavior;
 
@@ -171,21 +169,6 @@ impl Window {
         Widget::new(state, Window::new_priv())
     }
 }
-
-/*
-impl<T: DepObjBuilder<Id=Widget>> WidgetObjWithBuilder<T> for Window {
-    type Builder = WindowBuilder<T>;
-
-    fn build<'a>(
-        state: &'a mut dyn State,
-        f: impl FnOnce(WindowBuilder<T>)
-    ) -> Widget {
-        let window = Window::new(state);
-        f(WindowBuilder::new_priv(Builder { id: window, state }));
-        window
-    }
-}
-*/
 
 impl WidgetObj for Window {
     fn behavior(&self) -> &'static dyn WidgetBehavior { &Self::BEHAVIOR }

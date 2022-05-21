@@ -51,21 +51,6 @@ impl StaticText {
     }
 }
 
-/*
-impl<B: DepObjBuilder<Id=Widget>> WidgetObjWithBuilder<B> for StaticText {
-    type Builder = StaticTextBuilder<B>;
-
-    fn build<'a>(
-        state: &'a mut dyn State,
-        f: impl FnOnce(StaticTextBuilder<B>)
-    ) -> Widget {
-        let static_text = StaticText::new(state);
-        f(StaticTextBuilder::new_priv(Builder { id: static_text, state }));
-        static_text
-    }
-}
-*/
-
 impl WidgetObj for StaticText {
     fn behavior(&self) -> &'static dyn WidgetBehavior { &Self::BEHAVIOR }
 }
