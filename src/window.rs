@@ -32,11 +32,9 @@ impl<T: DepObjBuilder<Id=Widget>> WindowBuilder<T> {
         storage: Option<&mut Option<Widget>>,
         new: impl FnOnce(&mut dyn State) -> Widget,
     ) -> Self {
-        let window = self.id();
         let content = new(self.state_mut());
         storage.map(|x| x.replace(content));
-        Window::CONTENT.set(self.state_mut(), window, Some(content)).immediate();
-        self
+        self.content_ref(Some(content))
     }
 }
 
