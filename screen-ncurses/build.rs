@@ -40,7 +40,6 @@ fn generate_curses_types_rs(lib: &Library) {
 #define NCURSES_WIDECHAR 1
 #include <curses.h>
 int main() {
-    printf("type IconvIntT = i%zd;\n", sizeof(iconv_t) * CHAR_BIT);
     printf("pub type chtype = u%zd;\n", sizeof(chtype) * CHAR_BIT);
     printf("pub type wint_t = u%zd;\n", sizeof(wint_t) * CHAR_BIT);
     printf("pub const CCHARW_MAX: usize = %d;\n", CCHARW_MAX);

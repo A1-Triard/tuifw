@@ -41,7 +41,7 @@ use winapi::um::stringapiset::WideCharToMultiByte;
 use winapi::um::winnls::*;
 use winapi::um::winuser::*;
 
-fn no_zero<Z: Zero>(r: Z) -> Result<Z, Errno> {
+fn non_zero<Z: Zero>(r: Z) -> Result<Z, Errno> {
     if r.is_zero() {
         Err(errno())
     } else {
@@ -70,12 +70,12 @@ pub struct Screen {
 impl Screen {
     pub fn new() -> Result<Self, Errno> {
         unsafe { FreeConsole() };
-        no_zero(unsafe { AllocConsole() })?;
+        non_zero(unsafe { AllocConsole() })?;
         let window = unsafe { GetConsoleWindow() };
         assert_ne!(window, null_mut());
         let system_menu = unsafe { GetSystemMenu(window, FALSE) };
         if system_menu != null_mut() { // Wine lacks GetSystemMenu implementation
-            let _ = no_zero(unsafe { DeleteMenu(system_menu, SC_CLOSE as UINT, MF_BYCOMMAND) }); // non-fatal
+            let _ = non_zero(unsafe { DeleteMenu(system_menu, SC_CLOSE as UINT, MF_BYCOMMAND) }); // non-fatal
         }
         let mut s = Screen {
             h_input: INVALID_HANDLE_VALUE,
@@ -104,9 +104,9 @@ impl Screen {
             FILE_ATTRIBUTE_NORMAL,
             null_mut())
         })?;
-        no_zero(unsafe { SetConsoleMode(s.h_input, ENABLE_EXTENDED_FLAGS | ENABLE_WINDOW_INPUT) })?;
-        no_zero(unsafe { SetConsoleMode(s.h_output, 0) })?;
-        s.output_cp = no_zero(unsafe { GetConsoleOutputCP() })?;
+        non_zero(unsafe { SetConsoleMode(s.h_input, ENABLE_EXTENDED_FLAGS | ENABLE_WINDOW_INPUT) })?;
+        non_zero(unsafe { SetConsoleMode(s.h_output, 0) })?;
+        s.output_cp = non_zero(unsafe { GetConsoleOutputCP() })?;
         let test_char = 0u16;
         if unsafe { WideCharToMultiByte(
             s.output_cp,
@@ -133,15 +133,15 @@ impl Screen {
             srWindow: SMALL_RECT { Left: 0, Top: 0, Right: 0, Bottom: 0 },
             dwMaximumWindowSize: COORD { X: 0, Y: 0 }
         };
-        no_zero(unsafe { GetConsoleScreenBufferInfo(self.h_output, &mut ci as *mut _) })?;
+        non_zero(unsafe { GetConsoleScreenBufferInfo(self.h_output, &mut ci as *mut _) })?;
         ci.srWindow.Right = ci.srWindow.Right.saturating_sub(ci.srWindow.Left).saturating_add(1) - 1;
         ci.srWindow.Left = 0;
         ci.srWindow.Bottom = ci.srWindow.Bottom.saturating_sub(ci.srWindow.Top).saturating_add(1) - 1;
         ci.srWindow.Top = 0;
         let size = Vector { x: ci.srWindow.Right + 1, y: ci.srWindow.Bottom + 1 };
-        no_zero(unsafe { SetConsoleWindowInfo(self.h_output, 1, &ci.srWindow as *const _) })?;
-        no_zero(unsafe { SetConsoleScreenBufferSize(self.h_output, COORD { X: size.x, Y: size.y }) })?;
-        no_zero(unsafe { FlushConsoleInputBuffer(self.h_input) })?;
+        non_zero(unsafe { SetConsoleWindowInfo(self.h_output, 1, &ci.srWindow as *const _) })?;
+        non_zero(unsafe { SetConsoleScreenBufferSize(self.h_output, COORD { X: size.x, Y: size.y }) })?;
+        non_zero(unsafe { FlushConsoleInputBuffer(self.h_input) })?;
         Ok(())
     }
 
@@ -153,7 +153,7 @@ impl Screen {
             srWindow: SMALL_RECT { Left: 0, Top: 0, Right: 0, Bottom: 0 },
             dwMaximumWindowSize: COORD { X: 0, Y: 0 }
         };
-        no_zero(unsafe { GetConsoleScreenBufferInfo(self.h_output, &mut ci as *mut _) })?;
+        non_zero(unsafe { GetConsoleScreenBufferInfo(self.h_output, &mut ci as *mut _) })?;
         let mut space = CHAR_INFO {
             Attributes: 0,
             Char: CHAR_INFO_Char::default()
@@ -169,9 +169,9 @@ impl Screen {
     fn encode_grapheme(output_cp: UINT, wctmb_flags: DWORD, g: &str) -> Either<u8, (u8, u8)> {
         let g = g.encode_utf16().collect::<Vec<_>>();
         let len = g.len() as isize as _;
-        let n = no_zero(unsafe { WideCharToMultiByte(output_cp, wctmb_flags, g.as_ptr(), len, null_mut(), 0, null(), null_mut()) }).unwrap();
+        let n = non_zero(unsafe { WideCharToMultiByte(output_cp, wctmb_flags, g.as_ptr(), len, null_mut(), 0, null(), null_mut()) }).unwrap();
         let mut buf: Vec<MaybeUninit<u8>> = vec![MaybeUninit::uninit(); n as c_uint as usize];
-        no_zero(unsafe { WideCharToMultiByte(output_cp, wctmb_flags, g.as_ptr(), len, buf.as_mut_ptr() as *mut _, n, null(), null_mut()) }).unwrap();
+        non_zero(unsafe { WideCharToMultiByte(output_cp, wctmb_flags, g.as_ptr(), len, buf.as_mut_ptr() as *mut _, n, null(), null_mut()) }).unwrap();
         unsafe { 
             if IsDBCSLeadByteEx(output_cp, buf[0].assume_init()) != 0 {
                 Right((buf[0].assume_init(), buf[1].assume_init()))
@@ -214,12 +214,12 @@ impl Screen {
 
     unsafe fn drop_raw(&mut self) -> Result<(), Errno> {
         if self.h_input != INVALID_HANDLE_VALUE {
-            no_zero(CloseHandle(self.h_input))?;
+            non_zero(CloseHandle(self.h_input))?;
         }
         if self.h_output != INVALID_HANDLE_VALUE {
-            no_zero(CloseHandle(self.h_output))?;
+            non_zero(CloseHandle(self.h_output))?;
         }
-        no_zero(FreeConsole())?;
+        non_zero(FreeConsole())?;
         Ok(())
     }
 
@@ -231,7 +231,7 @@ impl Screen {
                 Right: self.invalidated.r() - 1,
                 Bottom: self.invalidated.b() - 1
             };
-            no_zero(unsafe { WriteConsoleOutputA(
+            non_zero(unsafe { WriteConsoleOutputA(
                 self.h_output,
                 self.buf.as_ptr(),
                 COORD { X: self.size.x, Y: self.size.y },
@@ -248,13 +248,13 @@ impl Screen {
             }
         });
         let mut ci = CONSOLE_CURSOR_INFO { dwSize: 0, bVisible: FALSE };
-        no_zero(unsafe { GetConsoleCursorInfo(self.h_output, &mut ci as *mut _) })?;
+        non_zero(unsafe { GetConsoleCursorInfo(self.h_output, &mut ci as *mut _) })?;
         ci.bVisible = if cursor.is_some() { TRUE } else { FALSE };
-        no_zero(unsafe { SetConsoleCursorInfo(self.h_output, &ci as *const _) })?;
+        non_zero(unsafe { SetConsoleCursorInfo(self.h_output, &ci as *const _) })?;
         let (count, key, c, ctrl, alt) = loop {
             if !wait {
                 let mut n: DWORD = 0;
-                no_zero(unsafe { GetNumberOfConsoleInputEvents(self.h_input, &mut n as *mut _) })?;
+                non_zero(unsafe { GetNumberOfConsoleInputEvents(self.h_input, &mut n as *mut _) })?;
                 if n == 0 { return Ok(None); }
             }
             let mut input = INPUT_RECORD {
@@ -262,7 +262,7 @@ impl Screen {
                 Event: INPUT_RECORD_Event::default()
             };
             let mut readed: DWORD = 0;
-            no_zero(unsafe { ReadConsoleInputW(self.h_input, &mut input as *mut _, 1, &mut readed as *mut _) })?;
+            non_zero(unsafe { ReadConsoleInputW(self.h_input, &mut input as *mut _, 1, &mut readed as *mut _) })?;
             assert_eq!(readed, 1);
             match input.EventType {
                 WINDOW_BUFFER_SIZE_EVENT => {
@@ -353,10 +353,10 @@ impl Screen {
                         Event: INPUT_RECORD_Event::default()
                     };
                     let mut n: DWORD = 0;
-                    no_zero(unsafe { GetNumberOfConsoleInputEvents(self.h_input, &mut n as *mut _) })?;
+                    non_zero(unsafe { GetNumberOfConsoleInputEvents(self.h_input, &mut n as *mut _) })?;
                     assert_ne!(n, 0);
                     let mut readed: DWORD = 0;
-                    no_zero(unsafe { ReadConsoleInputW(self.h_input, &mut input as *mut _, 1, &mut readed as *mut _) })?;
+                    non_zero(unsafe { ReadConsoleInputW(self.h_input, &mut input as *mut _, 1, &mut readed as *mut _) })?;
                     assert_eq!(readed, 1);
                     assert_eq!(input.EventType, KEY_EVENT);
                     let e = unsafe { input.Event.KeyEvent() };

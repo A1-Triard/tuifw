@@ -1,28 +1,10 @@
-use core::mem::{MaybeUninit, transmute};
+#![allow(non_camel_case_types)]
+#![allow(non_snake_case)]
+
+use core::mem::MaybeUninit;
 use libc::*;
 
 include!(concat!(env!("OUT_DIR"), "/curses_types.rs"));
-
-#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
-pub struct IconvT(IconvIntT);
-
-#[allow(clippy::transmutes_expressible_as_ptr_casts)]
-impl IconvT {
-    pub const ERROR: IconvT = IconvT(-1);
-
-    pub fn new(iconv_open_result: iconv_t) -> IconvT {
-        IconvT(unsafe { transmute(iconv_open_result) })
-    }
-
-    pub fn is_error(self) -> bool { self.0 == -1 }
-
-    #[allow(dead_code)]
-    pub fn is_ok(self) -> bool { self.0 != -1 }
-
-    pub fn ok(self) -> Option<iconv_t> {
-        if self.0 == -1 { None } else { Some(unsafe { transmute(self.0) }) }
-    }
-}
 
 pub const COLOR_BLACK: c_short = 0;
 pub const COLOR_RED: c_short = 1;

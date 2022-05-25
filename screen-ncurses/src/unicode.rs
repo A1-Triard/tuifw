@@ -31,7 +31,7 @@ impl !Send for Screen { }
 
 impl Screen {
     pub unsafe fn new() -> Result<Self, Errno> {
-        if no_null(initscr()).is_err() { return Err(Errno(EINVAL)); }
+        if non_null(initscr()).is_err() { return Err(Errno(EINVAL)); }
         let mut s = Screen {
             lines: Vec::with_capacity(max(0, min(LINES, i16::MAX as _)) as i16 as u16 as usize),
         };
@@ -42,7 +42,7 @@ impl Screen {
 
     fn resize(&mut self) -> Result<(), Errno> {
         for line in &self.lines {
-            no_err(unsafe { delwin(line.window.as_ptr()) })?;
+            non_err(unsafe { delwin(line.window.as_ptr()) })?;
         }
         self.lines.clear();
         let mut space_gr = ['\0'; CCHARW_MAX];
@@ -51,8 +51,8 @@ impl Screen {
         let space = (space_gr, WA_NORMAL);
         let size = self.size();
         for y in 0 .. size.y {
-            let window = no_null(unsafe { newwin(1, 0, y as _, 0) }).unwrap();
-            no_err(unsafe { keypad(window.as_ptr(), true) })?;
+            let window = non_null(unsafe { newwin(1, 0, y as _, 0) }).unwrap();
+            non_err(unsafe { keypad(window.as_ptr(), true) })?;
             self.lines.push(Line {
                 window,
                 invalidated: true,
@@ -92,20 +92,20 @@ impl Screen {
     }
 
     fn update_raw(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Errno> {
-        no_err(unsafe { curs_set(0) })?;
+        non_err(unsafe { curs_set(0) })?;
         assert_eq!(size_of::<char>(), size_of::<wchar_t>());
         for line in self.lines.iter_mut().filter(|l| l.invalidated) {
             line.invalidated = false;
             if line.cols.is_empty() { continue; }
-            no_err(unsafe { wmove(line.window.as_ptr(), 0, 0) })?;
+            non_err(unsafe { wmove(line.window.as_ptr(), 0, 0) })?;
             for &col in &line.cols {
                 if col.0[0] == '\0' { continue; }
-                no_err(unsafe { wattrset(line.window.as_ptr(), col.1 as _) })?;
+                non_err(unsafe { wattrset(line.window.as_ptr(), col.1 as _) })?;
                 let _ = unsafe { waddnwstr(line.window.as_ptr(), col.0.as_ptr() as _, CCHARW_MAX as _) };
             }
-            no_err(unsafe { wnoutrefresh(line.window.as_ptr()) })?;
+            non_err(unsafe { wnoutrefresh(line.window.as_ptr()) })?;
         }
-        no_err(unsafe { doupdate() })?;
+        non_err(unsafe { doupdate() })?;
         let cursor = cursor.and_then(|cursor| {
             if (Rect { tl: Point { x: 0, y: 0 }, size: self.size() }).contains(cursor) {
                 Some(cursor)
@@ -115,22 +115,22 @@ impl Screen {
         });
         let window = if let Some(cursor) = cursor {
             let window = self.lines[cursor.y as u16 as usize].window;
-            no_err(unsafe { wmove(window.as_ptr(), 0, cursor.x as _) })?;
-            no_err(unsafe { curs_set(1) })?;
+            non_err(unsafe { wmove(window.as_ptr(), 0, cursor.x as _) })?;
+            non_err(unsafe { curs_set(1) })?;
             Some(window)
         } else if let Some(line) = self.lines.first() {
             if line.cols.is_empty() {
                 None
             } else {
                 let window = line.window;
-                no_err(unsafe { wmove(window.as_ptr(), 0, 0) })?;
+                non_err(unsafe { wmove(window.as_ptr(), 0, 0) })?;
                 Some(window)
             }
         } else {
             None
         };
         let window = window.unwrap_or_else(|| unsafe { NonNull::new(stdscr).unwrap() });
-        unsafe { no_err(nodelay(window.as_ptr(), !wait)) }?;
+        unsafe { non_err(nodelay(window.as_ptr(), !wait)) }?;
         let e = read_event(window, |w| {
             let mut c: wint_t = 0;
             let key = unsafe { wget_wch(w.as_ptr(), &mut c as *mut _) };
@@ -150,7 +150,7 @@ impl Screen {
 impl Drop for Screen {
     #![allow(clippy::panicking_unwrap)]
     fn drop(&mut self) {
-        let e = unsafe { no_err(endwin()) };
+        let e = unsafe { non_err(endwin()) };
         if e.is_err() && !panicking() { e.unwrap(); }
     }
 }

@@ -13,8 +13,6 @@
 
 extern crate alloc;
 
-#[allow(non_camel_case_types)]
-#[allow(non_snake_case)]
 mod ncurses;
 
 mod common;

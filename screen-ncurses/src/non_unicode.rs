@@ -23,25 +23,27 @@ struct Line {
 
 pub struct Screen {
     lines: Vec<Line>,
-    cd: IconvT,
-    dc: IconvT,
+    cd: iconv_t,
+    dc: iconv_t,
 }
 
 impl !Sync for Screen { }
 impl !Send for Screen { }
 
+const ICONV_ERR: iconv_t = (-1isize) as usize as iconv_t;
+
 impl Screen {
     pub unsafe fn new() -> Result<Self, Errno> {
-        if no_null(initscr()).is_err() { return Err(Errno(EINVAL)); }
+        if non_null(initscr()).is_err() { return Err(Errno(EINVAL)); }
         let mut s = Screen {
             lines: Vec::with_capacity(max(0, min(LINES, i16::MAX as _)) as i16 as u16 as usize),
-            cd: IconvT::ERROR,
-            dc: IconvT::ERROR
+            cd: ICONV_ERR,
+            dc: ICONV_ERR
         };
-        s.cd = IconvT::new(iconv_open(nl_langinfo(CODESET), b"UTF-8\0".as_ptr() as _));
-        if s.cd.is_error() { return Err(errno()); }
-        s.dc = IconvT::new(iconv_open(b"UTF-8\0".as_ptr() as _, nl_langinfo(CODESET)));
-        if s.dc.is_error() { return Err(errno()); }
+        s.cd = iconv_open(nl_langinfo(CODESET), b"UTF-8\0".as_ptr() as _);
+        if s.cd == ICONV_ERR { return Err(errno()); }
+        s.dc = iconv_open(b"UTF-8\0".as_ptr() as _, nl_langinfo(CODESET));
+        if s.dc == ICONV_ERR { return Err(errno()); }
         init_settings()?;
         s.resize()?;
         Ok(s)
@@ -49,14 +51,14 @@ impl Screen {
 
     fn resize(&mut self) -> Result<(), Errno> {
         for line in &self.lines {
-            no_err(unsafe { delwin(line.window.as_ptr()) })?;
+            non_err(unsafe { delwin(line.window.as_ptr()) })?;
         }
         self.lines.clear();
         let space = b' ' as c_char as chtype;
         let size = self.size();
         for y in 0 .. size.y {
-            let window = no_null(unsafe { newwin(1, 0, y as _, 0) }).unwrap();
-            no_err(unsafe { keypad(window.as_ptr(), true) })?;
+            let window = non_null(unsafe { newwin(1, 0, y as _, 0) }).unwrap();
+            non_err(unsafe { keypad(window.as_ptr(), true) })?;
             self.lines.push(Line {
                 window,
                 invalidated: true,
@@ -67,14 +69,14 @@ impl Screen {
     }
 
     unsafe fn drop_raw(&mut self) -> Result<(), Errno> {
-        no_err(endwin())?;
-        if let Some(cd) = self.cd.ok() {
-            if iconv_close(cd) == -1 {
+        non_err(endwin())?;
+        if self.cd != ICONV_ERR {
+            if iconv_close(self.cd) == -1 {
                 return Err(errno());
             }
         }
-        if let Some(dc) = self.dc.ok() {
-            if iconv_close(dc) == -1 {
+        if self.dc != ICONV_ERR {
+            if iconv_close(self.dc) == -1 {
                 return Err(errno());
             }
         }
@@ -82,17 +84,17 @@ impl Screen {
     }
 
     fn update_raw(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Errno> {
-        no_err(unsafe { curs_set(0) })?;
+        non_err(unsafe { curs_set(0) })?;
         for line in self.lines.iter_mut().filter(|l| l.invalidated) {
             line.invalidated = false;
             if line.cols.is_empty() { continue; }
-            no_err(unsafe { wmove(line.window.as_ptr(), 0, 0) })?;
+            non_err(unsafe { wmove(line.window.as_ptr(), 0, 0) })?;
             for &col in &line.cols {
                 let _ = unsafe { waddch(line.window.as_ptr(), col) };
             }
-            no_err(unsafe { wnoutrefresh(line.window.as_ptr()) })?;
+            non_err(unsafe { wnoutrefresh(line.window.as_ptr()) })?;
         }
-        no_err(unsafe { doupdate() })?;
+        non_err(unsafe { doupdate() })?;
         let cursor = cursor.and_then(|cursor| {
             if (Rect { tl: Point { x: 0, y: 0 }, size: self.size() }).contains(cursor) {
                 Some(cursor)
@@ -102,27 +104,26 @@ impl Screen {
         });
         let window = if let Some(cursor) = cursor {
             let window = self.lines[cursor.y as u16 as usize].window;
-            no_err(unsafe { wmove(window.as_ptr(), 0, cursor.x as _) })?;
-            no_err(unsafe { curs_set(1) })?;
+            non_err(unsafe { wmove(window.as_ptr(), 0, cursor.x as _) })?;
+            non_err(unsafe { curs_set(1) })?;
             Some(window)
         } else if let Some(line) = self.lines.first() {
             if line.cols.is_empty() {
                 None
             } else {
                 let window = line.window;
-                no_err(unsafe { wmove(window.as_ptr(), 0, 0) })?;
+                non_err(unsafe { wmove(window.as_ptr(), 0, 0) })?;
                 Some(window)
             }
         } else {
             None
         };
         let window = window.unwrap_or_else(|| unsafe { NonNull::new(stdscr).unwrap() });
-        unsafe { no_err(nodelay(window.as_ptr(), !wait)) }?;
-        let dc = self.dc.ok().expect("iconv not initialized (2)");
+        unsafe { non_err(nodelay(window.as_ptr(), !wait)) }?;
         let e = read_event(window, |w| {
             let c = unsafe { wgetch(w.as_ptr()) };
             if c == ERR { return None; }
-            if c & KEY_CODE_YES == 0 { return Some(Right(decode_char(dc, c as c_char as u8))); }
+            if c & KEY_CODE_YES == 0 { return Some(Right(decode_char(self.dc, c as c_char as u8))); }
             Some(Left(c & !KEY_CODE_YES))
         })?;
         match e {
@@ -204,12 +205,11 @@ impl base_Screen for Screen {
         debug_assert!(soft.start >= 0 && soft.end > soft.start && soft.end <= self.size().x);
         let text_end = if soft.end <= p.x { return 0 .. 0 } else { soft.end.saturating_sub(p.x) };
         let text_start = if soft.start <= p.x { 0 } else { soft.start.saturating_sub(p.x) };
-        let cd = self.cd.ok().expect("iconv not initialized (1)");
         let line = &mut self.lines[p.y as u16 as usize];
         line.invalidated = true;
         let attr = unsafe { attr_ch(fg, bg, attr) };
         let text = text.nfc().filter(|c| c.width() == Some(1))
-            .map(|c| encode_char(cd, c))
+            .map(|c| encode_char(self.cd, c))
             .take(text_end as u16 as usize)
         ;
         let mut before_hard_start = min(p.x, hard.start);

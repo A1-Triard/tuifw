@@ -6,11 +6,11 @@ use errno_no_std::Errno;
 use libc::*;
 use tuifw_screen_base::*;
 
-pub fn no_err(r: c_int) -> Result<c_int, Errno> {
+pub fn non_err(r: c_int) -> Result<c_int, Errno> {
     if r == ERR { Err(Errno(EINVAL)) } else { Ok(r) }
 }
 
-pub fn no_null<T: ?Sized>(r: *mut T) -> Result<NonNull<T>, Errno> {
+pub fn non_null<T: ?Sized>(r: *mut T) -> Result<NonNull<T>, Errno> {
     NonNull::new(r).ok_or(Errno(EINVAL))
 }
 
@@ -32,24 +32,24 @@ fn color_index(c: Color) -> i16 {
 }
 
 pub unsafe fn init_settings() -> Result<(), Errno> {
-    no_err(cbreak())?; 
-    no_err(noecho())?; 
+    non_err(cbreak())?; 
+    non_err(noecho())?; 
     nonl(); 
     register_colors()?;
     set_escdelay(0);
-    no_err(keypad(stdscr, true))?;
+    non_err(keypad(stdscr, true))?;
     Ok(())
 }
 
 unsafe fn register_colors() -> Result<(), Errno> {
-    no_err(start_color())?;
-    no_err(assume_default_colors(0, -1))?;
+    non_err(start_color())?;
+    non_err(assume_default_colors(0, -1))?;
     for fg in Color::iter_variants().map(color_index) {
         if fg != 0 {
-            no_err(init_pair(fg, fg, -1))?;
+            non_err(init_pair(fg, fg, -1))?;
         }
         for bg in Color::iter_variants().map(color_index) {
-            no_err(init_pair((1 + bg) * colors_count() + fg, fg, bg))?;
+            non_err(init_pair((1 + bg) * colors_count() + fg, fg, bg))?;
         }
     }
     Ok(())
@@ -121,7 +121,7 @@ pub fn read_event(
         }),
         Right(c) => Ok(match c {
             '\x1B' => {
-                unsafe { no_err(nodelay(window.as_ptr(), true)) }?;
+                unsafe { non_err(nodelay(window.as_ptr(), true)) }?;
                 match getch(window) {
                     Some(Right(c)) if c < ' ' || c == '\x7F' => None,
                     Some(Right(c)) => Some(Event::Key(ONCE, Key::Alt(c))),
