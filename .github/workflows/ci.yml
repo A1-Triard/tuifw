@@ -64,6 +64,8 @@ jobs:
     - run: "rustup target add ${{ matrix.target }}"
     - run: "sudo apt-get install -y gcc-multilib"
       if: "${{ matrix.os == 'ubuntu-latest' }}"
+    - run: "sudo apt-get install -y pkg-config-x86-64-linux-gnux32"
+      if: "${{ matrix.os == 'ubuntu-latest' }}"
     - run: "brew tap SergioBenitez/osxct"
       if: "${{ matrix.os == 'macOS-latest' }}"
     - run: "brew install x86_64-unknown-linux-gnu"
