@@ -12,53 +12,33 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  main:
     strategy:
       fail-fast: false
       matrix:
         include:
         - os: ubuntu-latest
-          rust: nightly
           triple: x86_64-unknown-linux-gnu
         - os: windows-latest
-          rust: nightly
           triple: x86_64-pc-windows-msvc
         - os: macOS-latest
-          rust: nightly
           triple: x86_64-apple-darwin
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions-rs/toolchain@v1
       with:
-        toolchain: ${{ matrix.rust }}
+        toolchain: nightly
         override: true
+    - run: "rustup component add clippy"
+    - run: "rustup component add rust-src --toolchain nightly-${{ matrix.triple }}"
     - uses: actions/checkout@v2
-    - name: build
-      run: "cargo build --verbose --workspace"
-    - name: test --tests
-      run: "cargo test --verbose --workspace --tests"
-    - name: test --doc
-      run: "cargo test --verbose --workspace --doc"
-    - name: doc
-      run: "cargo doc --verbose --workspace"
-    - name: build --release
-      run: "cargo build --verbose --workspace --release"
-    - name: rustup component add rust-src
-      run: "rustup component add rust-src --toolchain nightly-${{ matrix.triple }}"
-    - name: ensure_no_std build
-      run: "cargo +nightly build --verbose -Z build-std=core,alloc,panic_abort --target ${{ matrix.triple }} --release"
+    - run: "cargo build --verbose --workspace"
+    - run: "cargo test --verbose --workspace --tests"
+    - run: "cargo test --verbose --workspace --doc"
+    - run: "cargo doc --verbose --workspace"
+    - run: "cargo build --verbose --workspace --release"
+    - run: "cargo test --verbose --workspace --examples"
+    - run: "cargo outdated --verbose --aggresssive --root-deps-only --exit-code 1"
+    - run: "cargo clippy --verbose"
+    - run: "cargo +nightly build --verbose -Z build-std=core,alloc,panic_abort --target ${{ matrix.triple }} --release"
       working-directory: ensure_no_std
-    - name: test --examples
-      run: "cargo test --verbose --workspace --examples"
-    - name: outdated
-      uses: actions-rs/cargo@v1
-      with:
-        command: outdated
-        args: "--verbose --aggresssive --root-deps-only --exit-code 1"
-    - name: rustup component add clippy
-      run: "rustup component add clippy"
-    - name: clippy
-      uses: actions-rs/cargo@v1
-      with:
-        command: clippy
-        args: "--verbose"
