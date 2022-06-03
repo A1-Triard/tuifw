@@ -6,3 +6,6 @@ pub use line::*;
 
 mod text;
 pub use text::*;
+
+mod robot;
+pub use robot::*;
