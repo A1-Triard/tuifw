@@ -1,4 +1,6 @@
+#![feature(iter_advance_by)]
 #![feature(stmt_expr_attributes)]
+#![feature(trusted_len)]
 
 #![deny(warnings)]
 #![doc(test(attr(deny(warnings))))]
@@ -15,6 +17,7 @@
 mod bitflags_ext;
 
 use core::cmp::{min, max};
+use core::iter::{DoubleEndedIterator, FusedIterator, Iterator, TrustedLen};
 use core::num::{NonZeroU16, NonZeroI16};
 use core::ops::{Add, AddAssign, Sub, SubAssign, Neg, Range, Index, IndexMut};
 use core::option::{Option};
@@ -25,6 +28,86 @@ use macro_attr_2018::macro_attr;
 use num_traits::Zero;
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
+
+pub struct Range1d {
+    pub from: i16,
+    pub to: i16,
+}
+
+impl Range1d {
+    pub fn new(from: i16, to: i16) -> Self {
+        Range1d { from, to }
+    }
+
+    pub fn inclusive(from: i16, to: i16) -> Self {
+        Range1d { from, to: to.wrapping_add(1) }
+    }
+}
+
+impl Iterator for Range1d {
+    type Item = i16;
+
+    fn next(&mut self) -> Option<i16> {
+        if self.from != self.to {
+            let item = self.from;
+            self.from = self.from.wrapping_add(1);
+            Some(item)
+        } else {
+            None
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let size = self.to.wrapping_sub(self.from) as u16 as usize;
+        (size, Some(size))
+    }
+
+    fn count(self) -> usize { self.len() }
+
+    fn last(self) -> Option<i16> { if self.from == self.to { None } else { Some(self.to) } }
+
+    fn advance_by(&mut self, n: usize) -> Result<(), usize> {
+        let count = self.count();
+        if n > count as usize {
+            self.from = self.to;
+            return Err(count as usize);
+        }
+        self.from = self.to.wrapping_sub(n as u16 as i16);
+        Ok(())
+    }
+}
+
+impl FusedIterator for Range1d { }
+
+impl DoubleEndedIterator for Range1d {
+    fn next_back(&mut self) -> Option<i16> {
+        if self.from != self.to {
+            let item = self.to;
+            self.to = self.to.wrapping_sub(1);
+            Some(item)
+        } else {
+            None
+        }
+    }
+
+    fn advance_back_by(&mut self, n: usize) -> Result<(), usize> {
+        let count = self.count();
+        if n > count as usize {
+            self.to = self.from;
+            return Err(count as usize);
+        }
+        self.to = self.from.wrapping_add(n as u16 as i16);
+        Ok(())
+    }
+}
+
+impl ExactSizeIterator for Range1d {
+    fn len(&self) -> usize {
+        self.to.wrapping_sub(self.from) as u16 as usize
+    }
+}
+
+unsafe impl TrustedLen for Range1d { }
 
 macro_attr! {
     #[derive(Eq, PartialEq, Debug, Hash, Clone, Copy, Ord, PartialOrd)]
@@ -129,6 +212,14 @@ impl Point {
 
     pub fn offset_from(self, other: Point) -> Vector {
         Vector { x: self.x.wrapping_sub(other.x), y: self.y.wrapping_sub(other.y) }
+    }
+
+    pub fn relative_to(self, base: Point) -> Point {
+        Point { x: self.x.wrapping_sub(base.x), y: self.y.wrapping_sub(base.y) }
+    }
+
+    pub fn absolute_with(self, base: Point) -> Point {
+        Point { x: self.x.wrapping_add(base.x), y: self.y.wrapping_add(base.y) }
     }
 }
 
@@ -236,6 +327,18 @@ impl VBand {
     }
 
     pub fn r(self) -> i16 { self.l.wrapping_add(self.w.get()) }
+
+    pub fn offset(self, d: Vector) -> VBand {
+        VBand { l: self.l.wrapping_add(d.x), w: self.w }
+    }
+
+    pub fn relative_to(self, base: Point) -> VBand {
+        VBand { l: self.l.wrapping_sub(base.x), w: self.w }
+    }
+
+    pub fn absolute_with(self, base: Point) -> VBand {
+        VBand { l: self.l.wrapping_add(base.x), w: self.w }
+    }
 }
 
 #[derive(Eq, PartialEq, Debug, Hash, Clone, Copy)]
@@ -250,6 +353,18 @@ impl HBand {
     }
 
     pub fn b(self) -> i16 { self.t.wrapping_add(self.h.get()) }
+
+    pub fn offset(self, d: Vector) -> HBand {
+        HBand { t: self.t.wrapping_add(d.y), h: self.h }
+    }
+
+    pub fn relative_to(self, base: Point) -> HBand {
+        HBand { t: self.t.wrapping_sub(base.y), h: self.h }
+    }
+
+    pub fn absolute_with(self, base: Point) -> HBand {
+        HBand { t: self.t.wrapping_add(base.y), h: self.h }
+    }
 }
 
 #[derive(Eq, PartialEq, Debug, Hash, Clone, Copy, Default)]
@@ -532,6 +647,20 @@ impl Rect {
 
     pub fn br(self) -> Point { Point { x: self.r(), y: self.b() } }
 
+    pub fn r_inner(self) -> i16 {
+        self.l().wrapping_add((self.size.x as u16).saturating_sub(1) as i16)
+    }
+
+    pub fn b_inner(self) -> i16 {
+        self.t().wrapping_add((self.size.y as u16).saturating_sub(1) as i16)
+    }
+
+    pub fn tr_inner(self) -> Point { Point { x: self.r_inner(), y: self.t() } }
+
+    pub fn bl_inner(self) -> Point { Point { x: self.l(), y: self.b_inner() } }
+
+    pub fn br_inner(self) -> Point { Point { x: self.r_inner(), y: self.b_inner() } }
+
     pub fn area(self) -> u32 { self.size.rect_area() }
 
     fn contains_1d(r: (i16, i16), p: i16) -> bool {
@@ -644,6 +773,40 @@ impl Rect {
  
     pub fn offset(self, d: Vector) -> Rect {
         Rect { tl: self.tl.offset(d), size: self.size }
+    }
+
+    pub fn relative_to(self, base: Point) -> Rect {
+        Rect { tl: self.tl.relative_to(base), size: self.size }
+    }
+
+    pub fn absolute_with(self, base: Point) -> Rect {
+        Rect { tl: self.tl.absolute_with(base), size: self.size }
+    }
+
+    pub fn t_line(self) -> Rect {
+        let height = min(1, self.size.y as u16) as i16;
+        Rect { tl: self.tl, size: Vector { x: self.size.x, y: height } }
+    }
+
+    pub fn b_line(self) -> Rect {
+        let height = min(1, self.size.y as u16) as i16;
+        Rect {
+            tl: Point { x: self.l(), y: self.b().wrapping_sub(height) },
+            size: Vector { x: self.size.x, y: height }
+        }
+    }
+
+    pub fn l_line(self) -> Rect {
+        let width = min(1, self.size.x as u16) as i16;
+        Rect { tl: self.tl, size: Vector { x: width, y: self.size.y } }
+    }
+
+    pub fn r_line(self) -> Rect {
+        let width = min(1, self.size.x as u16) as i16;
+        Rect {
+            tl: Point { x: self.r().wrapping_sub(width), y: self.t() },
+            size: Vector { x: width, y: self.size.y }
+        }
     }
 }
 
