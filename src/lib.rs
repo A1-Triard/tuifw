@@ -183,6 +183,13 @@ impl Window {
         window
     }
 
+    pub fn bounds<State: ?Sized>(
+        self,
+        tree: &WindowTree<State>
+    ) -> Rect {
+        tree.arena[self.0].bounds
+    }
+
     pub fn set_tag<Tag: ComponentId, State: ?Sized>(
         self,
         tree: &mut WindowTree<State>,
@@ -258,7 +265,6 @@ impl Window {
         let screen_bounds = bounds.offset(offset_from_root(parent, tree));
         invalidate_rect(tree.invalidated(), screen_bounds);
     }
-
 
     fn detach<State: ?Sized>(
         self,
