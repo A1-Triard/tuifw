@@ -1,12 +1,12 @@
 [package]
 edition = "2021"
-name = "tuifw"
-version = "0.0.12"
+name = "tuifw-window"
+version = "0.12.0"
 authors = ["warlock <internalmike@gmail.com>"]
-description = "Text User Interface Framework."
+description = "Text User Interface Framework. Overlappable hierachical windows."
 readme = "README.md"
-documentation = "https://docs.rs/tuifw-view/"
-keywords = ["tui", "view", "layout", "property", "widget"]
+documentation = "https://docs.rs/tuifw-window/"
+keywords = ["tui", "window"]
 categories = ["command-line-interface"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/A1-Triard/tuifw"
@@ -18,31 +18,20 @@ members = [
     "screen-winapi",
     "screen",
     "screen-test",
-    "window",
 ]
 exclude = [
     "ensure_no_std",
 ]
 
 [dependencies]
-components-arena = "3.0.1"
-downcast-rs = { version = "1.2.0", default-features = false }
-dyn-clone = "1.0.4"
-dyn-context = "0.17.2"
-dep-obj = "0.38.0"
+tuifw-screen-base = { path = "screen-base", version = "0.12.0" }
+components-arena = "3.3.0"
 educe = "0.4.18"
-either = { version = "1.6.1", default-features = false }
-enum-derive-2018 = { version = "2.0.0", default-features = false }
 errno-no-std = { version = "0.1.0", default-features = false }
 macro-attr-2018 = "2.1.0"
-num-traits = { version = "0.2.14", default-features = false }
-panicking = { version = "0.1.0", default-features = false }
-tuifw-screen-base = { path = "screen-base", version = "0.12.0" }
-tuifw-window = { path = "window", version = "0.12.0" }
-unicode-segmentation = "1.8.0"
-unicode-width = "0.1.8"
 
 [dev-dependencies]
+tuifw-screen-test = { path = "screen-test", version = "0.12.0" }
 tuifw-screen = { path = "screen", version = "0.12.0" }
 
 [badges]
