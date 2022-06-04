@@ -11,10 +11,8 @@ panic = "abort"
 panic = "abort"
 
 [dependencies]
-dep-obj = "0.38.0"
-dyn-context = "0.17.2"
 libc_alloc = "1.0.3"
-tuifw = { path = ".." }
+tuifw-window = { path = ".." }
 tuifw-screen = { path = "../screen" }
 
 [target.'cfg(not(windows))'.dependencies]
