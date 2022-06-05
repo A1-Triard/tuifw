@@ -1,7 +1,7 @@
 [package]
 edition = "2021"
 name = "tuifw-window"
-version = "0.12.0"
+version = "0.12.1"
 authors = ["warlock <internalmike@gmail.com>"]
 description = "Text User Interface Framework. Overlappable hierachical windows."
 readme = "README.md"
@@ -24,15 +24,16 @@ exclude = [
 ]
 
 [dependencies]
-tuifw-screen-base = { path = "screen-base", version = "0.12.0" }
 components-arena = "3.3.0"
 educe = "0.4.18"
 errno-no-std = { version = "0.1.0", default-features = false }
 macro-attr-2018 = "2.1.0"
+tuifw-screen-base = { path = "screen-base", version = "0.12.1" }
 
 [dev-dependencies]
-tuifw-screen-test = { path = "screen-test", version = "0.12.0" }
-tuifw-screen = { path = "screen", version = "0.12.0" }
+panicking = "0.2.0"
+tuifw-screen-test = { path = "screen-test", version = "0.12.1" }
+tuifw-screen = { path = "screen", version = "0.12.1" }
 unicode-width = "0.1.9"
 
 [badges]
