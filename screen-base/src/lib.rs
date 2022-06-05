@@ -58,8 +58,8 @@ impl Iterator for Range1d {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let size = self.to.wrapping_sub(self.from) as u16 as usize;
-        (size, Some(size))
+        let len = self.len();
+        (len, Some(len))
     }
 
     fn count(self) -> usize { self.len() }
@@ -67,10 +67,10 @@ impl Iterator for Range1d {
     fn last(self) -> Option<i16> { if self.from == self.to { None } else { Some(self.to) } }
 
     fn advance_by(&mut self, n: usize) -> Result<(), usize> {
-        let count = self.count();
-        if n > count as usize {
+        let len = self.len();
+        if n > len {
             self.from = self.to;
-            return Err(count as usize);
+            return Err(len);
         }
         self.from = self.from.wrapping_add(n as u16 as i16);
         Ok(())
@@ -91,10 +91,10 @@ impl DoubleEndedIterator for Range1d {
     }
 
     fn advance_back_by(&mut self, n: usize) -> Result<(), usize> {
-        let count = self.count();
-        if n > count as usize {
+        let len = self.len();
+        if n > len {
             self.to = self.from;
-            return Err(count as usize);
+            return Err(len);
         }
         self.to = self.to.wrapping_sub(n as u16 as i16);
         Ok(())
@@ -839,6 +839,12 @@ pub trait Screen {
 mod tests {
     use quickcheck_macros::quickcheck;
     use crate::*;
+
+    #[test]
+    fn test_range_iterator() {
+        let r = Range1d::new(0, 29).step_by(2);
+        assert_eq!(r.count(), 15);
+    }
 
     #[quickcheck]
     fn rect_area(r: Rect) -> bool {
