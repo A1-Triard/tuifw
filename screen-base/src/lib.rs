@@ -9,6 +9,7 @@
 #![doc(test(attr(allow(unused_variables))))]
 #![allow(clippy::collapsible_else_if)]
 #![allow(clippy::collapsible_if)]
+#![allow(clippy::manual_map)]
 #![allow(clippy::many_single_char_names)]
 #![allow(clippy::too_many_arguments)]
 
