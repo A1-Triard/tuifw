@@ -41,10 +41,11 @@ impl Range1d {
         Range1d { start, end }
     }
 
-    pub fn inclusive(start: i16, end: i16) -> Self {
+    pub fn len(self) -> u16 { self.end.wrapping_sub(self.start) as u16 }
+
+    pub fn inclusive(start: i16, end: i16) -> Option<Self> {
         let res = Range1d { start, end: end.wrapping_add(1) };
-        assert!(!res.is_empty());
-        res
+        if res.is_empty() { None } else { Some(res) }
     }
 
     pub fn contains(self, coord: i16) -> bool {
@@ -53,6 +54,70 @@ impl Range1d {
 
     pub fn is_empty(self) -> bool {
         self.start == self.end
+    }
+
+    pub fn intersect(self, other: Range1d) -> Range1d {
+        let (long, short) = if self.len() <= other.len() {
+            (other, self)
+        } else {
+            (self, other)
+        };
+        if long.contains(short.start) {
+            if long.contains(short.end) {
+                short
+            } else {
+                Range1d::new(short.start, long.end)
+            }
+        } else {
+            if long.contains(short.end) {
+                Range1d::new(long.start, short.end)
+            } else {
+                Range1d::new(self.start, self.start)
+            }
+        }
+    }
+
+    pub fn union(self, other: Range1d) -> Option<Range1d> {
+        let (long, short) = if self.len() <= other.len() {
+            (other, self)
+        } else {
+            (self, other)
+        };
+        if long.contains(short.start) {
+            if long.contains(short.end) {
+                if Range1d::new(long.start, short.end).len() >= Range1d::new(long.start, short.start).len() {
+                    Some(long)
+                } else {
+                    None
+                }
+            } else {
+                let res = Range1d::new(long.start, short.end);
+                if res.is_empty() { None } else { Some(res) }
+            }
+        } else {
+            if long.contains(short.end) {
+                let res = Range1d::new(short.start, long.end);
+                if res.is_empty() { None } else { Some(res) }
+            } else {
+                if other.is_empty() {
+                    Some(self)
+                } else if self.is_empty() {
+                    Some(other)
+                } else {
+                    let u = Range1d::new(self.start, other.end);
+                    let v = Range1d::new(other.start, self.end);
+                    if u.is_empty() {
+                        if v.is_empty() { None } else { Some(v) }
+                    } else {
+                        Some(if v.is_empty() {
+                            u
+                        } else {
+                            if u.len() < v.len() { u } else { v }
+                        })
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -74,7 +139,7 @@ impl Iterator for Range1d {
         (len, Some(len))
     }
 
-    fn count(self) -> usize { self.len() }
+    fn count(self) -> usize { self.len() as usize }
 
     fn last(self) -> Option<i16> {
         if self.is_empty() { None } else { Some(self.end) }
@@ -117,7 +182,7 @@ impl DoubleEndedIterator for Range1d {
 
 impl ExactSizeIterator for Range1d {
     fn len(&self) -> usize {
-        self.end.wrapping_sub(self.start) as u16 as usize
+        Range1d::len(*self) as usize
     }
 }
 
@@ -336,11 +401,17 @@ pub struct VBand {
 }
 
 impl VBand {
-    pub fn with_l_r(l: i16, r: i16) -> Option<VBand> {
+    pub fn from_l_r(l: i16, r: i16) -> Option<VBand> {
         NonZeroI16::new(r.wrapping_sub(l)).map(|w| VBand { l, w })
     }
 
+    pub fn from_h_range(h_range: Range1d) -> Option<VBand> {
+        VBand::from_l_r(h_range.start, h_range.end)
+    }
+
     pub fn r(self) -> i16 { self.l.wrapping_add(self.w.get()) }
+
+    pub fn h_range(self) -> Range1d { Range1d::new(self.l, self.r()) }
 
     pub fn offset(self, d: Vector) -> VBand {
         VBand { l: self.l.wrapping_add(d.x), w: self.w }
@@ -362,11 +433,17 @@ pub struct HBand {
 }
 
 impl HBand {
-    pub fn with_t_b(t: i16, b: i16) -> Option<HBand> {
+    pub fn from_t_b(t: i16, b: i16) -> Option<HBand> {
         NonZeroI16::new(b.wrapping_sub(t)).map(|h| HBand { t, h })
     }
 
+    pub fn from_v_range(v_range: Range1d) -> Option<HBand> {
+        HBand::from_t_b(v_range.start, v_range.end)
+    }
+
     pub fn b(self) -> i16 { self.t.wrapping_add(self.h.get()) }
+
+    pub fn v_range(self) -> Range1d { Range1d::new(self.t, self.b()) }
 
     pub fn offset(self, d: Vector) -> HBand {
         HBand { t: self.t.wrapping_add(d.y), h: self.h }
@@ -702,6 +779,13 @@ impl Rect {
     pub fn from_tl_br(tl: Point, br: Point) -> Rect {
         Rect { tl, size: br.offset_from(tl) }
     }
+    
+    pub fn from_h_v_ranges(h_range: Range1d, v_range: Range1d) -> Rect {
+        Rect::from_tl_br(
+            Point { x: h_range.start, y: v_range.start },
+            Point { x: h_range.end, y: v_range.end }
+        )
+    }
 
     pub fn is_empty(self) -> bool { self.w() == 0 || self.h() == 0 }
 
@@ -741,93 +825,44 @@ impl Rect {
 
     pub fn points(self) -> RectPoints { RectPoints { rect: self, x: self.l() } }
 
-    fn contains_1d(r: (i16, i16), p: i16) -> bool {
-        (p.wrapping_sub(r.0) as u16) < (r.1 as u16)
-    }
+    pub fn h_range(self) -> Range1d { Range1d { start: self.l(), end: self.r() } }
+
+    pub fn v_range(self) -> Range1d { Range1d { start: self.t(), end: self.b() } }
 
     pub fn contains(self, p: Point) -> bool {
-        Self::contains_1d((self.l(), self.w()), p.x) && Self::contains_1d((self.t(), self.h()), p.y)
-    }
-
-    fn intersect_1d(s: (i16, i16), o: (i16, i16)) -> (i16, i16) {
-        let (a, b) = if (s.1 as u16) <= (o.1 as u16) { (o, s) } else { (s, o) };
-        if Self::contains_1d(a, b.0) {
-            if Self::contains_1d(a, b.0.wrapping_add(b.1)) {
-                b
-            } else {
-                (b.0, a.0.wrapping_add(a.1).wrapping_sub(b.0))
-            }
-        } else {
-            if Self::contains_1d(a, b.0.wrapping_add(b.1)) {
-                (a.0, b.0.wrapping_add(b.1).wrapping_sub(a.0))
-            } else {
-                (b.0, 0)
-            }
-        }
+        self.h_range().contains(p.x) && self.v_range().contains(p.y)
     }
 
     pub fn intersect(self, other: Rect) -> Rect {
-        let (l, w) = Self::intersect_1d((self.l(), self.w()), (other.l(), other.w()));
-        let (t, h) = Self::intersect_1d((self.t(), self.h()), (other.t(), other.h()));
-        Rect { tl: Point { x: l, y: t }, size: Vector { x: w, y: h } }
+        let h = self.h_range().intersect(other.h_range());
+        let v = self.v_range().intersect(other.v_range());
+        Rect::from_h_v_ranges(h, v)
     }
 
     pub fn intersect_h_band(self, band: HBand) -> Rect {
-        let (t, h) = Self::intersect_1d((self.t(), self.h()), (band.t, band.h.get()));
-        Rect { tl: Point { x: self.l(), y: t }, size: Vector { x: self.w(), y: h } }
+        let v = self.v_range().intersect(band.v_range());
+        Rect::from_h_v_ranges(self.h_range(), v)
     }
 
     pub fn intersect_v_band(self, band: VBand) -> Rect {
-        let (l, w) = Self::intersect_1d((self.l(), self.w()), (band.l, band.w.get()));
-        Rect { tl: Point { x: l, y: self.t() }, size: Vector { x: w, y: self.h() } }
-    }
-
-    fn union_1d(s: (i16, NonZeroI16), o: (i16, NonZeroI16)) -> Option<(i16, NonZeroI16)> {
-        let (a, b) = if (s.1.get() as u16) <= (o.1.get() as u16) { (o, s) } else { (s, o) };
-        if Self::contains_1d((a.0, a.1.get()), b.0) {
-            if Self::contains_1d((a.0, a.1.get()), b.0.wrapping_add(b.1.get())) {
-                if (b.0.wrapping_add(b.1.get()).wrapping_sub(a.0) as u16) >= (b.0.wrapping_sub(a.0) as u16) {
-                    Some(a)
-                } else {
-                    None
-                }
-            } else {
-                let w = NonZeroI16::new(b.0.wrapping_add(b.1.get()).wrapping_sub(a.0));
-                w.map(|w| (a.0, w))
-            }
-        } else {
-            if Self::contains_1d((a.0, a.1.get()), b.0.wrapping_add(b.1.get())) {
-                let w = NonZeroI16::new(a.0.wrapping_add(a.1.get()).wrapping_sub(b.0));
-                w.map(|w| (b.0, w))
-            } else {
-                let u = NonZeroI16::new(o.0.wrapping_add(o.1.get()).wrapping_sub(s.0));
-                let v = NonZeroI16::new(s.0.wrapping_add(s.1.get()).wrapping_sub(o.0));
-                u.map_or_else(|| v.map(|v| (o.0, v)), |u| Some(v.map_or_else(
-                    || (s.0, u),
-                    |v| if (u.get() as u16) <= (v.get() as u16) { (s.0, u) } else { (o.0, v) }
-                )))
-            }
-        }
+        let h = self.h_range().intersect(band.h_range());
+        Rect::from_h_v_ranges(h, self.v_range())
     }
 
     pub fn union(self, other: Rect) -> Option<Either<Either<HBand, VBand>, Rect>> {
         if other.is_empty() { return Some(Right(self)); }
         if self.is_empty() { return Some(Right(other)); }
-        let self_w = unsafe { NonZeroI16::new_unchecked(self.w()) };
-        let self_h = unsafe { NonZeroI16::new_unchecked(self.h()) };
-        let other_w = unsafe { NonZeroI16::new_unchecked(other.w()) };
-        let other_h = unsafe { NonZeroI16::new_unchecked(other.h()) };
-        let hr = Self::union_1d((self.l(), self_w), (other.l(), other_w));
-        let vr = Self::union_1d((self.t(), self_h), (other.t(), other_h));
-        if let Some((l, w)) = hr {
-            if let Some((t, h)) = vr {
-                Some(Right(Rect { tl: Point { x: l, y: t }, size: Vector { x: w.get(), y: h.get() } }))
+        let hr = self.h_range().union(other.h_range());
+        let vr = self.v_range().union(other.v_range());
+        if let Some(hr) = hr {
+            if let Some(vr) = vr {
+                Some(Right(Rect::from_h_v_ranges(hr, vr)))
             } else {
-                Some(Left(Right(VBand { l, w })))
+                Some(Left(Right(VBand::from_h_range(hr).unwrap())))
             }
         } else {
-            if let Some((t, h)) = vr {
-                Some(Left(Left(HBand { t, h })))
+            if let Some(vr) = vr {
+                Some(Left(Left(HBand::from_v_range(vr).unwrap())))
             } else {
                 None
             }
@@ -950,7 +985,7 @@ mod tests {
     #[quickcheck]
     fn rect_intersect_empty(r1: Rect, tl2: Point) -> bool {
         let r2 = Rect { tl: tl2, size: Vector::null() };
-        r1.is_empty() || r1.intersect(r2) == r2
+        r1.is_empty() || r1.contains(r1.intersect(r2).tl)
     }
 
     #[quickcheck]
