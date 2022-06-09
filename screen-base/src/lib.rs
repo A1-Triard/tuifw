@@ -3,6 +3,7 @@
 #![feature(trusted_len)]
 
 #![deny(warnings)]
+#![allow(unstable_name_collisions)] // because I can
 #![doc(test(attr(deny(warnings))))]
 #![doc(test(attr(allow(dead_code))))]
 #![doc(test(attr(allow(unused_variables))))]
@@ -29,18 +30,29 @@ use num_traits::Zero;
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Range1d {
-    pub from: i16,
-    pub to: i16,
+    pub start: i16,
+    pub end: i16,
 }
 
 impl Range1d {
-    pub fn new(from: i16, to: i16) -> Self {
-        Range1d { from, to }
+    pub fn new(start: i16, end: i16) -> Self {
+        Range1d { start, end }
     }
 
-    pub fn inclusive(from: i16, to: i16) -> Self {
-        Range1d { from, to: to.wrapping_add(1) }
+    pub fn inclusive(start: i16, end: i16) -> Self {
+        let res = Range1d { start, end: end.wrapping_add(1) };
+        assert!(!res.is_empty());
+        res
+    }
+
+    pub fn contains(self, coord: i16) -> bool {
+        (coord.wrapping_sub(self.start) as u16) < (self.end.wrapping_sub(self.start) as u16)
+    }
+
+    pub fn is_empty(self) -> bool {
+        self.start == self.end
     }
 }
 
@@ -48,9 +60,9 @@ impl Iterator for Range1d {
     type Item = i16;
 
     fn next(&mut self) -> Option<i16> {
-        if self.from != self.to {
-            let item = self.from;
-            self.from = self.from.wrapping_add(1);
+        if !self.is_empty() {
+            let item = self.start;
+            self.start = self.start.wrapping_add(1);
             Some(item)
         } else {
             None
@@ -64,15 +76,17 @@ impl Iterator for Range1d {
 
     fn count(self) -> usize { self.len() }
 
-    fn last(self) -> Option<i16> { if self.from == self.to { None } else { Some(self.to) } }
+    fn last(self) -> Option<i16> {
+        if self.is_empty() { None } else { Some(self.end) }
+    }
 
     fn advance_by(&mut self, n: usize) -> Result<(), usize> {
         let len = self.len();
         if n > len {
-            self.from = self.to;
+            self.start = self.end;
             return Err(len);
         }
-        self.from = self.from.wrapping_add(n as u16 as i16);
+        self.start = self.start.wrapping_add(n as u16 as i16);
         Ok(())
     }
 }
@@ -81,9 +95,9 @@ impl FusedIterator for Range1d { }
 
 impl DoubleEndedIterator for Range1d {
     fn next_back(&mut self) -> Option<i16> {
-        if self.from != self.to {
-            let item = self.to;
-            self.to = self.to.wrapping_sub(1);
+        if !self.is_empty() {
+            let item = self.end;
+            self.end = self.end.wrapping_sub(1);
             Some(item)
         } else {
             None
@@ -93,17 +107,17 @@ impl DoubleEndedIterator for Range1d {
     fn advance_back_by(&mut self, n: usize) -> Result<(), usize> {
         let len = self.len();
         if n > len {
-            self.to = self.from;
+            self.end = self.start;
             return Err(len);
         }
-        self.to = self.to.wrapping_sub(n as u16 as i16);
+        self.end = self.end.wrapping_sub(n as u16 as i16);
         Ok(())
     }
 }
 
 impl ExactSizeIterator for Range1d {
     fn len(&self) -> usize {
-        self.to.wrapping_sub(self.from) as u16 as usize
+        self.end.wrapping_sub(self.start) as u16 as usize
     }
 }
 
