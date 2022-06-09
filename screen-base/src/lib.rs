@@ -616,6 +616,68 @@ macro_attr! {
     pub enum VAlign { Top, Center, Bottom }
 }
 
+pub struct RectPoints {
+    rect: Rect,
+    x: i16,
+}
+
+impl Iterator for RectPoints {
+    type Item = Point;
+
+    fn next(&mut self) -> Option<Point> {
+        if self.rect.is_empty() {
+            return None;
+        }
+        let item = Point { x: self.x, y: self.rect.t() };
+        self.x = self.x.wrapping_add(1);
+        if self.x == self.rect.r() {
+            self.x = self.rect.l();
+            self.rect.tl = Point { x: self.x, y: self.rect.t().wrapping_add(1) };
+            self.rect.size = Vector { x: self.rect.w(), y: self.rect.h().wrapping_sub(1) };
+        }
+        Some(item)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.rect.area() - (self.x.wrapping_sub(self.rect.l()) as u16 as u32);
+        if len as usize as u32 == len {
+            (len as usize, Some(len as usize))
+        } else {
+            (usize::MAX, None)
+        }
+    }
+
+    fn count(self) -> usize { self.size_hint().1.unwrap() }
+
+    fn last(self) -> Option<Point> {
+        if self.rect.is_empty() { None } else { Some(self.rect.br_inner()) }
+    }
+
+    fn advance_by(&mut self, n: usize) -> Result<(), usize> {
+        if let Some(size) = self.size_hint().1 {
+            if n > size {
+                self.x = self.rect.l();
+                self.rect.tl = self.rect.bl();
+                return Err(size);
+            }
+        }
+        let n = n as u32;
+        let current_line_last = self.rect.r().wrapping_sub(self.x) as u16 as u32;
+        if n < current_line_last {
+            self.x = self.x.wrapping_add(n as u16 as i16);
+            return Ok(());
+        }
+        let n = n - current_line_last;
+        let skip_lines = 1i16.wrapping_add((n / self.rect.w() as u32) as u16 as i16);
+        self.rect.tl = Point { x: self.rect.l(), y: self.rect.t().wrapping_add(skip_lines) };
+        self.rect.size = Vector { x: self.rect.w(), y: self.rect.h().wrapping_sub(skip_lines) };
+        self.x = (n % self.rect.w() as u32) as u16 as i16;
+        Ok(())
+    }
+}
+
+impl FusedIterator for RectPoints { }
+
 #[derive(Eq, PartialEq, Debug, Hash, Clone, Copy)]
 pub struct Rect {
     pub tl: Point,
@@ -662,6 +724,8 @@ impl Rect {
     pub fn br_inner(self) -> Point { Point { x: self.r_inner(), y: self.b_inner() } }
 
     pub fn area(self) -> u32 { self.size.rect_area() }
+
+    pub fn points(self) -> RectPoints { RectPoints { rect: self, x: self.l() } }
 
     fn contains_1d(r: (i16, i16), p: i16) -> bool {
         (p.wrapping_sub(r.0) as u16) < (r.1 as u16)
@@ -837,6 +901,7 @@ pub trait Screen {
 
 #[cfg(test)]
 mod tests {
+    use quickcheck::TestResult;
     use quickcheck_macros::quickcheck;
     use crate::*;
 
@@ -906,5 +971,11 @@ mod tests {
     fn rect_union_empty_w(r1: Rect, tl2: Point, h: i16) -> bool {
         let r2 = Rect { tl: tl2, size: Vector { x: 0, y: h } };
         r1.union(r2).unwrap().right().unwrap() == r1
+    }
+
+    #[quickcheck]
+    fn rect_contains_all_self_points(r: Rect) -> TestResult {
+        if r.area() > 100000 { return TestResult::discard(); }
+        TestResult::from_bool(r.points().all(|x| r.contains(x)))
     }
 }
