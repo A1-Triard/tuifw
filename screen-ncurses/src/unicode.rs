@@ -24,6 +24,7 @@ struct Line {
 
 pub struct Screen {
     lines: Vec<Line>,
+    escdelay: c_int,
 }
 
 impl !Sync for Screen { }
@@ -33,6 +34,7 @@ impl Screen {
     pub unsafe fn new() -> Result<Self, Errno> {
         if non_null(initscr()).is_err() { return Err(Errno(EINVAL)); }
         let mut s = Screen {
+            escdelay: get_escdelay(),
             lines: Vec::with_capacity(max(0, min(LINES, i16::MAX as _)) as i16 as u16 as usize),
         };
         init_settings()?;
@@ -150,6 +152,7 @@ impl Screen {
 impl Drop for Screen {
     #![allow(clippy::panicking_unwrap)]
     fn drop(&mut self) {
+        unsafe { restore_settings(self.escdelay); }
         let e = unsafe { non_err(endwin()) };
         if e.is_err() && !panicking() { e.unwrap(); }
     }

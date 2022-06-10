@@ -25,6 +25,7 @@ pub struct Screen {
     lines: Vec<Line>,
     cd: iconv_t,
     dc: iconv_t,
+    escdelay: c_int,
 }
 
 impl !Sync for Screen { }
@@ -36,6 +37,7 @@ impl Screen {
     pub unsafe fn new() -> Result<Self, Errno> {
         if non_null(initscr()).is_err() { return Err(Errno(EINVAL)); }
         let mut s = Screen {
+            escdelay: get_escdelay(),
             lines: Vec::with_capacity(max(0, min(LINES, i16::MAX as _)) as i16 as u16 as usize),
             cd: ICONV_ERR,
             dc: ICONV_ERR
@@ -69,18 +71,27 @@ impl Screen {
     }
 
     unsafe fn drop_raw(&mut self) -> Result<(), Errno> {
-        non_err(endwin())?;
-        if self.cd != ICONV_ERR {
+        restore_settings(self.escdelay);
+        let e1 = non_err(endwin()).map(|_| ());
+        let e2 = if self.cd != ICONV_ERR {
             if iconv_close(self.cd) == -1 {
-                return Err(errno());
+                Err(errno())
+            } else {
+                Ok(())
             }
-        }
-        if self.dc != ICONV_ERR {
+        } else {
+            Ok(())
+        };
+        let e3 = if self.dc != ICONV_ERR {
             if iconv_close(self.dc) == -1 {
-                return Err(errno());
+                Err(errno())
+            } else {
+                Ok(())
             }
-        }
-        Ok(())
+        } else {
+            Ok(())
+        };
+        if e1.is_err() { e1 } else if e2.is_err() { e2 } else { e3 }
     }
 
     fn update_raw(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Errno> {

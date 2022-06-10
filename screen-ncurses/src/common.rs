@@ -34,11 +34,18 @@ fn color_index(c: Color) -> i16 {
 pub unsafe fn init_settings() -> Result<(), Errno> {
     non_err(cbreak())?; 
     non_err(noecho())?; 
-    nonl(); 
+    non_err(nonl())?; 
     register_colors()?;
     set_escdelay(0);
     non_err(keypad(stdscr, true))?;
     Ok(())
+}
+
+pub unsafe fn restore_settings(e: c_int) {
+    let _ = nocbreak(); 
+    let _ = echo(); 
+    let _ = nl(); 
+    set_escdelay(e);
 }
 
 unsafe fn register_colors() -> Result<(), Errno> {

@@ -63,7 +63,12 @@ extern "C" {
     pub fn COLOR_PAIR(arg1: c_int) -> c_int;
     #[must_use]
     pub fn cbreak() -> c_int;
+    #[must_use]
+    pub fn nocbreak() -> c_int;
+    #[must_use]
     pub fn nonl() -> c_int;
+    #[must_use]
+    pub fn nl() -> c_int;
     pub fn clearok(arg1: *mut WINDOW, arg2: bool) -> c_int;
     #[must_use]
     pub fn curs_set(arg1: c_int) -> c_int;
@@ -93,6 +98,8 @@ extern "C" {
     #[must_use]
     pub fn nodelay(arg1: *mut WINDOW, arg2: bool) -> c_int;
     #[must_use]
+    pub fn echo() -> c_int;
+    #[must_use]
     pub fn noecho() -> c_int;
     #[must_use]
     pub fn start_color() -> c_int;
@@ -114,6 +121,7 @@ extern "C" {
         arg1: c_int,
         arg2: c_int,
     ) -> c_int;
+    pub fn get_escdelay() -> c_int;
     pub fn set_escdelay(arg1: c_int) -> c_int;
     #[must_use]
     pub fn waddnwstr(
