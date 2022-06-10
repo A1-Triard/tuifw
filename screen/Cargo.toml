@@ -1,7 +1,7 @@
 [package]
 edition = "2021"
 name = "tuifw-screen"
-version = "0.13.3"
+version = "0.13.4"
 authors = ["warlock <internalmike@gmail.com>"]
 description = "Text User Interface Framework. Basic platform-independent text screen implementation."
 readme = "README.md"
@@ -13,13 +13,13 @@ repository = "https://github.com/A1-Triard/tuifw"
 
 [dependencies]
 errno-no-std = { version = "0.1.0", default-features = false }
-tuifw-screen-base = { path = "../screen-base", version = "0.13.3" }
+tuifw-screen-base = { path = "../screen-base", version = "0.13.4" }
 
 [target.'cfg(not(windows))'.dependencies]
-tuifw-screen-ncurses = { path = "../screen-ncurses", version = "0.13.3" }
+tuifw-screen-ncurses = { path = "../screen-ncurses", version = "0.13.4" }
 
 [target.'cfg(windows)'.dependencies]
-tuifw-screen-winapi = { path = "../screen-winapi", version = "0.13.3" }
+tuifw-screen-winapi = { path = "../screen-winapi", version = "0.13.4" }
 
 [dev-dependencies]
 panicking = "0.2.0"
