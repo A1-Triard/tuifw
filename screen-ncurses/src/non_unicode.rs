@@ -12,7 +12,6 @@ use libc::*;
 use panicking::panicking;
 use tuifw_screen_base::*;
 use tuifw_screen_base::Screen as base_Screen;
-use unicode_normalization::UnicodeNormalization;
 use unicode_width::UnicodeWidthChar;
 
 struct Line {
@@ -216,7 +215,7 @@ impl base_Screen for Screen {
         let line = &mut self.lines[p.y as u16 as usize];
         line.invalidated = true;
         let attr = unsafe { attr_ch(fg, bg, attr) };
-        let text = text.nfc().filter(|c| c.width() == Some(1))
+        let text = text.chars().filter(|c| c.width() == Some(1))
             .map(|c| encode_char(self.cd, c))
             .take(text_end as u16 as usize)
         ;
