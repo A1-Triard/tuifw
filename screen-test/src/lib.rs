@@ -13,7 +13,6 @@ use core::ops::Range;
 use errno_no_std::Errno;
 use tuifw_screen_base::*;
 use tuifw_screen_base::Screen as base_Screen;
-use unicode_segmentation::UnicodeSegmentation;
 
 pub struct Screen {
     buf: Vec<(char, Color, Option<Color>, Attr)>,
@@ -71,7 +70,7 @@ impl base_Screen for Screen {
         let mut before_text_start = 0i16;
         let x0 = max(hard.start, p.x);
         let mut x = x0;
-        for g in text.graphemes(true).map(|g| g.chars().next().unwrap()).take(text_end as u16 as usize) {
+        for g in text.chars().take(text_end as u16 as usize) {
             if x >= hard.end { break; }
             let visible_1 = if before_text_start < text_start {
                 before_text_start += 1;

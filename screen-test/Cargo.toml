@@ -14,7 +14,6 @@ repository = "https://github.com/A1-Triard/tuifw"
 [dependencies]
 errno-no-std = { version = "0.1.0", default-features = false }
 tuifw-screen-base = { path = "../screen-base", version = "0.13.3" }
-unicode-segmentation = "1.8.0"
 
 [badges]
 maintenance = { status = "experimental" }

@@ -18,7 +18,6 @@ libc = { version = "0.2.101", default-features = false }
 panicking = { version = "0.2.0", default-features = false }
 tuifw-screen-base = { path = "../screen-base", version = "0.13.3" }
 unicode-width = "0.1.8"
-unicode-segmentation = "1.8.0"
 
 [build-dependencies]
 pkg-config = "0.3.19"

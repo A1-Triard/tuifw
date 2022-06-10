@@ -26,7 +26,6 @@ use num_traits::identities::Zero;
 use panicking::panicking;
 use tuifw_screen_base::*;
 use tuifw_screen_base::Screen as base_Screen;
-use unicode_segmentation::UnicodeSegmentation;
 use winapi::ctypes::*;
 use winapi::shared::minwindef::*;
 use winapi::shared::ntdef::{CHAR, HANDLE};
@@ -166,8 +165,9 @@ impl Screen {
         Ok(())
     }
 
-    fn encode_grapheme(output_cp: UINT, wctmb_flags: DWORD, g: &str) -> Either<u8, (u8, u8)> {
-        let g = g.encode_utf16().collect::<Vec<_>>();
+    fn encode_grapheme(output_cp: UINT, wctmb_flags: DWORD, g: char) -> Either<u8, (u8, u8)> {
+        let mut buf = [0u16; 2];
+        let g = g.encode_utf16(&mut buf[..]);
         let len = g.len() as isize as _;
         let n = non_zero(unsafe { WideCharToMultiByte(output_cp, wctmb_flags, g.as_ptr(), len, null_mut(), 0, null(), null_mut()) }).unwrap();
         let mut buf: Vec<MaybeUninit<u8>> = vec![MaybeUninit::uninit(); n as c_uint as usize];
@@ -450,7 +450,7 @@ impl base_Screen for Screen {
         let mut x0 = None;
         let mut x = p.x;
         let mut n = 0i16;
-        for g in text.graphemes(true).map(|g| Self::encode_grapheme(output_cp, wctmb_flags, g)) {
+        for g in text.chars().map(|g| Self::encode_grapheme(output_cp, wctmb_flags, g)) {
             if x >= hard.end { break; }
             if n >= text_end { break; }
             let w = if g.is_left() { 1 } else { 2 };

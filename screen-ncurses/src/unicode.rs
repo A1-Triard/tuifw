@@ -14,7 +14,6 @@ use panicking::panicking;
 use tuifw_screen_base::*;
 use tuifw_screen_base::Screen as base_Screen;
 use unicode_width::UnicodeWidthChar;
-use unicode_segmentation::UnicodeSegmentation;
 
 struct Line {
     window: NonNull<WINDOW>,
@@ -155,22 +154,44 @@ impl Drop for Screen {
     }
 }
 
-fn sanitize_grapheme(g: &str) -> &str {
-    let s = g
-        .char_indices()
-        .find_map(|(i, c)| if c.width().unwrap_or(1) > 0 { Some(i) } else { None })
-        .unwrap_or_else(|| g.len())
-    ;
-    let g = &g[s ..];
-    if let Some(w) = g.chars().next() {
-        if g.chars().skip(1).any(|c| c.width().unwrap_or(1) > 0) {
-            &g[.. w.len_utf8()]
+struct Graphemes<'a>(&'a str);
+
+impl<'a> Iterator for Graphemes<'a> {
+    type Item = (&'a str, usize);
+
+    fn next(&mut self) -> Option<(&'a str, usize)> {
+        let mut chars = self.0.char_indices()
+            .map(|(i, c)| (i, c.width().unwrap_or(1)))
+            .skip_while(|&(_, w)| w == 0)
+        ;
+        if let Some((start, width)) = chars.next() {
+            let end = 'r: loop {
+                for _ in 1 .. CCHARW_MAX {
+                    if let Some((i, w)) = chars.next() {
+                        if w != 0 {
+                            break 'r i;
+                        }
+                    } else {
+                        break 'r self.0.len();
+                    }
+                }
+                break 'r if let Some((i, _)) = chars.next() {
+                    i
+                } else {
+                    self.0.len()
+                };
+            };
+            let (item, tail) = self.0.split_at(end);
+            self.0 = tail;
+            Some((&item[start ..], width))
         } else {
-            let e = g.chars().take(CCHARW_MAX).map(|c| c.len_utf8()).sum();
-            &g[.. e]
+            self.0 = &self.0[self.0.len() ..];
+            None
         }
-    } else {
-        g
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, Some(self.0.len()))
     }
 }
 
@@ -200,16 +221,14 @@ impl base_Screen for Screen {
         let line = &mut self.lines[p.y as u16 as usize];
         line.invalidated = true;
         let attr = unsafe { attr_ch(fg, bg, attr) };
-        let text = text.graphemes(true)
-            .map(sanitize_grapheme)
-            .filter_map(|g| g.chars().next().map(|w| (g, w.width().unwrap_or(1) as u16 as i16)))
-        ;
+        let text = Graphemes(text);
         let mut x0 = None;
         let mut x = p.x;
         let mut n = 0i16;
         for (g, w) in text {
             if x >= hard.end { break; }
             if n >= text_end { break; }
+            let w = min(w, i16::MAX as u16 as usize) as u16 as i16;
             n = n.saturating_add(w);
             let before_text_start = n <= text_start;
             if before_text_start {
