@@ -41,13 +41,6 @@ pub unsafe fn init_settings() -> Result<(), Errno> {
     Ok(())
 }
 
-pub unsafe fn restore_settings(e: c_int) {
-    let _ = nocbreak(); 
-    let _ = echo(); 
-    let _ = nl(); 
-    set_escdelay(e);
-}
-
 unsafe fn register_colors() -> Result<(), Errno> {
     non_err(start_color())?;
     non_err(assume_default_colors(0, -1))?;
