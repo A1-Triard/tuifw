@@ -10,9 +10,9 @@
 extern { }
 
 mod no_std {
+    use composable_allocators::{AsGlobal, System};
     use core::panic::PanicInfo;
     use exit_no_std::exit;
-    use composable_allocators::{AsGlobal, System};
 
     #[global_allocator]
     static ALLOCATOR: AsGlobal<System> = AsGlobal(System);
