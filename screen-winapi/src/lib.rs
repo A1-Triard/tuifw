@@ -73,7 +73,7 @@ impl Screen {
         let window = unsafe { GetConsoleWindow() };
         assert_ne!(window, null_mut());
         let system_menu = unsafe { GetSystemMenu(window, FALSE) };
-        if system_menu != null_mut() { // Wine lacks GetSystemMenu implementation
+        if !system_menu.is_null() { // Wine lacks GetSystemMenu implementation
             let _ = non_zero(unsafe { DeleteMenu(system_menu, SC_CLOSE as UINT, MF_BYCOMMAND) }); // non-fatal
         }
         let mut s = Screen {
