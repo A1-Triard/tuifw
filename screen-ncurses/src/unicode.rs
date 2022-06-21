@@ -1,3 +1,5 @@
+#![allow(clippy::never_loop)]
+
 use crate::common::*;
 use crate::ncurses::*;
 use alloc::vec;
