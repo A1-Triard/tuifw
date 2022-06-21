@@ -1,5 +1,3 @@
-#![feature(explicit_generic_args_with_impl_trait)]
-
 #![deny(warnings)]
 #![allow(unused_variables)]
 

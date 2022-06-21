@@ -5,39 +5,31 @@
 
 #![no_std]
 
-use core::alloc::Layout;
-use core::panic::PanicInfo;
-#[cfg(not(windows))]
-use libc::exit;
-use libc_alloc::LibcAlloc;
-use tuifw_window::{RenderPort, WindowTree, Window};
-#[cfg(windows)]
-use winapi::shared::minwindef::UINT;
-#[cfg(windows)]
-use winapi::um::processthreadsapi::ExitProcess;
-
 #[cfg(windows)]
 #[link(name="msvcrt")]
 extern { }
 
-#[global_allocator]
-static ALLOCATOR: LibcAlloc = LibcAlloc;
+mod no_std {
+    use core::panic::PanicInfo;
+    use exit_no_std::exit;
+    use composable_allocators::{AsGlobal, System};
 
-#[cfg(windows)]
-unsafe fn exit(code: UINT) -> ! {
-    ExitProcess(code);
-    loop { }
+    #[global_allocator]
+    static ALLOCATOR: AsGlobal<System> = AsGlobal(System);
+
+    #[panic_handler]
+    fn panic(_info: &PanicInfo) -> ! {
+        exit(99)
+    }
+
+    #[cfg(windows)]
+    #[no_mangle]
+    fn rust_oom(_layout: core::alloc::Layout) -> ! {
+        exit(98)
+    }
 }
 
-#[panic_handler]
-pub extern fn panic(_info: &PanicInfo) -> ! {
-    unsafe { exit(99) }
-}
-
-#[no_mangle]
-pub fn rust_oom(_layout: Layout) -> ! {
-    unsafe { exit(98) }
-}
+use tuifw_window::{RenderPort, WindowTree, Window};
 
 fn render<State: ?Sized>(_: &WindowTree<State>, _: Option<Window>, _: &mut RenderPort, _: &mut State) { }
 

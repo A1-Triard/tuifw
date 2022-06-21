@@ -11,12 +11,7 @@ panic = "abort"
 panic = "abort"
 
 [dependencies]
-libc_alloc = "1.0.3"
-tuifw-window = { path = ".." }
+composable-allocators = "0.1.1"
+exit-no-std = "0.1.0"
 tuifw-screen = { path = "../screen" }
-
-[target.'cfg(not(windows))'.dependencies]
-libc = { version = "0.2", default-features = false }
-
-[target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3.9", features = ["processthreadsapi"] }
+tuifw-window = { path = ".." }
