@@ -15,8 +15,8 @@ use tuifw_screen_base::*;
 use tuifw_screen_base::Screen as base_Screen;
 
 pub struct Screen {
-    buf: Vec<(char, Color, Option<Color>, Attr)>,
-    out: Vec<(char, Color, Option<Color>, Attr)>,
+    buf: Vec<(char, Fg, Bg)>,
+    out: Vec<(char, Fg, Bg)>,
     size: Vector,
     invalidated: Rect,
     cursor: Option<Point>,
@@ -38,8 +38,8 @@ impl Screen {
     pub fn cursor(&self) -> Option<Point> { self.cursor }
 
     fn resize(&mut self, out_size: Vector) {
-        self.buf.resize(out_size.rect_area() as usize, (' ', Color::LightGray, None, Attr::empty()));
-        self.out.resize(out_size.rect_area() as usize, (' ', Color::LightGray, None, Attr::empty()));
+        self.buf.resize(out_size.rect_area() as usize, (' ', Fg::LightGray, Bg::None));
+        self.out.resize(out_size.rect_area() as usize, (' ', Fg::LightGray, Bg::None));
         self.size = out_size;
         self.invalidated = Rect { tl: Point { x: 0, y: 0 }, size: self.size };
     }
@@ -51,9 +51,8 @@ impl base_Screen for Screen {
     fn out(
         &mut self,
         p: Point,
-        fg: Color,
-        bg: Option<Color>,
-        attr: Attr,
+        fg: Fg,
+        bg: Bg,
         text: &str,
         hard: Range<i16>,
         soft: Range<i16>
@@ -86,7 +85,7 @@ impl base_Screen for Screen {
             };
             if visible_1 && visible_2 {
                 let col = &mut line[x as u16 as usize];
-                *col = (g, fg, bg, attr);
+                *col = (g, fg, bg);
             }
             x += 1;
         }

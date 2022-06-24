@@ -14,20 +14,41 @@ pub fn non_null<T: ?Sized>(r: *mut T) -> Result<NonNull<T>, Errno> {
     NonNull::new(r).ok_or(Errno(EINVAL))
 }
 
-fn colors_count() -> i16 {
-    Color::iter_variants().len() as i16
+fn bg_index(c: Bg) -> i16 {
+    match c {
+        Bg::None => -1,
+        Bg::Black => COLOR_BLACK,
+        Bg::Red => COLOR_RED,
+        Bg::Green => COLOR_GREEN,
+        Bg::Brown => COLOR_YELLOW,
+        Bg::Blue => COLOR_BLUE,
+        Bg::Magenta => COLOR_MAGENTA,
+        Bg::Cyan => COLOR_CYAN,
+        Bg::LightGray => COLOR_WHITE,
+    }
 }
 
-fn color_index(c: Color) -> i16 {
+fn fg_index(c: Fg) -> i16 {
     match c {
-        Color::Black => COLOR_BLACK,
-        Color::Red => COLOR_RED,
-        Color::Green => COLOR_GREEN,
-        Color::Brown => COLOR_YELLOW,
-        Color::Blue => COLOR_BLUE,
-        Color::Magenta => COLOR_MAGENTA,
-        Color::Cyan => COLOR_CYAN,
-        Color::LightGray => COLOR_WHITE,
+        Fg::Black | Fg::DarkGray => COLOR_BLACK,
+        Fg::Red | Fg::LightRed => COLOR_RED,
+        Fg::Green | Fg::LightGreen => COLOR_GREEN,
+        Fg::Brown | Fg::Yellow => COLOR_YELLOW,
+        Fg::Blue | Fg::LightBlue => COLOR_BLUE,
+        Fg::Magenta | Fg::LightMagenta => COLOR_MAGENTA,
+        Fg::Cyan | Fg::LightCyan => COLOR_CYAN,
+        Fg::LightGray | Fg::White => COLOR_WHITE,
+    }
+}
+
+fn fg_attr(c: Fg) -> chtype {
+    match c {
+        Fg::Black | Fg::Red | Fg::Green | Fg::Brown |
+        Fg::Blue | Fg::Magenta | Fg::Cyan | Fg::LightGray =>
+            A_NORMAL,
+        Fg::DarkGray | Fg::LightRed | Fg::LightGreen | Fg::Yellow |
+        Fg::LightBlue | Fg::LightMagenta | Fg::LightCyan | Fg::White =>
+            A_BOLD,
     }
 }
 
@@ -44,25 +65,17 @@ pub unsafe fn init_settings() -> Result<(), Errno> {
 unsafe fn register_colors() -> Result<(), Errno> {
     non_err(start_color())?;
     non_err(use_default_colors())?;
-    for fg in Color::iter_variants().map(color_index) {
-        non_err(init_pair(1 + fg, fg, -1))?;
-        for bg in Color::iter_variants().map(color_index) {
-            non_err(init_pair(1 + (1 + bg) * colors_count() + fg, fg, bg))?;
+    for fg in Fg::iter_variants().map(fg_index) {
+        for bg in Bg::iter_variants().map(bg_index) {
+            non_err(init_pair(1 + (bg + 1) * 8 + fg, fg, bg))?;
         }
     }
     Ok(())
 }
 
-fn attr_value(a: Attr) -> chtype {
-    let mut r = 0;
-    if a.contains(Attr::REVERSE) { r |= A_REVERSE; }
-    if a.contains(Attr::INTENSE) { r |= A_BOLD; }
-    r
-}
-
-pub unsafe fn attr_ch(fg: Color, bg: Option<Color>, attr: Attr) -> chtype {
-    let color = COLOR_PAIR((1 + bg.map_or(0, |b| (color_index(b) + 1) * colors_count()) + color_index(fg)) as _);
-    attr_value(attr) | color as chtype
+pub unsafe fn attr_ch(fg: Fg, bg: Bg) -> chtype {
+    let color = COLOR_PAIR((1 + (bg_index(bg) + 1) * 8 + fg_index(fg)) as _);
+    fg_attr(fg) | color as chtype
 }
 
 const KEY_F1: c_int = KEY_F(1);

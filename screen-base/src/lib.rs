@@ -14,9 +14,6 @@
 
 #![no_std]
 
-#[macro_use]
-mod bitflags_ext;
-
 use core::num::NonZeroU16;
 use core::ops::Range;
 use core::option::{Option};
@@ -37,8 +34,9 @@ macro_attr! {
 
 macro_attr! {
     #[derive(Eq, PartialEq, Debug, Hash, Clone, Copy, Ord, PartialOrd)]
-    #[derive(EnumDisplay!, EnumFromStr!, IterVariants!(ColorVariants))]
-    pub enum Color {
+    #[derive(EnumDisplay!, EnumFromStr!, IterVariants!(BgVariants))]
+    pub enum Bg {
+        None,
         Black,
         Red,
         Green,
@@ -50,10 +48,26 @@ macro_attr! {
     }
 }
 
-bitflags_ext! {
-    pub struct Attr: u8 {
-        REVERSE = 1 << 0,
-        INTENSE = 1 << 1,
+macro_attr! {
+    #[derive(Eq, PartialEq, Debug, Hash, Clone, Copy, Ord, PartialOrd)]
+    #[derive(EnumDisplay!, EnumFromStr!, IterVariants!(FgVariants))]
+    pub enum Fg {
+        Black,
+        Red,
+        Green,
+        Brown,
+        Blue,
+        Magenta,
+        Cyan,
+        LightGray,
+        DarkGray,
+        LightRed,
+        LightGreen,
+        Yellow,
+        LightBlue,
+        LightMagenta,
+        LightCyan,
+        White
     }
 }
 
@@ -111,9 +125,8 @@ pub trait Screen {
     fn out(
         &mut self,
         p: Point,
-        fg: Color,
-        bg: Option<Color>,
-        attr: Attr,
+        fg: Fg,
+        bg: Bg,
         text: &str,
         hard: Range<i16>,
         soft: Range<i16>,

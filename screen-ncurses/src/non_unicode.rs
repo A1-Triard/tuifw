@@ -200,9 +200,8 @@ impl base_Screen for Screen {
     fn out(
         &mut self,
         p: Point,
-        fg: Color,
-        bg: Option<Color>,
-        attr: Attr,
+        fg: Fg,
+        bg: Bg,
         text: &str,
         hard: Range<i16>,
         soft: Range<i16>
@@ -214,7 +213,7 @@ impl base_Screen for Screen {
         let text_start = if soft.start <= p.x { 0 } else { soft.start.saturating_sub(p.x) };
         let line = &mut self.lines[p.y as u16 as usize];
         line.invalidated = true;
-        let attr = unsafe { attr_ch(fg, bg, attr) };
+        let attr = unsafe { attr_ch(fg, bg) };
         let text = text.chars().filter(|c| c.width() == Some(1))
             .map(|c| encode_char(self.cd, c))
             .take(text_end as u16 as usize)

@@ -18,7 +18,6 @@ pub const COLOR_WHITE: c_short = 7;
 pub const ERR: c_int = -1;
 
 pub const A_NORMAL: chtype = 0;
-pub const A_REVERSE: chtype = 1 << 18;
 pub const A_BOLD: chtype = 1 << 21;
 
 pub const WA_NORMAL: attr_t = A_NORMAL;

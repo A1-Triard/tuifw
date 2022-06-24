@@ -23,7 +23,7 @@ use components_arena::{Arena, Component, ComponentId, Id, NewtypeComponentId, Ra
 use educe::Educe;
 use errno_no_std::Errno;
 use macro_attr_2018::macro_attr;
-use tuifw_screen_base::{Attr, Color, Event, Point, Rect, Screen, Vector};
+use tuifw_screen_base::{Bg, Event, Fg, Point, Rect, Screen, Vector};
 
 fn invalidate_rect(invalidated: (&mut Vec<Range<i16>>, Vector), rect: Rect) {
     debug_assert_eq!(invalidated.0.len(), invalidated.1.y as u16 as usize);
@@ -68,7 +68,7 @@ pub struct RenderPort {
 }
 
 impl RenderPort {
-    pub fn out(&mut self, p: Point, fg: Color, bg: Option<Color>, attr: Attr, text: &str) {
+    pub fn out(&mut self, p: Point, fg: Fg, bg: Bg, text: &str) {
         if p.y as u16 >= self.size.y as u16 || self.size.x == 0 { return; }
         let p = p.offset(self.offset);
         if p.y < 0 || p.y >= self.screen.size().y { return; }
@@ -94,7 +94,7 @@ impl RenderPort {
 
         for chunk in &chunks {
             if chunk.start >= chunk.end { continue; }
-            let out = self.screen.out(p, fg, bg, attr, text, chunk.clone(), row.clone());
+            let out = self.screen.out(p, fg, bg, text, chunk.clone(), row.clone());
             if out.start >= out.end { continue; }
             row.start = min(row.start, out.start);
             row.end = max(row.end, out.end);

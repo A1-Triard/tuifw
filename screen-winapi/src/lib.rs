@@ -391,38 +391,36 @@ impl Drop for Screen {
     }
 }
 
-fn attr_w(fg: Color, bg: Option<Color>, attr: Attr) -> WORD {
-    let bg = bg.unwrap_or(Color::Black);
-    let (fg, bg) = if attr.contains(Attr::REVERSE) { (bg, fg) } else { (fg, bg) };
+fn attr_w(fg: Fg, bg: Bg) -> WORD {
     let fg = match fg {
-        Color::Black => 0,
-        Color::Red => FOREGROUND_RED,
-        Color::Green => FOREGROUND_GREEN,
-        Color::Brown => FOREGROUND_RED | FOREGROUND_GREEN,
-        Color::Blue => FOREGROUND_BLUE,
-        Color::Magenta => FOREGROUND_RED | FOREGROUND_BLUE,
-        Color::Cyan => FOREGROUND_BLUE | FOREGROUND_GREEN,
-        Color::LightGray => FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED
+        Fg::Black => 0,
+        Fg::DarkGray => FOREGROUND_INTENSITY,
+        Fg::Red => FOREGROUND_RED,
+        Fg::LightRed => FOREGROUND_INTENSITY | FOREGROUND_RED,
+        Fg::Green => FOREGROUND_GREEN,
+        Fg::LightGreen => FOREGROUND_INTENSITY | FOREGROUND_GREEN,
+        Fg::Brown => FOREGROUND_RED | FOREGROUND_GREEN,
+        Fg::Yellow => FOREGROUND_INTENSITY | FOREGROUND_RED | FOREGROUND_GREEN,
+        Fg::Blue => FOREGROUND_BLUE,
+        Fg::LightBlue => FOREGROUND_INTENSITY | FOREGROUND_BLUE,
+        Fg::Magenta => FOREGROUND_RED | FOREGROUND_BLUE,
+        Fg::LightMagenta => FOREGROUND_INTENSITY | FOREGROUND_RED | FOREGROUND_BLUE,
+        Fg::Cyan => FOREGROUND_BLUE | FOREGROUND_GREEN,
+        Fg::LightCyan => FOREGROUND_INTENSITY | FOREGROUND_BLUE | FOREGROUND_GREEN,
+        Fg::LightGray => FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED,
+        Fg::White => FOREGROUND_INTENSITY | FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED,
     };
     let bg = match bg {
-        Color::Black => 0,
-        Color::Red => BACKGROUND_RED,
-        Color::Green => BACKGROUND_GREEN,
-        Color::Brown => BACKGROUND_RED | BACKGROUND_GREEN,
-        Color::Blue => BACKGROUND_BLUE,
-        Color::Magenta => BACKGROUND_RED | BACKGROUND_BLUE,
-        Color::Cyan => BACKGROUND_BLUE | BACKGROUND_GREEN,
-        Color::LightGray => BACKGROUND_BLUE | BACKGROUND_GREEN | BACKGROUND_RED
+        Bg::Black | Bg::None => 0,
+        Bg::Red => BACKGROUND_RED,
+        Bg::Green => BACKGROUND_GREEN,
+        Bg::Brown => BACKGROUND_RED | BACKGROUND_GREEN,
+        Bg::Blue => BACKGROUND_BLUE,
+        Bg::Magenta => BACKGROUND_RED | BACKGROUND_BLUE,
+        Bg::Cyan => BACKGROUND_BLUE | BACKGROUND_GREEN,
+        Bg::LightGray => BACKGROUND_BLUE | BACKGROUND_GREEN | BACKGROUND_RED
     };
-    const REVERSE_INTENSE: Attr = unsafe {
-        Attr::from_bits_unchecked(Attr::INTENSE.bits() | Attr::REVERSE.bits())
-    };
-    let attr = match attr {
-        Attr::INTENSE => FOREGROUND_INTENSITY,
-        REVERSE_INTENSE => BACKGROUND_INTENSITY,
-        _ => 0
-    };
-    fg | bg | attr
+    fg | bg
 }
 
 impl base_Screen for Screen {
@@ -431,9 +429,8 @@ impl base_Screen for Screen {
     fn out(
         &mut self,
         p: Point,
-        fg: Color,
-        bg: Option<Color>,
-        attr: Attr,
+        fg: Fg,
+        bg: Bg,
         text: &str,
         hard: Range<i16>,
         soft: Range<i16>
@@ -448,7 +445,7 @@ impl base_Screen for Screen {
         let wctmb_flags = self.wctmb_flags;
         let line = (p.y as u16 as usize) * (size.x as u16 as usize);
         let line = &mut self.buf[line .. line + size.x as u16 as usize];
-        let attr = attr_w(fg, bg, attr);
+        let attr = attr_w(fg, bg);
         let mut x0 = None;
         let mut x = p.x;
         let mut n = 0i16;
