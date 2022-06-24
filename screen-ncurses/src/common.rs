@@ -23,11 +23,11 @@ fn color_index(c: Color) -> i16 {
         Color::Black => COLOR_BLACK,
         Color::Red => COLOR_RED,
         Color::Green => COLOR_GREEN,
-        Color::Yellow => COLOR_YELLOW,
+        Color::Brown => COLOR_YELLOW,
         Color::Blue => COLOR_BLUE,
         Color::Magenta => COLOR_MAGENTA,
         Color::Cyan => COLOR_CYAN,
-        Color::White => COLOR_WHITE,
+        Color::LightGray => COLOR_WHITE,
     }
 }
 

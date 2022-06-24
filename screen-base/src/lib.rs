@@ -42,11 +42,11 @@ macro_attr! {
         Black,
         Red,
         Green,
-        Yellow,
+        Brown,
         Blue,
         Magenta,
         Cyan,
-        White
+        LightGray
     }
 }
 

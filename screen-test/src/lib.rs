@@ -38,8 +38,8 @@ impl Screen {
     pub fn cursor(&self) -> Option<Point> { self.cursor }
 
     fn resize(&mut self, out_size: Vector) {
-        self.buf.resize(out_size.rect_area() as usize, (' ', Color::White, None, Attr::empty()));
-        self.out.resize(out_size.rect_area() as usize, (' ', Color::White, None, Attr::empty()));
+        self.buf.resize(out_size.rect_area() as usize, (' ', Color::LightGray, None, Attr::empty()));
+        self.out.resize(out_size.rect_area() as usize, (' ', Color::LightGray, None, Attr::empty()));
         self.size = out_size;
         self.invalidated = Rect { tl: Point { x: 0, y: 0 }, size: self.size };
     }
