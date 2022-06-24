@@ -71,6 +71,42 @@ macro_attr! {
     }
 }
 
+impl TryFrom<Bg> for Fg {
+    type Error = ();
+
+    fn try_from(bg: Bg) -> Result<Fg, ()> {
+        match bg {
+            Bg::None => Err(()),
+            Bg::Black => Ok(Fg::Black),
+            Bg::Red => Ok(Fg::Red),
+            Bg::Green => Ok(Fg::Green),
+            Bg::Brown => Ok(Fg::Brown),
+            Bg::Blue => Ok(Fg::Blue),
+            Bg::Magenta => Ok(Fg::Magenta),
+            Bg::Cyan => Ok(Fg::Cyan),
+            Bg::LightGray => Ok(Fg::LightGray),
+        }
+    }
+}
+
+impl TryFrom<Fg> for Bg {
+    type Error = ();
+
+    fn try_from(fg: Fg) -> Result<Bg, ()> {
+        match fg {
+            Fg::Black => Ok(Bg::Black),
+            Fg::Red => Ok(Bg::Red),
+            Fg::Green => Ok(Bg::Green),
+            Fg::Brown => Ok(Bg::Brown),
+            Fg::Blue => Ok(Bg::Blue),
+            Fg::Magenta => Ok(Bg::Magenta),
+            Fg::Cyan => Ok(Bg::Cyan),
+            Fg::LightGray => Ok(Bg::LightGray),
+            _ => Err(()),
+        }
+    }
+}
+
 #[derive(Eq, PartialEq, Debug, Hash, Clone, Copy, Ord, PartialOrd)]
 pub enum Ctrl {
     At, A, B, C, D, E, F, G, J, K, L, N,
