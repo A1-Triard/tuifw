@@ -3,38 +3,38 @@
 #![deny(warnings)]
 
 use std::cmp::{min, max};
-use tuifw_screen::{Screen, Point, Color, Attr, Vector, Event, Key};
+use tuifw_screen::{Bg, Fg, Screen, Point, Vector, Event, Key};
 
 fn draw_box(screen: &mut dyn Screen, p: &mut Point) {
     if screen.size().y < 9 { return; }
     p.y = min(max(p.y, 4), screen.size().y - 5);
     if p.y < 0 { return; }
     let w = 0 .. screen.size().x;
-    screen.out(p.offset(Vector { x: -6, y: -4 }), Color::Green, None, Attr::empty(),
+    screen.out(p.offset(Vector { x: -6, y: -4 }), Fg::Green, Bg::None,
         "             ", w.clone(), w.clone()
     );
-    screen.out(p.offset(Vector { x: -7, y: -3 }), Color::Green, None, Attr::empty(),
+    screen.out(p.offset(Vector { x: -7, y: -3 }), Fg::Green, Bg::None,
         " ╔═══════════╗ ", w.clone(), w.clone()
     );
-    screen.out(p.offset(Vector { x: -7, y: -2 }), Color::Green, None, Attr::empty(),
+    screen.out(p.offset(Vector { x: -7, y: -2 }), Fg::Green, Bg::None,
         " ║     ↑     ║ ", w.clone(), w.clone()
     );
-    screen.out(p.offset(Vector { x: -7, y: -1 }), Color::Green, None, Attr::empty(),
+    screen.out(p.offset(Vector { x: -7, y: -1 }), Fg::Green, Bg::None,
         " ║     k     ║ ", w.clone(), w.clone()
     );
-    screen.out(p.offset(Vector { x: -7, y: 0 }), Color::Green, None, Attr::empty(),
+    screen.out(p.offset(Vector { x: -7, y: 0 }), Fg::Green, Bg::None,
         " ║ ←h     l→ ║ ", w.clone(), w.clone()
     );
-    screen.out(p.offset(Vector { x: -7, y: 1 }), Color::Green, None, Attr::empty(),
+    screen.out(p.offset(Vector { x: -7, y: 1 }), Fg::Green, Bg::None,
         " ║     j     ║ ", w.clone(), w.clone()
     );
-    screen.out(p.offset(Vector { x: -7, y: 2 }), Color::Green, None, Attr::empty(),
+    screen.out(p.offset(Vector { x: -7, y: 2 }), Fg::Green, Bg::None,
         " ║     ↓     ║ ", w.clone(), w.clone()
     );
-    screen.out(p.offset(Vector { x: -7, y: 3 }), Color::Green, None, Attr::empty(),
+    screen.out(p.offset(Vector { x: -7, y: 3 }), Fg::Green, Bg::None,
         " ╚═══════════╝ ", w.clone(), w.clone()
     );
-    screen.out(p.offset(Vector { x: -6, y: 4 }), Color::Green, None, Attr::empty(),
+    screen.out(p.offset(Vector { x: -6, y: 4 }), Fg::Green, Bg::None,
         "             ", w.clone(), w.clone()
     );
 }

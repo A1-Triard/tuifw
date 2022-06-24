@@ -2,25 +2,25 @@
 
 #![deny(warnings)]
 
-use tuifw_screen::{Attr, Color, Event, HAlign, Key, Point, Rect, Thickness, VAlign, Vector};
+use tuifw_screen::{Bg, Event, Fg, HAlign, Key, Point, Rect, Thickness, VAlign, Vector};
 use tuifw_window::{RenderPort, Window, WindowTree};
 
 fn draw(
     _tree: &WindowTree<()>,
     window: Option<Window>,
-    port: &mut RenderPort,
+    rp: &mut RenderPort,
     _state: &mut ()
 ) {
     if window.is_none() {
-        port.fill(|port, p| port.out(p, Color::Black, None, Attr::empty(), " "));
+        rp.fill(|rp, p| rp.out(p, Fg::Black, Bg::None, " "));
     } else {
-        port.out(Point { x: 0, y: 0 }, Color::Green, None, Attr::empty(), "╔═══════════╗");
-        port.out(Point { x: 0, y: 1 }, Color::Green, None, Attr::empty(), "║     ↑     ║");
-        port.out(Point { x: 0, y: 2 }, Color::Green, None, Attr::empty(), "║     k     ║");
-        port.out(Point { x: 0, y: 3 }, Color::Green, None, Attr::empty(), "║ ←h     l→ ║");
-        port.out(Point { x: 0, y: 4 }, Color::Green, None, Attr::empty(), "║     j     ║");
-        port.out(Point { x: 0, y: 5 }, Color::Green, None, Attr::empty(), "║     ↓     ║");
-        port.out(Point { x: 0, y: 6 }, Color::Green, None, Attr::empty(), "╚═══════════╝");
+        rp.out(Point { x: 0, y: 0 }, Fg::Green, Bg::None, "╔═══════════╗");
+        rp.out(Point { x: 0, y: 1 }, Fg::Green, Bg::None, "║     ↑     ║");
+        rp.out(Point { x: 0, y: 2 }, Fg::Green, Bg::None, "║     k     ║");
+        rp.out(Point { x: 0, y: 3 }, Fg::Green, Bg::None, "║ ←h     l→ ║");
+        rp.out(Point { x: 0, y: 4 }, Fg::Green, Bg::None, "║     j     ║");
+        rp.out(Point { x: 0, y: 5 }, Fg::Green, Bg::None, "║     ↓     ║");
+        rp.out(Point { x: 0, y: 6 }, Fg::Green, Bg::None, "╚═══════════╝");
     }
 }
 

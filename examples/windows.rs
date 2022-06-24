@@ -3,7 +3,7 @@
 
 use core::cmp::min;
 use core::mem::replace;
-use tuifw_screen::{HAlign, VAlign, Attr, Color};
+use tuifw_screen::{HAlign, VAlign, Bg, Fg};
 use tuifw_screen::{Event, Key, Point, Range1d, Rect, Thickness, Vector};
 use tuifw_window::*;
 use unicode_width::UnicodeWidthStr;
@@ -18,7 +18,7 @@ struct State {
 fn render(
     tree: &WindowTree<State>,
     window: Option<Window>,
-    port: &mut RenderPort,
+    rp: &mut RenderPort,
     state: &mut State,
 ) {
     if let Some(window) = window {
@@ -34,25 +34,25 @@ fn render(
             unreachable!()
         };
         let focused = state.focused == window;
-        port.fill(|port, p| port.out(p, Color::White, Some(Color::Blue), Attr::empty(), " "));
+        rp.fill(|rp, p| rp.out(p, Fg::White, Bg::Blue, " "));
         let (tl, t, tr, r, br, b, bl, l) = if focused {
             ("╔", "═", "╗", "║", "╝", "═", "╚", "║")
         } else {
             ("┌", "─", "┐", "│", "┘", "─", "└", "│")
         };
-        port.out(bounds.tl, Color::White, Some(Color::Blue), Attr::empty(), tl);
-        port.out(bounds.tr_inner(), Color::White, Some(Color::Blue), Attr::empty(), tr);
-        port.out(bounds.br_inner(), Color::White, Some(Color::Blue), Attr::empty(), br);
-        port.out(bounds.bl_inner(), Color::White, Some(Color::Blue), Attr::empty(), bl);
+        rp.out(bounds.tl, Fg::White, Bg::Blue, tl);
+        rp.out(bounds.tr_inner(), Fg::White, Bg::Blue, tr);
+        rp.out(bounds.br_inner(), Fg::White, Bg::Blue, br);
+        rp.out(bounds.bl_inner(), Fg::White, Bg::Blue, bl);
         let border_thickness = Thickness::all(1);
         let content_bounds = border_thickness.shrink_rect(bounds);
         for x in Range1d::new(content_bounds.l(), content_bounds.r()) {
-            port.out(Point { x, y: bounds.t() }, Color::White, Some(Color::Blue), Attr::empty(), t);
-            port.out(Point { x, y: bounds.b_inner() }, Color::White, Some(Color::Blue), Attr::empty(), b);
+            rp.out(Point { x, y: bounds.t() }, Fg::White, Bg::Blue, t);
+            rp.out(Point { x, y: bounds.b_inner() }, Fg::White, Bg::Blue, b);
         }
         for y in Range1d::new(content_bounds.t(), content_bounds.b()) {
-            port.out(Point { x: bounds.l(), y }, Color::White, Some(Color::Blue), Attr::empty(), l);
-            port.out(Point { x: bounds.r_inner(), y }, Color::White, Some(Color::Blue), Attr::empty(), r);
+            rp.out(Point { x: bounds.l(), y }, Fg::White, Bg::Blue, l);
+            rp.out(Point { x: bounds.r_inner(), y }, Fg::White, Bg::Blue, r);
         }
         let title_tl = Thickness::align(
             Vector { x: 1, y: 1 },
@@ -60,7 +60,7 @@ fn render(
             HAlign::Center,
             VAlign::Top
         ).shrink_rect(bounds.t_line()).tl;
-        port.out(title_tl, Color::White, Some(Color::Blue), Attr::empty(), title);
+        rp.out(title_tl, Fg::White, Bg::Blue, title);
         let content_width = min(u16::MAX as usize, content.width()) as u16 as i16;
         let content_tl = Thickness::align(
             Vector { x: content_width, y: 1 },
@@ -68,9 +68,9 @@ fn render(
             HAlign::Center,
             VAlign::Center
         ).shrink_rect(content_bounds).tl;
-        port.out(content_tl, Color::White, Some(Color::Blue), Attr::empty(), content);
+        rp.out(content_tl, Fg::White, Bg::Blue, content);
     } else {
-        port.fill(|port, p| port.out(p, Color::White, None, Attr::empty(), " "));
+        rp.fill(|rp, p| rp.out(p, Fg::White, Bg::None, " "));
     }
 }
 
