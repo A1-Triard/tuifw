@@ -53,7 +53,7 @@ macro_attr! {
 bitflags_ext! {
     pub struct Attr: u8 {
         REVERSE = 1 << 0,
-        INTENSITY = 1 << 1,
+        INTENSE = 1 << 1,
     }
 }
 

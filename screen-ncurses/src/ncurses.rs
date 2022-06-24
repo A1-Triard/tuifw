@@ -111,10 +111,7 @@ extern "C" {
     #[must_use]
     pub fn wnoutrefresh(arg1: *mut WINDOW) -> c_int;
     #[must_use]
-    pub fn assume_default_colors(
-        arg1: c_int,
-        arg2: c_int,
-    ) -> c_int;
+    pub fn use_default_colors() -> c_int;
     pub fn set_escdelay(arg1: c_int) -> c_int;
     #[must_use]
     pub fn waddnwstr(

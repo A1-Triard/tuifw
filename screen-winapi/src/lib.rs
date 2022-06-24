@@ -414,10 +414,10 @@ fn attr_w(fg: Color, bg: Option<Color>, attr: Attr) -> WORD {
         Color::Cyan => BACKGROUND_BLUE | BACKGROUND_GREEN,
         Color::White => BACKGROUND_BLUE | BACKGROUND_GREEN | BACKGROUND_RED
     };
-    const REVERSE_INTENSITY: Attr = unsafe { Attr::from_bits_unchecked(Attr::INTENSITY.bits() | Attr::REVERSE.bits()) };
+    const REVERSE_INTENSE: Attr = Attr::INTENSE | Attr::REVERSE;
     let attr = match attr {
-        Attr::INTENSITY => FOREGROUND_INTENSITY,
-        REVERSE_INTENSITY => BACKGROUND_INTENSITY,
+        Attr::INTENSE => FOREGROUND_INTENSITY,
+        REVERSE_INTENSE => BACKGROUND_INTENSITY,
         _ => 0
     };
     fg | bg | attr

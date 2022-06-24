@@ -43,13 +43,11 @@ pub unsafe fn init_settings() -> Result<(), Errno> {
 
 unsafe fn register_colors() -> Result<(), Errno> {
     non_err(start_color())?;
-    non_err(assume_default_colors(0, -1))?;
+    non_err(use_default_colors())?;
     for fg in Color::iter_variants().map(color_index) {
-        if fg != 0 {
-            non_err(init_pair(fg, fg, -1))?;
-        }
+        non_err(init_pair(1 + fg, fg, -1))?;
         for bg in Color::iter_variants().map(color_index) {
-            non_err(init_pair((1 + bg) * colors_count() + fg, fg, bg))?;
+            non_err(init_pair(1 + (1 + bg) * colors_count() + fg, fg, bg))?;
         }
     }
     Ok(())
@@ -58,12 +56,12 @@ unsafe fn register_colors() -> Result<(), Errno> {
 fn attr_value(a: Attr) -> chtype {
     let mut r = 0;
     if a.contains(Attr::REVERSE) { r |= A_REVERSE; }
-    if a.contains(Attr::INTENSITY) { r |= A_BOLD; }
+    if a.contains(Attr::INTENSE) { r |= A_BOLD; }
     r
 }
 
 pub unsafe fn attr_ch(fg: Color, bg: Option<Color>, attr: Attr) -> chtype {
-    let color = COLOR_PAIR((bg.map_or(0, |b| (color_index(b) + 1) * colors_count()) + color_index(fg)) as _);
+    let color = COLOR_PAIR((1 + bg.map_or(0, |b| (color_index(b) + 1) * colors_count()) + color_index(fg)) as _);
     attr_value(attr) | color as chtype
 }
 
