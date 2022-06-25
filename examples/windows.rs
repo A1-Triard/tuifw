@@ -98,36 +98,37 @@ fn main() {
     );
     let mut state = State { window_1, window_2, window_3, focused: window_1 };
     loop { 
-        let event = WindowTree::update(&mut windows, true, &mut state).unwrap().unwrap();
-        match event {
-            Event::Key(_, Key::Escape) => break,
-            Event::Key(_, Key::Char('1')) | Event::Key(_, Key::Alt('1')) =>
-                focus_window(&mut windows, window_1, &mut state),
-            Event::Key(_, Key::Char('2')) | Event::Key(_, Key::Alt('2')) =>
-                focus_window(&mut windows, window_2, &mut state),
-            Event::Key(_, Key::Char('3')) | Event::Key(_, Key::Alt('3')) =>
-                focus_window(&mut windows, window_3, &mut state),
-            Event::Key(n, Key::Left) | Event::Key(n, Key::Char('h')) => {
-                let offset = Vector { x: (n.get() as i16).wrapping_neg(), y: 0 };
-                let bounds = state.focused.bounds(&windows);
-                state.focused.move_xy(&mut windows, bounds.offset(offset));
-            },
-            Event::Key(n, Key::Right) | Event::Key(n, Key::Char('l')) => {
-                let offset = Vector { x: n.get() as i16, y: 0 };
-                let bounds = state.focused.bounds(&windows);
-                state.focused.move_xy(&mut windows, bounds.offset(offset));
-            },
-            Event::Key(n, Key::Up) | Event::Key(n, Key::Char('k')) => {
-                let offset = Vector { x: 0, y: (n.get() as i16).wrapping_neg() };
-                let bounds = state.focused.bounds(&windows);
-                state.focused.move_xy(&mut windows, bounds.offset(offset));
-            },
-            Event::Key(n, Key::Down) | Event::Key(n, Key::Char('j')) => {
-                let offset = Vector { x: 0, y: n.get() as i16 };
-                let bounds = state.focused.bounds(&windows);
-                state.focused.move_xy(&mut windows, bounds.offset(offset));
-            },
-            _ => { },
+        if let Some(event) = WindowTree::update(&mut windows, true, &mut state).unwrap() {
+            match event {
+                Event::Key(_, Key::Escape) => break,
+                Event::Key(_, Key::Char('1')) | Event::Key(_, Key::Alt('1')) =>
+                    focus_window(&mut windows, window_1, &mut state),
+                Event::Key(_, Key::Char('2')) | Event::Key(_, Key::Alt('2')) =>
+                    focus_window(&mut windows, window_2, &mut state),
+                Event::Key(_, Key::Char('3')) | Event::Key(_, Key::Alt('3')) =>
+                    focus_window(&mut windows, window_3, &mut state),
+                Event::Key(n, Key::Left) | Event::Key(n, Key::Char('h')) => {
+                    let offset = Vector { x: (n.get() as i16).wrapping_neg(), y: 0 };
+                    let bounds = state.focused.bounds(&windows);
+                    state.focused.move_xy(&mut windows, bounds.offset(offset));
+                },
+                Event::Key(n, Key::Right) | Event::Key(n, Key::Char('l')) => {
+                    let offset = Vector { x: n.get() as i16, y: 0 };
+                    let bounds = state.focused.bounds(&windows);
+                    state.focused.move_xy(&mut windows, bounds.offset(offset));
+                },
+                Event::Key(n, Key::Up) | Event::Key(n, Key::Char('k')) => {
+                    let offset = Vector { x: 0, y: (n.get() as i16).wrapping_neg() };
+                    let bounds = state.focused.bounds(&windows);
+                    state.focused.move_xy(&mut windows, bounds.offset(offset));
+                },
+                Event::Key(n, Key::Down) | Event::Key(n, Key::Char('j')) => {
+                    let offset = Vector { x: 0, y: n.get() as i16 };
+                    let bounds = state.focused.bounds(&windows);
+                    state.focused.move_xy(&mut windows, bounds.offset(offset));
+                },
+                _ => { },
+            }
         }
     }
 }
