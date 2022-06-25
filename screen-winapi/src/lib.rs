@@ -157,7 +157,7 @@ impl Screen {
             Attributes: 0,
             Char: CHAR_INFO_Char::default()
         };
-        *unsafe {space.Char.AsciiChar_mut() } = b' ' as CHAR;
+        *unsafe { space.Char.AsciiChar_mut() } = b' ' as CHAR;
         assert!(size_of::<usize>() >= 4);
         self.size = Vector { x: ci.dwSize.X, y: ci.dwSize.Y };
         self.buf.resize(self.size.rect_area() as usize, space);
@@ -169,9 +169,13 @@ impl Screen {
         let mut buf = [0u16; 2];
         let g = g.encode_utf16(&mut buf[..]);
         let len = g.len() as isize as _;
-        let n = non_zero(unsafe { WideCharToMultiByte(output_cp, wctmb_flags, g.as_ptr(), len, null_mut(), 0, null(), null_mut()) }).unwrap();
+        let n = non_zero(unsafe {
+            WideCharToMultiByte(output_cp, wctmb_flags, g.as_ptr(), len, null_mut(), 0, null(), null_mut())
+        }).unwrap();
         let mut buf: Vec<MaybeUninit<u8>> = vec![MaybeUninit::uninit(); n as c_uint as usize];
-        non_zero(unsafe { WideCharToMultiByte(output_cp, wctmb_flags, g.as_ptr(), len, buf.as_mut_ptr() as *mut _, n, null(), null_mut()) }).unwrap();
+        non_zero(unsafe {
+            WideCharToMultiByte(output_cp, wctmb_flags, g.as_ptr(), len, buf.as_mut_ptr() as *mut _, n, null(), null_mut())
+        }).unwrap();
         unsafe { 
             if IsDBCSLeadByteEx(output_cp, buf[0].assume_init()) != 0 {
                 Right((buf[0].assume_init(), buf[1].assume_init()))
