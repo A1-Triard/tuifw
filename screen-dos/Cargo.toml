@@ -1,0 +1,18 @@
+[package]
+edition = "2021"
+name = "tuifw-screen-dos"
+version = "0.14.1"
+authors = ["warlock <internalmike@gmail.com>"]
+description = "Text User Interface Framework. Basic text screen implementation for DOS platform."
+readme = "README.md"
+documentation = "https://docs.rs/tuifw-screen-dos/"
+keywords = ["tui", "dos", "screen", "dpmi", "b800h"]
+categories = ["command-line-interface"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/A1-Triard/tuifw"
+
+[dependencies]
+tuifw-screen-base = { path = "../screen-base", version = "0.14.1" }
+
+[badges]
+maintenance = { status = "experimental" }
