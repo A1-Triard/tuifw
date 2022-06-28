@@ -158,17 +158,24 @@ fn encode_char(cd: iconv_t, c: char) -> u8 {
     let mut encoded = 0u8;
     let mut encoded_ptr = (&mut encoded) as *mut _ as *mut c_char;
     let mut encoded_len: size_t = 1;
-    let invalid = unsafe { iconv(
+    unsafe { iconv(
         cd,
         (&mut c_ptr) as *mut _,
         (&mut c_len) as *mut _,
         (&mut encoded_ptr) as *mut _,
         (&mut encoded_len) as *mut _
     ) };
-    assert!(invalid == 0 || invalid == 1);
-    assert_eq!(c_len, 0);
-    assert_eq!(encoded_len, 0);
-    if encoded < 32 || encoded == 127 { b' ' } else { encoded }
+    if
+        encoded_len == 0 &&
+        encoded != b'\t' &&
+        encoded != b'\r' &&
+        encoded != b'\n' &&
+        encoded != 127
+    {
+        encoded
+    } else {
+        0
+    }
 }
 
 fn decode_char(dc: iconv_t, c: u8) -> char {
