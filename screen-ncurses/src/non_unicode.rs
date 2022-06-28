@@ -150,7 +150,42 @@ impl Drop for Screen {
     }
 }
 
-fn encode_char(cd: iconv_t, c: char) -> u8 {
+fn encode_char(cd: iconv_t, c: char) -> chtype {
+    match c {
+        '→' => return A_ALTCHARSET | 43,
+        '←' => return A_ALTCHARSET | 44,
+        '↑' => return A_ALTCHARSET | 45,
+        '↓' => return A_ALTCHARSET | 46,
+        '█' => return A_ALTCHARSET | 48,
+        '♦' => return A_ALTCHARSET | 96,
+        '▒' => return A_ALTCHARSET | 97,
+        '°' => return A_ALTCHARSET | 102,
+        '±' => return A_ALTCHARSET | 103,
+        '░' => return A_ALTCHARSET | 104,
+        '␋' => return A_ALTCHARSET | 105,
+        '┘' => return A_ALTCHARSET | 106,
+        '┐' => return A_ALTCHARSET | 107,
+        '┌' => return A_ALTCHARSET | 108,
+        '└' => return A_ALTCHARSET | 109,
+        '┼' => return A_ALTCHARSET | 110,
+        '⎺' => return A_ALTCHARSET | 111,
+        '⎻' => return A_ALTCHARSET | 112,
+        '─' => return A_ALTCHARSET | 113,
+        '⎼' => return A_ALTCHARSET | 114,
+        '⎽' => return A_ALTCHARSET | 115,
+        '├' => return A_ALTCHARSET | 116,
+        '┤' => return A_ALTCHARSET | 117,
+        '┴' => return A_ALTCHARSET | 118,
+        '┬' => return A_ALTCHARSET | 119,
+        '│' => return A_ALTCHARSET | 120,
+        '≤' => return A_ALTCHARSET | 121,
+        '≥' => return A_ALTCHARSET | 122,
+        'π' => return A_ALTCHARSET | 123,
+        '≠' => return A_ALTCHARSET | 124,
+        '£' => return A_ALTCHARSET | 125,
+        '·' => return A_ALTCHARSET | 126,
+        _ => { },
+    }
     let mut buf = [0; 4];
     let c = c.encode_utf8(&mut buf);
     let mut c_len = c.len() as size_t;
@@ -165,16 +200,10 @@ fn encode_char(cd: iconv_t, c: char) -> u8 {
         (&mut encoded_ptr) as *mut _,
         (&mut encoded_len) as *mut _
     ) };
-    if
-        encoded_len == 0 &&
-        encoded != b'\t' &&
-        encoded != b'\r' &&
-        encoded != b'\n' &&
-        encoded != 127
-    {
-        encoded
+    if encoded_len == 0 && encoded != 127 && encoded >= 32 {
+        encoded as chtype
     } else {
-        0
+        A_ALTCHARSET | 96
     }
 }
 
@@ -244,7 +273,7 @@ impl base_Screen for Screen {
                 true
             };
             if visible_1 && visible_2 {
-                line.cols[x as u16 as usize] = c as chtype | attr;
+                line.cols[x as u16 as usize] = c | attr;
             }
             x += 1;
         }

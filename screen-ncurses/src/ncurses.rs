@@ -19,6 +19,7 @@ pub const ERR: c_int = -1;
 
 pub const A_NORMAL: chtype = 0;
 pub const A_BOLD: chtype = 1 << 21;
+pub const A_ALTCHARSET: chtype = 1 << 22;
 
 pub const WA_NORMAL: attr_t = A_NORMAL;
 
