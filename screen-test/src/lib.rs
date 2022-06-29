@@ -10,7 +10,6 @@ extern crate alloc;
 use alloc::vec::Vec;
 use core::cmp::{min, max};
 use core::ops::Range;
-use errno_no_std::Errno;
 use tuifw_screen_base::*;
 use tuifw_screen_base::Screen as base_Screen;
 
@@ -96,7 +95,7 @@ impl base_Screen for Screen {
         x0 .. x
     }
 
-    fn update(&mut self, cursor: Option<Point>, _wait: bool) -> Result<Option<Event>, Errno> {
+    fn update(&mut self, cursor: Option<Point>, _wait: bool) -> Result<Option<Event>, Error> {
         for y in self.invalidated.t() .. self.invalidated.b() {
             let line = (y as u16 as usize) * (self.size.x as u16 as usize);
             let s = line + self.invalidated.l() as u16 as usize;

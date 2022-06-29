@@ -1,3 +1,4 @@
+#![feature(generic_arg_infer)]
 #![feature(iter_advance_by)]
 #![feature(stmt_expr_attributes)]
 #![feature(trusted_len)]
@@ -14,6 +15,7 @@
 
 #![no_std]
 
+use core::fmt::{self, Display, Formatter};
 use core::num::NonZeroU16;
 use core::ops::Range;
 use core::option::{Option};
@@ -155,6 +157,34 @@ pub enum Event {
     Key(NonZeroU16, Key),
 }
 
+#[derive(Debug, Clone)]
+pub struct Error {
+    pub errno: Errno,
+    pub msg: &'static str,
+}
+
+impl From<Errno> for Error {
+    fn from(errno: Errno) -> Error {
+        Error { errno, msg: "" }
+    }
+}
+
+impl From<Error> for Errno {
+    fn from(e: Error) -> Errno {
+        e.errno
+    }
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        if self.msg.is_empty() {
+            write!(f, "{}", self.errno)
+        } else {
+            write!(f, "{} ({})", self.msg, self.errno)
+        }
+    }
+}
+
 pub trait Screen {
     fn size(&self) -> Vector;
 
@@ -168,5 +198,5 @@ pub trait Screen {
         soft: Range<i16>,
     ) -> Range<i16>;
 
-    fn update(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Errno>;
+    fn update(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Error>;
 }

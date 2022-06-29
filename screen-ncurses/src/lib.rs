@@ -24,9 +24,8 @@ mod non_unicode;
 mod unicode;
 
 use alloc::boxed::Box;
-use errno_no_std::Errno;
 use libc::{CODESET, setlocale, strcmp, nl_langinfo, LC_ALL};
-use tuifw_screen_base::{Screen};
+use tuifw_screen_base::{Error, Screen};
 
 /// # Safety
 ///
@@ -36,7 +35,7 @@ use tuifw_screen_base::{Screen};
 ///
 /// It is impossible to garantee this conditions on a library level.
 /// So this unsafity should be propagated through all wrappers to the final application.
-pub unsafe fn init() -> Result<Box<dyn Screen>, Errno> {
+pub unsafe fn init() -> Result<Box<dyn Screen>, Error> {
     setlocale(LC_ALL, "\0".as_ptr() as _);
     let unicode = strcmp(nl_langinfo(CODESET), b"UTF-8\0".as_ptr() as _) == 0;
     let screen = if unicode {

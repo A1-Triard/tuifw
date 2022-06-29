@@ -288,7 +288,7 @@ impl base_Screen for Screen {
         }
     }
 
-    fn update(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Errno> {
-        self.update_raw(cursor, wait)
+    fn update(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Error> {
+        Ok(self.update_raw(cursor, wait)?)
     }
 }
