@@ -67,7 +67,7 @@ pub struct Screen {
 }
 
 impl Screen {
-    pub fn new() -> Result<Self, Errno> {
+    pub fn new() -> Result<Self, Error> {
         unsafe { FreeConsole() };
         non_zero(unsafe { AllocConsole() })?;
         let window = unsafe { GetConsoleWindow() };
@@ -518,7 +518,7 @@ impl base_Screen for Screen {
         }
     }
 
-    fn update(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Errno> {
-        self.update_raw(cursor, wait)
+    fn update(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Error> {
+        Ok(self.update_raw(cursor, wait)?)
     }
 }
