@@ -100,7 +100,7 @@ impl base_Screen for Screen {
             let line = (y as u16 as usize) * (self.size.x as u16 as usize);
             let s = line + self.invalidated.l() as u16 as usize;
             let f = line + self.invalidated.r() as u16 as usize;
-            (&mut self.out[s .. f]).copy_from_slice(&self.buf[s .. f]);
+            self.out[s .. f].copy_from_slice(&self.buf[s .. f]);
         }
         self.invalidated.size = Vector::null();
         self.cursor = cursor.and_then(|cursor| {
