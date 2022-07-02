@@ -13,6 +13,6 @@ panic = "abort"
 [dependencies]
 composable-allocators = "0.1.1"
 exit-no-std = "0.1.0"
-panicking = { version = "0.3.1", default-features = false, features = ["abort"] }
+panicking = { version = "0.4.0", default-features = false, features = ["abort"] }
 tuifw-screen = { path = "../screen" }
 tuifw-window = { path = ".." }
