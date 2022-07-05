@@ -15,10 +15,13 @@ repository = "https://github.com/A1-Triard/tuifw"
 errno-no-std = { version = "0.1.5", default-features = false }
 tuifw-screen-base = { path = "../screen-base", version = "0.16.0" }
 
-[target.'cfg(not(windows))'.dependencies]
+[target.'cfg(dos)'.dependencies]
+tuifw-screen-dos = { path = "../screen-dos", version = "0.16.0" }
+
+[target.'cfg(all(not(dos), not(windows)))'.dependencies]
 tuifw-screen-ncurses = { path = "../screen-ncurses", version = "0.16.0" }
 
-[target.'cfg(windows)'.dependencies]
+[target.'cfg(all(not(dos), windows))'.dependencies]
 tuifw-screen-winapi = { path = "../screen-winapi", version = "0.16.0" }
 
 [dev-dependencies]

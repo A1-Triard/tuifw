@@ -227,7 +227,7 @@ impl base_Screen for Screen {
         x0 .. x
     }
 
-    fn update(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Error> {
+    fn update(&mut self, _cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Error> {
         let video_ptr = (0xB800usize << 4) as *mut u16;
         for i in 0 .. 80 * 25 {
             unsafe {
