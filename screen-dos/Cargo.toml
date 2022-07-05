@@ -12,6 +12,10 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/A1-Triard/tuifw"
 
 [dependencies]
+dos-cp = "0.0.2"
+errno-no-std = { version = "0.1.5", default-features = false }
+panicking = { version = "0.4.0", default-features = false }
+pc-ints = "0.0.1"
 tuifw-screen-base = { path = "../screen-base", version = "0.16.0" }
 
 [badges]

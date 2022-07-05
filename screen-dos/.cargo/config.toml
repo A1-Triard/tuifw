@@ -1,0 +1,2 @@
+[build]
+target = "i586-pc-windows-msvc"
