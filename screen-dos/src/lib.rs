@@ -2,6 +2,7 @@
 #![doc(test(attr(deny(warnings))))]
 #![doc(test(attr(allow(dead_code))))]
 #![doc(test(attr(allow(unused_variables))))]
+#![allow(clippy::collapsible_else_if)]
 #![allow(clippy::collapsible_if)]
 #![allow(clippy::many_single_char_names)]
 
@@ -65,7 +66,7 @@ fn load_code_page() -> Result<&'static CodePage, Error> {
         });
     }
     let mut code_page: [MaybeUninit<u8>; 13] = unsafe { MaybeUninit::uninit().assume_init() };
-    (&mut code_page[.. 9]).copy_from_slice(unsafe { transmute(&b"CODEPAGE\\"[..]) });
+    code_page[.. 9].copy_from_slice(unsafe { transmute(&b"CODEPAGE\\"[..]) });
     code_page[9].write(b'0' + (code_page_n / 100) as u8);
     code_page[10].write(b'0' + ((code_page_n % 100) / 10) as u8);
     code_page[11].write(b'0' + (code_page_n % 10) as u8);
@@ -139,6 +140,7 @@ impl Screen {
 }
 
 impl Drop for Screen {
+    #[allow(clippy::panicking_unwrap)]
     fn drop(&mut self) {
         let e = int_10h_ah_00h_set_video_mode(self.original_mode).map_err(|_| Error {
             errno: Errno(DOS_ERR_NET_REQUEST_NOT_SUPPORTED.into()),
@@ -257,7 +259,7 @@ impl base_Screen for Screen {
             } else {
                 key(
                     int_21h_ah_06h_dl_FFh_inkey()
-                        .ok_or(Errno(DOS_ERR_READ_FAULT.into()))?
+                        .ok_or_else(|| Errno(DOS_ERR_READ_FAULT.into()))?
                         .al_char
                 )
             }.map(|x| Ok(Event::Key(unsafe { NonZeroU16::new_unchecked(1) }, x))).transpose()
