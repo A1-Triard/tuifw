@@ -13,39 +13,30 @@ pub use tuifw_screen_base::*;
 
 /// # Safety
 ///
-/// This function initializes ncurses lib. It is safe iff no other code in application calls ncurses functions
+/// This function may initialize ncurses lib. It is safe iff no other code in application calls ncurses functions
 /// while `Screen` instance is alive. This rule also applies to another `Screen` instance:
 /// it is not safe to call `init` again until `Screen` created by previous call is dropped.
 ///
+/// Also, iff compiled with `cfg(dos)` this method may not be invoked until it is guaranteed the memory addresses
+/// in `0xB8000 .. 0xBBE80` are not used by Rust abstract machine.
+///
 /// It is impossible to garantee this conditions on a library level.
 /// So this unsafity should be propagated through all wrappers to the final application.
-#[cfg(dos)]
 pub unsafe fn init() -> Result<Box<dyn Screen>, Error> {
+    init_raw()
+}
+
+#[cfg(dos)]
+unsafe fn init_raw() -> Result<Box<dyn Screen>, Error> {
     Ok(Box::new(tuifw_screen_dos::Screen::new()?) as _)
 }
 
-/// # Safety
-///
-/// This function initializes ncurses lib. It is safe iff no other code in application calls ncurses functions
-/// while `Screen` instance is alive. This rule also applies to another `Screen` instance:
-/// it is not safe to call `init` again until `Screen` created by previous call is dropped.
-///
-/// It is impossible to garantee this conditions on a library level.
-/// So this unsafity should be propagated through all wrappers to the final application.
 #[cfg(all(not(dos), windows))]
-pub unsafe fn init() -> Result<Box<dyn Screen>, Error> {
+unsafe fn init_raw() -> Result<Box<dyn Screen>, Error> {
     Ok(Box::new(tuifw_screen_winapi::Screen::new()?) as _)
 }
 
-/// # Safety
-///
-/// This function initializes ncurses lib. It is safe iff no other code in application calls ncurses functions
-/// while `Screen` instance is alive. This rule also applies to another `Screen` instance:
-/// it is not safe to call `init` again until `Screen` created by previous call is dropped.
-///
-/// It is impossible to garantee this conditions on a library level.
-/// So this unsafity should be propagated through all wrappers to the final application.
 #[cfg(all(not(dos), not(windows)))]
-pub unsafe fn init() -> Result<Box<dyn Screen>, Error> {
+unsafe fn init_raw() -> Result<Box<dyn Screen>, Error> {
     tuifw_screen_ncurses::init()
 }

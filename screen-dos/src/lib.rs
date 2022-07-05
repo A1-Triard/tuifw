@@ -116,6 +116,13 @@ fn load_code_page() -> Result<&'static CodePage, Error> {
 }
 
 impl Screen {
+    /// # Safety
+    ///
+    /// This method may be invoked iff it is guaranteed the memory addresses
+    /// in `0xB8000 .. 0xBBE80` are not used by Rust abstract machine.
+    ///
+    /// It is impossible to garantee this conditions on a library level.
+    /// So this unsafity should be propagated through all wrappers to the final application.
     pub unsafe fn new() -> Result<Self, Error> {
         assert_dos_3_3()?;
         let code_page = load_code_page()?;
