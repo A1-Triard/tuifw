@@ -1,7 +1,8 @@
 [package]
 edition = "2021"
 name = "tuifw-screen-dos"
-version = "0.16.3"
+version = "0.17.0"
+#rust-version = "nightly"
 authors = ["warlock <internalmike@gmail.com>"]
 description = "Text User Interface Framework. Basic text screen implementation for DOS platform."
 readme = "README.md"
@@ -12,11 +13,11 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/A1-Triard/tuifw"
 
 [dependencies]
-dos-cp = "0.0.2"
+dos-cp = "0.0.3"
 errno-no-std = { version = "0.1.5", default-features = false }
 panicking = { version = "0.4.0", default-features = false }
-pc-ints = "0.1.0"
-tuifw-screen-base = { path = "../screen-base", version = "0.16.3" }
+pc-ints = "0.1.4"
+tuifw-screen-base = { path = "../screen-base", version = "0.17.0" }
 
 [badges]
 maintenance = { status = "experimental" }

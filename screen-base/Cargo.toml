@@ -1,7 +1,8 @@
 [package]
 edition = "2021"
 name = "tuifw-screen-base"
-version = "0.16.3"
+version = "0.17.0"
+#rust-version = "nightly"
 authors = ["warlock <internalmike@gmail.com>"]
 description = "Text User Interface Framework. Basic platform-independent text screen interface."
 readme = "README.md"
