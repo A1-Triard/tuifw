@@ -35,7 +35,7 @@ impl Screen {
     pub unsafe fn new() -> Result<Self, Errno> {
         if non_null(initscr()).is_err() { return Err(Errno(EINVAL)); }
         let mut s = Screen {
-            lines: Vec::with_capacity(max(0, min(LINES, i16::MAX as _)) as i16 as u16 as usize),
+            lines: Vec::with_capacity(LINES.clamp(0, i16::MAX.into()) as i16 as u16 as usize),
             cd: ICONV_ERR,
             dc: ICONV_ERR
         };
@@ -228,8 +228,8 @@ fn decode_char(dc: iconv_t, c: u8) -> char {
 impl base_Screen for Screen {
     fn size(&self) -> Vector {
         Vector {
-            x: max(0, min(unsafe { COLS }, i16::MAX as _)) as i16,
-            y: max(0, min(unsafe { LINES }, i16::MAX as _)) as i16
+            x: (unsafe { COLS }).clamp(0, i16::MAX.into()) as i16,
+            y: (unsafe { LINES }).clamp(0, i16::MAX.into()) as i16
         }
     }
 
