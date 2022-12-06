@@ -29,7 +29,7 @@ fn generate_curses_types_rs(lib: &Library) {
 
     {
         let c_file_display = c_file.display();
-        let mut c_file = File::create(&c_file).unwrap_or_else(|_| panic!("cannot create {}", c_file_display));
+        let mut c_file = File::create(&c_file).unwrap_or_else(|_| panic!("cannot create {c_file_display}"));
         c_file.write_all(br##"
 #include <stdio.h>
 #include <stdalign.h>
@@ -45,7 +45,7 @@ int main() {
     printf("pub const CCHARW_MAX: usize = %d;\n", CCHARW_MAX);
     return 0;
 }
-"##).unwrap_or_else(|_| panic!("cannot write {}", c_file_display));
+"##).unwrap_or_else(|_| panic!("cannot write {c_file_display}"));
     }
 
     let mut build = cc::Build::new();
