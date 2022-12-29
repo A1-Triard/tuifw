@@ -42,3 +42,4 @@ jobs:
     - run: "cargo clippy --verbose --workspace"
     - run: "cargo +nightly build --verbose -Z build-std=core,alloc,panic_abort --target ${{ matrix.triple }} --release"
       working-directory: ensure_no_std
+    - run: "./ensure_no_std/target/${{ matrix.triple }}/release/ensure_no_std"
