@@ -15,7 +15,10 @@
 
 #![no_std]
 
-use core::fmt::{self, Display, Formatter};
+extern crate alloc;
+
+use alloc::boxed::Box;
+use core::fmt::{self, Debug, Display, Formatter};
 use core::num::NonZeroU16;
 use core::ops::Range;
 use core::option::{Option};
@@ -157,15 +160,14 @@ pub enum Event {
     Key(NonZeroU16, Key),
 }
 
-#[derive(Debug, Clone)]
 pub struct Error {
     pub errno: Errno,
-    pub msg: &'static str,
+    pub msg: Option<Box<dyn Display>>,
 }
 
 impl From<Errno> for Error {
     fn from(errno: Errno) -> Error {
-        Error { errno, msg: "" }
+        Error { errno, msg: None }
     }
 }
 
@@ -177,11 +179,17 @@ impl From<Error> for Errno {
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        if self.msg.is_empty() {
-            write!(f, "{}", self.errno)
+        if let Some(msg) = self.msg.as_deref() {
+            write!(f, "{} ({})", msg, self.errno)
         } else {
-            write!(f, "{} ({})", self.msg, self.errno)
+            write!(f, "{}", self.errno)
         }
+    }
+}
+
+impl Debug for Error {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        Display::fmt(self, f)
     }
 }
 
