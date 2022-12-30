@@ -128,10 +128,12 @@ impl Screen {
         assert_dos_3_3()?;
         let code_page = load_code_page()?;
         let original_mode = int_10h_ah_0Fh_video_mode().al_mode;
-        int_10h_ah_00h_set_video_mode(0x03).map_err(|_| Error {
-            errno: Errno(DOS_ERR_NET_REQUEST_NOT_SUPPORTED.into()),
-            msg: "cannot switch video mode"
-        })?;
+        if original_mode != 0x03 {
+            int_10h_ah_00h_set_video_mode(0x03).map_err(|_| Error {
+                errno: Errno(DOS_ERR_NET_REQUEST_NOT_SUPPORTED.into()),
+                msg: "cannot switch video mode"
+            })?;
+        }
         Ok(Screen {
             code_page,
             original_mode,
@@ -142,11 +144,13 @@ impl Screen {
 impl Drop for Screen {
     #[allow(clippy::panicking_unwrap)]
     fn drop(&mut self) {
-        let e = int_10h_ah_00h_set_video_mode(self.original_mode).map_err(|_| Error {
-            errno: Errno(DOS_ERR_NET_REQUEST_NOT_SUPPORTED.into()),
-            msg: "cannot switch video mode back"
-        });
-        if e.is_err() && !panicking() { e.unwrap(); }
+        if self.original_mode != 0x03 {
+            let e = int_10h_ah_00h_set_video_mode(self.original_mode).map_err(|_| Error {
+                errno: Errno(DOS_ERR_NET_REQUEST_NOT_SUPPORTED.into()),
+                msg: "cannot switch video mode back"
+            });
+            if e.is_err() && !panicking() { e.unwrap(); }
+        }
     }
 }
 
