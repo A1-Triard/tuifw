@@ -16,6 +16,7 @@ use core::num::NonZeroU16;
 use core::ops::Range;
 use core::ptr::{self};
 use dos_cp::CodePage;
+use either::{Either, Left, Right};
 use errno_no_std::Errno;
 use panicking::panicking;
 use pc_ints::*;
@@ -99,10 +100,6 @@ fn attr(fg: Fg, bg: Bg) -> u8 {
     fg | bg
 }
 
-fn key(_ch: u8) -> Option<Key> {
-    None
-}
-
 impl base_Screen for Screen {
     fn size(&self) -> Vector { Vector { x: 80, y: 25 } }
 
@@ -161,27 +158,92 @@ impl base_Screen for Screen {
                 ptr::write_volatile(video_ptr.add(i), c);
             }
         }
-        let al_char = loop {
-            if let Some(AlChar { al_char }) = int_21h_ah_06h_dl_FFh_inkey() {
-                break Some(al_char)
+        loop {
+            if let Some(c) = self.code_page.inkey().map_err(|_| Error {
+                errno: Errno(DOS_ERR_READ_FAULT.into()),
+                msg: Some(Box::new("read key error"))
+            })? {
+                break Ok(dos_key(c).map(|c| Event::Key(NonZeroU16::new(1).unwrap(), c)));
             } else {
                 if !wait {
-                    break None;
+                    break Ok(None);
                 }
             }
-        };
-        if let Some(al_char) = al_char {
-            if al_char != 0 {
-                self.code_page.to_char(al_char).map(Key::Char)
-            } else {
-                key(
-                    int_21h_ah_06h_dl_FFh_inkey()
-                        .ok_or_else(|| Errno(DOS_ERR_READ_FAULT.into()))?
-                        .al_char
-                )
-            }.map(|x| Ok(Event::Key(unsafe { NonZeroU16::new_unchecked(1) }, x))).transpose()
-        } else {
-            Ok(None)
         }
     }
+}
+
+fn dos_ctrl(c: char) -> Option<Ctrl> {
+    match c {
+        '\x00' => Some(Ctrl::At),
+        '\x01' => Some(Ctrl::A),
+        '\x02' => Some(Ctrl::B),
+        '\x03' => Some(Ctrl::C),
+        '\x04' => Some(Ctrl::D),
+        '\x05' => Some(Ctrl::E),
+        '\x06' => Some(Ctrl::F),
+        '\x07' => Some(Ctrl::G),
+        '\x0a' => Some(Ctrl::J),
+        '\x0b' => Some(Ctrl::K),
+        '\x0c' => Some(Ctrl::L),
+        '\x0e' => Some(Ctrl::N),
+        '\x0f' => Some(Ctrl::O),
+        '\x10' => Some(Ctrl::P),
+        '\x11' => Some(Ctrl::Q),
+        '\x12' => Some(Ctrl::R),
+        '\x13' => Some(Ctrl::S),
+        '\x14' => Some(Ctrl::T),
+        '\x15' => Some(Ctrl::U),
+        '\x16' => Some(Ctrl::V),
+        '\x17' => Some(Ctrl::W),
+        '\x18' => Some(Ctrl::X),
+        '\x19' => Some(Ctrl::Y),
+        '\x1a' => Some(Ctrl::Z),
+        '\x1c' => Some(Ctrl::Backslash),
+        '\x1d' => Some(Ctrl::Bracket),
+        '\x1e' => Some(Ctrl::Caret),
+        '\x1f' => Some(Ctrl::Underscore),
+        _ => None
+    }
+}
+
+fn dos_key(c: Either<u8, char>) -> Option<Key> {
+    Some(match c {
+        Right(c) => {
+            if let Some(ctrl) = dos_ctrl(c) {
+                Key::Ctrl(ctrl)
+            } else {
+                match c {
+                    '\r' => Key::Enter,
+                    '\t' => Key::Tab,
+                    '\x1b' => Key::Escape,
+                    '\x08' => Key::Backspace,
+                    c => Key::Char(c)
+                }
+            }
+        },
+        Left(80) => Key::Down,
+        Left(72) => Key::Up,
+        Left(75) => Key::Left,
+        Left(77) => Key::Right,
+        Left(71) => Key::Home,
+        Left(79) => Key::End,
+        Left(83) => Key::Delete,
+        Left(82) => Key::Insert,
+        Left(81) => Key::PageDown,
+        Left(73) => Key::PageUp,
+        Left(59) => Key::F1,
+        Left(60) => Key::F2,
+        Left(61) => Key::F3,
+        Left(62) => Key::F4,
+        Left(63) => Key::F5,
+        Left(64) => Key::F6,
+        Left(65) => Key::F7,
+        Left(66) => Key::F8,
+        Left(67) => Key::F9,
+        Left(68) => Key::F10,
+        Left(133) => Key::F11,
+        Left(134) => Key::F12,
+        _ => return None,
+    })
 }
