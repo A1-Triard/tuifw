@@ -1,42 +1,34 @@
 [package]
 edition = "2021"
-name = "tuifw-window"
-version = "0.18.2"
+name = "tuifw"
+version = "0.1.0"
 #rust-version = "nightly"
 authors = ["warlock <internalmike@gmail.com>"]
-description = "Text User Interface Framework. Overlappable hierachical windows."
+description = "Text User Interface Framework."
 readme = "README.md"
-documentation = "https://docs.rs/tuifw-window/"
-keywords = ["tui", "window"]
+documentation = "https://docs.rs/tuifw/"
+keywords = ["tui"]
 categories = ["command-line-interface"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/A1-Triard/tuifw"
 
 [workspace]
 members = [
+    "screen",
     "screen-base",
     "screen-dos",
     "screen-ncurses",
-    "screen-winapi",
-    "screen",
     "screen-test",
+    "screen-winapi",
+    "window",
 ]
 exclude = [
     "ensure_no_std",
 ]
 
 [dependencies]
-components-arena = "3.4.0"
-educe = "0.4.18"
-errno-no-std = { version = "0.1.5", default-features = false }
-macro-attr-2018 = "2.1.0"
-tuifw-screen-base = { path = "screen-base", version = "0.18.1" }
-
-[dev-dependencies]
-panicking = "0.4.0"
-tuifw-screen-test = { path = "screen-test", version = "0.18.1" }
-tuifw-screen = { path = "screen", version = "0.18.1" }
-unicode-width = "0.1.9"
+tuifw-screen-base = { path = "screen-base", version = "0.18.2" }
+tuifw-window = { path = "window", version = "0.18.2" }
 
 [badges]
 maintenance = { status = "experimental" }
