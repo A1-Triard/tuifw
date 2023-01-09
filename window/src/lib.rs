@@ -190,6 +190,14 @@ impl Window {
         tree.arena[self.0].bounds
     }
 
+    pub fn inner_bounds<State: ?Sized>(
+        self,
+        tree: &WindowTree<State>
+    ) -> Rect {
+        let bounds = self.bounds(tree);
+        Rect { tl: Point { x: 0, y: 0 }, size: bounds.size }
+    }
+
     pub fn set_tag<Tag: ComponentId, State: ?Sized>(
         self,
         tree: &mut WindowTree<State>,
