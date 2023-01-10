@@ -1,11 +1,14 @@
-#![windows_subsystem = "windows"]
+#![feature(allocator_api)]
 
 #![deny(warnings)]
 
+#![windows_subsystem = "windows"]
+
+use std::alloc::Global;
 use std::cmp::{min, max};
 use tuifw_screen::{Bg, Fg, Screen, Point, Vector, Event, Key};
 
-fn draw_box(screen: &mut dyn Screen, p: &mut Point) {
+fn draw_box(screen: &mut Screen, p: &mut Point) {
     if screen.size().y < 9 { return; }
     p.y = min(max(p.y, 4), screen.size().y - 5);
     if p.y < 0 { return; }
@@ -40,7 +43,7 @@ fn draw_box(screen: &mut dyn Screen, p: &mut Point) {
 }
 
 fn main() {
-    let mut screen = unsafe { tuifw_screen::init() }.unwrap();
+    let mut screen = unsafe { tuifw_screen::init_in(Global) }.unwrap();
     let screen = screen.as_mut();
     let mut p = Point { x: screen.size().x / 2, y: screen.size().y / 2 };
     draw_box(screen, &mut p);

@@ -1,3 +1,5 @@
+#![feature(allocator_api)]
+
 #![deny(warnings)]
 #![doc(test(attr(deny(warnings))))]
 #![doc(test(attr(allow(dead_code))))]
@@ -8,24 +10,25 @@
 extern crate alloc;
 
 use alloc::vec::Vec;
+use core::alloc::Allocator;
 use core::cmp::{min, max};
 use core::ops::Range;
 use tuifw_screen_base::*;
 use tuifw_screen_base::Screen as base_Screen;
 
-pub struct Screen {
-    buf: Vec<(char, Fg, Bg)>,
-    out: Vec<(char, Fg, Bg)>,
+pub struct Screen<A: Allocator + Clone> {
+    buf: Vec<(char, Fg, Bg), A>,
+    out: Vec<(char, Fg, Bg), A>,
     size: Vector,
     invalidated: Rect,
     cursor: Option<Point>,
 }
 
-impl Screen {
-    pub fn new(size: Vector) -> Self {
+impl<A: Allocator + Clone> Screen<A> {
+    pub fn new_in(size: Vector, alloc: A) -> Self {
         let mut s = Screen {
-            buf: Vec::new(),
-            out: Vec::new(),
+            buf: Vec::new_in(alloc.clone()),
+            out: Vec::new_in(alloc),
             size: Vector::null(),
             invalidated: Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() },
             cursor: None,
@@ -44,7 +47,7 @@ impl Screen {
     }
 }
 
-impl base_Screen for Screen {
+impl<A: Allocator + Clone> base_Screen for Screen<A> {
     fn size(&self) -> Vector { self.size }
 
     fn out(

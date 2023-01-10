@@ -1,5 +1,7 @@
 #![cfg(windows)]
 
+#![feature(allocator_api)]
+
 #![deny(warnings)]
 #![doc(test(attr(deny(warnings))))]
 #![doc(test(attr(allow(dead_code))))]
@@ -11,8 +13,10 @@
 
 extern crate alloc;
 
+use alloc::alloc::Global;
 use alloc::vec;
 use alloc::vec::Vec;
+use core::alloc::Allocator;
 use core::char::{self};
 use core::cmp::min;
 use core::mem::{size_of, MaybeUninit};
@@ -56,18 +60,18 @@ fn valid_handle(h: HANDLE) -> Result<HANDLE, Errno> {
     }
 }
 
-pub struct Screen {
+pub struct Screen<A: Allocator = Global> {
     h_input: HANDLE,
     h_output: HANDLE,
     output_cp: UINT,
     wctmb_flags: DWORD,
-    buf: Vec<CHAR_INFO>,
+    buf: Vec<CHAR_INFO, A>,
     size: Vector,
     invalidated: Rect,
 }
 
-impl Screen {
-    pub fn new() -> Result<Self, Error> {
+impl<A: Allocator> Screen<A> {
+    pub fn new_in(alloc: A) -> Result<Self, Error> {
         unsafe { FreeConsole() };
         non_zero(unsafe { AllocConsole() })?;
         let window = unsafe { GetConsoleWindow() };
@@ -81,7 +85,7 @@ impl Screen {
             h_output: INVALID_HANDLE_VALUE,
             output_cp: 0,
             wctmb_flags: WC_COMPOSITECHECK | WC_DISCARDNS,
-            buf: Vec::new(),
+            buf: Vec::new_in(alloc),
             size: Vector::null(),
             invalidated: Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() }
         };
@@ -387,7 +391,7 @@ impl Screen {
     }
 }
 
-impl Drop for Screen {
+impl<A: Allocator> Drop for Screen<A> {
     #[allow(clippy::panicking_unwrap)]
     fn drop(&mut self) {
         let e = unsafe { self.drop_raw() };
@@ -427,7 +431,7 @@ fn attr_w(fg: Fg, bg: Bg) -> WORD {
     fg | bg
 }
 
-impl base_Screen for Screen {
+impl<A: Allocator> base_Screen for Screen<A> {
     fn size(&self) -> Vector { self.size }
 
     fn out(

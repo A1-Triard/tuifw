@@ -13,9 +13,12 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/A1-Triard/tuifw"
 
 [dependencies]
+arraybox = "0.0.1"
 either = { version = "1.7.0", default-features = false }
 errno-no-std = { version = "0.1.5", default-features = false }
 libc = { version = "0.2.101", default-features = false }
+macro-attr-2018 = "2.1.2"
+newtype-derive-2018 = "0.1.0"
 panicking = { version = "0.4.0", default-features = false }
 tuifw-screen-base = { path = "../screen-base", version = "0.18.2" }
 unicode-width = "0.1.8"

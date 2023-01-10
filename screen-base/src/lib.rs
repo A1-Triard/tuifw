@@ -15,9 +15,7 @@
 
 #![no_std]
 
-extern crate alloc;
-
-use alloc::boxed::Box;
+use arrayvec::ArrayString;
 use core::fmt::{self, Debug, Display, Formatter};
 use core::num::NonZeroU16;
 use core::ops::Range;
@@ -162,12 +160,12 @@ pub enum Event {
 
 pub struct Error {
     pub errno: Errno,
-    pub msg: Option<Box<dyn Display>>,
+    pub msg: ArrayString<128>,
 }
 
 impl From<Errno> for Error {
     fn from(errno: Errno) -> Error {
-        Error { errno, msg: None }
+        Error { errno, msg: ArrayString::new() }
     }
 }
 
@@ -179,8 +177,8 @@ impl From<Error> for Errno {
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        if let Some(msg) = self.msg.as_deref() {
-            write!(f, "{} ({})", msg, self.errno)
+        if !self.msg.is_empty() {
+            write!(f, "{} ({})", self.msg, self.errno)
         } else {
             write!(f, "{}", self.errno)
         }

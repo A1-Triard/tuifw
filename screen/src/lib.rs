@@ -1,3 +1,5 @@
+#![feature(allocator_api)]
+
 #![deny(warnings)]
 #![doc(test(attr(deny(warnings))))]
 #![doc(test(attr(allow(dead_code))))]
@@ -7,9 +9,26 @@
 
 extern crate alloc;
 
-use alloc::boxed::Box;
+use alloc::alloc::Global;
+use core::alloc::Allocator;
+use macro_attr_2018::macro_attr;
+use newtype_derive_2018::{NewtypeDeref, NewtypeDerefMut};
 
 pub use tuifw_screen_base::*;
+
+#[cfg(target_os="dos")]
+type RawScreen<A> = tuifw_screen_dos::Screen<A>;
+
+#[cfg(all(not(target_os="dos"), windows))]
+type RawScreen<A> = tuifw_screen_winapi::Screen<A>;
+
+#[cfg(all(not(target_os="dos"), not(windows)))]
+type RawScreen<A> = tuifw_screen_ncurses::Screen<A>;
+
+macro_attr! {
+    #[derive(NewtypeDeref!, NewtypeDerefMut!)]
+    pub struct Screen<A: Allocator + Clone = Global>(RawScreen<A>);
+}
 
 /// # Safety
 ///
@@ -22,21 +41,21 @@ pub use tuifw_screen_base::*;
 ///
 /// It is impossible to garantee this conditions on a library level.
 /// So this unsafity should be propagated through all wrappers to the final application.
-pub unsafe fn init() -> Result<Box<dyn Screen>, Error> {
-    init_raw()
+pub unsafe fn init_in<A: Allocator + Clone + 'static>(alloc: A) -> Result<Screen<A>, Error> {
+    init_raw_in(alloc)
 }
 
 #[cfg(target_os="dos")]
-unsafe fn init_raw() -> Result<Box<dyn Screen>, Error> {
-    Ok(Box::new(tuifw_screen_dos::Screen::new()?) as _)
+unsafe fn init_raw_in<A: Allocator + Clone>(alloc: A) -> Result<Screen<A>, Error> {
+    Ok(Screen(tuifw_screen_dos::Screen::new_in(alloc)?))
 }
 
 #[cfg(all(not(target_os="dos"), windows))]
-unsafe fn init_raw() -> Result<Box<dyn Screen>, Error> {
-    Ok(Box::new(tuifw_screen_winapi::Screen::new()?) as _)
+unsafe fn init_raw_in<A: Allocator + Clone>(alloc: A) -> Result<Screen<A>, Error> {
+    Ok(Screen(tuifw_screen_winapi::Screen::new_in(alloc)?))
 }
 
 #[cfg(all(not(target_os="dos"), not(windows)))]
-unsafe fn init_raw() -> Result<Box<dyn Screen>, Error> {
-    tuifw_screen_ncurses::init()
+unsafe fn init_raw_in<A: Allocator + Clone + 'static>(alloc: A) -> Result<Screen<A>, Error> {
+    Ok(Screen(tuifw_screen_ncurses::init_in(alloc)?))
 }

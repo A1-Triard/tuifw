@@ -3,6 +3,7 @@
 use crate::common::*;
 use crate::ncurses::*;
 use alloc::vec::Vec;
+use core::alloc::Allocator;
 use core::char::{self};
 use core::cmp::{min};
 use core::mem::{size_of};
@@ -21,25 +22,26 @@ struct Line {
     invalidated: bool,
 }
 
-pub struct Screen {
-    lines: Vec<Line>,
+pub struct Screen<A: Allocator> {
+    lines: Vec<Line, A>,
     cols: usize,
-    chs_: Vec<([char; CCHARW_MAX], attr_t)>,
+    chs_: Vec<([char; CCHARW_MAX], attr_t), A>,
 }
 
-impl !Sync for Screen { }
-impl !Send for Screen { }
+impl<A: Allocator> !Sync for Screen<A> { }
+impl<A: Allocator> !Send for Screen<A> { }
 
-impl Screen {
-    pub unsafe fn new() -> Result<Self, Errno> {
+impl<A: Allocator> Screen<A> {
+    pub unsafe fn new_in(alloc: A) -> Result<Self, Errno> where A: Clone {
         if non_null(initscr()).is_err() { return Err(Errno(EINVAL)); }
         let mut s = Screen {
-            lines: Vec::with_capacity(usize::from(LINES.clamp(0, i16::MAX.into()) as i16 as u16)),
+            lines: Vec::with_capacity_in(usize::from(LINES.clamp(0, i16::MAX.into()) as i16 as u16), alloc.clone()),
             cols: usize::from(COLS.clamp(0, i16::MAX.into()) as i16 as u16),
-            chs_: Vec::with_capacity(
+            chs_: Vec::with_capacity_in(
                 usize::from(LINES.clamp(0, i16::MAX.into()) as i16 as u16)
                     .checked_mul(usize::from(COLS.clamp(0, i16::MAX.into()) as i16 as u16))
-                    .expect("OOM")
+                    .expect("OOM"),
+                alloc
             ),
         };
         init_settings()?;
@@ -153,7 +155,7 @@ impl Screen {
     }
 }
 
-impl Drop for Screen {
+impl<A: Allocator> Drop for Screen<A> {
     #![allow(clippy::panicking_unwrap)]
     fn drop(&mut self) {
         let e = unsafe { non_err(endwin()) };
@@ -202,7 +204,7 @@ impl<'a> Iterator for Graphemes<'a> {
     }
 }
 
-impl base_Screen for Screen {
+impl<A: Allocator> base_Screen for Screen<A> {
     fn size(&self) -> Vector {
         Vector {
             x: (unsafe { COLS }).clamp(0, i16::MAX.into()) as i16,

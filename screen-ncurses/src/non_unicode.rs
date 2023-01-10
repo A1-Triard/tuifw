@@ -1,6 +1,7 @@
 use crate::common::*;
 use crate::ncurses::*;
 use alloc::vec::Vec;
+use core::alloc::Allocator;
 use core::cmp::{max, min};
 use core::ops::Range;
 use core::ptr::NonNull;
@@ -18,29 +19,30 @@ struct Line {
     invalidated: bool,
 }
 
-pub struct Screen {
-    lines: Vec<Line>,
+pub struct Screen<A: Allocator> {
+    lines: Vec<Line, A>,
     cols: usize,
-    chs: Vec<chtype>,
+    chs: Vec<chtype, A>,
     cd: iconv_t,
     dc: iconv_t,
 }
 
-impl !Sync for Screen { }
-impl !Send for Screen { }
+impl<A: Allocator> !Sync for Screen<A> { }
+impl<A: Allocator> !Send for Screen<A> { }
 
 const ICONV_ERR: iconv_t = (-1isize) as usize as iconv_t;
 
-impl Screen {
-    pub unsafe fn new() -> Result<Self, Errno> {
+impl<A: Allocator> Screen<A> {
+    pub unsafe fn new_in(alloc: A) -> Result<Self, Errno> where A: Clone {
         if non_null(initscr()).is_err() { return Err(Errno(EINVAL)); }
         let mut s = Screen {
-            lines: Vec::with_capacity(usize::from(LINES.clamp(0, i16::MAX.into()) as i16 as u16)),
+            lines: Vec::with_capacity_in(usize::from(LINES.clamp(0, i16::MAX.into()) as i16 as u16), alloc.clone()),
             cols: usize::from(COLS.clamp(0, i16::MAX.into()) as i16 as u16),
-            chs: Vec::with_capacity(
+            chs: Vec::with_capacity_in(
                 usize::from(LINES.clamp(0, i16::MAX.into()) as i16 as u16)
                     .checked_mul(usize::from(COLS.clamp(0, i16::MAX.into()) as i16 as u16))
-                    .expect("OOM")
+                    .expect("OOM"),
+                alloc
             ),
             cd: ICONV_ERR,
             dc: ICONV_ERR
@@ -147,7 +149,7 @@ impl Screen {
     }
 }
 
-impl Drop for Screen {
+impl<A: Allocator> Drop for Screen<A> {
     #![allow(clippy::panicking_unwrap)]
     fn drop(&mut self) {
         let e = unsafe { self.drop_raw() };
@@ -230,7 +232,7 @@ fn decode_char(dc: iconv_t, c: u8) -> char {
     str::from_utf8(&buf[.. (buf.len() - buf_len)]).unwrap().chars().next().unwrap()
 }
 
-impl base_Screen for Screen {
+impl<A: Allocator> base_Screen for Screen<A> {
     fn size(&self) -> Vector {
         Vector {
             x: (unsafe { COLS }).clamp(0, i16::MAX.into()) as i16,
