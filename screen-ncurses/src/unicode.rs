@@ -2,7 +2,6 @@
 
 use crate::common::*;
 use crate::ncurses::*;
-use alloc::vec;
 use alloc::vec::Vec;
 use core::char::{self};
 use core::cmp::{min};
@@ -20,11 +19,12 @@ use unicode_width::UnicodeWidthChar;
 struct Line {
     window: NonNull<WINDOW>,
     invalidated: bool,
-    cols: Vec<([char; CCHARW_MAX], attr_t)>,
 }
 
 pub struct Screen {
     lines: Vec<Line>,
+    cols: usize,
+    chs_: Vec<([char; CCHARW_MAX], attr_t)>,
 }
 
 impl !Sync for Screen { }
@@ -34,7 +34,13 @@ impl Screen {
     pub unsafe fn new() -> Result<Self, Errno> {
         if non_null(initscr()).is_err() { return Err(Errno(EINVAL)); }
         let mut s = Screen {
-            lines: Vec::with_capacity(LINES.clamp(0, i16::MAX.into()) as i16 as u16 as usize),
+            lines: Vec::with_capacity(usize::from(LINES.clamp(0, i16::MAX.into()) as i16 as u16)),
+            cols: usize::from(COLS.clamp(0, i16::MAX.into()) as i16 as u16),
+            chs_: Vec::with_capacity(
+                usize::from(LINES.clamp(0, i16::MAX.into()) as i16 as u16)
+                    .checked_mul(usize::from(COLS.clamp(0, i16::MAX.into()) as i16 as u16))
+                    .expect("OOM")
+            ),
         };
         init_settings()?;
         s.resize()?;
@@ -51,22 +57,21 @@ impl Screen {
         space_gr[1] = '\0';
         let space = (space_gr, WA_NORMAL);
         let size = self.size();
+        self.lines.reserve(usize::from(size.y as u16));
+        self.cols = usize::from(size.x as u16);
+        self.chs_.resize(usize::from(size.y as u16).checked_mul(self.cols).expect("OOM"), space);
         for y in 0 .. size.y {
             let window = non_null(unsafe { newwin(1, 0, y as _, 0) }).unwrap();
             non_err(unsafe { keypad(window.as_ptr(), true) })?;
-            self.lines.push(Line {
-                window,
-                invalidated: true,
-                cols: vec![space; size.x as u16 as usize],
-            });
+            self.lines.push(Line { window, invalidated: true });
         }
         Ok(())
     }
 
-    fn start_text(line: &mut Line, x: i16) {
+    fn start_text(line: &mut [([char; CCHARW_MAX], attr_t)], x: i16) {
         if x <= 0 { return; }
         let mut x = x as u16;
-        if let Some(col) = line.cols.get(x as usize) {
+        if let Some(col) = line.get(x as usize) {
             if col.0[0] != '\0' { return; }
         } else {
             return;
@@ -74,7 +79,7 @@ impl Screen {
         loop {
             debug_assert!(x > 0);
             x -= 1;
-            let col = &mut line.cols[x as usize];
+            let col = &mut line[x as usize];
             let stop = col.0[0] != '\0';
             col.0[0] = ' ';
             col.0[1] = '\0';
@@ -82,9 +87,9 @@ impl Screen {
         }
     }
 
-    fn end_text(line: &mut Line, mut x: i16) {
+    fn end_text(line: &mut [([char; CCHARW_MAX], attr_t)], mut x: i16) {
         if x <= 0 { return; }
-        while let Some(ref mut col) = line.cols.get_mut(x as u16 as usize) {
+        while let Some(ref mut col) = line.get_mut(x as u16 as usize) {
             if col.0[0] != '\0' { break; }
             col.0[0] = ' ';
             col.0[1] = '\0';
@@ -95,14 +100,14 @@ impl Screen {
     fn update_raw(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Errno> {
         non_err(unsafe { curs_set(0) })?;
         assert_eq!(size_of::<char>(), size_of::<wchar_t>());
-        for line in self.lines.iter_mut().filter(|l| l.invalidated) {
+        for (chs, line) in self.chs_.chunks(self.cols).zip(self.lines.iter_mut()).filter(|(_, l)| l.invalidated) {
             line.invalidated = false;
-            if line.cols.is_empty() { continue; }
+            if chs.is_empty() { continue; }
             non_err(unsafe { wmove(line.window.as_ptr(), 0, 0) })?;
-            for &col in &line.cols {
-                if col.0[0] == '\0' { continue; }
-                non_err(unsafe { wattrset(line.window.as_ptr(), col.1 as _) })?;
-                let _ = unsafe { waddnwstr(line.window.as_ptr(), col.0.as_ptr() as _, CCHARW_MAX as _) };
+            for &ch in chs {
+                if ch.0[0] == '\0' { continue; }
+                non_err(unsafe { wattrset(line.window.as_ptr(), ch.1 as _) })?;
+                let _ = unsafe { waddnwstr(line.window.as_ptr(), ch.0.as_ptr() as _, CCHARW_MAX as _) };
             }
             non_err(unsafe { wnoutrefresh(line.window.as_ptr()) })?;
         }
@@ -120,7 +125,7 @@ impl Screen {
             non_err(unsafe { curs_set(1) })?;
             Some(window)
         } else if let Some(line) = self.lines.first() {
-            if line.cols.is_empty() {
+            if self.cols == 0 {
                 None
             } else {
                 let window = line.window;
@@ -219,8 +224,8 @@ impl base_Screen for Screen {
         debug_assert!(soft.start >= 0 && soft.end > soft.start && soft.end <= self.size().x);
         let text_end = if soft.end <= p.x { return 0 .. 0 } else { soft.end.saturating_sub(p.x) };
         let text_start = if soft.start <= p.x { 0 } else { soft.start.saturating_sub(p.x) };
-        let line = &mut self.lines[p.y as u16 as usize];
-        line.invalidated = true;
+        let line = &mut self.chs_[usize::from(p.y as u16) * self.cols .. (usize::from(p.y as u16) + 1) * self.cols];
+        self.lines[p.y as u16 as usize].invalidated = true;
         let attr = unsafe { attr_ch(fg, bg) };
         let text = Graphemes(text);
         let mut x0 = None;
@@ -243,7 +248,7 @@ impl base_Screen for Screen {
                     Self::start_text(line, hard.start);
                     x0 = Some(hard.start);
                     for i in hard.start .. x {
-                        let col = &mut line.cols[i as u16 as usize];
+                        let col = &mut line[i as u16 as usize];
                         col.0[0] = ' ';
                         col.0[1] = '\0';
                     }
@@ -257,14 +262,14 @@ impl base_Screen for Screen {
             let next_x = min(hard.end, x.saturating_add(w));
             if next_x - x < w {
                 for i in x .. next_x {
-                    let col = &mut line.cols[i as u16 as usize];
+                    let col = &mut line[i as u16 as usize];
                     col.0[0] = ' ';
                     col.0[1] = '\0';
                 }
                 x = next_x;
                 break;
             }
-            let col = &mut line.cols[x as u16 as usize];
+            let col = &mut line[x as u16 as usize];
             let mut i = 0;
             for c in g.chars() {
                 let c = if c < ' ' || c == '\x7F' || c.width().is_none() { ' ' } else { c };
@@ -276,7 +281,7 @@ impl base_Screen for Screen {
             }
             col.1 = attr;
             for i in x + 1 .. next_x {
-               line.cols[i as u16 as usize].0[0] = '\0';
+               line[i as u16 as usize].0[0] = '\0';
             }
             x = next_x;
         }

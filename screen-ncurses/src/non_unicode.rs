@@ -1,6 +1,5 @@
 use crate::common::*;
 use crate::ncurses::*;
-use alloc::vec;
 use alloc::vec::Vec;
 use core::cmp::{max, min};
 use core::ops::Range;
@@ -17,11 +16,12 @@ use unicode_width::UnicodeWidthChar;
 struct Line {
     window: NonNull<WINDOW>,
     invalidated: bool,
-    cols: Vec<chtype>,
 }
 
 pub struct Screen {
     lines: Vec<Line>,
+    cols: usize,
+    chs: Vec<chtype>,
     cd: iconv_t,
     dc: iconv_t,
 }
@@ -35,7 +35,13 @@ impl Screen {
     pub unsafe fn new() -> Result<Self, Errno> {
         if non_null(initscr()).is_err() { return Err(Errno(EINVAL)); }
         let mut s = Screen {
-            lines: Vec::with_capacity(LINES.clamp(0, i16::MAX.into()) as i16 as u16 as usize),
+            lines: Vec::with_capacity(usize::from(LINES.clamp(0, i16::MAX.into()) as i16 as u16)),
+            cols: usize::from(COLS.clamp(0, i16::MAX.into()) as i16 as u16),
+            chs: Vec::with_capacity(
+                usize::from(LINES.clamp(0, i16::MAX.into()) as i16 as u16)
+                    .checked_mul(usize::from(COLS.clamp(0, i16::MAX.into()) as i16 as u16))
+                    .expect("OOM")
+            ),
             cd: ICONV_ERR,
             dc: ICONV_ERR
         };
@@ -55,14 +61,13 @@ impl Screen {
         self.lines.clear();
         let space = b' ' as c_char as chtype;
         let size = self.size();
+        self.lines.reserve(usize::from(size.y as u16));
+        self.cols = usize::from(size.x as u16);
+        self.chs.resize(usize::from(size.y as u16).checked_mul(self.cols).expect("OOM"), space);
         for y in 0 .. size.y {
             let window = non_null(unsafe { newwin(1, 0, y as _, 0) }).unwrap();
             non_err(unsafe { keypad(window.as_ptr(), true) })?;
-            self.lines.push(Line {
-                window,
-                invalidated: true,
-                cols: vec![space; size.x as u16 as usize],
-            });
+            self.lines.push(Line { window, invalidated: true });
         }
         Ok(())
     }
@@ -92,12 +97,12 @@ impl Screen {
 
     fn update_raw(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Errno> {
         non_err(unsafe { curs_set(0) })?;
-        for line in self.lines.iter_mut().filter(|l| l.invalidated) {
+        for (chs, line) in self.chs.chunks(self.cols).zip(self.lines.iter_mut()).filter(|(_, l)| l.invalidated) {
             line.invalidated = false;
-            if line.cols.is_empty() { continue; }
+            if chs.is_empty() { continue; }
             non_err(unsafe { wmove(line.window.as_ptr(), 0, 0) })?;
-            for &col in &line.cols {
-                let _ = unsafe { waddch(line.window.as_ptr(), col) };
+            for &ch in chs {
+                let _ = unsafe { waddch(line.window.as_ptr(), ch) };
             }
             non_err(unsafe { wnoutrefresh(line.window.as_ptr()) })?;
         }
@@ -115,7 +120,7 @@ impl Screen {
             non_err(unsafe { curs_set(1) })?;
             Some(window)
         } else if let Some(line) = self.lines.first() {
-            if line.cols.is_empty() {
+            if self.cols == 0 {
                 None
             } else {
                 let window = line.window;
@@ -247,8 +252,8 @@ impl base_Screen for Screen {
         debug_assert!(soft.start >= 0 && soft.end > soft.start && soft.end <= self.size().x);
         let text_end = if soft.end <= p.x { return 0 .. 0 } else { soft.end.saturating_sub(p.x) };
         let text_start = if soft.start <= p.x { 0 } else { soft.start.saturating_sub(p.x) };
-        let line = &mut self.lines[p.y as u16 as usize];
-        line.invalidated = true;
+        let chs = &mut self.chs[usize::from(p.y as u16) * self.cols .. (usize::from(p.y as u16) + 1) * self.cols];
+        self.lines[p.y as u16 as usize].invalidated = true;
         let attr = unsafe { attr_ch(fg, bg) };
         let text = text.chars().filter(|c| c.width() == Some(1))
             .map(|c| encode_char(self.cd, c))
@@ -273,7 +278,7 @@ impl base_Screen for Screen {
                 true
             };
             if visible_1 && visible_2 {
-                line.cols[x as u16 as usize] = c | attr;
+                chs[x as u16 as usize] = c | attr;
             }
             x += 1;
         }
