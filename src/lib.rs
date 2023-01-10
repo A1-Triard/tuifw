@@ -95,6 +95,10 @@ impl WindowManager {
     }
 }
 
+impl Default for WindowManager {
+    fn default() -> Self { Self::new() }
+}
+
 macro_attr! {
     #[derive(Component!(class=WindowRenderFnClass))]
     struct WindowRenderFn<State: ?Sized>(fn(&WindowTree<State>, Window, &mut RenderPort, &mut State));
@@ -137,4 +141,8 @@ impl<State: WindowRendererState + ?Sized + 'static> WindowRenderer<State> {
             rp.fill(|rp, p| rp.out(p, Fg::LightGray, Bg::None, " "));
         }
     }
+}
+
+impl<State: WindowRendererState + ?Sized + 'static> Default for WindowRenderer<State> {
+    fn default() -> Self { Self::new() }
 }
