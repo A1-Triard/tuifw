@@ -9,6 +9,7 @@
 
 extern crate alloc;
 
+use alloc::alloc::Global;
 use alloc::vec::Vec;
 use core::alloc::Allocator;
 use core::cmp::{min, max};
@@ -16,12 +17,18 @@ use core::ops::Range;
 use tuifw_screen_base::*;
 use tuifw_screen_base::Screen as base_Screen;
 
-pub struct Screen<A: Allocator + Clone> {
+pub struct Screen<A: Allocator + Clone = Global> {
     buf: Vec<(char, Fg, Bg), A>,
     out: Vec<(char, Fg, Bg), A>,
     size: Vector,
     invalidated: Rect,
     cursor: Option<Point>,
+}
+
+impl Screen {
+    pub fn new(size: Vector) -> Self {
+        Self::new_in(Global)
+    }
 }
 
 impl<A: Allocator + Clone> Screen<A> {
