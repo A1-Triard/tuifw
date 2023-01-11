@@ -4,7 +4,7 @@
 
 use tuifw_screen::{Bg, Fg, Screen, Point, Event, Key};
 
-fn draw(screen: &mut Screen) {
+fn draw(screen: &mut dyn Screen) {
     let w = 0 .. screen.size().x;
     for (bg_n, bg) in Bg::iter_variants().enumerate() {
         let bg_n: i16 = bg_n.try_into().unwrap();
@@ -17,7 +17,7 @@ fn draw(screen: &mut Screen) {
 
 fn main() {
     let mut screen = unsafe { tuifw_screen::init() }.unwrap();
-    let screen = &mut screen;
+    let screen = screen.as_mut();
     draw(screen);
     loop {
         if let Some(e) = screen.update(None, true).unwrap() {

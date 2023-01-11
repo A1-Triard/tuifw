@@ -25,20 +25,10 @@ mod non_unicode;
 mod unicode;
 
 use alloc::alloc::Global;
-use arraybox::{ArrayBox, BufFor, Or};
+use alloc::boxed::Box;
 use core::alloc::Allocator;
 use libc::{CODESET, setlocale, strcmp, nl_langinfo, LC_ALL};
-use macro_attr_2018::macro_attr;
-use newtype_derive_2018::{NewtypeDeref, NewtypeDerefMut};
-use tuifw_screen_base::Error;
-use tuifw_screen_base::Screen as base_Screen;
-
-macro_attr! {
-    #[derive(NewtypeDeref!, NewtypeDerefMut!)]
-    pub struct Screen<A: Allocator = Global>(
-        ArrayBox<'static, dyn base_Screen, BufFor<Or<unicode::Screen<A>, non_unicode::Screen<A>>>>
-    );
-}
+use tuifw_screen_base::{Error, Screen};
 
 /// # Safety
 ///
@@ -48,7 +38,7 @@ macro_attr! {
 ///
 /// It is impossible to garantee this conditions on a library level.
 /// So this unsafity should be propagated through all wrappers to the final application.
-pub unsafe fn init() -> Result<Screen, Error> {
+pub unsafe fn init() -> Result<Box<dyn Screen>, Error> {
     init_in(Global)
 }
 
@@ -60,13 +50,13 @@ pub unsafe fn init() -> Result<Screen, Error> {
 ///
 /// It is impossible to garantee this conditions on a library level.
 /// So this unsafity should be propagated through all wrappers to the final application.
-pub unsafe fn init_in<A: Allocator + Clone + 'static>(alloc: A) -> Result<Screen<A>, Error> {
+pub unsafe fn init_in<A: Allocator + Clone + 'static>(alloc: A) -> Result<Box<dyn Screen>, Error> {
     setlocale(LC_ALL, "\0".as_ptr() as _);
     let unicode = strcmp(nl_langinfo(CODESET), b"UTF-8\0".as_ptr() as _) == 0;
     let screen = if unicode {
-        Screen(ArrayBox::new(unicode::Screen::new_in(alloc)?))
+        Box::new(unicode::Screen::new_in(alloc)?) as _
     } else {
-        Screen(ArrayBox::new(non_unicode::Screen::new_in(alloc)?))
+        Box::new(non_unicode::Screen::new_in(alloc)?) as _
     };
     Ok(screen)
 }

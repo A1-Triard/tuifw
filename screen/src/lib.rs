@@ -10,25 +10,10 @@
 extern crate alloc;
 
 use alloc::alloc::Global;
+use alloc::boxed::Box;
 use core::alloc::Allocator;
-use macro_attr_2018::macro_attr;
-use newtype_derive_2018::{NewtypeDeref, NewtypeDerefMut};
 
 pub use tuifw_screen_base::*;
-
-#[cfg(target_os="dos")]
-type RawScreen<A> = tuifw_screen_dos::Screen<A>;
-
-#[cfg(all(not(target_os="dos"), windows))]
-type RawScreen<A> = tuifw_screen_winapi::Screen<A>;
-
-#[cfg(all(not(target_os="dos"), not(windows)))]
-type RawScreen<A> = tuifw_screen_ncurses::Screen<A>;
-
-macro_attr! {
-    #[derive(NewtypeDeref!, NewtypeDerefMut!)]
-    pub struct Screen<A: Allocator + Clone = Global>(RawScreen<A>);
-}
 
 /// # Safety
 ///
@@ -41,7 +26,7 @@ macro_attr! {
 ///
 /// It is impossible to garantee this conditions on a library level.
 /// So this unsafity should be propagated through all wrappers to the final application.
-pub unsafe fn init() -> Result<Screen, Error> {
+pub unsafe fn init() -> Result<Box<dyn Screen>, Error> {
     init_raw_in(Global)
 }
 
@@ -56,21 +41,21 @@ pub unsafe fn init() -> Result<Screen, Error> {
 ///
 /// It is impossible to garantee this conditions on a library level.
 /// So this unsafity should be propagated through all wrappers to the final application.
-pub unsafe fn init_in<A: Allocator + Clone + 'static>(alloc: A) -> Result<Screen<A>, Error> {
+pub unsafe fn init_in<A: Allocator + Clone + 'static>(alloc: A) -> Result<Box<dyn Screen>, Error> {
     init_raw_in(alloc)
 }
 
 #[cfg(target_os="dos")]
-unsafe fn init_raw_in<A: Allocator + Clone>(alloc: A) -> Result<Screen<A>, Error> {
-    Ok(Screen(tuifw_screen_dos::Screen::new_in(alloc)?))
+unsafe fn init_raw_in<A: Allocator + Clone>(alloc: A) -> Result<Box<dyn Screen>, Error> {
+    Ok(Box::new(tuifw_screen_dos::Screen::new_in(alloc)?))
 }
 
 #[cfg(all(not(target_os="dos"), windows))]
-unsafe fn init_raw_in<A: Allocator + Clone>(alloc: A) -> Result<Screen<A>, Error> {
-    Ok(Screen(tuifw_screen_winapi::Screen::new_in(alloc)?))
+unsafe fn init_raw_in<A: Allocator + Clone>(alloc: A) -> Result<Box<dyn Screen>, Error> {
+    Ok(Box::new(tuifw_screen_winapi::Screen::new_in(alloc)?))
 }
 
 #[cfg(all(not(target_os="dos"), not(windows)))]
-unsafe fn init_raw_in<A: Allocator + Clone + 'static>(alloc: A) -> Result<Screen<A>, Error> {
-    Ok(Screen(tuifw_screen_ncurses::init_in(alloc)?))
+unsafe fn init_raw_in<A: Allocator + Clone + 'static>(alloc: A) -> Result<Box<dyn Screen>, Error> {
+    Ok(tuifw_screen_ncurses::init_in(alloc)?)
 }
