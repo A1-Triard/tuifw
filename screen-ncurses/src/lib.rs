@@ -38,8 +38,8 @@ use tuifw_screen_base::{Error, Screen};
 ///
 /// It is impossible to garantee this conditions on a library level.
 /// So this unsafity should be propagated through all wrappers to the final application.
-pub unsafe fn init() -> Result<Box<dyn Screen>, Error> {
-    init_in(Global)
+pub unsafe fn init(max_size: Option<(u16, u16)>) -> Result<Box<dyn Screen>, Error> {
+    init_in(max_size, Global)
 }
 
 /// # Safety
@@ -50,13 +50,13 @@ pub unsafe fn init() -> Result<Box<dyn Screen>, Error> {
 ///
 /// It is impossible to garantee this conditions on a library level.
 /// So this unsafity should be propagated through all wrappers to the final application.
-pub unsafe fn init_in<A: Allocator + Clone + 'static>(alloc: A) -> Result<Box<dyn Screen>, Error> {
+pub unsafe fn init_in<A: Allocator + Clone + 'static>(max_size: Option<(u16, u16)>, alloc: A) -> Result<Box<dyn Screen>, Error> {
     setlocale(LC_ALL, "\0".as_ptr() as _);
     let unicode = strcmp(nl_langinfo(CODESET), b"UTF-8\0".as_ptr() as _) == 0;
     let screen = if unicode {
-        Box::new(unicode::Screen::new_in(alloc)?) as _
+        Box::new(unicode::Screen::new_in(max_size, alloc)?) as _
     } else {
-        Box::new(non_unicode::Screen::new_in(alloc)?) as _
+        Box::new(non_unicode::Screen::new_in(max_size, alloc)?) as _
     };
     Ok(screen)
 }

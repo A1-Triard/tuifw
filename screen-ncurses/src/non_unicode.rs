@@ -20,6 +20,7 @@ struct Line {
 }
 
 pub struct Screen<A: Allocator> {
+    max_size: Option<(u16, u16)>,
     lines: Vec<Line, A>,
     cols: usize,
     chs: Vec<chtype, A>,
@@ -33,14 +34,16 @@ impl<A: Allocator> !Send for Screen<A> { }
 const ICONV_ERR: iconv_t = (-1isize) as usize as iconv_t;
 
 impl<A: Allocator> Screen<A> {
-    pub unsafe fn new_in(alloc: A) -> Result<Self, Errno> where A: Clone {
+    pub unsafe fn new_in(max_size: Option<(u16, u16)>, alloc: A) -> Result<Self, Errno> where A: Clone {
         if non_null(initscr()).is_err() { return Err(Errno(EINVAL)); }
+        let size = size(max_size);
         let mut s = Screen {
-            lines: Vec::with_capacity_in(usize::from(LINES.clamp(0, i16::MAX.into()) as i16 as u16), alloc.clone()),
-            cols: usize::from(COLS.clamp(0, i16::MAX.into()) as i16 as u16),
+            max_size,
+            lines: Vec::with_capacity_in(usize::from(max_size.map_or(size.y as u16, |m| m.1)), alloc.clone()),
+            cols: usize::from(size.x as u16),
             chs: Vec::with_capacity_in(
-                usize::from(LINES.clamp(0, i16::MAX.into()) as i16 as u16)
-                    .checked_mul(usize::from(COLS.clamp(0, i16::MAX.into()) as i16 as u16))
+                usize::from(max_size.map_or(size.y as u16, |m| m.1))
+                    .checked_mul(usize::from(max_size.map_or(size.x as u16, |m| m.0)))
                     .expect("OOM"),
                 alloc
             ),
@@ -157,6 +160,16 @@ impl<A: Allocator> Drop for Screen<A> {
     }
 }
 
+fn size(max_size: Option<(u16, u16)>) -> Vector {
+    let mut x = (unsafe { COLS }).clamp(0, i16::MAX.into()) as i16;
+    let mut y = (unsafe { LINES }).clamp(0, i16::MAX.into()) as i16;
+    if let Some(max_size) = max_size {
+        x = min(max_size.0, x as u16) as i16;
+        y = min(max_size.1, y as u16) as i16;
+    }
+    Vector { x, y }
+}
+
 fn encode_char(cd: iconv_t, c: char) -> chtype {
     match c {
         '→' => return A_ALTCHARSET | 43,
@@ -233,12 +246,7 @@ fn decode_char(dc: iconv_t, c: u8) -> char {
 }
 
 impl<A: Allocator> base_Screen for Screen<A> {
-    fn size(&self) -> Vector {
-        Vector {
-            x: (unsafe { COLS }).clamp(0, i16::MAX.into()) as i16,
-            y: (unsafe { LINES }).clamp(0, i16::MAX.into()) as i16
-        }
-    }
+    fn size(&self) -> Vector { size(self.max_size) }
 
     fn out(
         &mut self,

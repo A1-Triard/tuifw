@@ -23,23 +23,26 @@ struct Line {
 }
 
 pub struct Screen<A: Allocator> {
+    max_size: Option<(u16, u16)>,
     lines: Vec<Line, A>,
     cols: usize,
-    chs_: Vec<([char; CCHARW_MAX], attr_t), A>,
+    chs: Vec<([char; CCHARW_MAX], attr_t), A>,
 }
 
 impl<A: Allocator> !Sync for Screen<A> { }
 impl<A: Allocator> !Send for Screen<A> { }
 
 impl<A: Allocator> Screen<A> {
-    pub unsafe fn new_in(alloc: A) -> Result<Self, Errno> where A: Clone {
+    pub unsafe fn new_in(max_size: Option<(u16, u16)>, alloc: A) -> Result<Self, Errno> where A: Clone {
         if non_null(initscr()).is_err() { return Err(Errno(EINVAL)); }
+        let size = size(max_size);
         let mut s = Screen {
-            lines: Vec::with_capacity_in(usize::from(LINES.clamp(0, i16::MAX.into()) as i16 as u16), alloc.clone()),
-            cols: usize::from(COLS.clamp(0, i16::MAX.into()) as i16 as u16),
-            chs_: Vec::with_capacity_in(
-                usize::from(LINES.clamp(0, i16::MAX.into()) as i16 as u16)
-                    .checked_mul(usize::from(COLS.clamp(0, i16::MAX.into()) as i16 as u16))
+            max_size,
+            lines: Vec::with_capacity_in(usize::from(max_size.map_or(size.y as u16, |m| m.1)), alloc.clone()),
+            cols: usize::from(size.x as u16),
+            chs: Vec::with_capacity_in(
+                usize::from(max_size.map_or(size.y as u16, |m| m.1))
+                    .checked_mul(usize::from(max_size.map_or(size.x as u16, |m| m.0)))
                     .expect("OOM"),
                 alloc
             ),
@@ -61,7 +64,7 @@ impl<A: Allocator> Screen<A> {
         let size = self.size();
         self.lines.reserve(usize::from(size.y as u16));
         self.cols = usize::from(size.x as u16);
-        self.chs_.resize(usize::from(size.y as u16).checked_mul(self.cols).expect("OOM"), space);
+        self.chs.resize(usize::from(size.y as u16).checked_mul(self.cols).expect("OOM"), space);
         for y in 0 .. size.y {
             let window = non_null(unsafe { newwin(1, 0, y as _, 0) }).unwrap();
             non_err(unsafe { keypad(window.as_ptr(), true) })?;
@@ -102,7 +105,7 @@ impl<A: Allocator> Screen<A> {
     fn update_raw(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Errno> {
         non_err(unsafe { curs_set(0) })?;
         assert_eq!(size_of::<char>(), size_of::<wchar_t>());
-        for (chs, line) in self.chs_.chunks(self.cols).zip(self.lines.iter_mut()).filter(|(_, l)| l.invalidated) {
+        for (chs, line) in self.chs.chunks(self.cols).zip(self.lines.iter_mut()).filter(|(_, l)| l.invalidated) {
             line.invalidated = false;
             if chs.is_empty() { continue; }
             non_err(unsafe { wmove(line.window.as_ptr(), 0, 0) })?;
@@ -155,6 +158,16 @@ impl<A: Allocator> Screen<A> {
     }
 }
 
+fn size(max_size: Option<(u16, u16)>) -> Vector {
+    let mut x = (unsafe { COLS }).clamp(0, i16::MAX.into()) as i16;
+    let mut y = (unsafe { LINES }).clamp(0, i16::MAX.into()) as i16;
+    if let Some(max_size) = max_size {
+        x = min(max_size.0, x as u16) as i16;
+        y = min(max_size.1, y as u16) as i16;
+    }
+    Vector { x, y }
+}
+
 impl<A: Allocator> Drop for Screen<A> {
     #![allow(clippy::panicking_unwrap)]
     fn drop(&mut self) {
@@ -205,12 +218,7 @@ impl<'a> Iterator for Graphemes<'a> {
 }
 
 impl<A: Allocator> base_Screen for Screen<A> {
-    fn size(&self) -> Vector {
-        Vector {
-            x: (unsafe { COLS }).clamp(0, i16::MAX.into()) as i16,
-            y: (unsafe { LINES }).clamp(0, i16::MAX.into()) as i16
-        }
-    }
+    fn size(&self) -> Vector { size(self.max_size) }
 
     fn out(
         &mut self,
@@ -226,7 +234,7 @@ impl<A: Allocator> base_Screen for Screen<A> {
         debug_assert!(soft.start >= 0 && soft.end > soft.start && soft.end <= self.size().x);
         let text_end = if soft.end <= p.x { return 0 .. 0 } else { soft.end.saturating_sub(p.x) };
         let text_start = if soft.start <= p.x { 0 } else { soft.start.saturating_sub(p.x) };
-        let line = &mut self.chs_[usize::from(p.y as u16) * self.cols .. (usize::from(p.y as u16) + 1) * self.cols];
+        let line = &mut self.chs[usize::from(p.y as u16) * self.cols .. (usize::from(p.y as u16) + 1) * self.cols];
         self.lines[p.y as u16 as usize].invalidated = true;
         let attr = unsafe { attr_ch(fg, bg) };
         let text = Graphemes(text);
