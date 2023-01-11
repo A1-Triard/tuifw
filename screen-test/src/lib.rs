@@ -27,7 +27,7 @@ pub struct Screen<A: Allocator + Clone = Global> {
 
 impl Screen {
     pub fn new(size: Vector) -> Self {
-        Self::new_in(Global)
+        Self::new_in(size, Global)
     }
 }
 

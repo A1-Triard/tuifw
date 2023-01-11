@@ -17,7 +17,7 @@ fn draw(screen: &mut Screen) {
 
 fn main() {
     let mut screen = unsafe { tuifw_screen::init() }.unwrap();
-    let screen = screen.as_mut();
+    let screen = &mut screen;
     draw(screen);
     loop {
         if let Some(e) = screen.update(None, true).unwrap() {
