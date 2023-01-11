@@ -44,7 +44,7 @@ fn draw_box(screen: &mut Screen, p: &mut Point) {
 
 fn main() {
     let mut screen = unsafe { tuifw_screen::init_in(Global) }.unwrap();
-    let screen = screen.as_mut();
+    let screen = &mut screen;
     let mut p = Point { x: screen.size().x / 2, y: screen.size().y / 2 };
     draw_box(screen, &mut p);
     loop {

@@ -4,7 +4,7 @@
 
 use tuifw_screen::{Bg, Fg, Screen, Point, Event, Key};
 
-fn draw(screen: &mut dyn Screen) {
+fn draw(screen: &mut Screen) {
     let w = 0 .. screen.size().x;
     for (bg_n, bg) in Bg::iter_variants().enumerate() {
         let bg_n: i16 = bg_n.try_into().unwrap();

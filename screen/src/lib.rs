@@ -34,7 +34,22 @@ macro_attr! {
 ///
 /// This function may initialize ncurses lib. It is safe iff no other code in application calls ncurses functions
 /// while `Screen` instance is alive. This rule also applies to another `Screen` instance:
-/// it is not safe to call `init` again until `Screen` created by previous call is dropped.
+/// it is not safe to call `init`/`init_in` again until `Screen` created by previous call is dropped.
+///
+/// Also, iff compiled with `cfg(target_os="dos")` this method may not be invoked until it is guaranteed the memory addresses
+/// in `0xB8000 .. 0xBBE80` are not used by Rust abstract machine.
+///
+/// It is impossible to garantee this conditions on a library level.
+/// So this unsafity should be propagated through all wrappers to the final application.
+pub unsafe fn init() -> Result<Screen, Error> {
+    init_raw_in(Global)
+}
+
+/// # Safety
+///
+/// This function may initialize ncurses lib. It is safe iff no other code in application calls ncurses functions
+/// while `Screen` instance is alive. This rule also applies to another `Screen` instance:
+/// it is not safe to call `init`/`init_in` again until `Screen` created by previous call is dropped.
 ///
 /// Also, iff compiled with `cfg(target_os="dos")` this method may not be invoked until it is guaranteed the memory addresses
 /// in `0xB8000 .. 0xBBE80` are not used by Rust abstract machine.

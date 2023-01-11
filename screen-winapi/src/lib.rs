@@ -70,6 +70,12 @@ pub struct Screen<A: Allocator = Global> {
     invalidated: Rect,
 }
 
+impl Screen {
+    pub fn new() -> Result<Self, Error> {
+        Self::new_in(Global)
+    }
+}
+
 impl<A: Allocator> Screen<A> {
     pub fn new_in(alloc: A) -> Result<Self, Error> {
         unsafe { FreeConsole() };
