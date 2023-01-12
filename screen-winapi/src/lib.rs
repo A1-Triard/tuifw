@@ -143,54 +143,27 @@ impl<A: Allocator> Screen<A> {
     }
 
     fn init_screen_buffer(&mut self) -> Result<Vector, Errno> {
-        let mut width = 0;
-        let mut height = 0;
-        for _ in 0 .. 3 {
-            pump_messages();
-            let mut ci = CONSOLE_SCREEN_BUFFER_INFO {
-                dwSize: COORD { X: 0, Y: 0 },
-                dwCursorPosition: COORD { X: 0, Y: 0 },
-                wAttributes: 0,
-                srWindow: SMALL_RECT { Left: 0, Top: 0, Right: 0, Bottom: 0 },
-                dwMaximumWindowSize: COORD { X: 0, Y: 0 }
-            };
-            non_zero(unsafe { GetConsoleScreenBufferInfo(self.h_output, &mut ci as *mut _) })?;
-            width = ci.srWindow.Right.saturating_sub(ci.srWindow.Left).saturating_add(1);
-            height = ci.srWindow.Bottom.saturating_sub(ci.srWindow.Top).saturating_add(1);
-            ci.srWindow.Left = 0;
-            ci.srWindow.Top = 0;
-            ci.srWindow.Right = width;
-            ci.srWindow.Bottom = height - 1;
-            let _ = non_zero(unsafe { SetConsoleWindowInfo(self.h_output, 1, &ci.srWindow as *const _) });
-            let _ = non_zero(unsafe { SetConsoleScreenBufferSize(self.h_output, COORD { X: width, Y: height }) });
-            let mut cursor = CONSOLE_CURSOR_INFO { dwSize: 0, bVisible: FALSE };
-            cursor.bVisible = TRUE;
-            cursor.dwSize = 100;
-            non_zero(unsafe { FlushConsoleInputBuffer(self.h_input) })?;
-            non_zero(unsafe { SetConsoleCursorInfo(self.h_output, &cursor as *const _) })?;
-            pump_messages();
-            cursor.bVisible = TRUE;//if self.cursor_is_visible { TRUE } else { FALSE };
-            cursor.dwSize = 25;
-            non_zero(unsafe { FlushConsoleInputBuffer(self.h_input) })?;
-            non_zero(unsafe { SetConsoleCursorInfo(self.h_output, &cursor as *const _) })?;
-            pump_messages();
-            cursor.bVisible = FALSE;//if self.cursor_is_visible { TRUE } else { FALSE };
-            cursor.dwSize = 25;
-            non_zero(unsafe { FlushConsoleInputBuffer(self.h_input) })?;
-            non_zero(unsafe { SetConsoleCursorInfo(self.h_output, &cursor as *const _) })?;
-            pump_messages();
-            non_zero(unsafe { FlushConsoleInputBuffer(self.h_input) })?;
-            pump_messages();
-            pump_messages();
-            pump_messages();
-            pump_messages();
-            pump_messages();
-            pump_messages();
-            pump_messages();
-            pump_messages();
-            pump_messages();
+        for _ in 0 .. 50 {
             pump_messages();
         }
+        let mut ci = CONSOLE_SCREEN_BUFFER_INFO {
+            dwSize: COORD { X: 0, Y: 0 },
+            dwCursorPosition: COORD { X: 0, Y: 0 },
+            wAttributes: 0,
+            srWindow: SMALL_RECT { Left: 0, Top: 0, Right: 0, Bottom: 0 },
+            dwMaximumWindowSize: COORD { X: 0, Y: 0 }
+        };
+        non_zero(unsafe { GetConsoleScreenBufferInfo(self.h_output, &mut ci as *mut _) })?;
+        let mut width = ci.srWindow.Right.saturating_sub(ci.srWindow.Left).saturating_add(1);
+        let mut height = ci.srWindow.Bottom.saturating_sub(ci.srWindow.Top).saturating_add(1);
+        ci.srWindow.Left = 0;
+        ci.srWindow.Top = 0;
+        ci.srWindow.Right = width - 1;
+        ci.srWindow.Bottom = height - 1;
+        let _ = non_zero(unsafe { SetConsoleWindowInfo(self.h_output, 1, &ci.srWindow as *const _) });
+        let _ = non_zero(unsafe { SetConsoleScreenBufferSize(self.h_output, COORD { X: width, Y: height }) });
+        non_zero(unsafe { FlushConsoleInputBuffer(self.h_input) })?;
+        set_cursor_is_visible(self.h_output, self.cursor_is_visible)?;
         if let Some(max_size) = self.max_size {
             width = min(width as u16, max_size.0) as i16;
             height = min(height as u16, max_size.1) as i16;
@@ -298,19 +271,7 @@ impl<A: Allocator> Screen<A> {
             }
         });
         self.cursor_is_visible = cursor.is_some();
-        let mut ci = CONSOLE_CURSOR_INFO { dwSize: 0, bVisible: FALSE };
-        ci.bVisible = TRUE;
-        ci.dwSize = 100;
-        non_zero(unsafe { SetConsoleCursorInfo(self.h_output, &ci as *const _) })?;
-        pump_messages();
-        ci.bVisible = TRUE;//if self.cursor_is_visible { TRUE } else { FALSE };
-        ci.dwSize = 25;
-        non_zero(unsafe { SetConsoleCursorInfo(self.h_output, &ci as *const _) })?;
-        pump_messages();
-        ci.bVisible = FALSE;//if self.cursor_is_visible { TRUE } else { FALSE };
-        ci.dwSize = 25;
-        non_zero(unsafe { SetConsoleCursorInfo(self.h_output, &ci as *const _) })?;
-        pump_messages();
+        set_cursor_is_visible(self.h_output, self.cursor_is_visible)?;
         let (count, key, c, ctrl, alt) = loop {
             pump_messages();
             if !wait {
@@ -344,7 +305,6 @@ impl<A: Allocator> Screen<A> {
                 },
                 _ => { }
             }
-            pump_messages();
         };
         Ok(match key as i32 {
             VK_RETURN => Some(Event::Key(count, Key::Enter)),
@@ -426,7 +386,6 @@ impl<A: Allocator> Screen<A> {
                     assert_eq!(e.wRepeatCount, 1);
                     let h = *unsafe { e.uChar.UnicodeChar() };
                     assert!((0xD800 .. 0xDC00).contains(&h));
-                    pump_messages();
                     ((h as u32 - 0xD800) << 10) | (c as u32 - 0xDC00)
                 } else {
                     c as u32
@@ -455,6 +414,20 @@ fn pump_messages() {
             DispatchMessageA(&msg as *const _); 
         }
     }
+}
+
+fn set_cursor_is_visible(h_output: HANDLE, cursor_is_visible: bool) -> Result<(), Error> {
+    let mut cursor = CONSOLE_CURSOR_INFO { dwSize: 100, bVisible: TRUE };
+    cursor.bVisible = if !cursor_is_visible { TRUE } else { FALSE };
+    non_zero(unsafe { SetConsoleCursorInfo(h_output, &cursor as *const _) })?;
+    pump_messages();
+    cursor.dwSize = 25;
+    non_zero(unsafe { SetConsoleCursorInfo(h_output, &cursor as *const _) })?;
+    pump_messages();
+    cursor.bVisible = if cursor_is_visible { TRUE } else { FALSE };
+    non_zero(unsafe { SetConsoleCursorInfo(h_output, &cursor as *const _) })?;
+    pump_messages();
+    Ok(())
 }
 
 impl<A: Allocator> Drop for Screen<A> {
