@@ -14,15 +14,13 @@
 extern crate alloc;
 
 use alloc::alloc::Global;
-use alloc::vec;
 use alloc::vec::Vec;
 use core::alloc::Allocator;
 use core::char::{self};
 use core::cmp::min;
-use core::mem::{MaybeUninit};
 use core::num::NonZeroU16;
 use core::ops::Range;
-use core::ptr::{null, null_mut};
+use core::ptr::{null_mut};
 use core::str::{self};
 use either::{Either, Right, Left};
 use errno_no_std::{Errno, errno};
@@ -30,9 +28,9 @@ use num_traits::identities::Zero;
 use panicking::panicking;
 use tuifw_screen_base::*;
 use tuifw_screen_base::Screen as base_Screen;
-use winapi::ctypes::*;
+use unicode_width::UnicodeWidthChar;
 use winapi::shared::minwindef::*;
-use winapi::shared::ntdef::{CHAR, HANDLE};
+use winapi::shared::ntdef::{WCHAR, HANDLE};
 use winapi::um::synchapi::Sleep;
 use winapi::um::wincontypes::*;
 use winapi::um::wincontypes::INPUT_RECORD_Event;
@@ -41,8 +39,6 @@ use winapi::um::winnt::*;
 use winapi::um::fileapi::*;
 use winapi::um::consoleapi::*;
 use winapi::um::handleapi::*;
-use winapi::um::stringapiset::WideCharToMultiByte;
-use winapi::um::winnls::*;
 use winapi::um::winuser::*;
 
 fn non_zero<Z: Zero>(r: Z) -> Result<Z, Errno> {
@@ -65,8 +61,6 @@ pub struct Screen<A: Allocator = Global> {
     max_size: Option<(u16, u16)>,
     h_input: HANDLE,
     h_output: HANDLE,
-    output_cp: UINT,
-    wctmb_flags: DWORD,
     buf: Vec<CHAR_INFO, A>,
     size: Vector,
     invalidated: Rect,
@@ -100,8 +94,6 @@ impl<A: Allocator> Screen<A> {
             max_size,
             h_input: INVALID_HANDLE_VALUE,
             h_output: INVALID_HANDLE_VALUE,
-            output_cp: 0,
-            wctmb_flags: WC_COMPOSITECHECK | WC_DISCARDNS,
             buf: if let Some(max_size) = max_size {
                 Vec::with_capacity_in(usize::from(max_size.0).checked_mul(usize::from(max_size.1)).expect("OOM"), alloc)
             } else {
@@ -131,20 +123,6 @@ impl<A: Allocator> Screen<A> {
         })?;
         non_zero(unsafe { SetConsoleMode(s.h_input, ENABLE_EXTENDED_FLAGS | ENABLE_WINDOW_INPUT) })?;
         non_zero(unsafe { SetConsoleMode(s.h_output, 0) })?;
-        s.output_cp = non_zero(unsafe { GetConsoleOutputCP() })?;
-        let test_char = 0u16;
-        if unsafe { WideCharToMultiByte(
-            s.output_cp,
-            s.wctmb_flags,
-            &test_char as *const _,
-            1,
-            null_mut(),
-            0,
-            null(),
-            null_mut()
-        ) } == 0 {
-            s.wctmb_flags = 0;
-        }
         s.resize()?;
         Ok(s)
     }
@@ -184,31 +162,25 @@ impl<A: Allocator> Screen<A> {
             Attributes: 0,
             Char: CHAR_INFO_Char::default()
         };
-        *unsafe { space.Char.AsciiChar_mut() } = b' ' as CHAR;
+        *unsafe { space.Char.UnicodeChar_mut() } = b' ' as WCHAR;
         self.size = size;
         self.buf.resize(usize::try_from(self.size.rect_area()).expect("OOM"), space);
-        self.invalidated = Rect { tl: Point { x: 0, y: 0 }, size: self.size };
+        self.invalidated.size = Vector::null();
         Ok(())
     }
 
-    fn encode_grapheme(output_cp: UINT, wctmb_flags: DWORD, g: char) -> Either<u8, (u8, u8)> {
+    fn encode_grapheme(g: char) -> Option<Either<u16, (u16, u16)>> {
         let g = replace_control_chars(g);
+        let width = g.width()?;
         let mut buf = [0u16; 2];
         let g = g.encode_utf16(&mut buf[..]);
-        let len = g.len() as isize as _;
-        let n = non_zero(unsafe {
-            WideCharToMultiByte(output_cp, wctmb_flags, g.as_ptr(), len, null_mut(), 0, null(), null_mut())
-        }).unwrap();
-        let mut buf: Vec<MaybeUninit<u8>> = vec![MaybeUninit::uninit(); n as c_uint as usize];
-        non_zero(unsafe {
-            WideCharToMultiByte(output_cp, wctmb_flags, g.as_ptr(), len, buf.as_mut_ptr() as *mut _, n, null(), null_mut())
-        }).unwrap();
-        unsafe { 
-            if IsDBCSLeadByteEx(output_cp, buf[0].assume_init()) != 0 {
-                Right((buf[0].assume_init(), buf[1].assume_init()))
-            } else {
-                Left(buf[0].assume_init())
-            }
+        if g.len() != 1 { return None; }
+        if width == 1 {
+            Some(Left(g[0]))
+        } else if width == 2 {
+            Some(Right((g[0], g[0])))
+        } else {
+            None
         }
     }
 
@@ -218,7 +190,7 @@ impl<A: Allocator> Screen<A> {
                 let col = &mut line[(x as u16 as usize) - 1];
                 debug_assert!(col.Attributes & COMMON_LVB_LEADING_BYTE != 0);
                 col.Attributes &= !COMMON_LVB_LEADING_BYTE;
-                *unsafe { col.Char.AsciiChar_mut() } = b' ' as CHAR;
+                *unsafe { col.Char.UnicodeChar_mut() } = b' ' as WCHAR;
                 x - 1
             } else {
                 x
@@ -233,7 +205,7 @@ impl<A: Allocator> Screen<A> {
             let col = &mut line[x as u16 as usize];
             if col.Attributes & COMMON_LVB_TRAILING_BYTE != 0 {
                 col.Attributes &= !COMMON_LVB_TRAILING_BYTE;
-                *unsafe { col.Char.AsciiChar_mut() } = b' ' as CHAR;
+                *unsafe { col.Char.UnicodeChar_mut() } = b' ' as WCHAR;
                 x + 1
             } else {
                 x
@@ -262,7 +234,7 @@ impl<A: Allocator> Screen<A> {
                 Right: self.invalidated.r() - 1,
                 Bottom: self.invalidated.b() - 1
             };
-            non_zero(unsafe { WriteConsoleOutputA(
+            non_zero(unsafe { WriteConsoleOutputW(
                 self.h_output,
                 self.buf.as_ptr(),
                 COORD { X: self.size.x, Y: self.size.y },
@@ -496,15 +468,13 @@ impl<A: Allocator> base_Screen for Screen<A> {
         let text_end = if soft.end <= p.x { return 0 .. 0 } else { soft.end.saturating_sub(p.x) };
         let text_start = if soft.start <= p.x { 0 } else { soft.start.saturating_sub(p.x) };
         let size = self.size;
-        let output_cp = self.output_cp;
-        let wctmb_flags = self.wctmb_flags;
         let line = (p.y as u16 as usize) * (size.x as u16 as usize);
         let line = &mut self.buf[line .. line + size.x as u16 as usize];
         let attr = attr_w(fg, bg);
         let mut x0 = None;
         let mut x = p.x;
         let mut n = 0i16;
-        for g in text.chars().map(|g| Self::encode_grapheme(output_cp, wctmb_flags, g)) {
+        for g in text.chars().filter_map(|g| Self::encode_grapheme(g)) {
             if x >= hard.end { break; }
             if n >= text_end { break; }
             let w = if g.is_left() { 1 } else { 2 };
@@ -522,7 +492,7 @@ impl<A: Allocator> base_Screen for Screen<A> {
                     x0 = Some((invalidated_l, hard.start));
                     let col = &mut line[hard.start as u16 as usize];
                     col.Attributes = 0;
-                    *unsafe { col.Char.AsciiChar_mut() } = b' ' as CHAR;
+                    *unsafe { col.Char.UnicodeChar_mut() } = b' ' as WCHAR;
                 }
                 continue;
             }
@@ -534,7 +504,7 @@ impl<A: Allocator> base_Screen for Screen<A> {
             if next_x - x < w {
                 let col = &mut line[x as u16 as usize];
                 col.Attributes = 0;
-                *unsafe { col.Char.AsciiChar_mut() } = b' ' as CHAR;
+                *unsafe { col.Char.UnicodeChar_mut() } = b' ' as WCHAR;
                 x = next_x;
                 break;
             }
@@ -542,17 +512,17 @@ impl<A: Allocator> base_Screen for Screen<A> {
                 Left(c) => {
                     let col = &mut line[x as u16 as usize];
                     col.Attributes = attr;
-                    *unsafe { col.Char.AsciiChar_mut() } = c as CHAR;
+                    *unsafe { col.Char.UnicodeChar_mut() } = c;
                     x += 1;
                 },
                 Right((l, t)) => {
                     let col = &mut line[x as u16 as usize];
                     col.Attributes = attr | COMMON_LVB_LEADING_BYTE;
-                    *unsafe { col.Char.AsciiChar_mut() } = l as CHAR;
+                    *unsafe { col.Char.UnicodeChar_mut() } = l;
                     x += 1;
                     let col = &mut line[x as u16 as usize];
                     col.Attributes = attr | COMMON_LVB_TRAILING_BYTE;
-                    *unsafe { col.Char.AsciiChar_mut() } = t as CHAR;
+                    *unsafe { col.Char.UnicodeChar_mut() } = t;
                     x += 1;
                 }
             }

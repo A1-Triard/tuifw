@@ -22,6 +22,15 @@ fn main() {
     loop {
         if let Some(e) = screen.update(None, true).unwrap() {
             if matches!(e, Event::Key(_, Key::Escape)) { break; }
+            if matches!(e, Event::Resize) {
+                let w = 0 .. screen.size().x;
+                for x in 0 .. screen.size().x {
+                    for y in 0 .. screen.size().y {
+                        screen.out(Point { x, y }, Fg::LightGray, Bg::None, " ", w.clone(), w.clone());
+                    }
+                }
+                draw(screen);
+            }
         }
     }
 }

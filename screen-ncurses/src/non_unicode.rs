@@ -79,7 +79,7 @@ impl<A: Allocator> Screen<A> {
         for y in 0 .. size.y {
             let window = non_null(unsafe { newwin(1, 0, y as _, 0) }).unwrap();
             non_err(unsafe { keypad(window.as_ptr(), true) })?;
-            self.lines.push(Line { window, invalidated: true });
+            self.lines.push(Line { window, invalidated: false });
         }
         Ok(())
     }

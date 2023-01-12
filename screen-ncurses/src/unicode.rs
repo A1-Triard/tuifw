@@ -68,7 +68,7 @@ impl<A: Allocator> Screen<A> {
         for y in 0 .. size.y {
             let window = non_null(unsafe { newwin(1, 0, y as _, 0) }).unwrap();
             non_err(unsafe { keypad(window.as_ptr(), true) })?;
-            self.lines.push(Line { window, invalidated: true });
+            self.lines.push(Line { window, invalidated: false });
         }
         Ok(())
     }
@@ -191,7 +191,7 @@ impl<'a> Iterator for Graphemes<'a> {
     fn next(&mut self) -> Option<(&'a str, usize)> {
         let mut chars = self.0.char_indices()
             .map(|(i, c)| (i, replace_control_chars(c)))
-            .map(|(i, c)| (i, c.width().unwrap_or(1)))
+            .filter_map(|(i, c)| c.width().map(|w| (i, w)))
             .skip_while(|&(_, w)| w == 0)
         ;
         if let Some((start, width)) = chars.next() {
@@ -290,7 +290,6 @@ impl<A: Allocator> base_Screen for Screen<A> {
             let col = &mut line[x as u16 as usize];
             let mut i = 0;
             for c in g.chars() {
-                let c = if c < ' ' || c == '\x7F' || c.width().is_none() { ' ' } else { c };
                 col.0[i] = c;
                 i += 1;
             }
