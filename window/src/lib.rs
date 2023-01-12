@@ -467,8 +467,8 @@ impl<State: ?Sized> WindowTree<State> {
         let event = screen.update(self.cursor, wait)?;
         if event == Some(Event::Resize) {
             invalidated.clear();
-            invalidated.resize(screen.size().y as u16 as usize, 0 .. screen.size().x);
             self.screen_size = screen.size();
+            invalidated.resize(self.screen_size.y as u16 as usize, 0 .. self.screen_size.x);
             self.arena[self.root].bounds = Rect { tl: Point { x: 0, y: 0 }, size: self.screen_size };
         }
         Ok(event)

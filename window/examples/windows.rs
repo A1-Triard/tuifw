@@ -82,7 +82,7 @@ fn focus_window(tree: &mut WindowTree<State>, window: Window, state: &mut State)
 }
 
 fn main() {
-    let screen = unsafe { tuifw_screen::init() }.unwrap();
+    let screen = unsafe { tuifw_screen::init(None) }.unwrap();
     let mut windows = WindowTree::new(screen, render);
     let window_1 = Window::new(
         &mut windows, None, None, 
