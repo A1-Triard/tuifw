@@ -19,7 +19,7 @@ use alloc::vec::Vec;
 use core::alloc::Allocator;
 use core::char::{self};
 use core::cmp::min;
-use core::mem::{size_of, MaybeUninit};
+use core::mem::{MaybeUninit};
 use core::num::NonZeroU16;
 use core::ops::Range;
 use core::ptr::{null, null_mut};
@@ -33,6 +33,7 @@ use tuifw_screen_base::Screen as base_Screen;
 use winapi::ctypes::*;
 use winapi::shared::minwindef::*;
 use winapi::shared::ntdef::{CHAR, HANDLE};
+use winapi::um::synchapi::Sleep;
 use winapi::um::wincontypes::*;
 use winapi::um::wincontypes::INPUT_RECORD_Event;
 use winapi::um::wincon::*;
@@ -61,6 +62,7 @@ fn valid_handle(h: HANDLE) -> Result<HANDLE, Errno> {
 }
 
 pub struct Screen<A: Allocator = Global> {
+    max_size: Option<(u16, u16)>,
     h_input: HANDLE,
     h_output: HANDLE,
     output_cp: UINT,
@@ -68,16 +70,17 @@ pub struct Screen<A: Allocator = Global> {
     buf: Vec<CHAR_INFO, A>,
     size: Vector,
     invalidated: Rect,
+    cursor_is_visible: bool, 
 }
 
 impl Screen {
-    pub fn new() -> Result<Self, Error> {
-        Self::new_in(Global)
+    pub fn new(max_size: Option<(u16, u16)>) -> Result<Self, Error> {
+        Self::new_in(max_size, Global)
     }
 }
 
 impl<A: Allocator> Screen<A> {
-    pub fn new_in(alloc: A) -> Result<Self, Error> {
+    pub fn new_in(max_size: Option<(u16, u16)>, alloc: A) -> Result<Self, Error> {
         unsafe { FreeConsole() };
         non_zero(unsafe { AllocConsole() })?;
         let window = unsafe { GetConsoleWindow() };
@@ -87,13 +90,19 @@ impl<A: Allocator> Screen<A> {
             let _ = non_zero(unsafe { DeleteMenu(system_menu, SC_CLOSE as UINT, MF_BYCOMMAND) }); // non-fatal
         }
         let mut s = Screen {
+            max_size,
             h_input: INVALID_HANDLE_VALUE,
             h_output: INVALID_HANDLE_VALUE,
             output_cp: 0,
             wctmb_flags: WC_COMPOSITECHECK | WC_DISCARDNS,
-            buf: Vec::new_in(alloc),
+            buf: if let Some(max_size) = max_size {
+                Vec::with_capacity_in(usize::from(max_size.0).checked_mul(usize::from(max_size.1)).expect("OOM"), alloc)
+            } else {
+                Vec::new_in(alloc)
+            },
             size: Vector::null(),
-            invalidated: Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() }
+            invalidated: Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() },
+            cursor_is_visible: false,
         };
         s.h_input = valid_handle(unsafe { CreateFileA(
             "CONIN$\0".as_ptr() as _,
@@ -129,48 +138,75 @@ impl<A: Allocator> Screen<A> {
         ) } == 0 {
             s.wctmb_flags = 0;
         }
-        s.init_screen_buffer()?;
         s.resize()?;
         Ok(s)
     }
-    
-    fn init_screen_buffer(&mut self) -> Result<(), Errno> {
-        let mut ci = CONSOLE_SCREEN_BUFFER_INFO {
-            dwSize: COORD { X: 0, Y: 0 },
-            dwCursorPosition: COORD { X: 0, Y: 0 },
-            wAttributes: 0,
-            srWindow: SMALL_RECT { Left: 0, Top: 0, Right: 0, Bottom: 0 },
-            dwMaximumWindowSize: COORD { X: 0, Y: 0 }
-        };
-        non_zero(unsafe { GetConsoleScreenBufferInfo(self.h_output, &mut ci as *mut _) })?;
-        ci.srWindow.Right = ci.srWindow.Right.saturating_sub(ci.srWindow.Left).saturating_add(1) - 1;
-        ci.srWindow.Left = 0;
-        ci.srWindow.Bottom = ci.srWindow.Bottom.saturating_sub(ci.srWindow.Top).saturating_add(1) - 1;
-        ci.srWindow.Top = 0;
-        let size = Vector { x: ci.srWindow.Right + 1, y: ci.srWindow.Bottom + 1 };
-        non_zero(unsafe { SetConsoleWindowInfo(self.h_output, 1, &ci.srWindow as *const _) })?;
-        non_zero(unsafe { SetConsoleScreenBufferSize(self.h_output, COORD { X: size.x, Y: size.y }) })?;
-        non_zero(unsafe { FlushConsoleInputBuffer(self.h_input) })?;
-        Ok(())
+
+    fn init_screen_buffer(&mut self) -> Result<Vector, Errno> {
+        let mut width = 0;
+        let mut height = 0;
+        for _ in 0 .. 3 {
+            pump_messages();
+            let mut ci = CONSOLE_SCREEN_BUFFER_INFO {
+                dwSize: COORD { X: 0, Y: 0 },
+                dwCursorPosition: COORD { X: 0, Y: 0 },
+                wAttributes: 0,
+                srWindow: SMALL_RECT { Left: 0, Top: 0, Right: 0, Bottom: 0 },
+                dwMaximumWindowSize: COORD { X: 0, Y: 0 }
+            };
+            non_zero(unsafe { GetConsoleScreenBufferInfo(self.h_output, &mut ci as *mut _) })?;
+            width = ci.srWindow.Right.saturating_sub(ci.srWindow.Left).saturating_add(1);
+            height = ci.srWindow.Bottom.saturating_sub(ci.srWindow.Top).saturating_add(1);
+            ci.srWindow.Left = 0;
+            ci.srWindow.Top = 0;
+            ci.srWindow.Right = width;
+            ci.srWindow.Bottom = height - 1;
+            let _ = non_zero(unsafe { SetConsoleWindowInfo(self.h_output, 1, &ci.srWindow as *const _) });
+            let _ = non_zero(unsafe { SetConsoleScreenBufferSize(self.h_output, COORD { X: width, Y: height }) });
+            let mut cursor = CONSOLE_CURSOR_INFO { dwSize: 0, bVisible: FALSE };
+            cursor.bVisible = TRUE;
+            cursor.dwSize = 100;
+            non_zero(unsafe { FlushConsoleInputBuffer(self.h_input) })?;
+            non_zero(unsafe { SetConsoleCursorInfo(self.h_output, &cursor as *const _) })?;
+            pump_messages();
+            cursor.bVisible = TRUE;//if self.cursor_is_visible { TRUE } else { FALSE };
+            cursor.dwSize = 25;
+            non_zero(unsafe { FlushConsoleInputBuffer(self.h_input) })?;
+            non_zero(unsafe { SetConsoleCursorInfo(self.h_output, &cursor as *const _) })?;
+            pump_messages();
+            cursor.bVisible = FALSE;//if self.cursor_is_visible { TRUE } else { FALSE };
+            cursor.dwSize = 25;
+            non_zero(unsafe { FlushConsoleInputBuffer(self.h_input) })?;
+            non_zero(unsafe { SetConsoleCursorInfo(self.h_output, &cursor as *const _) })?;
+            pump_messages();
+            non_zero(unsafe { FlushConsoleInputBuffer(self.h_input) })?;
+            pump_messages();
+            pump_messages();
+            pump_messages();
+            pump_messages();
+            pump_messages();
+            pump_messages();
+            pump_messages();
+            pump_messages();
+            pump_messages();
+            pump_messages();
+        }
+        if let Some(max_size) = self.max_size {
+            width = min(width as u16, max_size.0) as i16;
+            height = min(height as u16, max_size.1) as i16;
+        }
+        Ok(Vector { x: width, y: height })
     }
 
     fn resize(&mut self) -> Result<(), Errno> {
-        let mut ci = CONSOLE_SCREEN_BUFFER_INFO {
-            dwSize: COORD { X: 0, Y: 0 },
-            dwCursorPosition: COORD { X: 0, Y: 0 },
-            wAttributes: 0,
-            srWindow: SMALL_RECT { Left: 0, Top: 0, Right: 0, Bottom: 0 },
-            dwMaximumWindowSize: COORD { X: 0, Y: 0 }
-        };
-        non_zero(unsafe { GetConsoleScreenBufferInfo(self.h_output, &mut ci as *mut _) })?;
+        let size = self.init_screen_buffer()?;
         let mut space = CHAR_INFO {
             Attributes: 0,
             Char: CHAR_INFO_Char::default()
         };
         *unsafe { space.Char.AsciiChar_mut() } = b' ' as CHAR;
-        assert!(size_of::<usize>() >= 4);
-        self.size = Vector { x: ci.dwSize.X, y: ci.dwSize.Y };
-        self.buf.resize(self.size.rect_area() as usize, space);
+        self.size = size;
+        self.buf.resize(usize::try_from(self.size.rect_area()).expect("OOM"), space);
         self.invalidated = Rect { tl: Point { x: 0, y: 0 }, size: self.size };
         Ok(())
     }
@@ -261,11 +297,22 @@ impl<A: Allocator> Screen<A> {
                 None
             }
         });
+        self.cursor_is_visible = cursor.is_some();
         let mut ci = CONSOLE_CURSOR_INFO { dwSize: 0, bVisible: FALSE };
-        non_zero(unsafe { GetConsoleCursorInfo(self.h_output, &mut ci as *mut _) })?;
-        ci.bVisible = if cursor.is_some() { TRUE } else { FALSE };
+        ci.bVisible = TRUE;
+        ci.dwSize = 100;
         non_zero(unsafe { SetConsoleCursorInfo(self.h_output, &ci as *const _) })?;
+        pump_messages();
+        ci.bVisible = TRUE;//if self.cursor_is_visible { TRUE } else { FALSE };
+        ci.dwSize = 25;
+        non_zero(unsafe { SetConsoleCursorInfo(self.h_output, &ci as *const _) })?;
+        pump_messages();
+        ci.bVisible = FALSE;//if self.cursor_is_visible { TRUE } else { FALSE };
+        ci.dwSize = 25;
+        non_zero(unsafe { SetConsoleCursorInfo(self.h_output, &ci as *const _) })?;
+        pump_messages();
         let (count, key, c, ctrl, alt) = loop {
+            pump_messages();
             if !wait {
                 let mut n: DWORD = 0;
                 non_zero(unsafe { GetNumberOfConsoleInputEvents(self.h_input, &mut n as *mut _) })?;
@@ -297,6 +344,7 @@ impl<A: Allocator> Screen<A> {
                 },
                 _ => { }
             }
+            pump_messages();
         };
         Ok(match key as i32 {
             VK_RETURN => Some(Event::Key(count, Key::Enter)),
@@ -378,6 +426,7 @@ impl<A: Allocator> Screen<A> {
                     assert_eq!(e.wRepeatCount, 1);
                     let h = *unsafe { e.uChar.UnicodeChar() };
                     assert!((0xD800 .. 0xDC00).contains(&h));
+                    pump_messages();
                     ((h as u32 - 0xD800) << 10) | (c as u32 - 0xDC00)
                 } else {
                     c as u32
@@ -394,6 +443,17 @@ impl<A: Allocator> Screen<A> {
                 }
             }
         })
+    }
+}
+
+fn pump_messages() {
+    unsafe {
+        Sleep(1);
+        let mut msg = MSG::default();
+        while PeekMessageA(&mut msg as *mut _, null_mut(), 0, 0, PM_REMOVE) != 0 {
+            TranslateMessage(&mut msg as *mut _); 
+            DispatchMessageA(&msg as *const _); 
+        }
     }
 }
 

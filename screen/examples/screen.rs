@@ -42,7 +42,8 @@ fn draw_box(screen: &mut dyn Screen, p: &mut Point) {
 }
 
 fn main() {
-    let mut screen = unsafe { tuifw_screen::init() }.unwrap();
+    let mut screen = unsafe { tuifw_screen::init(Some((16, 32))) }.unwrap();
+    //let mut screen = unsafe { tuifw_screen::init(None) }.unwrap();
     let screen = screen.as_mut();
     let mut p = Point { x: screen.size().x / 2, y: screen.size().y / 2 };
     draw_box(screen, &mut p);

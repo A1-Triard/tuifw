@@ -26,8 +26,8 @@ pub use tuifw_screen_base::*;
 ///
 /// It is impossible to garantee this conditions on a library level.
 /// So this unsafity should be propagated through all wrappers to the final application.
-pub unsafe fn init() -> Result<Box<dyn Screen>, Error> {
-    init_raw_in(Global)
+pub unsafe fn init(max_size: Option<(u16, u16)>) -> Result<Box<dyn Screen>, Error> {
+    init_raw_in(max_size, Global)
 }
 
 /// # Safety
@@ -41,21 +41,24 @@ pub unsafe fn init() -> Result<Box<dyn Screen>, Error> {
 ///
 /// It is impossible to garantee this conditions on a library level.
 /// So this unsafity should be propagated through all wrappers to the final application.
-pub unsafe fn init_in<A: Allocator + Clone + 'static>(alloc: A) -> Result<Box<dyn Screen>, Error> {
-    init_raw_in(alloc)
+pub unsafe fn init_in<A: Allocator + Clone + 'static>(max_size: Option<(u16, u16)>, alloc: A) -> Result<Box<dyn Screen>, Error> {
+    init_raw_in(max_size, alloc)
 }
 
 #[cfg(target_os="dos")]
-unsafe fn init_raw_in<A: Allocator + Clone>(alloc: A) -> Result<Box<dyn Screen>, Error> {
+unsafe fn init_raw_in<A: Allocator + Clone>(max_size: Option<(u16, u16)>, alloc: A) -> Result<Box<dyn Screen>, Error> {
+    if let Some(max_size) = max_size {
+        assert!(max_size.0 >= 80 && max_size.1 >= 25);
+    }
     Ok(Box::new(tuifw_screen_dos::Screen::new_in(alloc)?))
 }
 
 #[cfg(all(not(target_os="dos"), windows))]
-unsafe fn init_raw_in<A: Allocator + Clone>(alloc: A) -> Result<Box<dyn Screen>, Error> {
-    Ok(Box::new(tuifw_screen_winapi::Screen::new_in(alloc)?))
+unsafe fn init_raw_in<A: Allocator + Clone + 'static>(max_size: Option<(u16, u16)>, alloc: A) -> Result<Box<dyn Screen>, Error> {
+    Ok(Box::new(tuifw_screen_winapi::Screen::new_in(max_size, alloc)?))
 }
 
 #[cfg(all(not(target_os="dos"), not(windows)))]
-unsafe fn init_raw_in<A: Allocator + Clone + 'static>(alloc: A) -> Result<Box<dyn Screen>, Error> {
-    Ok(tuifw_screen_ncurses::init_in(alloc)?)
+unsafe fn init_raw_in<A: Allocator + Clone + 'static>(max_size: Option<(u16, u16)>, alloc: A) -> Result<Box<dyn Screen>, Error> {
+    Ok(tuifw_screen_ncurses::init_in(max_size, alloc)?)
 }
