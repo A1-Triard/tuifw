@@ -33,6 +33,13 @@ impl<A: Allocator> !Send for Screen<A> { }
 
 const ICONV_ERR: iconv_t = (-1isize) as usize as iconv_t;
 
+fn replace_control_chars(c: char) -> char {
+    if c < ' ' { return char::from_u32(0x2400 + c as u32).unwrap(); }
+    if c == '\x7F' { return '\u{2421}'; }
+    if c >= '\u{0080}' && c <= '\u{00FF}' { return '\u{2426}'; }
+    c
+}
+
 impl<A: Allocator> Screen<A> {
     pub unsafe fn new_in(max_size: Option<(u16, u16)>, alloc: A) -> Result<Self, Errno> where A: Clone {
         if non_null(initscr()).is_err() { return Err(Errno(EINVAL)); }
@@ -265,7 +272,7 @@ impl<A: Allocator> base_Screen for Screen<A> {
         let chs = &mut self.chs[usize::from(p.y as u16) * self.cols .. (usize::from(p.y as u16) + 1) * self.cols];
         self.lines[p.y as u16 as usize].invalidated = true;
         let attr = unsafe { attr_ch(fg, bg) };
-        let text = text.chars().filter(|c| c.width() == Some(1))
+        let text = text.chars().map(replace_control_chars).filter(|c| c.width() == Some(1))
             .map(|c| encode_char(self.cd, c))
             .take(text_end as u16 as usize)
         ;

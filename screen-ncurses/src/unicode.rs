@@ -176,6 +176,13 @@ impl<A: Allocator> Drop for Screen<A> {
     }
 }
 
+fn replace_control_chars(c: char) -> char {
+    if c < ' ' { return char::from_u32(0x2400 + c as u32).unwrap(); }
+    if c == '\x7F' { return '\u{2421}'; }
+    if c >= '\u{0080}' && c <= '\u{00FF}' { return '\u{2426}'; }
+    c
+}
+
 struct Graphemes<'a>(&'a str);
 
 impl<'a> Iterator for Graphemes<'a> {
@@ -183,6 +190,7 @@ impl<'a> Iterator for Graphemes<'a> {
 
     fn next(&mut self) -> Option<(&'a str, usize)> {
         let mut chars = self.0.char_indices()
+            .map(|(i, c)| (i, replace_control_chars(c)))
             .map(|(i, c)| (i, c.width().unwrap_or(1)))
             .skip_while(|&(_, w)| w == 0)
         ;

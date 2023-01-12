@@ -221,6 +221,7 @@ fn dos_key(c: Either<u8, char>) -> Option<Key> {
                     '\t' => Key::Tab,
                     '\x1b' => Key::Escape,
                     '\x08' => Key::Backspace,
+                    '\x7f' => Key::Backspace,
                     c => Key::Char(c)
                 }
             }
