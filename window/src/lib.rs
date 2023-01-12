@@ -79,7 +79,7 @@ impl RenderPort {
         let window_end = Point { x: 0, y: 0 }.offset(self.size + self.offset).x;
         let chunks = if window_start <= window_end {
             if window_end <= 0 || window_start >= self.screen.size().x { return; }
-            [max(0, window_start) .. min(self.screen.size().x,  window_end), 0 .. 0]
+            [max(0, window_start) .. min(self.screen.size().x, window_end), 0 .. 0]
         } else {
             if window_end > 0 && window_start < self.screen.size().x {
                 [0 .. window_end, window_start .. self.screen.size().x]
@@ -394,15 +394,15 @@ impl<State: ?Sized> WindowTree<State> {
         )
     ) -> Self {
         let mut arena = Arena::new();
+        let screen_size = screen.size();
         let root = arena.insert(|window| (WindowNode {
             parent: None,
             prev: window,
             next: window,
             first_child: None,
-            bounds: Rect { tl: Point { x: 0, y: 0 }, size: screen.size() },
+            bounds: Rect { tl: Point { x: 0, y: 0 }, size: screen_size },
             tag: None
         }, window));
-        let screen_size = screen.size();
         let rows = screen_size.y as u16 as usize;
         let cols = screen_size.x;
         WindowTree { screen: Some((screen, vec![0 .. cols; rows])), arena, root, render, cursor: None, screen_size }
@@ -467,8 +467,9 @@ impl<State: ?Sized> WindowTree<State> {
         let event = screen.update(self.cursor, wait)?;
         if event == Some(Event::Resize) {
             invalidated.clear();
-            invalidated.resize(screen.size().y as u16 as usize, 0 .. screen.size(). x);
+            invalidated.resize(screen.size().y as u16 as usize, 0 .. screen.size().x);
             self.screen_size = screen.size();
+            self.arena[self.root].bounds = Rect { tl: Point { x: 0, y: 0 }, size: self.screen_size };
         }
         Ok(event)
     }
