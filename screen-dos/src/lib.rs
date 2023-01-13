@@ -1,3 +1,5 @@
+#![feature(allocator_api)]
+
 #![deny(warnings)]
 #![doc(test(attr(deny(warnings))))]
 #![doc(test(attr(allow(dead_code))))]
@@ -8,9 +10,11 @@
 
 #![no_std]
 
-use arrayvec::ArrayString;
+extern crate alloc;
+
+use alloc::boxed::Box;
+use core::alloc::Allocator;
 use core::cmp::{min, max};
-use core::fmt::Write;
 use core::num::NonZeroU16;
 use core::ops::Range;
 use core::ptr::{self};
@@ -23,6 +27,7 @@ use tuifw_screen_base::*;
 use tuifw_screen_base::Screen as base_Screen;
 
 pub struct Screen {
+    error_alloc: &'static dyn Allocator,
     original_mode: u8,
     code_page: &'static CodePage,
 }
@@ -35,25 +40,24 @@ impl Screen {
     ///
     /// It is impossible to garantee this conditions on a library level.
     /// So this unsafity should be propagated through all wrappers to the final application.
-    pub unsafe fn new() -> Result<Self, Error> {
+    pub unsafe fn new(error_alloc: &'static dyn Allocator) -> Result<Self, Error> {
         let code_page = CodePage::load().map_err(|e| {
-            let mut msg = ArrayString::new();
-            write!(msg, "{}", e).unwrap();
             Error {
                 errno: e.errno().unwrap_or(Errno(DOS_ERR_DATA_INVALID.into())),
-                msg
+                msg: Some(Box::new_in(e, error_alloc))
             }
         })?;
         let original_mode = int_10h_ah_0Fh_video_mode().al_mode;
         if original_mode != 0x03 {
             int_10h_ah_00h_set_video_mode(0x03).map_err(|_| Error {
                 errno: Errno(DOS_ERR_NET_REQUEST_NOT_SUPPORTED.into()),
-                msg: ArrayString::from("cannot switch video mode").unwrap()
+                msg: Some(Box::new_in("cannot switch video mode", error_alloc))
             })?;
         } else {
             int_10h_ah_05h_set_video_active_page(0);
         }
         Ok(Screen {
+            error_alloc,
             code_page,
             original_mode,
         })
@@ -66,7 +70,7 @@ impl Drop for Screen {
         if self.original_mode != 0x03 {
             let e = int_10h_ah_00h_set_video_mode(self.original_mode).map_err(|_| Error {
                 errno: Errno(DOS_ERR_NET_REQUEST_NOT_SUPPORTED.into()),
-                msg: ArrayString::from("cannot switch video mode back").unwrap()
+                msg: Some(Box::new_in("cannot switch video mode back", self.error_alloc))
             });
             if e.is_err() && !panicking() { e.unwrap(); }
         }
@@ -212,7 +216,7 @@ impl base_Screen for Screen {
         loop {
             if let Some(c) = self.code_page.inkey().map_err(|_| Error {
                 errno: Errno(DOS_ERR_READ_FAULT.into()),
-                msg: ArrayString::from("read key error").unwrap()
+                msg: Some(Box::new_in("read key error", self.error_alloc))
             })? {
                 break Ok(dos_key(c).map(|c| Event::Key(NonZeroU16::new(1).unwrap(), c)));
             } else {

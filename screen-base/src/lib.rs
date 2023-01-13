@@ -1,3 +1,4 @@
+#![feature(allocator_api)]
 #![feature(generic_arg_infer)]
 #![feature(iter_advance_by)]
 #![feature(stmt_expr_attributes)]
@@ -15,7 +16,10 @@
 
 #![no_std]
 
-use arrayvec::ArrayString;
+extern crate alloc;
+
+use alloc::boxed::Box;
+use core::alloc::Allocator;
 use core::fmt::{self, Debug, Display, Formatter};
 use core::num::NonZeroU16;
 use core::ops::Range;
@@ -160,12 +164,12 @@ pub enum Event {
 
 pub struct Error {
     pub errno: Errno,
-    pub msg: ArrayString<128>,
+    pub msg: Option<Box<dyn Display, &'static dyn Allocator>>,
 }
 
 impl From<Errno> for Error {
     fn from(errno: Errno) -> Error {
-        Error { errno, msg: ArrayString::new() }
+        Error { errno, msg: None }
     }
 }
 
@@ -177,8 +181,8 @@ impl From<Error> for Errno {
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        if !self.msg.is_empty() {
-            write!(f, "{} ({})", self.msg, self.errno)
+        if let Some(msg) = &self.msg {
+            write!(f, "{} ({})", msg, self.errno)
         } else {
             write!(f, "{}", self.errno)
         }

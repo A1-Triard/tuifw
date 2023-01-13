@@ -25,12 +25,17 @@ extern crate pc_atomics;
 extern crate rlibc;
 
 mod no_std {
-    use composable_allocators::{AsGlobal, NonWorking};
+    use composable_allocators::{AsGlobal};
     use composable_allocators::stacked::{self, Stacked};
     use core::mem::MaybeUninit;
 
+    const MEM_SIZE: usize = 32;
+
+    static mut MEM: [MaybeUninit<u8>; MEM_SIZE] = [MaybeUninit::uninit(); _];
+
     #[global_allocator]
-    static ALLOCATOR: AsGlobal<NonWorking> = AsGlobal(NonWorking);
+    static ALLOCATOR: AsGlobal<Stacked<stacked::CtParams<MEM_SIZE>>> =
+        AsGlobal(Stacked::from_static_array(unsafe { &mut MEM }));
 
     #[cfg(windows)]
     #[alloc_error_handler]
@@ -61,20 +66,15 @@ mod dos {
 
 use tuifw_screen_base::{Bg, Fg, Screen, Point, Event, Key};
 
-const CONTROL_CHARS: &str = "\
-    \x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0A\x0B\x0C\x0D\x0E\x0F\
-    \x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F\
-";
-
-const DOS_CHARS: &str = "\
-    .☺☻♥♦♣♠•◘○◙♂♀♪♫☼\
-    ►◄↕‼¶§▬↨↑↓→←∟↔▲▼\
-";
-
 fn draw(screen: &mut dyn Screen) {
     let w = 0 .. screen.size().x;
-    screen.out(Point { x: 0, y: 0 }, Fg::LightGray, Bg::Blue, CONTROL_CHARS, w.clone(), w.clone());
-    screen.out(Point { x: 0, y: 1 }, Fg::LightGray, Bg::Blue, DOS_CHARS, w.clone(), w.clone());
+    for (bg_n, bg) in Bg::iter_variants().enumerate() {
+        let bg_n: i16 = bg_n.try_into().unwrap();
+        for (fg_n, fg) in Fg::iter_variants().enumerate() {
+            let fg_n: i16 = fg_n.try_into().unwrap();
+            screen.out(Point { x: 3 * fg_n, y: bg_n }, fg, bg, " ■ ", w.clone(), w.clone());
+        }
+    }
 }
 
 extern {
@@ -84,8 +84,8 @@ extern {
 #[allow(non_snake_case)]
 #[no_mangle]
 extern "stdcall" fn mainCRTStartup(_: *const PEB) -> u64 {
-    let mut screen = unsafe { tuifw_screen_dos::Screen::new(&no_std::ERROR_ALLOCATOR) }.unwrap();
-    let screen = &mut screen;
+    let mut screen = unsafe { tuifw_screen::init(None, &no_std::ERROR_ALLOCATOR) }.unwrap();
+    let screen = screen.as_mut();
     draw(screen);
     loop {
         if let Some(e) = screen.update(None, true).unwrap() {
