@@ -103,6 +103,50 @@ fn attr(fg: Fg, bg: Bg) -> u8 {
     fg | bg
 }
 
+fn replace_control_chars(c: char) -> char {
+    if c < ' ' { return char::from_u32(0x2400 + c as u32).unwrap(); }
+    if c == '\x7F' { return '\u{2421}'; }
+    if c >= '\u{0080}' && c <= '\u{00FF}' { return '\u{2426}'; }
+    c
+}
+
+fn use_dos_graph_chars(c: char) -> char {
+    match c {
+        '☺' => '\x01',
+        '☻' => '\x02',
+        '♥' => '\x03',
+        '♦' => '\x04',
+        '♣' => '\x05',
+        '♠' => '\x06',
+        '•' => '\x07',
+        '◘' => '\x08',
+        '○' => '\x09',
+        '◙' => '\x0A',
+        '♂' => '\x0B',
+        '♀' => '\x0C',
+        '♪' => '\x0D',
+        '♫' => '\x0E',
+        '☼' => '\x0F',
+        '►' => '\x10',
+        '◄' => '\x11',
+        '↕' => '\x12',
+        '‼' => '\x13',
+        '¶' => '\x14',
+        '§' => '\x15',
+        '▬' => '\x16',
+        '↨' => '\x17',
+        '↑' => '\x18',
+        '↓' => '\x19',
+        '→' => '\x1A',
+        '←' => '\x1B',
+        '∟' => '\x1C',
+        '↔' => '\x1D',
+        '▲' => '\x1E',
+        '▼' => '\x1F',
+        c => c
+    }
+}
+ 
 impl base_Screen for Screen {
     fn size(&self) -> Vector { Vector { x: 80, y: 25 } }
 
@@ -124,7 +168,9 @@ impl base_Screen for Screen {
         let line = ((0xB800usize << 4) + 80 * 25 * 2 + line * 80 * 2) as *mut u16;
         let attr = (attr(fg, bg) as u16) << 8;
         let text = text.chars()
-            .map(|c| self.code_page.from_char(c).unwrap_or(b' '))
+            .map(replace_control_chars)
+            .map(use_dos_graph_chars)
+            .map(|c| self.code_page.from_char(c).unwrap_or(b'\x04'))
             .take(text_end as u16 as usize)
         ;
         let mut before_hard_start = min(p.x, hard.start);
