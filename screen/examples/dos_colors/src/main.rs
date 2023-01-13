@@ -84,7 +84,7 @@ extern {
 #[allow(non_snake_case)]
 #[no_mangle]
 extern "stdcall" fn mainCRTStartup(_: *const PEB) -> u64 {
-    let mut screen = unsafe { tuifw_screen::init(None, &no_std::ERROR_ALLOCATOR) }.unwrap();
+    let mut screen = unsafe { tuifw_screen::init(None, Some(&no_std::ERROR_ALLOCATOR)) }.unwrap();
     let screen = screen.as_mut();
     draw(screen);
     loop {

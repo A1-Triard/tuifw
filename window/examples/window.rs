@@ -25,7 +25,7 @@ fn draw(
 }
 
 fn main() {
-    let screen = unsafe { tuifw_screen::init(None) }.unwrap();
+    let screen = unsafe { tuifw_screen::init(None, None) }.unwrap();
     let tree = &mut WindowTree::new(screen, draw);
     let size = Vector { x: 13, y: 7 };
     let padding = Thickness::align(size, tree.screen_size(), HAlign::Center, VAlign::Center);
