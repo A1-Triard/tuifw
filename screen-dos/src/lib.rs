@@ -50,6 +50,8 @@ impl Screen {
                 errno: Errno(DOS_ERR_NET_REQUEST_NOT_SUPPORTED.into()),
                 msg: ArrayString::from("cannot switch video mode").unwrap()
             })?;
+        } else {
+            int_10h_ah_05h_set_video_active_page(0);
         }
         Ok(Screen {
             code_page,
