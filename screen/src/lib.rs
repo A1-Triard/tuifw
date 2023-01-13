@@ -15,6 +15,8 @@ use core::alloc::Allocator;
 
 pub use tuifw_screen_base::*;
 
+const GLOBAL: composable_allocators::Global = composable_allocators::Global;
+
 /// # Safety
 ///
 /// This function may initialize ncurses lib. It is safe iff no other code in application calls ncurses functions
@@ -26,8 +28,8 @@ pub use tuifw_screen_base::*;
 ///
 /// It is impossible to garantee this conditions on a library level.
 /// So this unsafity should be propagated through all wrappers to the final application.
-pub unsafe fn init(max_size: Option<(u16, u16)>, error_alloc: &'static dyn Allocator) -> Result<Box<dyn Screen>, Error> {
-    init_raw_in(max_size, error_alloc, Global)
+pub unsafe fn init(max_size: Option<(u16, u16)>, error_alloc: Option<&'static dyn Allocator>) -> Result<Box<dyn Screen>, Error> {
+    init_raw_in(max_size, error_alloc.unwrap_or(&GLOBAL), Global)
 }
 
 /// # Safety
@@ -43,10 +45,10 @@ pub unsafe fn init(max_size: Option<(u16, u16)>, error_alloc: &'static dyn Alloc
 /// So this unsafity should be propagated through all wrappers to the final application.
 pub unsafe fn init_in<A: Allocator + Clone + 'static>(
     max_size: Option<(u16, u16)>,
-    error_alloc: &'static dyn Allocator,
+    error_alloc: Option<&'static dyn Allocator>,
     alloc: A
 ) -> Result<Box<dyn Screen>, Error> {
-    init_raw_in(max_size, error_alloc, alloc)
+    init_raw_in(max_size, error_alloc.unwrap_or(&GLOBAL), alloc)
 }
 
 #[cfg(target_os="dos")]

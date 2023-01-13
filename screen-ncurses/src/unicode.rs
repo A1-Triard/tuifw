@@ -11,6 +11,7 @@ use core::ops::Range;
 use core::ptr::NonNull;
 use either::{Left, Right};
 use errno_no_std::Errno;
+use itertools::Itertools;
 use libc::*;
 use panicking::panicking;
 use tuifw_screen_base::*;
@@ -183,48 +184,6 @@ fn replace_control_chars(c: char) -> char {
     c
 }
 
-struct Graphemes<'a>(&'a str);
-
-impl<'a> Iterator for Graphemes<'a> {
-    type Item = (&'a str, usize);
-
-    fn next(&mut self) -> Option<(&'a str, usize)> {
-        let mut chars = self.0.char_indices()
-            .map(|(i, c)| (i, replace_control_chars(c)))
-            .filter_map(|(i, c)| c.width().map(|w| (i, w)))
-            .skip_while(|&(_, w)| w == 0)
-        ;
-        if let Some((start, width)) = chars.next() {
-            let end = 'r: loop {
-                for _ in 1 .. CCHARW_MAX {
-                    if let Some((i, w)) = chars.next() {
-                        if w != 0 {
-                            break 'r i;
-                        }
-                    } else {
-                        break 'r self.0.len();
-                    }
-                }
-                break 'r if let Some((i, _)) = chars.next() {
-                    i
-                } else {
-                    self.0.len()
-                };
-            };
-            let (item, tail) = self.0.split_at(end);
-            self.0 = tail;
-            Some((&item[start ..], width))
-        } else {
-            self.0 = &self.0[self.0.len() ..];
-            None
-        }
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        (0, Some(self.0.len()))
-    }
-}
-
 impl<A: Allocator> base_Screen for Screen<A> {
     fn size(&self) -> Vector { size(self.max_size) }
 
@@ -245,11 +204,27 @@ impl<A: Allocator> base_Screen for Screen<A> {
         let line = &mut self.chs[usize::from(p.y as u16) * self.cols .. (usize::from(p.y as u16) + 1) * self.cols];
         self.lines[p.y as u16 as usize].invalidated = true;
         let attr = unsafe { attr_ch(fg, bg) };
-        let text = Graphemes(text);
+        let graphemes = text.chars().map(replace_control_chars).peekable().batching(|text| {
+            let (c, w) = loop {
+                let c = text.next()?;
+                let w = c.width().unwrap_or(0);
+                if w != 0 { break (c, w); }
+            };
+            let mut grapheme = ['\0'; CCHARW_MAX];
+            grapheme[0] = c;
+            for i in 1 .. CCHARW_MAX {
+                if let Some(c) = text.next_if(|x| x.width() == Some(0)) {
+                    grapheme[i] = c;
+                } else {
+                    break;
+                }
+            }
+            Some((grapheme, w))
+        });
         let mut x0 = None;
         let mut x = p.x;
         let mut n = 0i16;
-        for (g, w) in text {
+        for (g, w) in graphemes {
             if x >= hard.end { break; }
             if n >= text_end { break; }
             let w = min(w, i16::MAX as u16 as usize) as u16 as i16;
@@ -288,14 +263,7 @@ impl<A: Allocator> base_Screen for Screen<A> {
                 break;
             }
             let col = &mut line[x as u16 as usize];
-            let mut i = 0;
-            for c in g.chars() {
-                col.0[i] = c;
-                i += 1;
-            }
-            if i <= CCHARW_MAX {
-                col.0[i] = '\0';
-            }
+            col.0 = g;
             col.1 = attr;
             for i in x + 1 .. next_x {
                line[i as u16 as usize].0[0] = '\0';

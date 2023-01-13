@@ -21,7 +21,7 @@ fn draw(screen: &mut dyn Screen) {
 }
 
 fn main() {
-    let mut screen = unsafe { tuifw_screen::init(None) }.unwrap();
+    let mut screen = unsafe { tuifw_screen::init(None, None) }.unwrap();
     let screen = screen.as_mut();
     draw(screen);
     loop {
