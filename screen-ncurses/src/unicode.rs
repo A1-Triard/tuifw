@@ -180,7 +180,7 @@ impl<A: Allocator> Drop for Screen<A> {
 fn replace_control_chars(c: char) -> char {
     if c < ' ' { return char::from_u32(0x2400 + c as u32).unwrap(); }
     if c == '\x7F' { return '\u{2421}'; }
-    if c >= '\u{0080}' && c <= '\u{00FF}' { return '\u{2426}'; }
+    if ('\u{0080}' ..= '\u{00FF}').contains(&c) { return '\u{2426}'; }
     c
 }
 
@@ -212,9 +212,9 @@ impl<A: Allocator> base_Screen for Screen<A> {
             };
             let mut grapheme = ['\0'; CCHARW_MAX];
             grapheme[0] = c;
-            for i in 1 .. CCHARW_MAX {
+            for g in grapheme[1 ..].iter_mut() {
                 if let Some(c) = text.next_if(|x| x.width() == Some(0)) {
-                    grapheme[i] = c;
+                    *g = c;
                 } else {
                     break;
                 }

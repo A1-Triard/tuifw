@@ -78,5 +78,5 @@ unsafe fn init_raw_in<A: Allocator + Clone + 'static>(
     _error_alloc: &'static dyn Allocator,
     alloc: A
 ) -> Result<Box<dyn Screen>, Error> {
-    Ok(tuifw_screen_ncurses::init_in(max_size, alloc)?)
+    tuifw_screen_ncurses::init_in(max_size, alloc)
 }
