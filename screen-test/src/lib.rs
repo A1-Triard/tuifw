@@ -12,10 +12,12 @@ extern crate alloc;
 use alloc::alloc::Global;
 use alloc::vec::Vec;
 use core::alloc::Allocator;
+use core::iter::repeat;
 use core::cmp::{min, max};
 use core::ops::Range;
 use tuifw_screen_base::*;
 use tuifw_screen_base::Screen as base_Screen;
+use unicode_width::UnicodeWidthChar;
 
 pub struct Screen<A: Allocator + Clone = Global> {
     buf: Vec<(char, Fg, Bg), A>,
@@ -78,7 +80,11 @@ impl<A: Allocator + Clone> base_Screen for Screen<A> {
         let mut before_text_start = 0i16;
         let x0 = max(hard.start, p.x);
         let mut x = x0;
-        for g in text.chars().take(text_end as u16 as usize) {
+        let text = text.chars()
+            .filter(|&c| c != '\0' && c.width().is_some())
+            .flat_map(|c| repeat(c).take(c.width().unwrap()))
+        ;
+        for g in text.take(text_end as u16 as usize) {
             if x >= hard.end { break; }
             let visible_1 = if before_text_start < text_start {
                 before_text_start += 1;

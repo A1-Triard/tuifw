@@ -15,6 +15,7 @@ extern crate alloc;
 use alloc::boxed::Box;
 use core::alloc::Allocator;
 use core::cmp::{min, max};
+use core::iter::{once, repeat};
 use core::num::NonZeroU16;
 use core::ops::Range;
 use core::ptr::{self};
@@ -25,6 +26,7 @@ use panicking::panicking;
 use pc_ints::*;
 use tuifw_screen_base::*;
 use tuifw_screen_base::Screen as base_Screen;
+use unicode_width::UnicodeWidthChar;
 
 pub struct Screen {
     error_alloc: &'static dyn Allocator,
@@ -109,13 +111,6 @@ fn attr(fg: Fg, bg: Bg) -> u8 {
     fg | bg
 }
 
-fn replace_control_chars(c: char) -> char {
-    if c < ' ' { return char::from_u32(0x2400 + c as u32).unwrap(); }
-    if c == '\x7F' { return '\u{2421}'; }
-    if ('\u{0080}' ..= '\u{00FF}').contains(&c) { return '\u{2426}'; }
-    c
-}
-
 fn use_dos_graph_chars(c: char) -> char {
     match c {
         '☺' => '\x01',
@@ -174,9 +169,12 @@ impl base_Screen for Screen {
         let line = ((0xB800usize << 4) + 80 * 25 * 2 + line * 80 * 2) as *mut u16;
         let attr = (attr(fg, bg) as u16) << 8;
         let text = text.chars()
-            .map(replace_control_chars)
+            .filter(|&x| x != '\0' && x.width().is_some())
             .map(use_dos_graph_chars)
-            .map(|c| self.code_page.from_char(c).unwrap_or(b'\x04'))
+            .flat_map(|c| self.code_page.from_char(c).map_or_else(
+                || Left(repeat(b'\x04').take(c.width().unwrap())),
+                |c| Right(once(c))
+            ))
             .take(text_end as u16 as usize)
         ;
         let mut before_hard_start = min(p.x, hard.start);

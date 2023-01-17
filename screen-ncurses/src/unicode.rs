@@ -177,13 +177,6 @@ impl<A: Allocator> Drop for Screen<A> {
     }
 }
 
-fn replace_control_chars(c: char) -> char {
-    if c < ' ' { return char::from_u32(0x2400 + c as u32).unwrap(); }
-    if c == '\x7F' { return '\u{2421}'; }
-    if ('\u{0080}' ..= '\u{00FF}').contains(&c) { return '\u{2426}'; }
-    c
-}
-
 impl<A: Allocator> base_Screen for Screen<A> {
     fn size(&self) -> Vector { size(self.max_size) }
 
@@ -204,16 +197,16 @@ impl<A: Allocator> base_Screen for Screen<A> {
         let line = &mut self.chs[usize::from(p.y as u16) * self.cols .. (usize::from(p.y as u16) + 1) * self.cols];
         self.lines[p.y as u16 as usize].invalidated = true;
         let attr = unsafe { attr_ch(fg, bg) };
-        let graphemes = text.chars().map(replace_control_chars).peekable().batching(|text| {
+        let graphemes = text.chars().filter(|&c| c != '\0' && c.width().is_some()).peekable().batching(|text| {
             let (c, w) = loop {
                 let c = text.next()?;
-                let w = c.width().unwrap_or(0);
+                let w = c.width().unwrap();
                 if w != 0 { break (c, w); }
             };
             let mut grapheme = ['\0'; CCHARW_MAX];
             grapheme[0] = c;
             for g in grapheme[1 ..].iter_mut() {
-                if let Some(c) = text.next_if(|x| x.width() == Some(0)) {
+                if let Some(c) = text.next_if(|x| x.width().unwrap() == 0) {
                     *g = c;
                 } else {
                     break;

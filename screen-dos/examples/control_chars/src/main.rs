@@ -71,10 +71,13 @@ const DOS_CHARS: &str = "\
     ►◄↕‼¶§▬↨↑↓→←∟↔▲▼\
 ";
 
+const WIDE_CHARS: &str = "好 女 子";
+
 fn draw(screen: &mut dyn Screen) {
     let w = 0 .. screen.size().x;
     screen.out(Point { x: 0, y: 0 }, Fg::LightGray, Bg::Blue, CONTROL_CHARS, w.clone(), w.clone());
     screen.out(Point { x: 0, y: 1 }, Fg::LightGray, Bg::Blue, DOS_CHARS, w.clone(), w.clone());
+    screen.out(Point { x: 0, y: 3 }, Fg::LightGray, Bg::Blue, WIDE_CHARS, w.clone(), w.clone());
 }
 
 extern {

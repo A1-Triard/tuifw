@@ -3,6 +3,7 @@ use crate::ncurses::*;
 use alloc::vec::Vec;
 use core::alloc::Allocator;
 use core::cmp::{max, min};
+use core::iter::{once, repeat};
 use core::ops::Range;
 use core::ptr::NonNull;
 use core::str::{self};
@@ -32,13 +33,6 @@ impl<A: Allocator> !Sync for Screen<A> { }
 impl<A: Allocator> !Send for Screen<A> { }
 
 const ICONV_ERR: iconv_t = (-1isize) as usize as iconv_t;
-
-fn replace_control_chars(c: char) -> char {
-    if c < ' ' { return char::from_u32(0x2400 + c as u32).unwrap(); }
-    if c == '\x7F' { return '\u{2421}'; }
-    if ('\u{0080}' ..= '\u{00FF}').contains(&c) { return '\u{2426}'; }
-    c
-}
 
 impl<A: Allocator> Screen<A> {
     pub unsafe fn new_in(max_size: Option<(u16, u16)>, alloc: A) -> Result<Self, Errno> where A: Clone {
@@ -177,40 +171,40 @@ fn size(max_size: Option<(u16, u16)>) -> Vector {
     Vector { x, y }
 }
 
-fn encode_char(cd: iconv_t, c: char) -> chtype {
+fn encode_char(cd: iconv_t, c: char) -> Option<chtype> {
     match c {
-        '→' => return A_ALTCHARSET | 43,
-        '←' => return A_ALTCHARSET | 44,
-        '↑' => return A_ALTCHARSET | 45,
-        '↓' => return A_ALTCHARSET | 46,
-        '█' => return A_ALTCHARSET | 48,
-        '♦' => return A_ALTCHARSET | 96,
-        '▒' => return A_ALTCHARSET | 97,
-        '°' => return A_ALTCHARSET | 102,
-        '±' => return A_ALTCHARSET | 103,
-        '░' => return A_ALTCHARSET | 104,
-        '␋' => return A_ALTCHARSET | 105,
-        '┘' => return A_ALTCHARSET | 106,
-        '┐' => return A_ALTCHARSET | 107,
-        '┌' => return A_ALTCHARSET | 108,
-        '└' => return A_ALTCHARSET | 109,
-        '┼' => return A_ALTCHARSET | 110,
-        '⎺' => return A_ALTCHARSET | 111,
-        '⎻' => return A_ALTCHARSET | 112,
-        '─' => return A_ALTCHARSET | 113,
-        '⎼' => return A_ALTCHARSET | 114,
-        '⎽' => return A_ALTCHARSET | 115,
-        '├' => return A_ALTCHARSET | 116,
-        '┤' => return A_ALTCHARSET | 117,
-        '┴' => return A_ALTCHARSET | 118,
-        '┬' => return A_ALTCHARSET | 119,
-        '│' => return A_ALTCHARSET | 120,
-        '≤' => return A_ALTCHARSET | 121,
-        '≥' => return A_ALTCHARSET | 122,
-        'π' => return A_ALTCHARSET | 123,
-        '≠' => return A_ALTCHARSET | 124,
-        '£' => return A_ALTCHARSET | 125,
-        '·' => return A_ALTCHARSET | 126,
+        '→' => return Some(A_ALTCHARSET | 43),
+        '←' => return Some(A_ALTCHARSET | 44),
+        '↑' => return Some(A_ALTCHARSET | 45),
+        '↓' => return Some(A_ALTCHARSET | 46),
+        '█' => return Some(A_ALTCHARSET | 48),
+        '♦' => return Some(A_ALTCHARSET | 96),
+        '▒' => return Some(A_ALTCHARSET | 97),
+        '°' => return Some(A_ALTCHARSET | 102),
+        '±' => return Some(A_ALTCHARSET | 103),
+        '░' => return Some(A_ALTCHARSET | 104),
+        '␋' => return Some(A_ALTCHARSET | 105),
+        '┘' => return Some(A_ALTCHARSET | 106),
+        '┐' => return Some(A_ALTCHARSET | 107),
+        '┌' => return Some(A_ALTCHARSET | 108),
+        '└' => return Some(A_ALTCHARSET | 109),
+        '┼' => return Some(A_ALTCHARSET | 110),
+        '⎺' => return Some(A_ALTCHARSET | 111),
+        '⎻' => return Some(A_ALTCHARSET | 112),
+        '─' => return Some(A_ALTCHARSET | 113),
+        '⎼' => return Some(A_ALTCHARSET | 114),
+        '⎽' => return Some(A_ALTCHARSET | 115),
+        '├' => return Some(A_ALTCHARSET | 116),
+        '┤' => return Some(A_ALTCHARSET | 117),
+        '┴' => return Some(A_ALTCHARSET | 118),
+        '┬' => return Some(A_ALTCHARSET | 119),
+        '│' => return Some(A_ALTCHARSET | 120),
+        '≤' => return Some(A_ALTCHARSET | 121),
+        '≥' => return Some(A_ALTCHARSET | 122),
+        'π' => return Some(A_ALTCHARSET | 123),
+        '≠' => return Some(A_ALTCHARSET | 124),
+        '£' => return Some(A_ALTCHARSET | 125),
+        '·' => return Some(A_ALTCHARSET | 126),
         _ => { },
     }
     let mut buf = [0; 4];
@@ -227,10 +221,10 @@ fn encode_char(cd: iconv_t, c: char) -> chtype {
         (&mut encoded_ptr) as *mut _,
         (&mut encoded_len) as *mut _
     ) };
-    if encoded_len == 0 && encoded != 127 && encoded >= 32 {
-        encoded as chtype
+    if encoded_len == 0 {
+        Some(encoded as chtype)
     } else {
-        A_ALTCHARSET | 96
+        None
     }
 }
 
@@ -272,8 +266,12 @@ impl<A: Allocator> base_Screen for Screen<A> {
         let chs = &mut self.chs[usize::from(p.y as u16) * self.cols .. (usize::from(p.y as u16) + 1) * self.cols];
         self.lines[p.y as u16 as usize].invalidated = true;
         let attr = unsafe { attr_ch(fg, bg) };
-        let text = text.chars().map(replace_control_chars).filter(|c| c.width() == Some(1))
-            .map(|c| encode_char(self.cd, c))
+        let text = text.chars()
+            .filter(|&x| x != '\0' && x.width().is_some())
+            .flat_map(|c| encode_char(self.cd, c).map_or_else(
+                || Left(repeat(A_ALTCHARSET | 96).take(c.width().unwrap())),
+                |c| Right(once(c))
+            ))
             .take(text_end as u16 as usize)
         ;
         let mut before_hard_start = min(p.x, hard.start);

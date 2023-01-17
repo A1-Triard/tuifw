@@ -18,6 +18,7 @@ use alloc::vec::Vec;
 use core::alloc::Allocator;
 use core::char::{self};
 use core::cmp::min;
+use core::iter::{once, repeat};
 use core::num::NonZeroU16;
 use core::ops::Range;
 use core::ptr::{null_mut};
@@ -71,13 +72,6 @@ impl Screen {
     pub fn new(max_size: Option<(u16, u16)>) -> Result<Self, Error> {
         Self::new_in(max_size, Global)
     }
-}
-
-fn replace_control_chars(c: char) -> char {
-    if c < ' ' { return char::from_u32(0x2400 + c as u32).unwrap(); }
-    if c == '\x7F' { return '\u{2421}'; }
-    if ('\u{0080}' ..= '\u{00FF}').contains(&c) { return '\u{2426}'; }
-    c
 }
 
 impl<A: Allocator> Screen<A> {
@@ -170,8 +164,7 @@ impl<A: Allocator> Screen<A> {
     }
 
     fn encode_grapheme(g: char) -> Option<Either<u16, (u16, u16)>> {
-        let g = replace_control_chars(g);
-        let width = g.width()?;
+        let width = g.width().unwrap();
         let mut buf = [0u16; 2];
         let g = g.encode_utf16(&mut buf[..]);
         if g.len() != 1 { return None; }
@@ -474,7 +467,14 @@ impl<A: Allocator> base_Screen for Screen<A> {
         let mut x0 = None;
         let mut x = p.x;
         let mut n = 0i16;
-        for g in text.chars().filter_map(|g| Self::encode_grapheme(g)) {
+        let text = text.chars()
+            .filter(|&x| x != '\0' && x.width().is_some())
+            .flat_map(|c| Self::encode_grapheme(c).map_or_else(
+                || Left(repeat(Left(0x2666u16)).take(c.width().unwrap())),
+                |g| Right(once(g))
+            ))
+        ;
+        for g in text {
             if x >= hard.end { break; }
             if n >= text_end { break; }
             let w = if g.is_left() { 1 } else { 2 };
