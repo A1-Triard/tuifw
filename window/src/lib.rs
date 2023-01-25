@@ -521,8 +521,8 @@ mod tests {
         let screen = tuifw_screen_test::Screen::new(Vector::null());
         let screen = Box::new(screen) as _;
         let tree = &mut WindowTree::<()>::new(screen, render);
-        let w = Window::new(tree, None, None, Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() });
-        let _ = Window::new(tree, Some(w), None, Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() });
+        let w = Window::new(tree, None, None);
+        let _ = Window::new(tree, Some(w), None);
         w.drop_window(tree);
         assert_eq!(tree.arena.items().len(), 1);
      }
