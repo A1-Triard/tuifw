@@ -38,7 +38,7 @@ jobs:
     - run: "cargo doc --verbose --workspace"
     - run: "cargo build --verbose --workspace --release"
     - run: "cargo test --verbose --workspace --examples"
-    - run: "cargo outdated --verbose --workspace --aggressive --root-deps-only --exit-code 1"
+    - run: "cargo outdated --verbose --workspace --root-deps-only --exit-code 1"
     - run: "cargo clippy --verbose --workspace"
     - run: "cargo +nightly build --verbose -Z build-std=core,alloc,panic_abort --target ${{ matrix.triple }} --release"
       working-directory: ensure_no_std
