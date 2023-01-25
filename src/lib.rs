@@ -11,6 +11,7 @@
 
 extern crate alloc;
 
+use alloc::boxed::Box;
 use alloc::vec::Vec;
 use components_arena::{Arena, Id, Component};
 use macro_attr_2018::macro_attr;
@@ -63,39 +64,70 @@ impl RenderPortExt for RenderPort {
     }
 }
 
-pub struct WindowManager {
-    windows: Vec<(Window, fn(Vector) -> Rect)>
+pub trait WindowOwner<State: ?Sized> {
+    fn move_xy(&mut self, tree: &mut WindowTree<State>, bounds: Rect);
 }
 
-impl WindowManager {
+struct WindowAsWindowOwner(Window);
+
+impl<State: ?Sized> WindowOwner<State> for WindowAsWindowOwner {
+    fn move_xy(&mut self, tree: &mut WindowTree<State>, bounds: Rect) {
+        self.0.move_xy(tree, bounds);
+    }
+}
+
+pub struct WindowManager<State: ?Sized> {
+    windows: Vec<(Box<dyn WindowOwner<State>>, fn(Vector) -> Rect)>
+}
+
+impl<State: ?Sized> WindowManager<State> {
     pub fn new() -> Self {
         WindowManager { windows: Vec::new() }
     }
 
-    pub fn update<State: ?Sized>(&self, tree: &mut WindowTree<State>, event: Event) {
+    pub fn update(&mut self, tree: &mut WindowTree<State>, event: Event) {
         if event == Event::Resize {
             let screen_size = tree.screen_size();
-            for (window, bounds) in &self.windows {
-                window.move_xy(tree, bounds(screen_size));
+            for (window_owner, bounds) in &mut self.windows {
+                window_owner.move_xy(tree, bounds(screen_size));
             }
         }
     }
 
-    pub fn new_window<State: ?Sized>(
+    pub fn add_window_owner(
+        &mut self,
+        tree: &mut WindowTree<State>,
+        mut window_owner: Box<dyn WindowOwner<State>>,
+        bounds: fn(Vector) -> Rect
+    ) {
+        let initial_bounds = bounds(tree.screen_size());
+        window_owner.move_xy(tree, initial_bounds);
+        self.windows.push((window_owner, bounds));
+    }
+
+    pub fn add_window(
+        &mut self,
+        tree: &mut WindowTree<State>,
+        window: Window,
+        bounds: fn(Vector) -> Rect
+    ) {
+        self.add_window_owner(tree, Box::new(WindowAsWindowOwner(window)), bounds);
+    }
+
+    pub fn new_window(
         &mut self,
         tree: &mut WindowTree<State>,
         parent: Option<Window>,
         prev: Option<Window>,
         bounds: fn(Vector) -> Rect
     ) -> Window {
-        let initial_bounds = bounds(tree.screen_size());
-        let window = Window::new(tree, parent, prev, initial_bounds);
-        self.windows.push((window, bounds));
+        let window = Window::new(tree, parent, prev);
+        self.add_window(tree, window, bounds);
         window
     }
 }
 
-impl Default for WindowManager {
+impl<State: ?Sized> Default for WindowManager<State> {
     fn default() -> Self { Self::new() }
 }
 

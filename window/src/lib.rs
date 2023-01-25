@@ -164,7 +164,6 @@ impl Window {
         tree: &mut WindowTree<State>,
         parent: Option<Self>,
         prev: Option<Self>,
-        bounds: Rect,
     ) -> Window {
         let parent = parent.map_or(tree.root, |w| w.0);
         let window = tree.arena.insert(|window| {
@@ -173,13 +172,11 @@ impl Window {
                 prev: window,
                 next: window,
                 first_child: None,
-                bounds,
+                bounds: Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() },
                 tag: None
             }, Window(window))
         });
         window.attach(tree, parent, prev);
-        let screen_bounds = bounds.offset(offset_from_root(parent, tree));
-        invalidate_rect(tree.invalidated(), screen_bounds);
         window
     }
 
