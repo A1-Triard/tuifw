@@ -1,7 +1,7 @@
 [package]
 edition = "2021"
 name = "tuifw"
-version = "0.1.0"
+version = "0.2.0"
 #rust-version = "nightly"
 authors = ["warlock <internalmike@gmail.com>"]
 description = "Text User Interface Framework."
@@ -29,8 +29,8 @@ exclude = [
 [dependencies]
 components-arena = "3.4.1"
 macro-attr-2018 = "2.1.2"
-tuifw-screen-base = { path = "screen-base", version = "0.19.1" }
-tuifw-window = { path = "window", version = "0.19.1" }
+tuifw-screen-base = { path = "screen-base", version = "0.20.0" }
+tuifw-window = { path = "window", version = "0.20.0" }
 
 [badges]
 maintenance = { status = "experimental" }
