@@ -176,7 +176,7 @@ impl Display for Error {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             Error::Oom => write!(f, "out of memory"),
-            Error::System(msg) => write!(f, "{}", msg)
+            Error::System(msg) => write!(f, "{msg}")
         }
     }
 }
