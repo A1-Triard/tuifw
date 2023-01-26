@@ -14,8 +14,10 @@ extern crate alloc;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use components_arena::{Arena, Id, Component};
+use core::fmt::Debug;
 use macro_attr_2018::macro_attr;
-use tuifw_screen_base::{Bg, Error, Event, Fg, Point, Range1d, Rect, Vector};
+use phantom_type::PhantomType;
+use tuifw_screen_base::{Bg, Event, Fg, Point, Range1d, Rect, Vector};
 use tuifw_window::{RenderPort, Window, WindowTree};
 
 pub trait RenderPortExt {
@@ -65,44 +67,60 @@ impl RenderPortExt for RenderPort {
 }
 
 pub trait WindowOwner<State: ?Sized> {
-    fn move_xy(&mut self, tree: &mut WindowTree<State>, bounds: Rect);
+    type Error;
+
+    fn error_priority(&self) -> u8;
+
+    fn move_xy(&mut self, tree: &mut WindowTree<State>, bounds: Rect) -> Result<(), Self::Error>;
 }
 
-struct WindowAsWindowOwner(Window);
+struct WindowAsWindowOwner<Error: Debug>(Window, PhantomType<Error>);
 
-impl<State: ?Sized> WindowOwner<State> for WindowAsWindowOwner {
-    fn move_xy(&mut self, tree: &mut WindowTree<State>, bounds: Rect) {
+impl<State: ?Sized, Error: Debug> WindowOwner<State> for WindowAsWindowOwner<Error> {
+    type Error = Error;
+
+    fn error_priority(&self) -> u8 { 0 }
+
+    fn move_xy(&mut self, tree: &mut WindowTree<State>, bounds: Rect) -> Result<(), Error> {
         self.0.move_xy(tree, bounds);
+        Ok(())
     }
 }
 
-pub struct WindowManager<State: ?Sized> {
-    windows: Vec<(Box<dyn WindowOwner<State>>, fn(Vector) -> Rect)>
+pub struct WindowManager<State: ?Sized, Error: Debug> {
+    windows: Vec<(Box<dyn WindowOwner<State, Error=Error>>, fn(Vector) -> Rect)>
 }
 
-impl<State: ?Sized> WindowManager<State> {
+impl<State: ?Sized, Error: Debug> WindowManager<State, Error> {
     pub fn new() -> Self {
         WindowManager { windows: Vec::new() }
     }
 
-    pub fn update(&mut self, tree: &mut WindowTree<State>, event: Event) {
+    pub fn update(&mut self, tree: &mut WindowTree<State>, event: Event) -> Result<(), Error> {
         if event == Event::Resize {
             let screen_size = tree.screen_size();
             for (window_owner, bounds) in &mut self.windows {
-                window_owner.move_xy(tree, bounds(screen_size));
+                window_owner.move_xy(tree, bounds(screen_size))?;
             }
         }
+        Ok(())
     }
 
     pub fn add_window_owner(
         &mut self,
         tree: &mut WindowTree<State>,
-        mut window_owner: Box<dyn WindowOwner<State>>,
+        mut window_owner: Box<dyn WindowOwner<State, Error=Error>>,
         bounds: fn(Vector) -> Rect
-    ) {
+    ) -> Result<(), Error> {
+        self.windows.try_reserve(1).expect("OOM");
         let initial_bounds = bounds(tree.screen_size());
-        window_owner.move_xy(tree, initial_bounds);
-        self.windows.push((window_owner, bounds));
+        window_owner.move_xy(tree, initial_bounds)?;
+        let index = self.windows.binary_search_by_key(
+            &(u8::MAX - window_owner.error_priority()),
+            |x| u8::MAX - x.0.error_priority()
+        ).unwrap_or_else(|x| x);
+        self.windows.insert(index, (window_owner, bounds));
+        Ok(())
     }
 
     pub fn add_window(
@@ -110,8 +128,8 @@ impl<State: ?Sized> WindowManager<State> {
         tree: &mut WindowTree<State>,
         window: Window,
         bounds: fn(Vector) -> Rect
-    ) {
-        self.add_window_owner(tree, Box::new(WindowAsWindowOwner(window)), bounds);
+    ) where Error: 'static {
+        self.add_window_owner(tree, Box::new(WindowAsWindowOwner(window, PhantomType::new())), bounds).unwrap();
     }
 
     pub fn new_window(
@@ -120,14 +138,14 @@ impl<State: ?Sized> WindowManager<State> {
         parent: Option<Window>,
         prev: Option<Window>,
         bounds: fn(Vector) -> Rect
-    ) -> Result<Window, Error> {
+    ) -> Result<Window, tuifw_screen_base::Error> where Error: 'static {
         let window = Window::new(tree, parent, prev)?;
         self.add_window(tree, window, bounds);
         Ok(window)
     }
 }
 
-impl<State: ?Sized> Default for WindowManager<State> {
+impl<State: ?Sized, Error: Debug> Default for WindowManager<State, Error> {
     fn default() -> Self { Self::new() }
 }
 
