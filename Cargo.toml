@@ -27,7 +27,7 @@ exclude = [
 ]
 
 [dependencies]
-components-arena = "3.4.1"
+components-arena = "3.5.0"
 macro-attr-2018 = "2.1.2"
 tuifw-screen-base = { path = "screen-base", version = "0.20.0" }
 tuifw-window = { path = "window", version = "0.20.0" }

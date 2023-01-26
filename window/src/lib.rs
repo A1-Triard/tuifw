@@ -159,7 +159,8 @@ impl Window {
         tree: &mut WindowTree<State>,
         parent: Option<Self>,
         prev: Option<Self>,
-    ) -> Window {
+    ) -> Result<Window, Error> {
+        tree.arena.try_reserve().map_err(|_| Error::Oom)?;
         let parent = parent.map_or(tree.root, |w| w.0);
         let window = tree.arena.insert(|window| {
             (WindowNode {
@@ -172,7 +173,7 @@ impl Window {
             }, Window(window))
         });
         window.attach(tree, parent, prev);
-        window
+        Ok(window)
     }
 
     pub fn bounds<State: ?Sized>(
@@ -384,8 +385,9 @@ impl<State: ?Sized> WindowTree<State> {
             port: &mut RenderPort,
             state: &mut State,
         )
-    ) -> Self {
+    ) -> Result<Self, Error> {
         let mut arena = Arena::new();
+        arena.try_reserve().map_err(|_| Error::Oom)?;
         let screen_size = screen.size();
         let root = arena.insert(|window| (WindowNode {
             parent: None,
@@ -395,7 +397,7 @@ impl<State: ?Sized> WindowTree<State> {
             bounds: Rect { tl: Point { x: 0, y: 0 }, size: screen_size },
             tag: None
         }, window));
-        WindowTree { screen: Some(screen), arena, root, render, cursor: None, screen_size }
+        Ok(WindowTree { screen: Some(screen), arena, root, render, cursor: None, screen_size })
     }
 
     pub fn screen_size(&self) -> Vector { self.screen_size }
