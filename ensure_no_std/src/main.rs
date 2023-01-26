@@ -43,6 +43,6 @@ pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
     let _ = black_box(tuifw_screen::init);
     let screen = Box::new(tuifw_screen_test::Screen::new(Vector { x: 80, y: 25 }));
     let _windows = WindowTree::<()>::new(screen, render);
-    let _window_manager = WindowManager::<()>::new();
+    let _window_manager = WindowManager::<(), ()>::new();
     0
 }
