@@ -46,14 +46,9 @@ impl<A: Allocator> Screen<A> {
         let mut s = Screen {
             error_alloc,
             max_size,
-            lines: Vec::with_capacity_in(usize::from(max_size.map_or(size.y as u16, |m| m.1)), alloc.clone()),
+            lines: Vec::new_in(alloc.clone()),
             cols: usize::from(size.x as u16),
-            chs: Vec::with_capacity_in(
-                usize::from(max_size.map_or(size.y as u16, |m| m.1))
-                    .checked_mul(usize::from(max_size.map_or(size.x as u16, |m| m.0)))
-                    .expect("OOM"),
-                alloc
-            ),
+            chs: Vec::new_in(alloc),
         };
         init_settings(error_alloc)?;
         s.resize()?;
@@ -61,6 +56,10 @@ impl<A: Allocator> Screen<A> {
     }
 
     fn resize(&mut self) -> Result<(), Error> {
+        let size = self.size();
+        self.lines.try_reserve(usize::from(size.y as u16).saturating_sub(self.lines.len())).map_err(|_| Error::Oom)?;
+        let chs_len = usize::from(size.y as u16).checked_mul(usize::from(size.x as u16)).ok_or(Error::Oom)?;
+        self.chs.try_reserve(chs_len.saturating_sub(self.chs.len())).map_err(|_| Error::Oom)?;
         for line in &self.lines {
             set_err(non_err(unsafe { delwin(line.window.as_ptr()) }), "delwin", self.error_alloc)?;
         }
@@ -69,10 +68,8 @@ impl<A: Allocator> Screen<A> {
         space_gr[0] = ' ';
         space_gr[1] = '\0';
         let space = (space_gr, WA_NORMAL);
-        let size = self.size();
-        self.lines.reserve(usize::from(size.y as u16));
         self.cols = usize::from(size.x as u16);
-        self.chs.resize(usize::from(size.y as u16).checked_mul(self.cols).expect("OOM"), space);
+        self.chs.resize(chs_len, space);
         for y in 0 .. size.y {
             let window = non_null(unsafe { newwin(1, 0, y as _, 0) }).unwrap();
             set_err(non_err(unsafe { keypad(window.as_ptr(), true) }), "keypad", self.error_alloc)?;

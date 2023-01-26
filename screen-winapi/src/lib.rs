@@ -100,11 +100,7 @@ impl<A: Allocator> Screen<A> {
             h_input: INVALID_HANDLE_VALUE,
             h_output: INVALID_HANDLE_VALUE,
             data: Vec::new_in(alloc.clone()),
-            buf: if let Some(max_size) = max_size {
-                Vec::with_capacity_in(usize::from(max_size.0).checked_mul(usize::from(max_size.1)).expect("OOM"), alloc)
-            } else {
-                Vec::new_in(alloc)
-            },
+            buf: Vec::new_in(alloc),
             size: Vector::null(),
             invalidated: Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() },
             cursor_is_visible: false,
@@ -164,6 +160,10 @@ impl<A: Allocator> Screen<A> {
 
     fn resize(&mut self) -> Result<(), Error> {
         let size = self.init_screen_buffer()?;
+        let reserve_data = usize::from(size.y as u16).saturating_sub(self.data.len());
+        self.data.try_reserve(reserve_data).map_err(|_| Error::Oom)?;
+        let buf_len = usize::try_from(size.rect_area()).map_err(|_| Error::Oom)?;
+        self.buf.try_reserve(buf_len.saturating_sub(self.buf.len())).map_err(|_| Error::Oom)?;
         self.data.clear();
         self.data.resize(usize::from(size.y as u16), 0 .. size.x);
         let mut space = CHAR_INFO {
@@ -172,7 +172,7 @@ impl<A: Allocator> Screen<A> {
         };
         *unsafe { space.Char.UnicodeChar_mut() } = b' ' as WCHAR;
         self.size = size;
-        self.buf.resize(usize::try_from(self.size.rect_area()).expect("OOM"), space);
+        self.buf.resize(buf_len, space);
         self.invalidated.size = Vector::null();
         Ok(())
     }
@@ -365,7 +365,10 @@ impl<A: Allocator> Screen<A> {
                     non_zero(unsafe { GetNumberOfConsoleInputEvents(self.h_input, &mut n as *mut _) }, self.error_alloc)?;
                     assert_ne!(n, 0);
                     let mut readed: DWORD = 0;
-                    non_zero(unsafe { ReadConsoleInputW(self.h_input, &mut input as *mut _, 1, &mut readed as *mut _) }, self.error_alloc)?;
+                    non_zero(
+                        unsafe { ReadConsoleInputW(self.h_input, &mut input as *mut _, 1, &mut readed as *mut _) },
+                        self.error_alloc
+                    )?;
                     assert_eq!(readed, 1);
                     assert_eq!(input.EventType, KEY_EVENT);
                     let e = unsafe { input.Event.KeyEvent() };
