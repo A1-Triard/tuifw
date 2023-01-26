@@ -14,37 +14,32 @@
 extern crate alloc;
 
 use alloc::boxed::Box;
-use alloc::vec;
-use alloc::vec::Vec;
 use core::cmp::{max, min};
 use core::mem::replace;
-use core::ops::Range;
 use components_arena::{Arena, Component, ComponentId, Id, NewtypeComponentId, RawId};
 use educe::Educe;
 use macro_attr_2018::macro_attr;
 use tuifw_screen_base::{Bg, Error, Event, Fg, Point, Rect, Screen, Vector};
 
-fn invalidate_rect(invalidated: (&mut Vec<Range<i16>>, Vector), rect: Rect) {
-    debug_assert_eq!(invalidated.0.len(), invalidated.1.y as u16 as usize);
-    let rect = rect.intersect(Rect { tl: Point { x: 0, y: 0 }, size: invalidated.1 });
+fn invalidate_rect(screen: &mut dyn Screen, rect: Rect) {
+    let rect = rect.intersect(Rect { tl: Point { x: 0, y: 0 }, size: screen.size() });
     if rect.is_empty() { return; }
     let l = rect.l();
     let r = rect.r();
     for y in rect.t() .. rect.b() {
-        let row = &mut invalidated.0[y as u16 as usize];
+        let row = screen.line_invalidated_range_mut(y);
         row.start = min(row.start, l);
         row.end = max(row.end, r);
     }
 }
 
-fn rect_invalidated(invalidated: (&Vec<Range<i16>>, Vector), rect: Rect) -> bool {
-    debug_assert_eq!(invalidated.0.len(), invalidated.1.y as u16 as usize);
-    let rect = rect.intersect(Rect { tl: Point { x: 0, y: 0 }, size: invalidated.1 });
+fn rect_invalidated(screen: &dyn Screen, rect: Rect) -> bool {
+    let rect = rect.intersect(Rect { tl: Point { x: 0, y: 0 }, size: screen.size() });
     if rect.is_empty() { return false; }
     let l = rect.l();
     let r = rect.r();
     for y in rect.t() .. rect.b() {
-        let row = &invalidated.0[y as u16 as usize];
+        let row = screen.line_invalidated_range(y);
         if row.end == row.start { continue; }
         if l < row.start {
             if r > row.end { return true; }
@@ -60,7 +55,6 @@ fn rect_invalidated(invalidated: (&Vec<Range<i16>>, Vector), rect: Rect) -> bool
 pub struct RenderPort {
     #[educe(Debug(ignore))]
     screen: Box<dyn Screen>,
-    invalidated: Vec<Range<i16>>,
     offset: Vector,
     size: Vector,
     cursor: Option<Point>,
@@ -68,24 +62,25 @@ pub struct RenderPort {
 
 impl RenderPort {
     pub fn out(&mut self, p: Point, fg: Fg, bg: Bg, text: &str) {
+        let screen_size = self.screen.size();
         if p.y as u16 >= self.size.y as u16 || self.size.x == 0 { return; }
         let p = p.offset(self.offset);
         if p.y < 0 || p.y >= self.screen.size().y { return; }
-        let row = &mut self.invalidated[p.y as u16 as usize];
+        let row = self.screen.line_invalidated_range(p.y).clone();
         if p.x >= row.end { return; }
 
         let window_start = Point { x: 0, y: 0 }.offset(self.offset).x;
         let window_end = Point { x: 0, y: 0 }.offset(self.size + self.offset).x;
         let chunks = if window_start <= window_end {
-            if window_end <= 0 || window_start >= self.screen.size().x { return; }
-            [max(0, window_start) .. min(self.screen.size().x, window_end), 0 .. 0]
+            if window_end <= 0 || window_start >= screen_size.x { return; }
+            [max(0, window_start) .. min(screen_size.x, window_end), 0 .. 0]
         } else {
-            if window_end > 0 && window_start < self.screen.size().x {
-                [0 .. window_end, window_start .. self.screen.size().x]
+            if window_end > 0 && window_start < screen_size.x {
+                [0 .. window_end, window_start .. screen_size.x]
             } else if window_end > 0 {
                 [0 .. window_end, 0 .. 0]
-            } else if window_start < self.screen.size().x {
-                [window_start .. self.screen.size().x, 0 .. 0]
+            } else if window_start < screen_size.x {
+                [window_start .. screen_size.x, 0 .. 0]
             } else {
                 return
             }
@@ -95,6 +90,7 @@ impl RenderPort {
             if chunk.start >= chunk.end { continue; }
             let out = self.screen.out(p, fg, bg, text, chunk.clone(), row.clone());
             if out.start >= out.end { continue; }
+            let row = self.screen.line_invalidated_range_mut(p.y);
             row.start = min(row.start, out.start);
             row.end = max(row.end, out.end);
             if let Some(cursor) = self.cursor {
@@ -109,14 +105,14 @@ impl RenderPort {
         if self.cursor.is_some() { return; }
         let p = p.offset(self.offset);
         if p.y < 0 || p.y >= self.screen.size().y { return; }
-        let row = &self.invalidated[p.y as u16 as usize];
+        let row = &self.screen.line_invalidated_range(p.y);
         if p.x < row.start || p.x >= row.end { return; }
         self.cursor = Some(p);
     }
 
     pub fn fill(&mut self, mut f: impl FnMut(&mut Self, Point)) {
         for y in 0 .. self.screen.size().y {
-            for x in self.invalidated[y as u16 as usize].clone() {
+            for x in self.screen.line_invalidated_range(y).clone() {
                 f(self, Point { x, y }.offset(-self.offset));
             }
         }
@@ -252,10 +248,10 @@ impl Window {
     ) {
         let parent = tree.arena[self.0].parent.unwrap();
         let screen_bounds = bounds.offset(offset_from_root(parent, tree));
-        invalidate_rect(tree.invalidated(), screen_bounds);
+        invalidate_rect(tree.screen(), screen_bounds);
         let bounds = replace(&mut tree.arena[self.0].bounds, bounds);
         let screen_bounds = bounds.offset(offset_from_root(parent, tree));
-        invalidate_rect(tree.invalidated(), screen_bounds);
+        invalidate_rect(tree.screen(), screen_bounds);
     }
 
     pub fn move_z<State: ?Sized>(
@@ -267,7 +263,7 @@ impl Window {
         self.attach(tree, parent, prev);
         let bounds = tree.arena[self.0].bounds;
         let screen_bounds = bounds.offset(offset_from_root(parent, tree));
-        invalidate_rect(tree.invalidated(), screen_bounds);
+        invalidate_rect(tree.screen(), screen_bounds);
     }
 
     fn detach<State: ?Sized>(
@@ -319,7 +315,7 @@ impl Window {
         let parent = self.detach(tree);
         let node = tree.arena.remove(self.0);
         let screen_bounds = node.bounds.offset(offset_from_root(parent, tree));
-        invalidate_rect(tree.invalidated(), screen_bounds);
+        invalidate_rect(tree.screen(), screen_bounds);
         Self::drop_node_tree(node, tree);
     }
 
@@ -347,7 +343,7 @@ impl Window {
         let rect = rect.offset(bounds.tl.offset_from(Point { x: 0, y: 0 })).intersect(bounds);
         let parent = tree.arena[self.0].parent.unwrap();
         let screen_rect = rect.offset(offset_from_root(parent, tree));
-        invalidate_rect(tree.invalidated(), screen_rect);
+        invalidate_rect(tree.screen(), screen_rect);
     }
  
     pub fn invalidate<State: ?Sized>(
@@ -357,7 +353,7 @@ impl Window {
         let bounds = tree.arena[self.0].bounds;
         let parent = tree.arena[self.0].parent.unwrap();
         let screen_bounds = bounds.offset(offset_from_root(parent, tree));
-        invalidate_rect(tree.invalidated(), screen_bounds);
+        invalidate_rect(tree.screen(), screen_bounds);
     }
 }
 
@@ -365,7 +361,7 @@ impl Window {
 #[educe(Debug)]
 pub struct WindowTree<State: ?Sized> {
     #[educe(Debug(ignore))]
-    screen: Option<(Box<dyn Screen>, Vec<Range<i16>>)>,
+    screen: Option<Box<dyn Screen>>,
     arena: Arena<WindowNode>,
     root: Id<WindowNode>,
     #[educe(Debug(ignore))]
@@ -399,36 +395,32 @@ impl<State: ?Sized> WindowTree<State> {
             bounds: Rect { tl: Point { x: 0, y: 0 }, size: screen_size },
             tag: None
         }, window));
-        let rows = screen_size.y as u16 as usize;
-        let cols = screen_size.x;
-        WindowTree { screen: Some((screen, vec![0 .. cols; rows])), arena, root, render, cursor: None, screen_size }
+        WindowTree { screen: Some(screen), arena, root, render, cursor: None, screen_size }
     }
 
     pub fn screen_size(&self) -> Vector { self.screen_size }
 
     pub fn invalidate_rect(&mut self, rect: Rect) {
-        invalidate_rect(self.invalidated(), rect);
+        invalidate_rect(self.screen(), rect);
     }
  
     pub fn invalidate_screen(&mut self) {
         let size = self.screen_size;
-        invalidate_rect(self.invalidated(), Rect { tl: Point { x: 0, y: 0 }, size });
+        invalidate_rect(self.screen(), Rect { tl: Point { x: 0, y: 0 }, size });
     }
 
-    fn invalidated(&mut self) -> (&mut Vec<Range<i16>>, Vector) {
-        let (screen, invalidated) = self.screen.as_mut().expect("WindowTree is in invalid state");
-        (invalidated, screen.size())
+    fn screen(&mut self) -> &mut dyn Screen {
+        self.screen.as_mut().expect("WindowTree is in invalid state").as_mut()
     }
 
     fn render_window(&mut self, window: Id<WindowNode>, offset: Vector, render_state: &mut State) {
         let bounds = self.arena[window].bounds.offset(offset);
-        let (invalidated, screen_size) = self.invalidated();
-        if !rect_invalidated((invalidated, screen_size), bounds) { return; }
+        let screen = self.screen();
+        if !rect_invalidated(screen, bounds) { return; }
         let offset = bounds.tl.offset_from(Point { x: 0, y: 0 });
-        let (screen, invalidated) = self.screen.take().expect("WindowTree is in invalid state");
+        let screen = self.screen.take().expect("WindowTree is in invalid state");
         let mut port = RenderPort {
             screen,
-            invalidated,
             cursor: self.cursor,
             offset,
             size: bounds.size,
@@ -439,7 +431,7 @@ impl<State: ?Sized> WindowTree<State> {
             &mut port,
             render_state
         );
-        self.screen.replace((port.screen, port.invalidated));
+        self.screen.replace(port.screen);
         self.cursor = port.cursor;
         if let Some(first_child) = self.arena[window].first_child {
             let mut child = first_child;
@@ -453,18 +445,16 @@ impl<State: ?Sized> WindowTree<State> {
 
     pub fn update(&mut self, wait: bool, render_state: &mut State) -> Result<Option<Event>, Error> {
         if let Some(cursor) = self.cursor {
-            let (invalidated, screen_size) = self.invalidated();
-            if rect_invalidated((invalidated, screen_size), Rect { tl: cursor, size: Vector { x: 1, y: 1 } }) {
+            let screen = self.screen();
+            if rect_invalidated(screen, Rect { tl: cursor, size: Vector { x: 1, y: 1 } }) {
                 self.cursor = None;
             }
         }
         self.render_window(self.root, Vector::null(), render_state);
-        let (screen, invalidated) = self.screen.as_mut().expect("WindowTree is in invalid state");
+        let screen = self.screen.as_mut().expect("WindowTree is in invalid state");
         let event = screen.update(self.cursor, wait)?;
         if event == Some(Event::Resize) {
-            invalidated.clear();
             self.screen_size = screen.size();
-            invalidated.resize(self.screen_size.y as u16 as usize, 0 .. self.screen_size.x);
             self.arena[self.root].bounds = Rect { tl: Point { x: 0, y: 0 }, size: self.screen_size };
         }
         Ok(event)
