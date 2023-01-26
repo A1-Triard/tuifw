@@ -83,12 +83,12 @@ fn focus_window(tree: &mut WindowTree<State>, window: Window, state: &mut State)
 
 fn main() {
     let screen = unsafe { tuifw_screen::init(None, None) }.unwrap();
-    let mut windows = WindowTree::new(screen, render);
-    let window_1 = Window::new(&mut windows, None, None);
+    let mut windows = WindowTree::new(screen, render).unwrap();
+    let window_1 = Window::new(&mut windows, None, None).unwrap();
     window_1.move_xy(&mut windows, Rect::from_tl_br(Point { x: 5, y: 0}, Point { x: 40, y: 15 }));
-    let window_2 = Window::new(&mut windows, None, None);
+    let window_2 = Window::new(&mut windows, None, None).unwrap();
     window_2.move_xy(&mut windows, Rect::from_tl_br(Point { x: 30, y: 5}, Point { x: 62, y: 20 }));
-    let window_3 = Window::new(&mut windows, None, Some(window_2));
+    let window_3 = Window::new(&mut windows, None, Some(window_2)).unwrap();
     window_3.move_xy(&mut windows, Rect::from_tl_br(Point { x: 20, y: 10}, Point { x: 50, y: 22 }));
     let mut state = State { window_1, window_2, window_3, focused: window_1 };
     loop { 

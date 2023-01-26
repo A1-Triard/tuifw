@@ -26,11 +26,11 @@ fn draw(
 
 fn main() {
     let screen = unsafe { tuifw_screen::init(None, None) }.unwrap();
-    let tree = &mut WindowTree::new(screen, draw);
+    let tree = &mut WindowTree::new(screen, draw).unwrap();
     let size = Vector { x: 13, y: 7 };
     let padding = Thickness::align(size, tree.screen_size(), HAlign::Center, VAlign::Center);
     let mut bounds = padding.shrink_rect(Rect { tl: Point { x: 0, y: 0 }, size: tree.screen_size() });
-    let window = Window::new(tree, None, None);
+    let window = Window::new(tree, None, None).unwrap();
     window.move_xy(tree, bounds);
     loop {
         if let Some(e) = tree.update(true, &mut ()).unwrap() {
