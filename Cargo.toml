@@ -30,8 +30,8 @@ exclude = [
 components-arena = "3.5.0"
 macro-attr-2018 = "2.1.2"
 phantom-type = { version = "0.4.2", default-features = false }
-tuifw-screen-base = { path = "screen-base", version = "0.20.0" }
-tuifw-window = { path = "window", version = "0.20.0" }
+tuifw-screen-base = { path = "screen-base", version = "0.21.0" }
+tuifw-window = { path = "window", version = "0.21.0" }
 
 [badges]
 maintenance = { status = "experimental" }
