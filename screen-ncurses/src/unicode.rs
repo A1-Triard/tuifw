@@ -276,7 +276,7 @@ impl<A: Allocator> base_Screen for Screen<A> {
     }
 
     fn update(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Error> {
-        Ok(self.update_raw(cursor, wait)?)
+        self.update_raw(cursor, wait)
     }
 
     fn line_invalidated_range(&self, line: i16) -> &Range<i16> { &self.lines[usize::from(line as u16)].data }
