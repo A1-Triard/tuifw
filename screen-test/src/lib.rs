@@ -25,6 +25,7 @@ pub struct Screen<A: Allocator + Clone = Global> {
     size: Vector,
     invalidated: Rect,
     cursor: Option<Point>,
+    data: Vec<Range<i16>, A>,
 }
 
 impl Screen {
@@ -35,7 +36,9 @@ impl Screen {
 
 impl<A: Allocator + Clone> Screen<A> {
     pub fn new_in(size: Vector, alloc: A) -> Self {
+        assert!(size.x >= 0 && size.y >= 0);
         let mut s = Screen {
+            data: Vec::new_in(alloc.clone()),
             buf: Vec::new_in(alloc.clone()),
             out: Vec::new_in(alloc),
             size: Vector::null(),
@@ -49,6 +52,8 @@ impl<A: Allocator + Clone> Screen<A> {
     pub fn cursor(&self) -> Option<Point> { self.cursor }
 
     fn resize(&mut self, out_size: Vector) {
+        self.data.clear();
+        self.data.resize(usize::from(out_size.y as u16), 0 .. out_size. x);
         self.buf.resize(out_size.rect_area() as usize, (' ', Fg::LightGray, Bg::None));
         self.out.resize(out_size.rect_area() as usize, (' ', Fg::LightGray, Bg::None));
         self.size = out_size;
@@ -128,4 +133,8 @@ impl<A: Allocator + Clone> base_Screen for Screen<A> {
         });
         Ok(None)
     }
+
+    fn line_invalidated_range(&self, line: i16) -> &Range<i16> { &self.data[usize::from(line as u16)] }
+
+    fn line_invalidated_range_mut(&mut self, line: i16) -> &mut Range<i16> { &mut self.data[usize::from(line as u16)] }
 }

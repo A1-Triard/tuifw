@@ -20,6 +20,7 @@ use unicode_width::UnicodeWidthChar;
 struct Line {
     window: NonNull<WINDOW>,
     invalidated: bool,
+    data: Range<i16>,
 }
 
 pub struct Screen<A: Allocator> {
@@ -75,7 +76,7 @@ impl<A: Allocator> Screen<A> {
         for y in 0 .. size.y {
             let window = non_null(unsafe { newwin(1, 0, y as _, 0) }).unwrap();
             set_err(non_err(unsafe { keypad(window.as_ptr(), true) }), "keypad", self.error_alloc)?;
-            self.lines.push(Line { window, invalidated: false });
+            self.lines.push(Line { window, invalidated: false, data: 0 .. size.x });
         }
         Ok(())
     }
@@ -280,4 +281,8 @@ impl<A: Allocator> base_Screen for Screen<A> {
     fn update(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Error> {
         Ok(self.update_raw(cursor, wait)?)
     }
+
+    fn line_invalidated_range(&self, line: i16) -> &Range<i16> { &self.lines[usize::from(line as u16)].data }
+
+    fn line_invalidated_range_mut(&mut self, line: i16) -> &mut Range<i16> { &mut self.lines[usize::from(line as u16)].data }
 }

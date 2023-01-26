@@ -16,9 +16,11 @@ use alloc::boxed::Box;
 use core::alloc::Allocator;
 use core::cmp::{min, max};
 use core::iter::{once, repeat};
+use core::mem::{MaybeUninit, align_of, size_of};
 use core::num::NonZeroU16;
 use core::ops::Range;
 use core::ptr::{self};
+use core::slice::{self};
 use dos_cp::CodePage;
 use either::{Either, Left, Right};
 use panicking::panicking;
@@ -52,6 +54,12 @@ impl Screen {
         } else {
             int_10h_ah_05h_set_video_active_page(0);
         }
+        let video_ptr = (0xB800usize << 4) as *mut i16;
+        assert!(size_of::<Range<i16>>() <= 80 * size_of::<i16>());
+        assert!(align_of::<Range<i16>>() <= 32); // 32 is (0xB800 << 4) + 80 * 25 * 2 * 2 divisor
+        let third_page_ptr = video_ptr.add(80 * 25 * 2) as *mut MaybeUninit<Range<i16>>;
+        let data = slice::from_raw_parts_mut(third_page_ptr, 25);
+        data.fill_with(|| MaybeUninit::new(0 .. 80));
         Ok(Screen {
             error_alloc,
             code_page,
@@ -212,6 +220,24 @@ impl base_Screen for Screen {
                 }
             }
         }
+    }
+
+    fn line_invalidated_range(&self, line: i16) -> &Range<i16> {
+        assert!((0 .. 25).contains(&line));
+        assert!(size_of::<Range<i16>>() <= 80 * size_of::<i16>());
+        let video_ptr = (0xB800usize << 4) as *const i16;
+        assert!(align_of::<Range<i16>>() <= 32); // 32 is (0xB800 << 4) + 80 * 25 * 2 * 2 divisor
+        let third_page_ptr = unsafe { video_ptr.add(80 * 25 * 2) } as *const Range<i16>;
+        unsafe { &*third_page_ptr.add(usize::from(line as u16)) }
+    }
+
+    fn line_invalidated_range_mut(&mut self, line: i16) -> &mut Range<i16> {
+        assert!((0 .. 25).contains(&line));
+        assert!(size_of::<Range<i16>>() <= 80 * size_of::<i16>());
+        let video_ptr = (0xB800usize << 4) as *mut i16;
+        assert!(align_of::<Range<i16>>() <= 32); // 32 is (0xB800 << 4) + 80 * 25 * 2 * 2 divisor
+        let third_page_ptr = unsafe { video_ptr.add(80 * 25 * 2) } as *mut Range<i16>;
+        unsafe { &mut *third_page_ptr.add(usize::from(line as u16)) }
     }
 }
 

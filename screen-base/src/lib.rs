@@ -201,4 +201,8 @@ pub trait Screen {
     ) -> Range<i16>;
 
     fn update(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Error>;
+
+    fn line_invalidated_range(&self, line: i16) -> &Range<i16>;
+
+    fn line_invalidated_range_mut(&mut self, line: i16) -> &mut Range<i16>;
 }

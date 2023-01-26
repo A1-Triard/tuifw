@@ -70,6 +70,7 @@ pub struct Screen<A: Allocator = Global> {
     size: Vector,
     invalidated: Rect,
     cursor_is_visible: bool, 
+    data: Vec<Range<i16>, A>,
 }
 
 impl Screen {
@@ -79,7 +80,11 @@ impl Screen {
 }
 
 impl<A: Allocator> Screen<A> {
-    pub fn new_in(max_size: Option<(u16, u16)>, error_alloc: Option<&'static dyn Allocator>, alloc: A) -> Result<Self, Error> {
+    pub fn new_in(
+        max_size: Option<(u16, u16)>,
+        error_alloc: Option<&'static dyn Allocator>,
+        alloc: A
+    ) -> Result<Self, Error> where A: Clone {
         let error_alloc = error_alloc.unwrap_or(&GLOBAL);
         unsafe { FreeConsole() };
         non_zero(unsafe { AllocConsole() }, error_alloc)?;
@@ -94,6 +99,7 @@ impl<A: Allocator> Screen<A> {
             max_size,
             h_input: INVALID_HANDLE_VALUE,
             h_output: INVALID_HANDLE_VALUE,
+            data: Vec::new_in(alloc.clone()),
             buf: if let Some(max_size) = max_size {
                 Vec::with_capacity_in(usize::from(max_size.0).checked_mul(usize::from(max_size.1)).expect("OOM"), alloc)
             } else {
@@ -158,6 +164,8 @@ impl<A: Allocator> Screen<A> {
 
     fn resize(&mut self) -> Result<(), Error> {
         let size = self.init_screen_buffer()?;
+        self.data.clear();
+        self.data.resize(usize::from(size.y as u16), 0 .. size.x);
         let mut space = CHAR_INFO {
             Attributes: 0,
             Char: CHAR_INFO_Char::default()
@@ -548,4 +556,8 @@ impl<A: Allocator> base_Screen for Screen<A> {
     fn update(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Error> {
         Ok(self.update_raw(cursor, wait)?)
     }
+
+    fn line_invalidated_range(&self, line: i16) -> &Range<i16> { &self.data[usize::from(line as u16)] }
+
+    fn line_invalidated_range_mut(&mut self, line: i16) -> &mut Range<i16> { &mut self.data[usize::from(line as u16)] }
 }
