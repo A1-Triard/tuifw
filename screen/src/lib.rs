@@ -15,8 +15,6 @@ use core::alloc::Allocator;
 
 pub use tuifw_screen_base::*;
 
-const GLOBAL: composable_allocators::Global = composable_allocators::Global;
-
 /// # Safety
 ///
 /// This function may initialize ncurses lib. It is safe iff no other code in application calls ncurses functions
@@ -29,7 +27,7 @@ const GLOBAL: composable_allocators::Global = composable_allocators::Global;
 /// It is impossible to garantee this conditions on a library level.
 /// So this unsafity should be propagated through all wrappers to the final application.
 pub unsafe fn init(max_size: Option<(u16, u16)>, error_alloc: Option<&'static dyn Allocator>) -> Result<Box<dyn Screen>, Error> {
-    init_raw_in(max_size, error_alloc.unwrap_or(&GLOBAL), Global)
+    init_raw_in(max_size, error_alloc, Global)
 }
 
 /// # Safety
@@ -48,13 +46,13 @@ pub unsafe fn init_in<A: Allocator + Clone + 'static>(
     error_alloc: Option<&'static dyn Allocator>,
     alloc: A
 ) -> Result<Box<dyn Screen>, Error> {
-    init_raw_in(max_size, error_alloc.unwrap_or(&GLOBAL), alloc)
+    init_raw_in(max_size, error_alloc, alloc)
 }
 
 #[cfg(target_os="dos")]
 unsafe fn init_raw_in<A: Allocator + Clone>(
     max_size: Option<(u16, u16)>,
-    error_alloc: &'static dyn Allocator,
+    error_alloc: Option<&'static dyn Allocator>,
     _alloc: A
 ) -> Result<Box<dyn Screen>, Error> {
     if let Some(max_size) = max_size {
@@ -66,17 +64,17 @@ unsafe fn init_raw_in<A: Allocator + Clone>(
 #[cfg(all(not(target_os="dos"), windows))]
 unsafe fn init_raw_in<A: Allocator + Clone + 'static>(
     max_size: Option<(u16, u16)>,
-    _error_alloc: &'static dyn Allocator,
+    error_alloc: Option<&'static dyn Allocator>,
     alloc: A
 ) -> Result<Box<dyn Screen>, Error> {
-    Ok(Box::new(tuifw_screen_winapi::Screen::new_in(max_size, alloc)?))
+    Ok(Box::new(tuifw_screen_winapi::Screen::new_in(max_size, error_alloc, alloc)?))
 }
 
 #[cfg(all(not(target_os="dos"), not(windows)))]
 unsafe fn init_raw_in<A: Allocator + Clone + 'static>(
     max_size: Option<(u16, u16)>,
-    _error_alloc: &'static dyn Allocator,
+    error_alloc: Option<&'static dyn Allocator>,
     alloc: A
 ) -> Result<Box<dyn Screen>, Error> {
-    tuifw_screen_ncurses::init_in(max_size, alloc)
+    tuifw_screen_ncurses::init_in(max_size, error_alloc, alloc)
 }

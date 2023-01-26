@@ -1,17 +1,24 @@
 use crate::ncurses::*;
+use alloc::boxed::Box;
+use core::alloc::Allocator;
 use core::ptr::NonNull;
 use core::num::NonZeroU16;
 use either::{Either, Left, Right};
-use errno_no_std::Errno;
 use libc::*;
 use tuifw_screen_base::*;
 
-pub fn non_err(r: c_int) -> Result<c_int, Errno> {
-    if r == ERR { Err(Errno(EINVAL)) } else { Ok(r) }
+pub const GLOBAL: composable_allocators::Global = composable_allocators::Global;
+
+pub fn set_err<T>(r: Result<T, ()>, func_name: &'static str, error_alloc: &'static dyn Allocator) -> Result<T, Error> {
+    r.map_err(|()| Error::System(Box::new_in(func_name, error_alloc)))
 }
 
-pub fn non_null<T: ?Sized>(r: *mut T) -> Result<NonNull<T>, Errno> {
-    NonNull::new(r).ok_or(Errno(EINVAL))
+pub fn non_err(r: c_int) -> Result<c_int, ()> {
+    if r == ERR { Err(()) } else { Ok(r) }
+}
+
+pub fn non_null<T: ?Sized>(r: *mut T) -> Result<NonNull<T>, ()> {
+    NonNull::new(r).ok_or(())
 }
 
 fn bg_index(c: Bg) -> i16 {
@@ -52,22 +59,22 @@ fn fg_attr(c: Fg) -> chtype {
     }
 }
 
-pub unsafe fn init_settings() -> Result<(), Errno> {
-    non_err(cbreak())?; 
-    non_err(noecho())?; 
-    non_err(nonl())?; 
-    register_colors()?;
+pub unsafe fn init_settings(error_alloc: &'static dyn Allocator) -> Result<(), Error> {
+    set_err(non_err(cbreak()), "cbreak", error_alloc)?;
+    set_err(non_err(noecho()), "noecho", error_alloc)?;
+    set_err(non_err(nonl()), "nonl", error_alloc)?;
+    register_colors(error_alloc)?;
     set_escdelay(0);
-    non_err(keypad(stdscr, true))?;
+    set_err(non_err(keypad(stdscr, true)), "keypad", error_alloc)?;
     Ok(())
 }
 
-unsafe fn register_colors() -> Result<(), Errno> {
-    non_err(start_color())?;
-    non_err(use_default_colors())?;
+unsafe fn register_colors(error_alloc: &'static dyn Allocator) -> Result<(), Error> {
+    set_err(non_err(start_color()), "start_color", error_alloc)?;
+    set_err(non_err(use_default_colors()), "use_default_colors", error_alloc)?;
     for fg in Fg::iter_variants().map(fg_index) {
         for bg in Bg::iter_variants().map(bg_index) {
-            non_err(init_pair(1 + (bg + 1) * 8 + fg, fg, bg))?;
+            set_err(non_err(init_pair(1 + (bg + 1) * 8 + fg, fg, bg)), "init_pair", error_alloc)?;
         }
     }
     Ok(())
@@ -95,8 +102,9 @@ const ONCE: NonZeroU16 = unsafe { NonZeroU16::new_unchecked(1) };
 
 pub fn read_event(
     window: NonNull<WINDOW>,
-    getch: impl Fn(NonNull<WINDOW>
-) -> Option<Either<c_int, char>>) -> Result<Option<Event>, Errno> {
+    getch: impl Fn(NonNull<WINDOW>) -> Option<Either<c_int, char>>,
+    error_alloc: &'static dyn Allocator
+) -> Result<Option<Event>, Error> {
     let e = if let Some(e) = getch(window) {
         e
     } else {
@@ -132,7 +140,7 @@ pub fn read_event(
         }),
         Right(c) => Ok(match c {
             '\x1B' => {
-                unsafe { non_err(nodelay(window.as_ptr(), true)) }?;
+                set_err(unsafe { non_err(nodelay(window.as_ptr(), true)) }, "nodelay", error_alloc)?;
                 match getch(window) {
                     Some(Right(c)) if c < ' ' || c == '\x7F' => None,
                     Some(Right(c)) => Some(Event::Key(ONCE, Key::Alt(c))),

@@ -13,6 +13,7 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/A1-Triard/tuifw"
 
 [dependencies]
+composable-allocators = { version = "0.2.3", default-features = false, features = ["global"] }
 either = { version = "1.7.0", default-features = false }
 errno-no-std = { version = "0.1.5", default-features = false }
 itertools = { version = "0.10.5", default-features = false }

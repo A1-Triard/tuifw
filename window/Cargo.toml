@@ -15,7 +15,6 @@ repository = "https://github.com/A1-Triard/tuifw"
 [dependencies]
 components-arena = "3.4.0"
 educe = "0.4.18"
-errno-no-std = { version = "0.1.5", default-features = false }
 macro-attr-2018 = "2.1.0"
 tuifw-screen-base = { path = "../screen-base", version = "0.20.0" }
 

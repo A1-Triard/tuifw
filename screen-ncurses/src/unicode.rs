@@ -10,7 +10,6 @@ use core::mem::{size_of};
 use core::ops::Range;
 use core::ptr::NonNull;
 use either::{Left, Right};
-use errno_no_std::Errno;
 use itertools::Itertools;
 use libc::*;
 use panicking::panicking;
@@ -24,6 +23,7 @@ struct Line {
 }
 
 pub struct Screen<A: Allocator> {
+    error_alloc: &'static dyn Allocator,
     max_size: Option<(u16, u16)>,
     lines: Vec<Line, A>,
     cols: usize,
@@ -34,10 +34,16 @@ impl<A: Allocator> !Sync for Screen<A> { }
 impl<A: Allocator> !Send for Screen<A> { }
 
 impl<A: Allocator> Screen<A> {
-    pub unsafe fn new_in(max_size: Option<(u16, u16)>, alloc: A) -> Result<Self, Errno> where A: Clone {
-        if non_null(initscr()).is_err() { return Err(Errno(EINVAL)); }
+    pub unsafe fn new_in(
+        max_size: Option<(u16, u16)>,
+        error_alloc: Option<&'static dyn Allocator>,
+        alloc: A
+    ) -> Result<Self, Error> where A: Clone {
+        let error_alloc = error_alloc.unwrap_or(&GLOBAL);
+        set_err(non_null(initscr()), "initscr", error_alloc)?;
         let size = size(max_size);
         let mut s = Screen {
+            error_alloc,
             max_size,
             lines: Vec::with_capacity_in(usize::from(max_size.map_or(size.y as u16, |m| m.1)), alloc.clone()),
             cols: usize::from(size.x as u16),
@@ -48,14 +54,14 @@ impl<A: Allocator> Screen<A> {
                 alloc
             ),
         };
-        init_settings()?;
+        init_settings(error_alloc)?;
         s.resize()?;
         Ok(s)
     }
 
-    fn resize(&mut self) -> Result<(), Errno> {
+    fn resize(&mut self) -> Result<(), Error> {
         for line in &self.lines {
-            non_err(unsafe { delwin(line.window.as_ptr()) })?;
+            set_err(non_err(unsafe { delwin(line.window.as_ptr()) }), "delwin", self.error_alloc)?;
         }
         self.lines.clear();
         let mut space_gr = ['\0'; CCHARW_MAX];
@@ -68,7 +74,7 @@ impl<A: Allocator> Screen<A> {
         self.chs.resize(usize::from(size.y as u16).checked_mul(self.cols).expect("OOM"), space);
         for y in 0 .. size.y {
             let window = non_null(unsafe { newwin(1, 0, y as _, 0) }).unwrap();
-            non_err(unsafe { keypad(window.as_ptr(), true) })?;
+            set_err(non_err(unsafe { keypad(window.as_ptr(), true) }), "keypad", self.error_alloc)?;
             self.lines.push(Line { window, invalidated: false });
         }
         Ok(())
@@ -103,21 +109,21 @@ impl<A: Allocator> Screen<A> {
         }
     }
 
-    fn update_raw(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Errno> {
-        non_err(unsafe { curs_set(0) })?;
+    fn update_raw(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Error> {
+        set_err(non_err(unsafe { curs_set(0) }), "curs_set", self.error_alloc)?;
         assert_eq!(size_of::<char>(), size_of::<wchar_t>());
         for (chs, line) in self.chs.chunks(self.cols).zip(self.lines.iter_mut()).filter(|(_, l)| l.invalidated) {
             line.invalidated = false;
             if chs.is_empty() { continue; }
-            non_err(unsafe { wmove(line.window.as_ptr(), 0, 0) })?;
+            set_err(non_err(unsafe { wmove(line.window.as_ptr(), 0, 0) }), "wmove", self.error_alloc)?;
             for &ch in chs {
                 if ch.0[0] == '\0' { continue; }
-                non_err(unsafe { wattrset(line.window.as_ptr(), ch.1 as _) })?;
+                set_err(non_err(unsafe { wattrset(line.window.as_ptr(), ch.1 as _) }), "wattrset", self.error_alloc)?;
                 let _ = unsafe { waddnwstr(line.window.as_ptr(), ch.0.as_ptr() as _, CCHARW_MAX as _) };
             }
-            non_err(unsafe { wnoutrefresh(line.window.as_ptr()) })?;
+            set_err(non_err(unsafe { wnoutrefresh(line.window.as_ptr()) }), "wnoutrefresh", self.error_alloc)?;
         }
-        non_err(unsafe { doupdate() })?;
+        set_err(non_err(unsafe { doupdate() }), "doupdate", self.error_alloc)?;
         let cursor = cursor.and_then(|cursor| {
             if (Rect { tl: Point { x: 0, y: 0 }, size: self.size() }).contains(cursor) {
                 Some(cursor)
@@ -127,29 +133,29 @@ impl<A: Allocator> Screen<A> {
         });
         let window = if let Some(cursor) = cursor {
             let window = self.lines[cursor.y as u16 as usize].window;
-            non_err(unsafe { wmove(window.as_ptr(), 0, cursor.x as _) })?;
-            non_err(unsafe { curs_set(1) })?;
+            set_err(non_err(unsafe { wmove(window.as_ptr(), 0, cursor.x as _) }), "wmove", self.error_alloc)?;
+            set_err(non_err(unsafe { curs_set(1) }), "curs_set", self.error_alloc)?;
             Some(window)
         } else if let Some(line) = self.lines.first() {
             if self.cols == 0 {
                 None
             } else {
                 let window = line.window;
-                non_err(unsafe { wmove(window.as_ptr(), 0, 0) })?;
+                set_err(non_err(unsafe { wmove(window.as_ptr(), 0, 0) }), "wmove", self.error_alloc)?;
                 Some(window)
             }
         } else {
             None
         };
         let window = window.unwrap_or_else(|| unsafe { NonNull::new(stdscr).unwrap() });
-        unsafe { non_err(nodelay(window.as_ptr(), !wait)) }?;
+        set_err(non_err(unsafe { nodelay(window.as_ptr(), !wait) }), "nodelay", self.error_alloc)?;
         let e = read_event(window, |w| {
             let mut c: wint_t = 0;
             let key = unsafe { wget_wch(w.as_ptr(), &mut c as *mut _) };
             if key == ERR { return None; }
             if key != KEY_CODE_YES { return Some(Right(char::from_u32(c as wchar_t as u32).unwrap())); }
             Some(Left(c as _))
-        })?;
+        }, self.error_alloc)?;
         match e {
             Some(Event::Resize) => self.resize()?,
             Some(Event::Key(_, Key::Ctrl(Ctrl::L))) => unsafe { clearok(curscr, true); },

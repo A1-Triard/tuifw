@@ -24,7 +24,6 @@ use core::fmt::{self, Debug, Display, Formatter};
 use core::num::NonZeroU16;
 use core::ops::Range;
 use core::option::{Option};
-use errno_no_std::Errno;
 use enum_derive_2018::{EnumDisplay, EnumFromStr, IterVariants};
 use macro_attr_2018::macro_attr;
 
@@ -78,12 +77,15 @@ macro_attr! {
     }
 }
 
-impl TryFrom<Bg> for Fg {
-    type Error = ();
+#[derive(Debug)]
+pub struct TryFromBgError;
 
-    fn try_from(bg: Bg) -> Result<Fg, ()> {
+impl TryFrom<Bg> for Fg {
+    type Error = TryFromBgError;
+
+    fn try_from(bg: Bg) -> Result<Fg, Self::Error> {
         match bg {
-            Bg::None => Err(()),
+            Bg::None => Err(TryFromBgError),
             Bg::Black => Ok(Fg::Black),
             Bg::Red => Ok(Fg::Red),
             Bg::Green => Ok(Fg::Green),
@@ -96,10 +98,13 @@ impl TryFrom<Bg> for Fg {
     }
 }
 
-impl TryFrom<Fg> for Bg {
-    type Error = ();
+#[derive(Debug)]
+pub struct TryFromFgError;
 
-    fn try_from(fg: Fg) -> Result<Bg, ()> {
+impl TryFrom<Fg> for Bg {
+    type Error = TryFromFgError;
+
+    fn try_from(fg: Fg) -> Result<Bg, Self::Error> {
         match fg {
             Fg::Black => Ok(Bg::Black),
             Fg::Red => Ok(Bg::Red),
@@ -109,7 +114,7 @@ impl TryFrom<Fg> for Bg {
             Fg::Magenta => Ok(Bg::Magenta),
             Fg::Cyan => Ok(Bg::Cyan),
             Fg::LightGray => Ok(Bg::LightGray),
-            _ => Err(()),
+            _ => Err(TryFromFgError),
         }
     }
 }
@@ -162,29 +167,16 @@ pub enum Event {
     Key(NonZeroU16, Key),
 }
 
-pub struct Error {
-    pub errno: Errno,
-    pub msg: Option<Box<dyn Display, &'static dyn Allocator>>,
-}
-
-impl From<Errno> for Error {
-    fn from(errno: Errno) -> Error {
-        Error { errno, msg: None }
-    }
-}
-
-impl From<Error> for Errno {
-    fn from(e: Error) -> Errno {
-        e.errno
-    }
+pub enum Error {
+    Oom,
+    System(Box<dyn Display, &'static dyn Allocator>),
 }
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        if let Some(msg) = &self.msg {
-            write!(f, "{} ({})", msg, self.errno)
-        } else {
-            write!(f, "{}", self.errno)
+        match self {
+            Error::Oom => write!(f, "out of memory"),
+            Error::System(msg) => write!(f, "{}", msg)
         }
     }
 }
