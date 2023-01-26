@@ -15,7 +15,7 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 use components_arena::{Arena, Id, Component};
 use macro_attr_2018::macro_attr;
-use tuifw_screen_base::{Bg, Event, Fg, Point, Range1d, Rect, Vector};
+use tuifw_screen_base::{Bg, Error, Event, Fg, Point, Range1d, Rect, Vector};
 use tuifw_window::{RenderPort, Window, WindowTree};
 
 pub trait RenderPortExt {
@@ -120,10 +120,10 @@ impl<State: ?Sized> WindowManager<State> {
         parent: Option<Window>,
         prev: Option<Window>,
         bounds: fn(Vector) -> Rect
-    ) -> Window {
-        let window = Window::new(tree, parent, prev);
+    ) -> Result<Window, Error> {
+        let window = Window::new(tree, parent, prev)?;
         self.add_window(tree, window, bounds);
-        window
+        Ok(window)
     }
 }
 
