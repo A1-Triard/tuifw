@@ -46,15 +46,15 @@ HXRT216.zip:
 	touch -t 200801011952 HXRT216.zip
 
 target/$(WIN_TARGET)/debug/$(BIN).exe: Cargo.toml Cargo.lock src/main.rs build.rs
-	RUSTFLAGS="--cfg custom_errno --cfg dos_errno_and_panic --cfg pc_atomics" \
+	RUSTFLAGS="--cfg pc_atomics" \
 		cargo +nightly build --verbose -Z build-std=alloc,core,panic_abort --target $(WIN_TARGET).json
 
 target/$(WIN_TARGET)/release/$(BIN).exe: Cargo.toml Cargo.lock src/main.rs build.rs
-	RUSTFLAGS="--cfg custom_errno --cfg dos_errno_and_panic --cfg pc_atomics" \
+	RUSTFLAGS="--cfg pc_atomics" \
 		cargo +nightly build --verbose -Z build-std=alloc,core,panic_abort -Z build-std-features=panic_immediate_abort --target $(WIN_TARGET).json --release
 
 clippy:
-	RUSTFLAGS="--cfg custom_errno --cfg dos_errno_and_panic --cfg pc_atomics" \
+	RUSTFLAGS="--cfg pc_atomics" \
 		cargo +nightly clippy --verbose -Z build-std=alloc,core,panic_abort -Z build-std-features=panic_immediate_abort --target $(WIN_TARGET).json
 
 Cargo.lock: Cargo.toml

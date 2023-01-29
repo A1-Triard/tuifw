@@ -20,7 +20,6 @@
 #![no_main]
 
 extern crate alloc;
-extern crate dos_errno_and_panic;
 extern crate pc_atomics;
 extern crate rlibc;
 
@@ -37,6 +36,9 @@ mod no_std {
     fn rust_oom(_: core::alloc::Layout) -> ! {
         panic!("OOM")
     }
+
+    #[panic_handler]
+    fn panic_handler(info: &core::panic::PanicInfo) -> ! { panic_no_std::panic(info, b'P') }
 
     const ERROR_MEM_SIZE: usize = 256;
 
@@ -87,7 +89,7 @@ extern {
 #[allow(non_snake_case)]
 #[no_mangle]
 extern "stdcall" fn mainCRTStartup(_: *const PEB) -> u64 {
-    let mut screen = unsafe { tuifw_screen_dos::Screen::new(&no_std::ERROR_ALLOCATOR) }.unwrap();
+    let mut screen = unsafe { tuifw_screen_dos::Screen::new(Some(&no_std::ERROR_ALLOCATOR)) }.unwrap();
     let screen = &mut screen;
     draw(screen);
     loop {

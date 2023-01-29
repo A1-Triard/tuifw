@@ -43,3 +43,40 @@ jobs:
     - run: "cargo +nightly build --verbose -Z build-std=core,alloc,panic_abort --target ${{ matrix.triple }} --release"
       working-directory: ensure_no_std
     - run: "./ensure_no_std/target/${{ matrix.triple }}/release/ensure_no_std"
+  dos_examples:
+    strategy:
+      fail-fast: false
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: nightly
+        override: true
+    - run: "rustup component add clippy"
+    - run: "rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu"
+    - run: "sudo apt-get update && sudo apt-get install msitools wine"
+    - run: "sudo dpkg --add-architecture i386 && sudo apt-get update && sudo apt-get install wine32"
+    - run: "git clone --depth=1 https://github.com/est31/msvc-wine-rust.git"
+      working-directory: ".."
+    - run: "./get.sh licenses-accepted"
+      working-directory: "../msvc-wine-rust"
+    - run: "sed -i 's|\\./linker\\.sh|xvfb-run ./linker.sh|' linker-scripts/linkx64.sh"
+      working-directory: "../msvc-wine-rust"
+    - run: "sed -i 's|\\./linker\\.sh|xvfb-run ./linker.sh|' linker-scripts/linkx86.sh"
+      working-directory: "../msvc-wine-rust"
+    - run: "cp msobj140.dll mspdbcore.dll ../x86"
+      working-directory: "../msvc-wine-rust/extracted/tools/VC/Tools/MSVC/14.11.25503/bin/Hostx64/x64"
+    - run: "cp mspdb140.dll msobj140.dll mspdbcore.dll mspdbsrv.exe ../x64"
+      working-directory: "../msvc-wine-rust/extracted/tools/VC/Tools/MSVC/14.11.25503/bin/Hostx86/x86"
+    - run: "echo '[target.i386-pc-dos-msvc]' > $HOME/.cargo/config"
+    - run: "echo -n \"linker=\\\"$PWD/linker-scripts/linkx86.sh\\\"\" >> $HOME/.cargo/config"
+      working-directory: "../msvc-wine-rust"
+    - uses: actions/checkout@v2
+    - run: "make debug"
+      working-directory: screen-dos/examples/control_chars
+    - run: "make release"
+      working-directory: screen-dos/examples/control_chars
+    - run: "make clippy"
+      working-directory: screen-dos/examples/control_chars
+    - run: "cargo outdated --verbose --root-deps-only --exit-code 1"
+      working-directory: screen-dos/examples/control_chars
