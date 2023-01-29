@@ -1,7 +1,7 @@
 [package]
 edition = "2021"
 name = "tuifw-screen-dos"
-version = "0.21.0"
+version = "0.21.1"
 #rust-version = "nightly"
 authors = ["warlock <internalmike@gmail.com>"]
 description = "Text User Interface Framework. Basic text screen implementation for DOS platform."
@@ -18,7 +18,7 @@ dos-cp = "0.4.0"
 either = { version = "1.8.0", default-features = false }
 panicking = { version = "0.4.0", default-features = false }
 pc-ints = "0.3.2"
-tuifw-screen-base = { path = "../screen-base", version = "0.21.0" }
+tuifw-screen-base = { path = "../screen-base", version = "0.21.1" }
 unicode-width = "0.1.10"
 
 [badges]

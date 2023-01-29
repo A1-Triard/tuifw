@@ -70,9 +70,10 @@ impl<A: Allocator> Screen<A> {
 
     fn resize(&mut self) -> Result<(), Error> {
         let size = self.size();
-        let lines_reserve = usize::from(size.y as u16).saturating_sub(self.lines.len());
+        let reserve = self.max_size.unwrap_or((size.x as u16, size.y as u16));
+        let lines_reserve = usize::from(reserve.1).saturating_sub(self.lines.len());
         self.lines.try_reserve(lines_reserve).map_err(|_| Error::Oom)?;
-        let chs_len = usize::from(size.y as u16).checked_mul(usize::from(size.x as u16)).ok_or(Error::Oom)?;
+        let chs_len = usize::from(reserve.1).checked_mul(usize::from(reserve.0)).ok_or(Error::Oom)?;
         self.chs.try_reserve(chs_len.saturating_sub(self.chs.len())).map_err(|_| Error::Oom)?;
         for line in &self.lines {
             set_err(non_err(unsafe { delwin(line.window.as_ptr()) }), "delwin", self.error_alloc)?;

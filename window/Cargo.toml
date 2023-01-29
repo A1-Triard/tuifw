@@ -1,7 +1,7 @@
 [package]
 edition = "2021"
 name = "tuifw-window"
-version = "0.21.0"
+version = "0.21.1"
 #rust-version = "nightly"
 authors = ["warlock <internalmike@gmail.com>"]
 description = "Text User Interface Framework. Overlappable hierachical windows."
@@ -16,12 +16,12 @@ repository = "https://github.com/A1-Triard/tuifw"
 components-arena = "3.5.0"
 educe = "0.4.18"
 macro-attr-2018 = "2.1.0"
-tuifw-screen-base = { path = "../screen-base", version = "0.21.0" }
+tuifw-screen-base = { path = "../screen-base", version = "0.21.1" }
 
 [dev-dependencies]
 panicking = "0.4.0"
-tuifw-screen-test = { path = "../screen-test", version = "0.21.0" }
-tuifw-screen = { path = "../screen", version = "0.21.0" }
+tuifw-screen-test = { path = "../screen-test", version = "0.21.1" }
+tuifw-screen = { path = "../screen", version = "0.21.1" }
 unicode-width = "0.1.9"
 
 [badges]
