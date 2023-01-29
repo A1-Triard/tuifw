@@ -163,7 +163,7 @@ impl<A: Allocator> Screen<A> {
         let reserve = self.max_size.unwrap_or((size.x as u16, size.y as u16));
         let reserve_data = usize::from(reserve.1).saturating_sub(self.data.len());
         self.data.try_reserve(reserve_data).map_err(|_| Error::Oom)?;
-        let bug_len = usize::from(reserve.1).checked_mul(usize::from(reserve.0)).ok_or(Error::Oom)?;
+        let buf_len = usize::from(reserve.1).checked_mul(usize::from(reserve.0)).ok_or(Error::Oom)?;
         self.buf.try_reserve(buf_len.saturating_sub(self.buf.len())).map_err(|_| Error::Oom)?;
         self.data.clear();
         self.data.resize(usize::from(size.y as u16), 0 .. size.x);
