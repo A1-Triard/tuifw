@@ -75,6 +75,7 @@ const DOS_CHARS: &str = "\
 
 const WIDE_CHARS: &str = "好 女 子";
 
+#[allow(clippy::redundant_clone)]
 fn draw(screen: &mut dyn Screen) {
     let w = 0 .. screen.size().x;
     screen.out(Point { x: 0, y: 0 }, Fg::LightGray, Bg::Blue, CONTROL_CHARS, w.clone(), w.clone());

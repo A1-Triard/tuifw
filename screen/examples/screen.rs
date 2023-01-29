@@ -7,6 +7,7 @@
 use std::cmp::{min, max};
 use tuifw_screen::{Bg, Fg, Screen, Point, Vector, Event, Key};
 
+#[allow(clippy::redundant_clone)]
 fn draw_box(screen: &mut dyn Screen, p: &mut Point) {
     if screen.size().y < 9 { return; }
     p.y = min(max(p.y, 4), screen.size().y - 5);
