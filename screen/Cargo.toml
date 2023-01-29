@@ -13,7 +13,6 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/A1-Triard/tuifw"
 
 [dependencies]
-errno-no-std = { version = "0.1.5", default-features = false }
 tuifw-screen-base = { path = "../screen-base", version = "0.21.1" }
 
 [target.'cfg(target_os="dos")'.dependencies]

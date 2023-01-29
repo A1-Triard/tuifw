@@ -80,3 +80,11 @@ jobs:
       working-directory: screen-dos/examples/control_chars
     - run: "cargo outdated --verbose --root-deps-only --exit-code 1"
       working-directory: screen-dos/examples/control_chars
+    - run: "make debug"
+      working-directory: screen/examples/dos_colors
+    - run: "make release"
+      working-directory: screen/examples/dos_colors
+    - run: "make clippy"
+      working-directory: screen/examples/dos_colors
+    - run: "cargo outdated --verbose --root-deps-only --exit-code 1"
+      working-directory: screen/examples/dos_colors
