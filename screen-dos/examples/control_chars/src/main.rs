@@ -1,4 +1,3 @@
-#![feature(alloc_error_handler)]
 #![feature(const_maybe_uninit_as_mut_ptr)]
 #![feature(const_mut_refs)]
 #![feature(const_ptr_write)]
@@ -30,12 +29,6 @@ mod no_std {
 
     #[global_allocator]
     static ALLOCATOR: AsGlobal<NonWorking> = AsGlobal(NonWorking);
-
-    #[cfg(windows)]
-    #[alloc_error_handler]
-    fn rust_oom(_: core::alloc::Layout) -> ! {
-        panic!("OOM")
-    }
 
     #[panic_handler]
     fn panic_handler(info: &core::panic::PanicInfo) -> ! { panic_no_std::panic(info, b'P') }
