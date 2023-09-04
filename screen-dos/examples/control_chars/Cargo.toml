@@ -17,7 +17,7 @@ strip = true
 [workspace]
 
 [dependencies]
-composable-allocators = { version = "0.2.3", default-features = false, features = ["global"] }
+composable-allocators = { version = "0.2.7", default-features = false, features = ["global"] }
 panic-no-std = "0.0.1"
 panicking = { version = "0.4.0", default-features = false, features = ["abort"] }
 rlibc = "1.0.0"
@@ -28,4 +28,4 @@ tuifw-screen-dos = { path = "../.." }
 pc-atomics = "0.0.2"
 
 [build-dependencies]
-dos-cp-generator = "0.4.0"
+dos-cp-generator = "0.5.1"

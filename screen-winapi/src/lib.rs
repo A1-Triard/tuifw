@@ -1,6 +1,7 @@
 #![cfg(windows)]
 
 #![feature(allocator_api)]
+#![feature(effects)]
 
 #![deny(warnings)]
 #![doc(test(attr(deny(warnings))))]

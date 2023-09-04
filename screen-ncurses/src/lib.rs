@@ -1,6 +1,7 @@
 #![cfg(not(windows))]
 
 #![feature(allocator_api)]
+#![feature(effects)]
 #![feature(extern_types)]
 #![feature(negative_impls)]
 

@@ -1,4 +1,5 @@
 #![feature(allocator_api)]
+#![feature(effects)]
 #![feature(generic_arg_infer)]
 #![feature(iter_advance_by)]
 #![feature(stmt_expr_attributes)]

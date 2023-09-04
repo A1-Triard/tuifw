@@ -1,3 +1,4 @@
+#![feature(effects)]
 #![feature(never_type)]
 
 #![deny(warnings)]
