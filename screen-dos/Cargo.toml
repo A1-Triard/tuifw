@@ -13,7 +13,7 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/A1-Triard/tuifw"
 
 [dependencies]
-composable-allocators = { version = "0.2.7", default-features = false, features = ["global"] }
+composable-allocators = { version = "0.2.8", default-features = false, features = ["global"] }
 dos-cp = "0.5.1"
 either = { version = "1.8.0", default-features = false }
 panicking = { version = "0.4.0", default-features = false }

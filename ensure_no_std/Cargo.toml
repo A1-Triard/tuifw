@@ -11,7 +11,7 @@ panic = "abort"
 panic = "abort"
 
 [dependencies]
-composable-allocators = "0.2.1"
+composable-allocators = "0.2.8"
 exit-no-std = "0.2.0"
 panicking = { version = "0.4.0", default-features = false, features = ["abort"] }
 tuifw-screen-test = { path = "../screen-test" }
