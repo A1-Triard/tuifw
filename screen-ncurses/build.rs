@@ -1,4 +1,5 @@
 #![deny(warnings)]
+#![allow(clippy::needless_raw_string_hashes)]
 
 use std::process::{Command, Stdio};
 use std::fs::{File};
