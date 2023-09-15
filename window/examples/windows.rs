@@ -24,12 +24,12 @@ fn render(
     if let Some(window) = window {
         let bounds = window.bounds(tree);
         let bounds = bounds.relative_to(bounds.tl);
-        let (title, content) = if window == state.window_1 {
-            ("1", "First Window")
+        let (title, content, cursor) = if window == state.window_1 {
+            ("1", "First Window", false)
         } else if window == state.window_2 {
-            ("2", "Second Window")
+            ("2", "Second Window", true)
         } else if window == state.window_3 {
-            ("3", "Third Window")
+            ("3", "Third Window", false)
         } else {
             unreachable!()
         };
@@ -69,6 +69,9 @@ fn render(
             VAlign::Center
         ).shrink_rect(content_bounds).tl;
         rp.out(content_tl, Fg::White, Bg::Blue, content);
+        if cursor {
+            rp.cursor(Point { x: 1, y: 1 })
+        }
     } else {
         rp.fill(|rp, p| rp.out(p, Fg::White, Bg::None, " "));
     }
