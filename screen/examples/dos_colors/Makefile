@@ -42,7 +42,7 @@ HXRT216/BIN/HDPMI32.EXE HXRT216/BIN/DPMILD32.EXE HXRT216/BIN/PESTUB.EXE HXRT216/
 	unzip -d HXRT216 HXRT216.zip
 
 HXRT216.zip:
-	wget https://www.japheth.de/Download/HX/HXRT216.zip
+	wget -4 https://www.japheth.de/Download/HX/HXRT216.zip
 	touch -t 200801011952 HXRT216.zip
 
 target/$(WIN_TARGET)/debug/$(BIN).exe: Cargo.toml Cargo.lock src/main.rs build.rs

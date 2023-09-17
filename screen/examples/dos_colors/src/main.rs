@@ -4,7 +4,6 @@
 #![feature(const_trait_impl)]
 #![feature(extern_types)]
 #![feature(generic_arg_infer)]
-#![feature(lang_items)]
 #![feature(panic_info_message)]
 #![feature(ptr_metadata)]
 #![feature(raw_ref_op)]
