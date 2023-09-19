@@ -157,6 +157,7 @@ impl LineEdit {
         port: &mut RenderPort,
     ) {
         if self.window != window { return; }
+        port.fill_bg(self.bg);
         port.out(Point { x: 0, y: 0 }, self.fg, self.bg, &self.line[self.view.clone()]);
     }
 
@@ -171,6 +172,7 @@ impl LineEdit {
                 for _ in 0 .. n.get() {
                     self.line.insert(self.cursor, c);
                 }
+                self.update_view(tree);
                 self.window.invalidate(tree);
             },
             _ => { }
