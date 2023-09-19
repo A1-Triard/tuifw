@@ -32,6 +32,11 @@ macro-attr-2018 = "3.0.0"
 phantom-type = { version = "0.4.2", default-features = false }
 tuifw-screen-base = { path = "screen-base", version = "0.22.0" }
 tuifw-window = { path = "window", version = "0.22.0" }
+unicode-width = "0.1.10"
+
+[dev-dependencies]
+panicking = "0.4.0"
+tuifw-screen = { path = "screen", version = "0.22.0" }
 
 [badges]
 maintenance = { status = "experimental" }
