@@ -19,7 +19,6 @@ use alloc::string::String;
 //use components_arena::{Arena, Id, Component};
 //use core::fmt::Debug;
 use core::ops::Range;
-use core::str::FromStr;
 //use macro_attr_2018::macro_attr;
 //use phantom_type::PhantomType;
 use tuifw_screen_base::{Bg, Event, Fg, Key, Point, Range1d, Rect};
@@ -72,18 +71,9 @@ impl RenderPortExt for RenderPort {
     }
 }
 
-pub enum EditValueRange {
-    Any,
-    Float(Range<f64>),
-    Integer(Range<i64>),
-}
-
 pub struct LineEdit {
-    allowed_values: EditValueRange,
-    norm_fg: Fg,
-    norm_bg: Bg,
-    err_bg: Bg,
-    err_fg: Fg,
+    fg: Fg,
+    bg: Bg,
     line: String,
     is_active: bool,
     window: Window,
@@ -94,17 +84,13 @@ pub struct LineEdit {
 impl LineEdit {
     pub fn new<State: ?Sized>(
         tree: &mut WindowTree<State>,
-        allowed_values: EditValueRange,
         parent: Option<Window>,
         prev: Option<Window>
     ) -> Result<Self, tuifw_screen_base::Error> {
         let window = Window::new(tree, parent, prev)?;
         Ok(LineEdit {
-            allowed_values,
-            norm_fg: Fg::White,
-            norm_bg: Bg::Blue,
-            err_fg: Fg::White,
-            err_bg: Bg::Red,
+            fg: Fg::White,
+            bg: Bg::Blue,
             line: String::new(),
             is_active: false,
             window,
@@ -113,31 +99,17 @@ impl LineEdit {
         })
     }
 
-    pub fn norm_fg(&self) -> Fg { self.norm_fg }
+    pub fn fg(&self) -> Fg { self.fg }
 
-    pub fn err_fg(&self) -> Fg { self.err_fg }
-
-    pub fn set_norm_fg<State: ?Sized>(&mut self, tree: &mut WindowTree<State>, fg: Fg) {
-        self.norm_fg = fg;
+    pub fn set_fg<State: ?Sized>(&mut self, tree: &mut WindowTree<State>, fg: Fg) {
+        self.fg = fg;
         self.window.invalidate(tree);
     }
 
-    pub fn set_err_fg<State: ?Sized>(&mut self, tree: &mut WindowTree<State>, fg: Fg) {
-        self.err_fg = fg;
-        self.window.invalidate(tree);
-    }
+    pub fn bg(&self) -> Bg { self.bg }
 
-    pub fn norm_bg(&self) -> Bg { self.norm_bg }
-
-    pub fn err_bg(&self) -> Bg { self.err_bg }
-
-    pub fn set_norm_bg<State: ?Sized>(&mut self, tree: &mut WindowTree<State>, bg: Bg) {
-        self.norm_bg = bg;
-        self.window.invalidate(tree);
-    }
-
-    pub fn set_err_bg<State: ?Sized>(&mut self, tree: &mut WindowTree<State>, bg: Bg) {
-        self.err_bg = bg;
+    pub fn set_bg<State: ?Sized>(&mut self, tree: &mut WindowTree<State>, bg: Bg) {
+        self.bg = bg;
         self.window.invalidate(tree);
     }
 
@@ -179,31 +151,14 @@ impl LineEdit {
         self.is_active = is_active;
     }
 
-    fn show_err(&self) -> bool {
-        match &self.allowed_values {
-            EditValueRange::Any => false,
-            EditValueRange::Integer(range) => if let Ok(value) = i64::from_str(&self.line) {
-                !range.contains(&value)
-            } else {
-                true
-            },
-            EditValueRange::Float(range) => if let Ok(value) = f64::from_str(&self.line) {
-                !range.contains(&value)
-            } else {
-                true
-            },
-        }
-    }
-
     pub fn render(
         &self,
         window: Window,
         port: &mut RenderPort,
     ) {
         if self.window != window { return; }
-        let (bg, fg) = if self.show_err() { (self.err_bg, self.err_fg) } else { (self.norm_bg, self.norm_fg) };
-        port.fill_bg(bg);
-        port.out(Point { x: 0, y: 0 }, fg, bg, &self.line[self.view.clone()]);
+        port.fill_bg(self.bg);
+        port.out(Point { x: 0, y: 0 }, self.fg, self.bg, &self.line[self.view.clone()]);
     }
 
     pub fn update<State: ?Sized>(
