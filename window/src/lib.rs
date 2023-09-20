@@ -17,7 +17,7 @@ extern crate alloc;
 use alloc::boxed::Box;
 use core::cmp::{max, min};
 use core::mem::replace;
-use components_arena::{Arena, Component, ComponentId, Id, NewtypeComponentId, RawId};
+use components_arena::{Arena, Component, Id, NewtypeComponentId};
 use educe::Educe;
 use macro_attr_2018::macro_attr;
 use tuifw_screen_base::{Bg, Error, Event, Fg, Point, Rect, Screen, Vector};
@@ -51,10 +51,7 @@ fn rect_invalidated(screen: &dyn Screen, rect: Rect) -> bool {
     false
 }
 
-#[derive(Educe)]
-#[educe(Debug)]
 pub struct RenderPort {
-    #[educe(Debug(ignore))]
     screen: Box<dyn Screen>,
     offset: Vector,
     size: Vector,
@@ -121,21 +118,20 @@ impl RenderPort {
 }
 
 macro_attr! {
-    #[derive(Component!)]
-    #[derive(Debug)]
-    struct WindowNode {
-        parent: Option<Id<WindowNode>>,
-        prev: Id<WindowNode>,
-        next: Id<WindowNode>,
-        first_child: Option<Id<WindowNode>>,
+    #[derive(Component!(class=WindowNodeClass))]
+    struct WindowNode<Tag> {
+        parent: Option<Id<WindowNode<Tag>>>,
+        prev: Id<WindowNode<Tag>>,
+        next: Id<WindowNode<Tag>>,
+        first_child: Option<Id<WindowNode<Tag>>>,
         bounds: Rect,
-        tag: Option<RawId>,
+        tag: Option<Tag>,
     }
 }
 
-fn offset_from_root<State: ?Sized>(
-    mut window: Id<WindowNode>,
-    tree: &WindowTree<State>
+fn offset_from_root<Tag, State: ?Sized>(
+    mut window: Id<WindowNode<Tag>>,
+    tree: &WindowTree<Tag, State>
 ) -> Vector {
     let mut offset = Vector::null();
     loop {
@@ -151,26 +147,28 @@ fn offset_from_root<State: ?Sized>(
 
 macro_attr! {
     #[derive(NewtypeComponentId!)]
-    #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
-    pub struct Window(Id<WindowNode>);
+    #[derive(Educe)]
+    #[educe(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+    pub struct Window<Tag>(Id<WindowNode<Tag>>);
 }
 
-impl Window {
+impl<Tag> Window<Tag> {
     pub fn new<State: ?Sized>(
-        tree: &mut WindowTree<State>,
+        tree: &mut WindowTree<Tag, State>,
+        tag: Tag,
         parent: Option<Self>,
         prev: Option<Self>,
-    ) -> Result<Window, Error> {
+    ) -> Result<Window<Tag>, Error> {
         tree.arena.try_reserve().map_err(|_| Error::Oom)?;
         let parent = parent.map_or(tree.root, |w| w.0);
-        let window = tree.arena.insert(|window| {
+        let window = tree.arena.insert(move |window| {
             (WindowNode {
                 parent: Some(parent),
                 prev: window,
                 next: window,
                 first_child: None,
                 bounds: Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() },
-                tag: None
+                tag: Some(tag)
             }, Window(window))
         });
         window.attach(tree, parent, prev);
@@ -179,73 +177,58 @@ impl Window {
 
     pub fn bounds<State: ?Sized>(
         self,
-        tree: &WindowTree<State>
+        tree: &WindowTree<Tag, State>
     ) -> Rect {
         tree.arena[self.0].bounds
     }
 
     pub fn inner_bounds<State: ?Sized>(
         self,
-        tree: &WindowTree<State>
+        tree: &WindowTree<Tag, State>
     ) -> Rect {
         let bounds = self.bounds(tree);
         Rect { tl: Point { x: 0, y: 0 }, size: bounds.size }
     }
 
-    pub fn set_tag<Tag: ComponentId, State: ?Sized>(
+    pub fn tag<State: ?Sized>(
         self,
-        tree: &mut WindowTree<State>,
-        tag: Tag
-    ) {
-        tree.arena[self.0].tag = Some(tag.into_raw());
-    }
-
-    pub fn reset_tag<State: ?Sized>(
-        self,
-        tree: &mut WindowTree<State>
-    ) {
-        tree.arena[self.0].tag = None;
-    }
-
-    pub fn tag<Tag: ComponentId, State: ?Sized>(
-        self,
-        tree: &WindowTree<State>
-    ) -> Option<Tag> {
-        tree.arena[self.0].tag.map(Tag::from_raw)
+        tree: &WindowTree<Tag, State>
+    ) -> &Tag {
+        tree.arena[self.0].tag.as_ref().unwrap()
     }
 
     pub fn parent<State: ?Sized>(
         self,
-        tree: &WindowTree<State>
-    ) -> Option<Window> {
+        tree: &WindowTree<Tag, State>
+    ) -> Option<Window<Tag>> {
         let parent = tree.arena[self.0].parent.unwrap();
         if parent == tree.root { None } else { Some(Window(parent)) }
     }
 
     pub fn first_child<State: ?Sized>(
         self,
-        tree: &WindowTree<State>
-    ) -> Option<Window> {
+        tree: &WindowTree<Tag, State>
+    ) -> Option<Window<Tag>> {
         tree.arena[self.0].first_child.map(Window)
     }
 
     pub fn prev<State: ?Sized>(
         self,
-        tree: &WindowTree<State>
-    ) -> Window {
+        tree: &WindowTree<Tag, State>
+    ) -> Window<Tag> {
         Window(tree.arena[self.0].prev)
     }
 
     pub fn next<State: ?Sized>(
         self,
-        tree: &WindowTree<State>
-    ) -> Window {
+        tree: &WindowTree<Tag, State>
+    ) -> Window<Tag> {
         Window(tree.arena[self.0].next)
     }
 
     pub fn move_xy<State: ?Sized>(
         self,
-        tree: &mut WindowTree<State>,
+        tree: &mut WindowTree<Tag, State>,
         bounds: Rect
     ) {
         let parent = tree.arena[self.0].parent.unwrap();
@@ -258,8 +241,8 @@ impl Window {
 
     pub fn move_z<State: ?Sized>(
         self,
-        tree: &mut WindowTree<State>,
-        prev: Option<Window>
+        tree: &mut WindowTree<Tag, State>,
+        prev: Option<Window<Tag>>
     ) {
         let parent = self.detach(tree);
         self.attach(tree, parent, prev);
@@ -270,8 +253,8 @@ impl Window {
 
     fn detach<State: ?Sized>(
         self,
-        tree: &mut WindowTree<State>
-    ) -> Id<WindowNode> {
+        tree: &mut WindowTree<Tag, State>
+    ) -> Id<WindowNode<Tag>> {
         let node = &mut tree.arena[self.0];
         let prev = replace(&mut node.prev, self.0);
         let next = replace(&mut node.next, self.0);
@@ -287,9 +270,9 @@ impl Window {
 
     fn attach<State: ?Sized>(
         self,
-        tree: &mut WindowTree<State>,
-        parent: Id<WindowNode>,
-        prev: Option<Window>
+        tree: &mut WindowTree<Tag, State>,
+        parent: Id<WindowNode<Tag>>,
+        prev: Option<Window<Tag>>
     ) {
         let (prev, next) = if let Some(prev) = prev {
             assert_eq!(tree.arena[prev.0].parent.unwrap(), parent);
@@ -312,7 +295,7 @@ impl Window {
 
     pub fn drop_window<State: ?Sized>(
         self,
-        tree: &mut WindowTree<State>
+        tree: &mut WindowTree<Tag, State>
     ) {
         let parent = self.detach(tree);
         let node = tree.arena.remove(self.0);
@@ -322,8 +305,8 @@ impl Window {
     }
 
     fn drop_node_tree<State: ?Sized>(
-        node: WindowNode,
-        tree: &mut WindowTree<State>
+        node: WindowNode<Tag>,
+        tree: &mut WindowTree<Tag, State>
     ) {
         if let Some(first_child) = node.first_child {
             let mut child = first_child;
@@ -338,7 +321,7 @@ impl Window {
 
     pub fn invalidate_rect<State: ?Sized>(
         self,
-        tree: &mut WindowTree<State>,
+        tree: &mut WindowTree<Tag, State>,
         rect: Rect
     ) {
         let bounds = tree.arena[self.0].bounds;
@@ -350,7 +333,7 @@ impl Window {
  
     pub fn invalidate<State: ?Sized>(
         self,
-        tree: &mut WindowTree<State>
+        tree: &mut WindowTree<Tag, State>
     ) {
         let bounds = tree.arena[self.0].bounds;
         let parent = tree.arena[self.0].parent.unwrap();
@@ -359,17 +342,13 @@ impl Window {
     }
 }
 
-#[derive(Educe)]
-#[educe(Debug)]
-pub struct WindowTree<State: ?Sized> {
-    #[educe(Debug(ignore))]
+pub struct WindowTree<Tag: 'static, State: ?Sized> {
     screen: Option<Box<dyn Screen>>,
-    arena: Arena<WindowNode>,
-    root: Id<WindowNode>,
-    #[educe(Debug(ignore))]
+    arena: Arena<WindowNode<Tag>>,
+    root: Id<WindowNode<Tag>>,
     render: fn(
-        tree: &WindowTree<State>,
-        window: Option<Window>,
+        tree: &WindowTree<Tag, State>,
+        window: Option<Window<Tag>>,
         port: &mut RenderPort,
         state: &mut State,
     ),
@@ -377,12 +356,12 @@ pub struct WindowTree<State: ?Sized> {
     screen_size: Vector,
 }
 
-impl<State: ?Sized> WindowTree<State> {
+impl<Tag, State: ?Sized> WindowTree<Tag, State> {
     pub fn new(
         screen: Box<dyn Screen>,
         render: fn(
-            tree: &WindowTree<State>,
-            window: Option<Window>,
+            tree: &WindowTree<Tag, State>,
+            window: Option<Window<Tag>>,
             port: &mut RenderPort,
             state: &mut State,
         )
@@ -416,7 +395,7 @@ impl<State: ?Sized> WindowTree<State> {
         self.screen.as_mut().expect("WindowTree is in invalid state").as_mut()
     }
 
-    fn render_window(&mut self, window: Id<WindowNode>, offset: Vector, render_state: &mut State) {
+    fn render_window(&mut self, window: Id<WindowNode<Tag>>, offset: Vector, render_state: &mut State) {
         let bounds = self.arena[window].bounds.offset(offset);
         let screen = self.screen();
         if !rect_invalidated(screen, bounds) { return; }
@@ -470,25 +449,25 @@ mod tests {
 
     #[test]
     fn window_tree_new_window() {
-        fn render<State: ?Sized>(_: &WindowTree<State>, _: Option<Window>, _: &mut RenderPort, _: &mut State) { }
+        fn render<State: ?Sized>(_: &WindowTree<(), State>, _: Option<Window<()>>, _: &mut RenderPort, _: &mut State) { }
         let screen = tuifw_screen_test::Screen::new(Vector::null());
         let screen = Box::new(screen) as _;
-        let tree = &mut WindowTree::<()>::new(screen, render).unwrap();
+        let tree = &mut WindowTree::<(), ()>::new(screen, render).unwrap();
         assert!(tree.arena[tree.root].first_child.is_none());
-        let one = Window::new(tree, None, None).unwrap();
+        let one = Window::new(tree, (), None, None).unwrap();
         one.move_xy(tree, Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() });
         assert!(tree.arena[one.0].first_child.is_none());
         assert_eq!(tree.arena[one.0].parent, Some(tree.root));
         assert_eq!(tree.arena[tree.root].first_child, Some(one.0));
         assert_eq!(tree.arena[one.0].next, one.0);
-        let two = Window::new(tree, None, Some(one)).unwrap();
+        let two = Window::new(tree, (), None, Some(one)).unwrap();
         two.move_xy(tree, Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() });
         assert!(tree.arena[two.0].first_child.is_none());
         assert_eq!(tree.arena[two.0].parent, Some(tree.root));
         assert_eq!(tree.arena[tree.root].first_child, Some(one.0));
         assert_eq!(tree.arena[one.0].next, two.0);
         assert_eq!(tree.arena[two.0].next, one.0);
-        let three = Window::new(tree, None, Some(two)).unwrap();
+        let three = Window::new(tree, (), None, Some(two)).unwrap();
         three.move_xy(tree, Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() });
         assert!(tree.arena[three.0].first_child.is_none());
         assert_eq!(tree.arena[three.0].parent, Some(tree.root));
@@ -496,7 +475,7 @@ mod tests {
         assert_eq!(tree.arena[one.0].next, two.0);
         assert_eq!(tree.arena[two.0].next, three.0);
         assert_eq!(tree.arena[three.0].next, one.0);
-        let four = Window::new(tree, None, None).unwrap();
+        let four = Window::new(tree, (), None, None).unwrap();
         four.move_xy(tree, Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() });
         assert!(tree.arena[four.0].first_child.is_none());
         assert_eq!(tree.arena[four.0].parent, Some(tree.root));
@@ -509,12 +488,12 @@ mod tests {
 
     #[test]
     fn drop_subtree() {
-        fn render<State: ?Sized>(_: &WindowTree<State>, _: Option<Window>, _: &mut RenderPort, _: &mut State) { }
+        fn render<State: ?Sized>(_: &WindowTree<(), State>, _: Option<Window<()>>, _: &mut RenderPort, _: &mut State) { }
         let screen = tuifw_screen_test::Screen::new(Vector::null());
         let screen = Box::new(screen) as _;
-        let tree = &mut WindowTree::<()>::new(screen, render).unwrap();
-        let w = Window::new(tree, None, None).unwrap();
-        let _ = Window::new(tree, Some(w), None).unwrap();
+        let tree = &mut WindowTree::<(), ()>::new(screen, render).unwrap();
+        let w = Window::new(tree, (), None, None).unwrap();
+        let _ = Window::new(tree, (), Some(w), None).unwrap();
         w.drop_window(tree);
         assert_eq!(tree.arena.items().len(), 1);
      }
