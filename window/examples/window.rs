@@ -5,11 +5,43 @@
 use tuifw_screen::{Bg, Event, Fg, HAlign, Key, Point, Rect, Thickness, VAlign, Vector};
 use tuifw_window::{RenderPort, Window, WindowTree};
 
-fn draw(
-    tree: &WindowTree<bool, ()>,
+fn measure(
+    tree: &mut WindowTree<bool, Point>,
+    window: Window<bool>,
+    available_width: Option<i16>,
+    available_height: Option<i16>,
+    state: &mut Point
+) -> Vector {
+    if *window.tag(tree) {
+        let child = window.first_child(tree).unwrap();
+        child.measure(tree, None, None, state);
+        Vector { x: available_width.unwrap(), y: available_height.unwrap() }
+    } else {
+        Vector { x: 13, y: 7 }
+    }
+}
+
+fn arrange(
+    tree: &mut WindowTree<bool, Point>,
+    window: Window<bool>,
+    final_inner_bounds: Rect,
+    state: &mut Point
+) -> Vector {
+    if *window.tag(tree) {
+        let child = window.first_child(tree).unwrap();
+        let child_desired_size = child.desired_size(tree);
+        child.arrange(tree, Rect { tl: *state, size: child_desired_size }, state);
+        final_inner_bounds.size
+    } else {
+        final_inner_bounds.size
+    }
+}
+
+fn render(
+    tree: &WindowTree<bool, Point>,
     window: Window<bool>,
     rp: &mut RenderPort,
-    _state: &mut ()
+    _state: &mut Point
 ) {
     if *window.tag(tree) {
         rp.fill(|rp, p| rp.out(p, Fg::Black, Bg::None, " "));
@@ -26,16 +58,15 @@ fn draw(
 
 fn main() {
     let screen = unsafe { tuifw_screen::init(None, None) }.unwrap();
-    let tree = &mut WindowTree::new(screen, draw, true).unwrap();
+    let tree = &mut WindowTree::new(screen, render, measure, arrange, true).unwrap();
     let root = tree.root();
     let size = Vector { x: 13, y: 7 };
     let screen_size = root.bounds(tree).size;
     let padding = Thickness::align(size, screen_size, HAlign::Center, VAlign::Center);
-    let mut bounds = padding.shrink_rect(Rect { tl: Point { x: 0, y: 0 }, size: screen_size });
-    let window = Window::new(tree, false, root, None).unwrap();
-    window.move_xy(tree, bounds);
+    let mut location = padding.shrink_rect(Rect { tl: Point { x: 0, y: 0 }, size: screen_size }).tl;
+    Window::new(tree, false, root, None).unwrap();
     loop {
-        if let Some(e) = tree.update(true, &mut ()).unwrap() {
+        if let Some(e) = tree.update(true, &mut location).unwrap() {
             let d = match e {
                 Event::Key(n, Key::Left) | Event::Key(n, Key::Char('h')) =>
                     -Vector { x: (n.get() as i16).wrapping_mul(2), y: 0 },
@@ -48,8 +79,8 @@ fn main() {
                 Event::Key(_, Key::Escape) => break,
                 _ => Vector::null(),
             };
-            bounds = bounds.offset(d);
-            window.move_xy(tree, bounds)
+            location = location.offset(d);
+            root.invalidate_arrange(tree);
         }
     }
 }
