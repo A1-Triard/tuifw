@@ -6,12 +6,12 @@ use tuifw_screen::{Bg, Event, Fg, HAlign, Key, Point, Rect, Thickness, VAlign, V
 use tuifw_window::{RenderPort, Window, WindowTree};
 
 fn draw(
-    _tree: &WindowTree<(), ()>,
-    window: Option<Window<()>>,
+    tree: &WindowTree<bool, ()>,
+    window: Window<bool>,
     rp: &mut RenderPort,
     _state: &mut ()
 ) {
-    if window.is_none() {
+    if *window.tag(tree) {
         rp.fill(|rp, p| rp.out(p, Fg::Black, Bg::None, " "));
     } else {
         rp.out(Point { x: 0, y: 0 }, Fg::Green, Bg::None, "╔═══════════╗");
@@ -26,11 +26,13 @@ fn draw(
 
 fn main() {
     let screen = unsafe { tuifw_screen::init(None, None) }.unwrap();
-    let tree = &mut WindowTree::new(screen, draw).unwrap();
+    let tree = &mut WindowTree::new(screen, draw, true).unwrap();
+    let root = tree.root();
     let size = Vector { x: 13, y: 7 };
-    let padding = Thickness::align(size, tree.screen_size(), HAlign::Center, VAlign::Center);
-    let mut bounds = padding.shrink_rect(Rect { tl: Point { x: 0, y: 0 }, size: tree.screen_size() });
-    let window = Window::new(tree, (), None, None).unwrap();
+    let screen_size = root.bounds(tree).size;
+    let padding = Thickness::align(size, screen_size, HAlign::Center, VAlign::Center);
+    let mut bounds = padding.shrink_rect(Rect { tl: Point { x: 0, y: 0 }, size: screen_size });
+    let window = Window::new(tree, false, root, None).unwrap();
     window.move_xy(tree, bounds);
     loop {
         if let Some(e) = tree.update(true, &mut ()).unwrap() {
