@@ -15,6 +15,65 @@ struct State {
     focused: Window<()>,
 }
 
+fn measure(
+    tree: &mut WindowTree<(), State>,
+    window: Window<()>,
+    available_width: Option<i16>,
+    available_height: Option<i16>,
+    state: &mut State
+) -> Vector {
+    if window == state.window_1 {
+        Vector { x: 35, y: 15 }
+    } else if window == state.window_2 {
+        Vector { x: 32, y: 15 }
+    } else if window == state.window_3 {
+        Vector { x: 30, y: 15 }
+    } else {
+        let first_child = window.first_child(tree).unwrap();
+        let mut child = first_child;
+        loop {
+            child.measure(tree, None, None, state);
+            child = child.next(tree);
+            if child == first_child { break; }
+        }
+        Vector { x: available_width.unwrap(), y: available_height.unwrap() }
+    }
+}
+
+fn arrange(
+    tree: &mut WindowTree<(), State>,
+    window: Window<()>,
+    final_inner_bounds: Rect,
+    state: &mut State
+) -> Vector {
+    if window == state.window_1 {
+        final_inner_bounds.size
+    } else if window == state.window_2 {
+        final_inner_bounds.size
+    } else if window == state.window_3 {
+        final_inner_bounds.size
+    } else {
+        let first_child = window.first_child(tree).unwrap();
+        let mut child = first_child;
+        loop {
+            let child_desired_size = child.desired_size(tree);
+            let bounds = if child == state.window_1 {
+                Rect { tl: Point { x: 5, y: 0 }, size: child_desired_size }
+            } else if child == state.window_2 {
+                Rect { tl: Point { x: 30, y: 5 }, size: child_desired_size }
+            } else if child == state.window_3 {
+                Rect { tl: Point { x: 20, y: 10 }, size: child_desired_size }
+            } else {
+                unreachable!()
+            };
+            child.arrange(tree, bounds, state);
+            child = child.next(tree);
+            if child == first_child { break; }
+        }
+        final_inner_bounds.size
+    }
+}
+
 fn render(
     tree: &WindowTree<(), State>,
     window: Window<()>,
@@ -83,14 +142,11 @@ fn focus_window(tree: &mut WindowTree<(), State>, window: Window<()>, state: &mu
 
 fn main() {
     let screen = unsafe { tuifw_screen::init(None, None) }.unwrap();
-    let mut windows = WindowTree::new(screen, render, ()).unwrap();
+    let mut windows = WindowTree::new(screen, render, measure, arrange, ()).unwrap();
     let root = windows.root();
     let window_1 = Window::new(&mut windows, (), root, None).unwrap();
-    window_1.move_xy(&mut windows, Rect::from_tl_br(Point { x: 5, y: 0}, Point { x: 40, y: 15 }));
     let window_2 = Window::new(&mut windows, (), root, None).unwrap();
-    window_2.move_xy(&mut windows, Rect::from_tl_br(Point { x: 30, y: 5}, Point { x: 62, y: 20 }));
     let window_3 = Window::new(&mut windows, (), root, Some(window_2)).unwrap();
-    window_3.move_xy(&mut windows, Rect::from_tl_br(Point { x: 20, y: 10}, Point { x: 50, y: 22 }));
     let mut state = State { window_1, window_2, window_3, focused: window_1 };
     loop { 
         if let Some(event) = WindowTree::update(&mut windows, true, &mut state).unwrap() {
@@ -102,26 +158,6 @@ fn main() {
                     focus_window(&mut windows, window_2, &mut state),
                 Event::Key(_, Key::Char('3')) | Event::Key(_, Key::Alt('3')) =>
                     focus_window(&mut windows, window_3, &mut state),
-                Event::Key(n, Key::Left) | Event::Key(n, Key::Char('h')) => {
-                    let offset = Vector { x: (n.get() as i16).wrapping_neg(), y: 0 };
-                    let bounds = state.focused.bounds(&windows);
-                    state.focused.move_xy(&mut windows, bounds.offset(offset));
-                },
-                Event::Key(n, Key::Right) | Event::Key(n, Key::Char('l')) => {
-                    let offset = Vector { x: n.get() as i16, y: 0 };
-                    let bounds = state.focused.bounds(&windows);
-                    state.focused.move_xy(&mut windows, bounds.offset(offset));
-                },
-                Event::Key(n, Key::Up) | Event::Key(n, Key::Char('k')) => {
-                    let offset = Vector { x: 0, y: (n.get() as i16).wrapping_neg() };
-                    let bounds = state.focused.bounds(&windows);
-                    state.focused.move_xy(&mut windows, bounds.offset(offset));
-                },
-                Event::Key(n, Key::Down) | Event::Key(n, Key::Char('j')) => {
-                    let offset = Vector { x: 0, y: n.get() as i16 };
-                    let bounds = state.focused.bounds(&windows);
-                    state.focused.move_xy(&mut windows, bounds.offset(offset));
-                },
                 _ => { },
             }
         }

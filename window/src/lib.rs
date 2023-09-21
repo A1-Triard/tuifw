@@ -587,26 +587,36 @@ mod tests {
     #[test]
     fn window_tree_new_window() {
         fn render<State: ?Sized>(_: &WindowTree<(), State>, _: Window<()>, _: &mut RenderPort, _: &mut State) { }
+        fn measure<State: ?Sized>(
+            _: &mut WindowTree<(), State>,
+            _: Window<()>,
+            _: Option<i16>,
+            _: Option<i16>,
+            _: &mut State
+        ) -> Vector { Vector::null() }
+        fn arrange<State: ?Sized>(
+            _: &mut WindowTree<(), State>,
+            _: Window<()>,
+            _: Rect,
+            _: &mut State
+        ) -> Vector { Vector::null() }
         let screen = tuifw_screen_test::Screen::new(Vector::null());
         let screen = Box::new(screen) as _;
-        let tree = &mut WindowTree::<(), ()>::new(screen, render, ()).unwrap();
+        let tree = &mut WindowTree::<(), ()>::new(screen, render, measure, arrange, ()).unwrap();
         let root = tree.root();
         assert!(tree.arena[tree.root.0].first_child.is_none());
         let one = Window::new(tree, (), root, None).unwrap();
-        one.move_xy(tree, Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() });
         assert!(tree.arena[one.0].first_child.is_none());
         assert_eq!(tree.arena[one.0].parent, Some(tree.root));
         assert_eq!(tree.arena[tree.root.0].first_child, Some(one));
         assert_eq!(tree.arena[one.0].next, one);
         let two = Window::new(tree, (), root, Some(one)).unwrap();
-        two.move_xy(tree, Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() });
         assert!(tree.arena[two.0].first_child.is_none());
         assert_eq!(tree.arena[two.0].parent, Some(tree.root));
         assert_eq!(tree.arena[tree.root.0].first_child, Some(one));
         assert_eq!(tree.arena[one.0].next, two);
         assert_eq!(tree.arena[two.0].next, one);
         let three = Window::new(tree, (), root, Some(two)).unwrap();
-        three.move_xy(tree, Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() });
         assert!(tree.arena[three.0].first_child.is_none());
         assert_eq!(tree.arena[three.0].parent, Some(tree.root));
         assert_eq!(tree.arena[tree.root.0].first_child, Some(one));
@@ -614,7 +624,6 @@ mod tests {
         assert_eq!(tree.arena[two.0].next, three);
         assert_eq!(tree.arena[three.0].next, one);
         let four = Window::new(tree, (), root, None).unwrap();
-        four.move_xy(tree, Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() });
         assert!(tree.arena[four.0].first_child.is_none());
         assert_eq!(tree.arena[four.0].parent, Some(tree.root));
         assert_eq!(tree.arena[tree.root.0].first_child, Some(four));
@@ -627,9 +636,22 @@ mod tests {
     #[test]
     fn drop_subtree() {
         fn render<State: ?Sized>(_: &WindowTree<(), State>, _: Window<()>, _: &mut RenderPort, _: &mut State) { }
+        fn measure<State: ?Sized>(
+            _: &mut WindowTree<(), State>,
+            _: Window<()>,
+            _: Option<i16>,
+            _: Option<i16>,
+            _: &mut State
+        ) -> Vector { Vector::null() }
+        fn arrange<State: ?Sized>(
+            _: &mut WindowTree<(), State>,
+            _: Window<()>,
+            _: Rect,
+            _: &mut State
+        ) -> Vector { Vector::null() }
         let screen = tuifw_screen_test::Screen::new(Vector::null());
         let screen = Box::new(screen) as _;
-        let tree = &mut WindowTree::<(), ()>::new(screen, render, ()).unwrap();
+        let tree = &mut WindowTree::<(), ()>::new(screen, render, measure, arrange, ()).unwrap();
         let root = tree.root();
         let w = Window::new(tree, (), root, None).unwrap();
         let _ = Window::new(tree, (), w, None).unwrap();
