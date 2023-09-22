@@ -28,9 +28,9 @@ exclude = [
 
 [dependencies]
 components-arena = "4.1.0"
+dyn-clone = "1.0.14"
 macro-attr-2018 = "3.0.0"
 phantom-type = { version = "0.4.2", default-features = false }
-portrait = "0.3.0"
 tuifw-screen-base = { path = "screen-base", version = "0.22.0" }
 tuifw-window = { path = "window", version = "0.22.0" }
 unicode-width = "0.1.10"
