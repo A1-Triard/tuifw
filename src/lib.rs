@@ -29,7 +29,7 @@ use tuifw_window::{RenderPort, Window, WindowTree};
 use unicode_width::UnicodeWidthChar;
 
 pub trait RenderPortExt {
-    fn fill_bg(&mut self, bg: Bg);
+    fn fill_bg(&mut self, bg: Bg, fg: Option<Fg>);
     fn h_line(&mut self, start: Point, len: i16, double: bool, fg: Fg, bg: Bg);
     fn v_line(&mut self, start: Point, len: i16, double: bool, fg: Fg, bg: Bg);
     fn tl_edge(&mut self, p: Point, double: bool, fg: Fg, bg: Bg);
@@ -39,8 +39,8 @@ pub trait RenderPortExt {
 }
 
 impl RenderPortExt for RenderPort {
-    fn fill_bg(&mut self, bg: Bg) {
-        self.fill(|rp, p| rp.out(p, Fg::LightGray, bg, " "));
+    fn fill_bg(&mut self, bg: Bg, fg: Option<Fg>) {
+        self.fill(|rp, p| rp.out(p, fg.unwrap_or(Fg::LightGray), bg, if fg.is_some() { "░" } else { " " }));
     }
 
     fn h_line(&mut self, start: Point, len: i16, double: bool, fg: Fg, bg: Bg) {
@@ -329,6 +329,88 @@ impl<State: ?Sized> Widget<State> for StaticTextWidget {
             .fold(0i16, |s, c| s.wrapping_add(i16::try_from(c).unwrap()))
         ;
         Vector { x: width, y: 1 }
+    }
+}
+
+pub struct Background {
+    pub bg: Bg,
+    pub fg: Option<Fg>,
+}
+
+impl Background {
+    pub fn widget_tag<State: ?Sized>(self) -> WidgetTag<State> {
+        (Box::new(BackgroundWidget), Box::new(self))
+    }
+
+    pub fn window<State: ?Sized>(
+        self,
+        tree: &mut WindowTree<WidgetTag<State>, State>,
+        parent: Window<WidgetTag<State>>,
+        prev: Option<Window<WidgetTag<State>>>
+    ) -> Result<Window<WidgetTag<State>>, Error> {
+        Window::new(tree, self.widget_tag(), parent, prev)
+    }
+
+    pub fn window_tree<State: ?Sized>(
+        self,
+        screen: Box<dyn Screen>
+    ) -> Result<WindowTree<WidgetTag<State>, State>, Error> {
+        WindowTree::new(screen, widget_render, widget_measure, widget_arrange, self.widget_tag())
+    }
+}
+
+#[derive(Clone)]
+pub struct BackgroundWidget;
+
+impl<State: ?Sized> Widget<State> for BackgroundWidget {
+    fn render(
+        &self,
+        tree: &WindowTree<WidgetTag<State>, State>,
+        window: Window<WidgetTag<State>>,
+        port: &mut RenderPort,
+        _state: &mut State,
+    ) {
+        let data = window.tag(tree).1.downcast_ref::<Background>().expect("Background");
+        port.fill_bg(data.bg, data.fg);
+    }
+
+    fn measure(
+        &self,
+        tree: &mut WindowTree<WidgetTag<State>, State>,
+        window: Window<WidgetTag<State>>,
+        available_width: Option<i16>,
+        available_height: Option<i16>,
+        state: &mut State,
+    ) -> Vector {
+        let mut size = Vector::null();
+        if let Some(first_child) = window.first_child(tree) {
+            let mut child = first_child;
+            loop {
+                child.measure(tree, available_width, available_height, state);
+                size = size.max(child.desired_size(tree));
+                child = child.next(tree);
+                if child == first_child { break; }
+            }
+        }
+        size
+    }
+
+    fn arrange(
+        &self,
+        tree: &mut WindowTree<WidgetTag<State>, State>,
+        window: Window<WidgetTag<State>>,
+        final_inner_bounds: Rect,
+        state: &mut State,
+    ) -> Vector {
+        if let Some(first_child) = window.first_child(tree) {
+            let mut child = first_child;
+            loop {
+                child.arrange(tree, final_inner_bounds, state);
+                child = child.next(tree);
+                if child == first_child { break; }
+            }
+        }
+        final_inner_bounds.size
     }
 }
 
