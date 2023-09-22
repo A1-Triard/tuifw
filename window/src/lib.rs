@@ -295,6 +295,13 @@ impl<Tag> Window<Tag> {
         &tree.arena[self.0].tag
     }
 
+    pub fn tag_mut<State: ?Sized>(
+        self,
+        tree: &mut WindowTree<Tag, State>
+    ) -> &mut Tag {
+        &mut tree.arena[self.0].tag
+    }
+
     pub fn parent<State: ?Sized>(
         self,
         tree: &WindowTree<Tag, State>
