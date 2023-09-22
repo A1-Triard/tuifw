@@ -24,7 +24,7 @@ use core::any::Any;
 use dyn_clone::{DynClone, clone_trait_object};
 //use macro_attr_2018::macro_attr;
 //use phantom_type::PhantomType;
-use tuifw_screen_base::{Bg, Error, /*Event,*/ Fg, /*Key,*/ Point, Range1d, Rect, Vector};
+use tuifw_screen_base::{Bg, Error, /*Event,*/ Fg, /*Key,*/ Point, Range1d, Rect, Screen, Vector};
 use tuifw_window::{RenderPort, Window, WindowTree};
 use unicode_width::UnicodeWidthChar;
 
@@ -153,6 +153,13 @@ impl StackPanel {
     ) -> Result<Window<WidgetTag<State>>, Error> {
         Window::new(tree, self.widget_tag(), parent, prev)
     }
+
+    pub fn window_tree<State: ?Sized>(
+        self,
+        screen: Box<dyn Screen>
+    ) -> Result<WindowTree<WidgetTag<State>, State>, Error> {
+        WindowTree::new(screen, widget_render, widget_measure, widget_arrange, self.widget_tag())
+    }
 }
 
 #[derive(Clone)]
@@ -266,6 +273,13 @@ impl StaticText {
         prev: Option<Window<WidgetTag<State>>>
     ) -> Result<Window<WidgetTag<State>>, Error> {
         Window::new(tree, self.widget_tag(), parent, prev)
+    }
+
+    pub fn window_tree<State: ?Sized>(
+        self,
+        screen: Box<dyn Screen>
+    ) -> Result<WindowTree<WidgetTag<State>, State>, Error> {
+        WindowTree::new(screen, widget_render, widget_measure, widget_arrange, self.widget_tag())
     }
 }
 
