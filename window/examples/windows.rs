@@ -140,9 +140,11 @@ fn update(
     state: &mut State
 ) -> bool {
     match event {
-        Event::LostFocus => if window != tree.root() {
-            let focused = tree.focused();
-            focused.move_z(tree, Some(window));
+        Event::GotFocus => {
+            let old_focused = tree.focused();
+            if old_focused != tree.root() {
+                window.move_z(tree, Some(old_focused));
+            }
         },
         Event::Key(_, Key::Escape) => state.quit = true,
         Event::Key(_, Key::Char('1')) | Event::Key(_, Key::Alt('1')) => {

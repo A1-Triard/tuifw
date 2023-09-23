@@ -343,13 +343,15 @@ impl<Tag> Window<Tag> {
         self,
         tree: &mut WindowTree<Tag, State>,
         state: &mut State
-    ) -> Window<Tag> {
-        let old_focused = replace(&mut tree.focused, self);
-        if old_focused == self { return old_focused; }
+    ) -> Option<Window<Tag>> {
+        let old_focused = tree.focused;
+        if self == old_focused { return None; }
         let update = tree.update;
-        update(tree, self, Event::GotFocus, false, state);
+        let handled = update(tree, self, Event::GotFocus, false, state);
+        if !handled { return None; }
+        tree.focused = self;
         update(tree, old_focused, Event::LostFocus, false, state);
-        old_focused
+        Some(old_focused)
     }
 
     fn update<State: ?Sized>(
