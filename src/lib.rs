@@ -597,6 +597,20 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                     window.invalidate(tree);
                     true
                 },
+                Key::Backspace => {
+                    let data = window.data_mut(tree).1.downcast_mut::<InputLine>().expect("InputLine");
+                    for _ in 0 .. n.get() {
+                        if let Some(i) = data.cursor_index.checked_sub(1) {
+                            data.cursor_index = i;
+                            let c = data.value.remove(data.cursor_index);
+                            data.cursor_x = data.cursor_x.wrapping_sub(
+                                if c == '\0' { 0 } else { i16::try_from(c.width().unwrap_or(0)).unwrap() }
+                            );
+                        }
+                    }
+                    window.invalidate(tree);
+                    true
+                },
                 _ => false,
             },
             _ => false
