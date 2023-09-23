@@ -164,12 +164,6 @@ impl RenderPort {
     }
 }
 
-pub struct WidgetData<State: ?Sized> {
-    pub widget: Box<dyn Widget<State>>,
-    pub data: Box<dyn Any>,
-    pub layout: Box<dyn Any>,
-}
-
 pub trait Widget<State: ?Sized>: DynClone {
     fn render(
         &self,
@@ -208,45 +202,45 @@ pub trait Widget<State: ?Sized>: DynClone {
 
 clone_trait_object!(<State: ?Sized> Widget<State>);
 
-pub fn widget_render<State: ?Sized>(
+fn widget_render<State: ?Sized>(
     tree: &WindowTree<State>,
     window: Window<State>,
     rp: &mut RenderPort,
     state: &mut State,
 ) {
-    let widget = window.data(tree).widget.clone();
+    let widget = tree.arena[window.0].widget.clone();
     widget.render(tree, window, rp, state)
 }
 
-pub fn widget_measure<State: ?Sized>(
+fn widget_measure<State: ?Sized>(
     tree: &mut WindowTree<State>,
     window: Window<State>,
     available_width: Option<i16>,
     available_height: Option<i16>,
     state: &mut State,
 ) -> Vector {
-    let widget = window.data(tree).widget.clone();
+    let widget = tree.arena[window.0].widget.clone();
     widget.measure(tree, window, available_width, available_height, state)
 }
 
-pub fn widget_arrange<State: ?Sized>(
+fn widget_arrange<State: ?Sized>(
     tree: &mut WindowTree<State>,
     window: Window<State>,
     final_inner_bounds: Rect,
     state: &mut State,
 ) -> Vector {
-    let widget = window.data(tree).widget.clone();
+    let widget = tree.arena[window.0].widget.clone();
     widget.arrange(tree, window, final_inner_bounds, state)
 }
 
-pub fn widget_update<State: ?Sized>(
+fn widget_update<State: ?Sized>(
     tree: &mut WindowTree<State>,
     window: Window<State>,
     event: Event,
     preview: bool,
     state: &mut State,
 ) -> bool {
-    let widget = window.data(tree).widget.clone();
+    let widget = tree.arena[window.0].widget.clone();
     widget.update(tree, window, event, preview, state)
 }
 
@@ -257,7 +251,8 @@ macro_attr! {
         prev: Window<State>,
         next: Window<State>,
         first_child: Option<Window<State>>,
-        data: WidgetData<State>,
+        widget: Box<dyn Widget<State>>,
+        data: Box<dyn Any>,
         measure_size: Option<(Option<i16>, Option<i16>)>,
         desired_size: Vector,
         arrange_bounds: Option<Rect>,
@@ -296,7 +291,8 @@ macro_attr! {
 impl<State: ?Sized> Window<State> {
     pub fn new(
         tree: &mut WindowTree<State>,
-        data: WidgetData<State>,
+        widget: Box<dyn Widget<State>>,
+        data: Box<dyn Any>,
         parent: Self,
         prev: Option<Self>,
     ) -> Result<Window<State>, Error> {
@@ -307,6 +303,7 @@ impl<State: ?Sized> Window<State> {
                 prev: Window(window),
                 next: Window(window),
                 first_child: None,
+                widget,
                 data,
                 measure_size: None,
                 desired_size: Vector::null(),
@@ -418,18 +415,18 @@ impl<State: ?Sized> Window<State> {
         Rect { tl: Point { x: 0, y: 0 }, size: bounds.size }
     }
 
-    pub fn data(
+    pub fn data<T: 'static>(
         self,
         tree: &WindowTree<State>
-    ) -> &WidgetData<State> {
-        &tree.arena[self.0].data
+    ) -> &T {
+        tree.arena[self.0].data.downcast_ref::<T>().expect("wrong type")
     }
 
-    pub fn data_mut(
+    pub fn data_mut<T: 'static>(
         self,
         tree: &mut WindowTree<State>
-    ) -> &mut WidgetData<State> {
-        &mut tree.arena[self.0].data
+    ) -> &mut T {
+        tree.arena[self.0].data.downcast_mut::<T>().expect("wrong type")
     }
 
     pub fn parent(
@@ -686,7 +683,8 @@ pub struct WindowTree<State: ?Sized + 'static> {
 impl<State: ?Sized> WindowTree<State> {
     pub fn new(
         screen: Box<dyn Screen>,
-        root_data: WidgetData<State>,
+        root_widget: Box<dyn Widget<State>>,
+        root_data: Box<dyn Any>,
     ) -> Result<Self, Error> {
         let mut arena = Arena::new();
         arena.try_reserve().map_err(|_| Error::Oom)?;
@@ -696,6 +694,7 @@ impl<State: ?Sized> WindowTree<State> {
             prev: Window(window),
             next: Window(window),
             first_child: None,
+            widget: root_widget,
             data: root_data,
             measure_size: Some((Some(screen_size.x), Some(screen_size.y))),
             desired_size: screen_size,

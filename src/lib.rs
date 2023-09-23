@@ -18,7 +18,7 @@ use alloc::string::String;
 use core::ops::Range;
 use core::str::FromStr;
 use tuifw_screen_base::{Bg, Error, Fg, Key, Point, Rect, Screen, Vector};
-use tuifw_window::{Event, RenderPort, WidgetData, Window, WindowTree, Widget};
+use tuifw_window::{Event, RenderPort, Window, WindowTree, Widget};
 use unicode_width::UnicodeWidthChar;
 
 pub struct StackPanel {
@@ -26,28 +26,20 @@ pub struct StackPanel {
 }
 
 impl StackPanel {
-    pub fn widget_data<State: ?Sized>(self) -> WidgetData<State> {
-        WidgetData {
-            widget: Box::new(StackPanelWidget),
-            data: Box::new(self),
-            layout: Box::new(()),
-        }
-    }
-
     pub fn window<State: ?Sized>(
         self,
         tree: &mut WindowTree<State>,
         parent: Window<State>,
         prev: Option<Window<State>>
     ) -> Result<Window<State>, Error> {
-        Window::new(tree, self.widget_data(), parent, prev)
+        Window::new(tree, Box::new(StackPanelWidget), Box::new(self), parent, prev)
     }
 
     pub fn window_tree<State: ?Sized>(
         self,
         screen: Box<dyn Screen>
     ) -> Result<WindowTree<State>, Error> {
-        WindowTree::new(screen, self.widget_data())
+        WindowTree::new(screen, Box::new(StackPanelWidget), Box::new(self))
     }
 }
 
@@ -71,7 +63,7 @@ impl<State: ?Sized> Widget<State> for StackPanelWidget {
         available_height: Option<i16>,
         state: &mut State,
     ) -> Vector {
-        let vertical = window.data(tree).data.downcast_ref::<StackPanel>().expect("StackPanel").vertical;
+        let vertical = window.data::<StackPanel>(tree).vertical;
         if vertical {
             let mut size = Vector::null();
             if let Some(first_child) = window.first_child(tree) {
@@ -108,7 +100,7 @@ impl<State: ?Sized> Widget<State> for StackPanelWidget {
         final_inner_bounds: Rect,
         state: &mut State,
     ) -> Vector {
-        let vertical = window.data(tree).data.downcast_ref::<StackPanel>().expect("StackPanel").vertical;
+        let vertical = window.data::<StackPanel>(tree).vertical;
         if vertical {
             let mut pos = final_inner_bounds.tl;
             let mut size = Vector::null();
@@ -162,28 +154,20 @@ pub struct StaticText {
 }
 
 impl StaticText {
-    pub fn widget_data<State: ?Sized>(self) -> WidgetData<State> {
-        WidgetData {
-            widget: Box::new(StaticTextWidget),
-            data: Box::new(self),
-            layout: Box::new(()),
-        }
-    }
-
     pub fn window<State: ?Sized>(
         self,
         tree: &mut WindowTree<State>,
         parent: Window<State>,
         prev: Option<Window<State>>
     ) -> Result<Window<State>, Error> {
-        Window::new(tree, self.widget_data(), parent, prev)
+        Window::new(tree, Box::new(StaticTextWidget), Box::new(self), parent, prev)
     }
 
     pub fn window_tree<State: ?Sized>(
         self,
         screen: Box<dyn Screen>
     ) -> Result<WindowTree<State>, Error> {
-        WindowTree::new(screen, self.widget_data())
+        WindowTree::new(screen, Box::new(StaticTextWidget), Box::new(self))
     }
 }
 
@@ -198,7 +182,7 @@ impl<State: ?Sized> Widget<State> for StaticTextWidget {
         rp: &mut RenderPort,
         _state: &mut State,
     ) {
-        let data = window.data(tree).data.downcast_ref::<StaticText>().expect("StaticText");
+        let data = window.data::<StaticText>(tree);
         rp.out(Point { x: 0, y: 0 }, data.color.0, data.color.1, &data.text);
     }
 
@@ -210,7 +194,7 @@ impl<State: ?Sized> Widget<State> for StaticTextWidget {
         _available_height: Option<i16>,
         _state: &mut State,
     ) -> Vector {
-        let data = window.data(tree).data.downcast_ref::<StaticText>().expect("StaticText");
+        let data = window.data::<StaticText>(tree);
         let width = data.text
             .chars()
             .filter_map(|c| if c == '\0' { None } else { c.width() })
@@ -226,7 +210,7 @@ impl<State: ?Sized> Widget<State> for StaticTextWidget {
         _final_inner_bounds: Rect,
         _state: &mut State,
     ) -> Vector {
-        let data = window.data(tree).data.downcast_ref::<StaticText>().expect("StaticText");
+        let data = window.data::<StaticText>(tree);
         let width = data.text
             .chars()
             .filter_map(|c| if c == '\0' { None } else { c.width() })
@@ -253,28 +237,20 @@ pub struct Background {
 }
 
 impl Background {
-    pub fn widget_data<State: ?Sized>(self) -> WidgetData<State> {
-        WidgetData {
-            widget: Box::new(BackgroundWidget),
-            data: Box::new(self),
-            layout: Box::new(()),
-        }
-    }
-
     pub fn window<State: ?Sized>(
         self,
         tree: &mut WindowTree<State>,
         parent: Window<State>,
         prev: Option<Window<State>>
     ) -> Result<Window<State>, Error> {
-        Window::new(tree, self.widget_data(), parent, prev)
+        Window::new(tree, Box::new(BackgroundWidget), Box::new(self), parent, prev)
     }
 
     pub fn window_tree<State: ?Sized>(
         self,
         screen: Box<dyn Screen>
     ) -> Result<WindowTree<State>, Error> {
-        WindowTree::new(screen, self.widget_data())
+        WindowTree::new(screen, Box::new(BackgroundWidget), Box::new(self))
     }
 }
 
@@ -289,7 +265,7 @@ impl<State: ?Sized> Widget<State> for BackgroundWidget {
         rp: &mut RenderPort,
         _state: &mut State,
     ) {
-        let data = window.data(tree).data.downcast_ref::<Background>().expect("Background");
+        let data = window.data::<Background>(tree);
         rp.fill_bg(data.bg, data.fg);
     }
 
@@ -362,28 +338,20 @@ pub struct InputLine {
 }
 
 impl InputLine {
-    pub fn widget_data<State: ?Sized>(self) -> WidgetData<State> {
-        WidgetData {
-            widget: Box::new(InputLineWidget),
-            data: Box::new(self),
-            layout: Box::new(()),
-        }
-    }
-
     pub fn window<State: ?Sized>(
         self,
         tree: &mut WindowTree<State>,
         parent: Window<State>,
         prev: Option<Window<State>>
     ) -> Result<Window<State>, Error> {
-        Window::new(tree, self.widget_data(), parent, prev)
+        Window::new(tree, Box::new(InputLineWidget), Box::new(self), parent, prev)
     }
 
     pub fn window_tree<State: ?Sized>(
         self,
         screen: Box<dyn Screen>
     ) -> Result<WindowTree<State>, Error> {
-        WindowTree::new(screen, self.widget_data())
+        WindowTree::new(screen, Box::new(InputLineWidget), Box::new(self))
     }
 
     pub fn error(&self) -> bool {
@@ -414,7 +382,7 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
         rp: &mut RenderPort,
         _state: &mut State,
     ) {
-        let data = window.data(tree).data.downcast_ref::<InputLine>().expect("InputLine");
+        let data = window.data::<InputLine>(tree);
         let color = if data.error() { data.error_color } else { data.normal_color };
         rp.fill_bg(color.1, None);
         rp.out(Point { x: 0, y: 0 }, color.0, color.1, &data.value[data.view_start ..]);
@@ -457,7 +425,7 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
             Event::Key(n, key) => match key {
                 Key::Char(c)  => {
                     let width = window.bounds(tree).w();
-                    let data = window.data_mut(tree).data.downcast_mut::<InputLine>().expect("InputLine");
+                    let data = window.data_mut::<InputLine>(tree);
                     for _ in 0 .. n.get() {
                         if data.value.try_reserve(c.len_utf8()).is_ok() {
                             data.value.insert(data.cursor_index, c);
@@ -479,7 +447,7 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                 },
                 Key::Backspace => {
                     let width = window.bounds(tree).w();
-                    let data = window.data_mut(tree).data.downcast_mut::<InputLine>().expect("InputLine");
+                    let data = window.data_mut::<InputLine>(tree);
                     for _ in 0 .. n.get() {
                         if let Some(i) = data.cursor_index.checked_sub(1) {
                             data.cursor_index = i;
