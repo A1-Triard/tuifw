@@ -18,7 +18,7 @@ use alloc::string::String;
 use core::ops::Range;
 use core::str::FromStr;
 use tuifw_screen_base::{Bg, Error, Fg, Key, Point, Rect, Screen, Vector};
-use tuifw_window::{Event, RenderPort, Window, WindowTree, Widget};
+use tuifw_window::{Event, RenderPort, Widget, Window, WindowTree};
 use unicode_width::UnicodeWidthChar;
 
 pub struct StackPanel {
