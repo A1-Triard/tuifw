@@ -16,9 +16,12 @@ extern crate alloc;
 
 use alloc::boxed::Box;
 use components_arena::{Arena, Component, Id, NewtypeComponentId};
+use core::any::Any;
 use core::cmp::{max, min};
+use core::marker::PhantomData;
 use core::mem::replace;
 use core::num::NonZeroU16;
+use dyn_clone::{DynClone, clone_trait_object};
 use educe::Educe;
 use macro_attr_2018::macro_attr;
 use tuifw_screen_base::{Bg, Error, Fg, Key, Point, Rect, Screen, Vector};
@@ -161,14 +164,100 @@ impl RenderPort {
     }
 }
 
+pub struct WidgetData<State: ?Sized> {
+    pub widget: Box<dyn Widget<State>>,
+    pub data: Box<dyn Any>,
+    pub layout: Box<dyn Any>,
+}
+
+pub trait Widget<State: ?Sized>: DynClone {
+    fn render(
+        &self,
+        tree: &WindowTree<State>,
+        window: Window<State>,
+        rp: &mut RenderPort,
+        state: &mut State,
+    );
+
+    fn measure(
+        &self,
+        tree: &mut WindowTree<State>,
+        window: Window<State>,
+        available_width: Option<i16>,
+        available_height: Option<i16>,
+        state: &mut State,
+    ) -> Vector;
+
+    fn arrange(
+        &self,
+        tree: &mut WindowTree<State>,
+        window: Window<State>,
+        final_inner_bounds: Rect,
+        state: &mut State,
+    ) -> Vector;
+
+    fn update(
+        &self,
+        tree: &mut WindowTree<State>,
+        window: Window<State>,
+        event: Event,
+        preview: bool,
+        state: &mut State,
+    ) -> bool;
+}
+
+clone_trait_object!(<State: ?Sized> Widget<State>);
+
+pub fn widget_render<State: ?Sized>(
+    tree: &WindowTree<State>,
+    window: Window<State>,
+    rp: &mut RenderPort,
+    state: &mut State,
+) {
+    let widget = window.data(tree).widget.clone();
+    widget.render(tree, window, rp, state)
+}
+
+pub fn widget_measure<State: ?Sized>(
+    tree: &mut WindowTree<State>,
+    window: Window<State>,
+    available_width: Option<i16>,
+    available_height: Option<i16>,
+    state: &mut State,
+) -> Vector {
+    let widget = window.data(tree).widget.clone();
+    widget.measure(tree, window, available_width, available_height, state)
+}
+
+pub fn widget_arrange<State: ?Sized>(
+    tree: &mut WindowTree<State>,
+    window: Window<State>,
+    final_inner_bounds: Rect,
+    state: &mut State,
+) -> Vector {
+    let widget = window.data(tree).widget.clone();
+    widget.arrange(tree, window, final_inner_bounds, state)
+}
+
+pub fn widget_update<State: ?Sized>(
+    tree: &mut WindowTree<State>,
+    window: Window<State>,
+    event: Event,
+    preview: bool,
+    state: &mut State,
+) -> bool {
+    let widget = window.data(tree).widget.clone();
+    widget.update(tree, window, event, preview, state)
+}
+
 macro_attr! {
     #[derive(Component!(class=WindowNodeClass))]
-    struct WindowNode<Data> {
-        parent: Option<Window<Data>>,
-        prev: Window<Data>,
-        next: Window<Data>,
-        first_child: Option<Window<Data>>,
-        data: Data,
+    struct WindowNode<State: ?Sized> {
+        parent: Option<Window<State>>,
+        prev: Window<State>,
+        next: Window<State>,
+        first_child: Option<Window<State>>,
+        data: WidgetData<State>,
         measure_size: Option<(Option<i16>, Option<i16>)>,
         desired_size: Vector,
         arrange_bounds: Option<Rect>,
@@ -181,9 +270,9 @@ macro_attr! {
     }
 }
 
-fn offset_from_root<Data, State: ?Sized>(
-    mut window: Window<Data>,
-    tree: &WindowTree<Data, State>
+fn offset_from_root<State: ?Sized>(
+    mut window: Window<State>,
+    tree: &WindowTree<State>
 ) -> Vector {
     let mut offset = Vector::null();
     loop {
@@ -201,16 +290,16 @@ macro_attr! {
     #[derive(NewtypeComponentId!)]
     #[derive(Educe)]
     #[educe(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
-    pub struct Window<Data>(Id<WindowNode<Data>>);
+    pub struct Window<State: ?Sized>(Id<WindowNode<State>>);
 }
 
-impl<Data> Window<Data> {
-    pub fn new<State: ?Sized>(
-        tree: &mut WindowTree<Data, State>,
-        data: Data,
+impl<State: ?Sized> Window<State> {
+    pub fn new(
+        tree: &mut WindowTree<State>,
+        data: WidgetData<State>,
         parent: Self,
         prev: Option<Self>,
-    ) -> Result<Window<Data>, Error> {
+    ) -> Result<Window<State>, Error> {
         tree.arena.try_reserve().map_err(|_| Error::Oom)?;
         let window = tree.arena.insert(move |window| {
             (WindowNode {
@@ -234,7 +323,7 @@ impl<Data> Window<Data> {
         Ok(window)
     }
 
-    pub fn invalidate_measure<State: ?Sized>(self, tree: &mut WindowTree<Data, State>) {
+    pub fn invalidate_measure(self, tree: &mut WindowTree<State>) {
         let mut window = self;
         loop {
             let node = &mut tree.arena[window.0];
@@ -245,7 +334,7 @@ impl<Data> Window<Data> {
         }
     }
 
-    pub fn invalidate_arrange<State: ?Sized>(self, tree: &mut WindowTree<Data, State>) {
+    pub fn invalidate_arrange(self, tree: &mut WindowTree<State>) {
         let mut window = self;
         loop {
             let node = &mut tree.arena[window.0];
@@ -256,9 +345,9 @@ impl<Data> Window<Data> {
         }
     }
 
-    pub fn measure<State: ?Sized>(
+    pub fn measure(
         self,
-        tree: &mut WindowTree<Data, State>,
+        tree: &mut WindowTree<State>,
         available_width: Option<i16>,
         available_height: Option<i16>,
         state: &mut State
@@ -269,14 +358,13 @@ impl<Data> Window<Data> {
         let measure_size = (available_width.map(|_| measure_size.x), available_height.map(|_| measure_size.y));
         if node.measure_size == Some(measure_size) { return; }
         node.measure_size = Some(measure_size);
-        let measure = tree.measure;
-        let measured_size = measure(tree, self, measure_size.0, measure_size.1, state);
+        let measured_size = widget_measure(tree, self, measure_size.0, measure_size.1, state);
         let node = &mut tree.arena[self.0];
         node.desired_size = measured_size.min(node.max_size).max(node.min_size);
         self.invalidate_arrange(tree);
     }
 
-    pub fn arrange<State: ?Sized>(self, tree: &mut WindowTree<Data, State>, final_bounds: Rect, state: &mut State) {
+    pub fn arrange(self, tree: &mut WindowTree<State>, final_bounds: Rect, state: &mut State) {
         let node = &mut tree.arena[self.0];
         let shrinked_bounds = node.margin.shrink_rect(final_bounds);
         let shrinked_bounds_size = Vector {
@@ -294,8 +382,7 @@ impl<Data> Window<Data> {
         debug_assert_eq!(arrange_bounds.size, arrange_bounds_size);
         if node.arrange_bounds == Some(arrange_bounds) { return; }
         node.arrange_bounds = Some(arrange_bounds);
-        let arrange = tree.arrange;
-        let arranged_size = arrange(tree, self, Rect { tl: Point { x: 0, y: 0 }, size: arrange_bounds.size }, state);
+        let arranged_size = widget_arrange(tree, self, Rect { tl: Point { x: 0, y: 0 }, size: arrange_bounds.size }, state);
         let node = &mut tree.arena[self.0];
         let arranged_size = arranged_size.min(node.max_size).max(node.min_size);
         let arranged_bounds_margin = Thickness::align(
@@ -309,88 +396,87 @@ impl<Data> Window<Data> {
         self.move_xy_raw(tree, arranged_bounds);
     }
 
-    pub fn desired_size<State: ?Sized>(
+    pub fn desired_size(
         self,
-        tree: &WindowTree<Data, State>
+        tree: &WindowTree<State>
     ) -> Vector {
         tree.arena[self.0].desired_size
     }
 
-    pub fn bounds<State: ?Sized>(
+    pub fn bounds(
         self,
-        tree: &WindowTree<Data, State>
+        tree: &WindowTree<State>
     ) -> Rect {
         tree.arena[self.0].bounds
     }
 
-    pub fn inner_bounds<State: ?Sized>(
+    pub fn inner_bounds(
         self,
-        tree: &WindowTree<Data, State>
+        tree: &WindowTree<State>
     ) -> Rect {
         let bounds = self.bounds(tree);
         Rect { tl: Point { x: 0, y: 0 }, size: bounds.size }
     }
 
-    pub fn data<State: ?Sized>(
+    pub fn data(
         self,
-        tree: &WindowTree<Data, State>
-    ) -> &Data {
+        tree: &WindowTree<State>
+    ) -> &WidgetData<State> {
         &tree.arena[self.0].data
     }
 
-    pub fn data_mut<State: ?Sized>(
+    pub fn data_mut(
         self,
-        tree: &mut WindowTree<Data, State>
-    ) -> &mut Data {
+        tree: &mut WindowTree<State>
+    ) -> &mut WidgetData<State> {
         &mut tree.arena[self.0].data
     }
 
-    pub fn parent<State: ?Sized>(
+    pub fn parent(
         self,
-        tree: &WindowTree<Data, State>
-    ) -> Option<Window<Data>> {
+        tree: &WindowTree<State>
+    ) -> Option<Window<State>> {
         tree.arena[self.0].parent
     }
 
-    pub fn first_child<State: ?Sized>(
+    pub fn first_child(
         self,
-        tree: &WindowTree<Data, State>
-    ) -> Option<Window<Data>> {
+        tree: &WindowTree<State>
+    ) -> Option<Window<State>> {
         tree.arena[self.0].first_child
     }
 
-    pub fn prev<State: ?Sized>(
+    pub fn prev(
         self,
-        tree: &WindowTree<Data, State>
-    ) -> Window<Data> {
+        tree: &WindowTree<State>
+    ) -> Window<State> {
         tree.arena[self.0].prev
     }
 
-    pub fn next<State: ?Sized>(
+    pub fn next(
         self,
-        tree: &WindowTree<Data, State>
-    ) -> Window<Data> {
+        tree: &WindowTree<State>
+    ) -> Window<State> {
         tree.arena[self.0].next
     }
 
-    pub fn focus<State: ?Sized>(
+    pub fn focus(
         self,
-        tree: &mut WindowTree<Data, State>,
+        tree: &mut WindowTree<State>,
         state: &mut State
-    ) -> Option<Window<Data>> {
+    ) -> Option<Window<State>> {
         let old_focused = tree.focused;
         if self == old_focused { return None; }
-        let update = tree.update;
-        let handled = update(tree, self, Event::GotFocus, false, state);
+        let handled = widget_update(tree, self, Event::GotFocus, false, state);
         if !handled { return None; }
         tree.focused = self;
-        update(tree, old_focused, Event::LostFocus, false, state);
+        widget_update(tree, old_focused, Event::LostFocus, false, state);
         Some(old_focused)
     }
 
-    fn update<State: ?Sized>(
+    fn update(
         self,
-        tree: &mut WindowTree<Data, State>,
+        tree: &mut WindowTree<State>,
         event: Event,
         preview: bool,
         handled: &mut bool,
@@ -403,8 +489,7 @@ impl<Data> Window<Data> {
             }
         }
         if !*handled {
-            let update = tree.update;
-            *handled = update(tree, self, event, preview, state);
+            *handled = widget_update(tree, self, event, preview, state);
         }
         if !*handled && !preview {
             if let Some(parent) = parent {
@@ -413,9 +498,9 @@ impl<Data> Window<Data> {
         }
     }
 
-    fn move_xy_raw<State: ?Sized>(
+    fn move_xy_raw(
         self,
-        tree: &mut WindowTree<Data, State>,
+        tree: &mut WindowTree<State>,
         bounds: Rect
     ) {
         let Some(parent) = tree.arena[self.0].parent else { return; };
@@ -426,69 +511,69 @@ impl<Data> Window<Data> {
         invalidate_rect(tree.screen(), screen_bounds);
     }
 
-    pub fn h_align<State: ?Sized>(self, tree: &WindowTree<Data, State>) -> Option<HAlign> {
+    pub fn h_align(self, tree: &WindowTree<State>) -> Option<HAlign> {
         tree.arena[self.0].h_align
     }
 
-    pub fn set_h_align<State: ?Sized>(self, tree: &mut WindowTree<Data, State>, value: Option<HAlign>) {
+    pub fn set_h_align(self, tree: &mut WindowTree<State>, value: Option<HAlign>) {
         tree.arena[self.0].h_align = value;
         self.invalidate_measure(tree);
     }
 
-    pub fn v_align<State: ?Sized>(self, tree: &WindowTree<Data, State>) -> Option<VAlign> {
+    pub fn v_align(self, tree: &WindowTree<State>) -> Option<VAlign> {
         tree.arena[self.0].v_align
     }
 
-    pub fn set_v_align<State: ?Sized>(self, tree: &mut WindowTree<Data, State>, value: Option<VAlign>) {
+    pub fn set_v_align(self, tree: &mut WindowTree<State>, value: Option<VAlign>) {
         tree.arena[self.0].v_align = value;
         self.invalidate_measure(tree);
     }
 
-    pub fn margin<State: ?Sized>(self, tree: &WindowTree<Data, State>) -> Thickness {
+    pub fn margin(self, tree: &WindowTree<State>) -> Thickness {
         tree.arena[self.0].margin
     }
 
-    pub fn set_margin<State: ?Sized>(self, tree: &mut WindowTree<Data, State>, value: Thickness) {
+    pub fn set_margin(self, tree: &mut WindowTree<State>, value: Thickness) {
         tree.arena[self.0].margin = value;
         self.invalidate_measure(tree);
     }
 
-    pub fn min_size<State: ?Sized>(self, tree: &WindowTree<Data, State>) -> Vector {
+    pub fn min_size(self, tree: &WindowTree<State>) -> Vector {
         tree.arena[self.0].min_size
     }
 
-    pub fn set_min_size<State: ?Sized>(self, tree: &mut WindowTree<Data, State>, value: Vector) {
+    pub fn set_min_size(self, tree: &mut WindowTree<State>, value: Vector) {
         tree.arena[self.0].min_size = value;
         self.invalidate_measure(tree);
     }
 
-    pub fn max_size<State: ?Sized>(self, tree: &WindowTree<Data, State>) -> Vector {
+    pub fn max_size(self, tree: &WindowTree<State>) -> Vector {
         tree.arena[self.0].max_size
     }
 
-    pub fn set_max_size<State: ?Sized>(self, tree: &mut WindowTree<Data, State>, value: Vector) {
+    pub fn set_max_size(self, tree: &mut WindowTree<State>, value: Vector) {
         tree.arena[self.0].max_size = value;
         self.invalidate_measure(tree);
     }
 
-    pub fn set_width<State: ?Sized>(self, tree: &mut WindowTree<Data, State>, value: i16) {
+    pub fn set_width(self, tree: &mut WindowTree<State>, value: i16) {
         let node = &mut tree.arena[self.0];
         node.min_size.x = value;
         node.max_size.x = value;
         self.invalidate_measure(tree);
     }
 
-    pub fn set_height<State: ?Sized>(self, tree: &mut WindowTree<Data, State>, value: i16) {
+    pub fn set_height(self, tree: &mut WindowTree<State>, value: i16) {
         let node = &mut tree.arena[self.0];
         node.min_size.y = value;
         node.max_size.y = value;
         self.invalidate_measure(tree);
     }
 
-    pub fn move_z<State: ?Sized>(
+    pub fn move_z(
         self,
-        tree: &mut WindowTree<Data, State>,
-        prev: Option<Window<Data>>
+        tree: &mut WindowTree<State>,
+        prev: Option<Window<State>>
     ) {
         let parent = self.detach(tree);
         self.attach(tree, parent, prev);
@@ -497,10 +582,10 @@ impl<Data> Window<Data> {
         invalidate_rect(tree.screen(), screen_bounds);
     }
 
-    fn detach<State: ?Sized>(
+    fn detach(
         self,
-        tree: &mut WindowTree<Data, State>
-    ) -> Window<Data> {
+        tree: &mut WindowTree<State>
+    ) -> Window<State> {
         let node = &mut tree.arena[self.0];
         let parent = node.parent.take().expect("root can not be detached");
         let prev = replace(&mut node.prev, self);
@@ -515,11 +600,11 @@ impl<Data> Window<Data> {
         parent
     }
 
-    fn attach<State: ?Sized>(
+    fn attach(
         self,
-        tree: &mut WindowTree<Data, State>,
-        parent: Window<Data>,
-        prev: Option<Window<Data>>
+        tree: &mut WindowTree<State>,
+        parent: Window<State>,
+        prev: Option<Window<State>>
     ) {
         let (prev, next) = if let Some(prev) = prev {
             assert_eq!(tree.arena[prev.0].parent.unwrap(), parent);
@@ -540,9 +625,9 @@ impl<Data> Window<Data> {
         parent.invalidate_measure(tree);
     }
 
-    pub fn drop_window<State: ?Sized>(
+    pub fn drop_window(
         self,
-        tree: &mut WindowTree<Data, State>
+        tree: &mut WindowTree<State>
     ) {
         let parent = self.detach(tree);
         let node = tree.arena.remove(self.0);
@@ -551,9 +636,9 @@ impl<Data> Window<Data> {
         Self::drop_node_tree(node, tree);
     }
 
-    fn drop_node_tree<State: ?Sized>(
-        node: WindowNode<Data>,
-        tree: &mut WindowTree<Data, State>
+    fn drop_node_tree(
+        node: WindowNode<State>,
+        tree: &mut WindowTree<State>
     ) {
         if let Some(first_child) = node.first_child {
             let mut child = first_child;
@@ -566,9 +651,9 @@ impl<Data> Window<Data> {
         }
     }
 
-    pub fn invalidate_rect<State: ?Sized>(
+    pub fn invalidate_rect(
         self,
-        tree: &mut WindowTree<Data, State>,
+        tree: &mut WindowTree<State>,
         rect: Rect
     ) {
         let bounds = tree.arena[self.0].bounds;
@@ -578,9 +663,9 @@ impl<Data> Window<Data> {
         invalidate_rect(tree.screen(), screen_rect);
     }
  
-    pub fn invalidate<State: ?Sized>(
+    pub fn invalidate(
         self,
-        tree: &mut WindowTree<Data, State>
+        tree: &mut WindowTree<State>
     ) {
         let bounds = tree.arena[self.0].bounds;
         let parent = tree.arena[self.0].parent.unwrap();
@@ -589,70 +674,19 @@ impl<Data> Window<Data> {
     }
 }
 
-pub struct WindowTree<Data: 'static, State: ?Sized> {
+pub struct WindowTree<State: ?Sized + 'static> {
     screen: Option<Box<dyn Screen>>,
-    arena: Arena<WindowNode<Data>>,
-    root: Window<Data>,
-    focused: Window<Data>,
-    render: fn(
-        tree: &WindowTree<Data, State>,
-        window: Window<Data>,
-        port: &mut RenderPort,
-        state: &mut State,
-    ),
-    measure: fn(
-        tree: &mut WindowTree<Data, State>,
-        window: Window<Data>,
-        available_width: Option<i16>,
-        available_height: Option<i16>,
-        state: &mut State,
-    ) -> Vector,
-    arrange: fn(
-        tree: &mut WindowTree<Data, State>,
-        window: Window<Data>,
-        final_inner_bounds: Rect,
-        state: &mut State,
-    ) -> Vector,
-    update: fn(
-        tree: &mut WindowTree<Data, State>,
-        window: Window<Data>,
-        event: Event,
-        preview: bool,
-        state: &mut State,
-    ) -> bool,
+    arena: Arena<WindowNode<State>>,
+    root: Window<State>,
+    focused: Window<State>,
     cursor: Option<Point>,
+    phantom: PhantomData<State>,
 }
 
-impl<Data, State: ?Sized> WindowTree<Data, State> {
+impl<State: ?Sized> WindowTree<State> {
     pub fn new(
         screen: Box<dyn Screen>,
-        render: fn(
-            tree: &WindowTree<Data, State>,
-            window: Window<Data>,
-            port: &mut RenderPort,
-            state: &mut State,
-        ),
-        measure: fn(
-            tree: &mut WindowTree<Data, State>,
-            window: Window<Data>,
-            available_width: Option<i16>,
-            available_height: Option<i16>,
-            state: &mut State,
-        ) -> Vector,
-        arrange: fn(
-            tree: &mut WindowTree<Data, State>,
-            window: Window<Data>,
-            final_inner_bounds: Rect,
-            state: &mut State,
-        ) -> Vector,
-        update: fn(
-            tree: &mut WindowTree<Data, State>,
-            window: Window<Data>,
-            event: Event,
-            preview: bool,
-            state: &mut State,
-        ) -> bool,
-        root_data: Data,
+        root_data: WidgetData<State>,
     ) -> Result<Self, Error> {
         let mut arena = Arena::new();
         arena.try_reserve().map_err(|_| Error::Oom)?;
@@ -678,23 +712,20 @@ impl<Data, State: ?Sized> WindowTree<Data, State> {
             arena,
             root,
             focused: root,
-            render,
-            measure,
-            arrange,
-            update,
+            phantom: PhantomData,
             cursor: None
         })
     }
 
-    pub fn root(&self) -> Window<Data> { self.root }
+    pub fn root(&self) -> Window<State> { self.root }
 
-    pub fn focused(&self) -> Window<Data> { self.focused }
+    pub fn focused(&self) -> Window<State> { self.focused }
 
     fn screen(&mut self) -> &mut dyn Screen {
         self.screen.as_mut().expect("WindowTree is in invalid state").as_mut()
     }
 
-    fn render_window(&mut self, window: Window<Data>, offset: Vector, render_state: &mut State) {
+    fn render_window(&mut self, window: Window<State>, offset: Vector, render_state: &mut State) {
         let bounds = self.arena[window.0].bounds.offset(offset);
         let screen = self.screen();
         if !rect_invalidated(screen, bounds) { return; }
@@ -706,7 +737,7 @@ impl<Data, State: ?Sized> WindowTree<Data, State> {
             offset,
             size: bounds.size,
         };
-        (self.render)(self, window, &mut port, render_state);
+        widget_render(self, window, &mut port, render_state);
         self.screen.replace(port.screen);
         self.cursor = port.cursor;
         if let Some(first_child) = self.arena[window.0].first_child {

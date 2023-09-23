@@ -15,105 +15,11 @@ extern crate alloc;
 
 use alloc::boxed::Box;
 use alloc::string::String;
-//use alloc::vec::Vec;
-//use components_arena::{Arena, Id, Component};
-use core::any::Any;
-//use core::fmt::Debug;
 use core::ops::Range;
 use core::str::FromStr;
-//use downcast_rs::{Downcast, impl_downcast};
-use dyn_clone::{DynClone, clone_trait_object};
-//use macro_attr_2018::macro_attr;
-//use phantom_type::PhantomType;
 use tuifw_screen_base::{Bg, Error, Fg, Key, Point, Rect, Screen, Vector};
-use tuifw_window::{Event, RenderPort, Window, WindowTree};
+use tuifw_window::{Event, RenderPort, WidgetData, Window, WindowTree, Widget};
 use unicode_width::UnicodeWidthChar;
-
-pub struct WidgetData<State: ?Sized> {
-    pub widget: Box<dyn Widget<State>>,
-    pub data: Box<dyn Any>,
-    pub layout: Box<dyn Any>,
-}
-
-pub trait Widget<State: ?Sized>: DynClone {
-    fn render(
-        &self,
-        tree: &WindowTree<WidgetData<State>, State>,
-        window: Window<WidgetData<State>>,
-        rp: &mut RenderPort,
-        state: &mut State,
-    );
-
-    fn measure(
-        &self,
-        tree: &mut WindowTree<WidgetData<State>, State>,
-        window: Window<WidgetData<State>>,
-        available_width: Option<i16>,
-        available_height: Option<i16>,
-        state: &mut State,
-    ) -> Vector;
-
-    fn arrange(
-        &self,
-        tree: &mut WindowTree<WidgetData<State>, State>,
-        window: Window<WidgetData<State>>,
-        final_inner_bounds: Rect,
-        state: &mut State,
-    ) -> Vector;
-
-    fn update(
-        &self,
-        tree: &mut WindowTree<WidgetData<State>, State>,
-        window: Window<WidgetData<State>>,
-        event: Event,
-        preview: bool,
-        state: &mut State,
-    ) -> bool;
-}
-
-clone_trait_object!(<State: ?Sized> Widget<State>);
-
-pub fn widget_render<State: ?Sized>(
-    tree: &WindowTree<WidgetData<State>, State>,
-    window: Window<WidgetData<State>>,
-    rp: &mut RenderPort,
-    state: &mut State,
-) {
-    let widget = window.data(tree).widget.clone();
-    widget.render(tree, window, rp, state)
-}
-
-pub fn widget_measure<State: ?Sized>(
-    tree: &mut WindowTree<WidgetData<State>, State>,
-    window: Window<WidgetData<State>>,
-    available_width: Option<i16>,
-    available_height: Option<i16>,
-    state: &mut State,
-) -> Vector {
-    let widget = window.data(tree).widget.clone();
-    widget.measure(tree, window, available_width, available_height, state)
-}
-
-pub fn widget_arrange<State: ?Sized>(
-    tree: &mut WindowTree<WidgetData<State>, State>,
-    window: Window<WidgetData<State>>,
-    final_inner_bounds: Rect,
-    state: &mut State,
-) -> Vector {
-    let widget = window.data(tree).widget.clone();
-    widget.arrange(tree, window, final_inner_bounds, state)
-}
-
-pub fn widget_update<State: ?Sized>(
-    tree: &mut WindowTree<WidgetData<State>, State>,
-    window: Window<WidgetData<State>>,
-    event: Event,
-    preview: bool,
-    state: &mut State,
-) -> bool {
-    let widget = window.data(tree).widget.clone();
-    widget.update(tree, window, event, preview, state)
-}
 
 pub struct StackPanel {
     pub vertical: bool,
@@ -130,18 +36,18 @@ impl StackPanel {
 
     pub fn window<State: ?Sized>(
         self,
-        tree: &mut WindowTree<WidgetData<State>, State>,
-        parent: Window<WidgetData<State>>,
-        prev: Option<Window<WidgetData<State>>>
-    ) -> Result<Window<WidgetData<State>>, Error> {
+        tree: &mut WindowTree<State>,
+        parent: Window<State>,
+        prev: Option<Window<State>>
+    ) -> Result<Window<State>, Error> {
         Window::new(tree, self.widget_data(), parent, prev)
     }
 
     pub fn window_tree<State: ?Sized>(
         self,
         screen: Box<dyn Screen>
-    ) -> Result<WindowTree<WidgetData<State>, State>, Error> {
-        WindowTree::new(screen, widget_render, widget_measure, widget_arrange, widget_update, self.widget_data())
+    ) -> Result<WindowTree<State>, Error> {
+        WindowTree::new(screen, self.widget_data())
     }
 }
 
@@ -151,16 +57,16 @@ pub struct StackPanelWidget;
 impl<State: ?Sized> Widget<State> for StackPanelWidget {
     fn render(
         &self,
-        _tree: &WindowTree<WidgetData<State>, State>,
-        _window: Window<WidgetData<State>>,
+        _tree: &WindowTree<State>,
+        _window: Window<State>,
         _rp: &mut RenderPort,
         _state: &mut State,
     ) { }
 
     fn measure(
         &self,
-        tree: &mut WindowTree<WidgetData<State>, State>,
-        window: Window<WidgetData<State>>,
+        tree: &mut WindowTree<State>,
+        window: Window<State>,
         available_width: Option<i16>,
         available_height: Option<i16>,
         state: &mut State,
@@ -197,8 +103,8 @@ impl<State: ?Sized> Widget<State> for StackPanelWidget {
 
     fn arrange(
         &self,
-        tree: &mut WindowTree<WidgetData<State>, State>,
-        window: Window<WidgetData<State>>,
+        tree: &mut WindowTree<State>,
+        window: Window<State>,
         final_inner_bounds: Rect,
         state: &mut State,
     ) -> Vector {
@@ -240,8 +146,8 @@ impl<State: ?Sized> Widget<State> for StackPanelWidget {
 
     fn update(
         &self,
-        _tree: &mut WindowTree<WidgetData<State>, State>,
-        _window: Window<WidgetData<State>>,
+        _tree: &mut WindowTree<State>,
+        _window: Window<State>,
         _event: Event,
         _preview: bool,
         _state: &mut State,
@@ -266,18 +172,18 @@ impl StaticText {
 
     pub fn window<State: ?Sized>(
         self,
-        tree: &mut WindowTree<WidgetData<State>, State>,
-        parent: Window<WidgetData<State>>,
-        prev: Option<Window<WidgetData<State>>>
-    ) -> Result<Window<WidgetData<State>>, Error> {
+        tree: &mut WindowTree<State>,
+        parent: Window<State>,
+        prev: Option<Window<State>>
+    ) -> Result<Window<State>, Error> {
         Window::new(tree, self.widget_data(), parent, prev)
     }
 
     pub fn window_tree<State: ?Sized>(
         self,
         screen: Box<dyn Screen>
-    ) -> Result<WindowTree<WidgetData<State>, State>, Error> {
-        WindowTree::new(screen, widget_render, widget_measure, widget_arrange, widget_update, self.widget_data())
+    ) -> Result<WindowTree<State>, Error> {
+        WindowTree::new(screen, self.widget_data())
     }
 }
 
@@ -287,8 +193,8 @@ pub struct StaticTextWidget;
 impl<State: ?Sized> Widget<State> for StaticTextWidget {
     fn render(
         &self,
-        tree: &WindowTree<WidgetData<State>, State>,
-        window: Window<WidgetData<State>>,
+        tree: &WindowTree<State>,
+        window: Window<State>,
         rp: &mut RenderPort,
         _state: &mut State,
     ) {
@@ -298,8 +204,8 @@ impl<State: ?Sized> Widget<State> for StaticTextWidget {
 
     fn measure(
         &self,
-        tree: &mut WindowTree<WidgetData<State>, State>,
-        window: Window<WidgetData<State>>,
+        tree: &mut WindowTree<State>,
+        window: Window<State>,
         _available_width: Option<i16>,
         _available_height: Option<i16>,
         _state: &mut State,
@@ -315,8 +221,8 @@ impl<State: ?Sized> Widget<State> for StaticTextWidget {
 
     fn arrange(
         &self,
-        tree: &mut WindowTree<WidgetData<State>, State>,
-        window: Window<WidgetData<State>>,
+        tree: &mut WindowTree<State>,
+        window: Window<State>,
         _final_inner_bounds: Rect,
         _state: &mut State,
     ) -> Vector {
@@ -331,8 +237,8 @@ impl<State: ?Sized> Widget<State> for StaticTextWidget {
 
     fn update(
         &self,
-        _tree: &mut WindowTree<WidgetData<State>, State>,
-        _window: Window<WidgetData<State>>,
+        _tree: &mut WindowTree<State>,
+        _window: Window<State>,
         _event: Event,
         _preview: bool,
         _state: &mut State,
@@ -357,18 +263,18 @@ impl Background {
 
     pub fn window<State: ?Sized>(
         self,
-        tree: &mut WindowTree<WidgetData<State>, State>,
-        parent: Window<WidgetData<State>>,
-        prev: Option<Window<WidgetData<State>>>
-    ) -> Result<Window<WidgetData<State>>, Error> {
+        tree: &mut WindowTree<State>,
+        parent: Window<State>,
+        prev: Option<Window<State>>
+    ) -> Result<Window<State>, Error> {
         Window::new(tree, self.widget_data(), parent, prev)
     }
 
     pub fn window_tree<State: ?Sized>(
         self,
         screen: Box<dyn Screen>
-    ) -> Result<WindowTree<WidgetData<State>, State>, Error> {
-        WindowTree::new(screen, widget_render, widget_measure, widget_arrange, widget_update, self.widget_data())
+    ) -> Result<WindowTree<State>, Error> {
+        WindowTree::new(screen, self.widget_data())
     }
 }
 
@@ -378,8 +284,8 @@ pub struct BackgroundWidget;
 impl<State: ?Sized> Widget<State> for BackgroundWidget {
     fn render(
         &self,
-        tree: &WindowTree<WidgetData<State>, State>,
-        window: Window<WidgetData<State>>,
+        tree: &WindowTree<State>,
+        window: Window<State>,
         rp: &mut RenderPort,
         _state: &mut State,
     ) {
@@ -389,8 +295,8 @@ impl<State: ?Sized> Widget<State> for BackgroundWidget {
 
     fn measure(
         &self,
-        tree: &mut WindowTree<WidgetData<State>, State>,
-        window: Window<WidgetData<State>>,
+        tree: &mut WindowTree<State>,
+        window: Window<State>,
         available_width: Option<i16>,
         available_height: Option<i16>,
         state: &mut State,
@@ -410,8 +316,8 @@ impl<State: ?Sized> Widget<State> for BackgroundWidget {
 
     fn arrange(
         &self,
-        tree: &mut WindowTree<WidgetData<State>, State>,
-        window: Window<WidgetData<State>>,
+        tree: &mut WindowTree<State>,
+        window: Window<State>,
         final_inner_bounds: Rect,
         state: &mut State,
     ) -> Vector {
@@ -428,8 +334,8 @@ impl<State: ?Sized> Widget<State> for BackgroundWidget {
 
     fn update(
         &self,
-        _tree: &mut WindowTree<WidgetData<State>, State>,
-        _window: Window<WidgetData<State>>,
+        _tree: &mut WindowTree<State>,
+        _window: Window<State>,
         _event: Event,
         _preview: bool,
         _state: &mut State,
@@ -466,18 +372,18 @@ impl InputLine {
 
     pub fn window<State: ?Sized>(
         self,
-        tree: &mut WindowTree<WidgetData<State>, State>,
-        parent: Window<WidgetData<State>>,
-        prev: Option<Window<WidgetData<State>>>
-    ) -> Result<Window<WidgetData<State>>, Error> {
+        tree: &mut WindowTree<State>,
+        parent: Window<State>,
+        prev: Option<Window<State>>
+    ) -> Result<Window<State>, Error> {
         Window::new(tree, self.widget_data(), parent, prev)
     }
 
     pub fn window_tree<State: ?Sized>(
         self,
         screen: Box<dyn Screen>
-    ) -> Result<WindowTree<WidgetData<State>, State>, Error> {
-        WindowTree::new(screen, widget_render, widget_measure, widget_arrange, widget_update, self.widget_data())
+    ) -> Result<WindowTree<State>, Error> {
+        WindowTree::new(screen, self.widget_data())
     }
 
     pub fn error(&self) -> bool {
@@ -503,8 +409,8 @@ pub struct InputLineWidget;
 impl<State: ?Sized> Widget<State> for InputLineWidget {
     fn render(
         &self,
-        tree: &WindowTree<WidgetData<State>, State>,
-        window: Window<WidgetData<State>>,
+        tree: &WindowTree<State>,
+        window: Window<State>,
         rp: &mut RenderPort,
         _state: &mut State,
     ) {
@@ -519,8 +425,8 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
 
     fn measure(
         &self,
-        _tree: &mut WindowTree<WidgetData<State>, State>,
-        _window: Window<WidgetData<State>>,
+        _tree: &mut WindowTree<State>,
+        _window: Window<State>,
         available_width: Option<i16>,
         _available_height: Option<i16>,
         _state: &mut State,
@@ -530,8 +436,8 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
 
     fn arrange(
         &self,
-        _tree: &mut WindowTree<WidgetData<State>, State>,
-        _window: Window<WidgetData<State>>,
+        _tree: &mut WindowTree<State>,
+        _window: Window<State>,
         final_inner_bounds: Rect,
         _state: &mut State,
     ) -> Vector {
@@ -540,8 +446,8 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
 
     fn update(
         &self,
-        tree: &mut WindowTree<WidgetData<State>, State>,
-        window: Window<WidgetData<State>>,
+        tree: &mut WindowTree<State>,
+        window: Window<State>,
         event: Event,
         _preview: bool,
         _state: &mut State,
