@@ -392,21 +392,62 @@ impl<Data> Window<Data> {
         invalidate_rect(tree.screen(), screen_bounds);
     }
 
-    pub fn move_xy<State: ?Sized>(
-        self,
-        tree: &mut WindowTree<Data, State>,
-        h_align: Option<HAlign>,
-        v_align: Option<VAlign>,
-        margin: Thickness,
-        min_size: Vector,
-        max_size: Vector,
-    ) {
+    pub fn h_align<State: ?Sized>(self, tree: &WindowTree<Data, State>) -> Option<HAlign> {
+        tree.arena[self.0].h_align
+    }
+
+    pub fn set_h_align<State: ?Sized>(self, tree: &mut WindowTree<Data, State>, value: Option<HAlign>) {
+        tree.arena[self.0].h_align = value;
+        self.invalidate_measure(tree);
+    }
+
+    pub fn v_align<State: ?Sized>(self, tree: &WindowTree<Data, State>) -> Option<VAlign> {
+        tree.arena[self.0].v_align
+    }
+
+    pub fn set_v_align<State: ?Sized>(self, tree: &mut WindowTree<Data, State>, value: Option<VAlign>) {
+        tree.arena[self.0].v_align = value;
+        self.invalidate_measure(tree);
+    }
+
+    pub fn margin<State: ?Sized>(self, tree: &WindowTree<Data, State>) -> Thickness {
+        tree.arena[self.0].margin
+    }
+
+    pub fn set_margin<State: ?Sized>(self, tree: &mut WindowTree<Data, State>, value: Thickness) {
+        tree.arena[self.0].margin = value;
+        self.invalidate_measure(tree);
+    }
+
+    pub fn min_size<State: ?Sized>(self, tree: &WindowTree<Data, State>) -> Vector {
+        tree.arena[self.0].min_size
+    }
+
+    pub fn set_min_size<State: ?Sized>(self, tree: &mut WindowTree<Data, State>, value: Vector) {
+        tree.arena[self.0].min_size = value;
+        self.invalidate_measure(tree);
+    }
+
+    pub fn max_size<State: ?Sized>(self, tree: &WindowTree<Data, State>) -> Vector {
+        tree.arena[self.0].max_size
+    }
+
+    pub fn set_max_size<State: ?Sized>(self, tree: &mut WindowTree<Data, State>, value: Vector) {
+        tree.arena[self.0].max_size = value;
+        self.invalidate_measure(tree);
+    }
+
+    pub fn set_width<State: ?Sized>(self, tree: &mut WindowTree<Data, State>, value: i16) {
         let node = &mut tree.arena[self.0];
-        node.h_align = h_align;
-        node.v_align = v_align;
-        node.margin = margin;
-        node.min_size = min_size;
-        node.max_size = max_size;
+        node.min_size.x = value;
+        node.max_size.x = value;
+        self.invalidate_measure(tree);
+    }
+
+    pub fn set_height<State: ?Sized>(self, tree: &mut WindowTree<Data, State>, value: i16) {
+        let node = &mut tree.arena[self.0];
+        node.min_size.y = value;
+        node.max_size.y = value;
         self.invalidate_measure(tree);
     }
 

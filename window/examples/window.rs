@@ -12,7 +12,7 @@ fn measure(
     available_height: Option<i16>,
     state: &mut (Point, bool)
 ) -> Vector {
-    if *window.tag(tree) {
+    if *window.data(tree) {
         let child = window.first_child(tree).unwrap();
         child.measure(tree, None, None, state);
         Vector { x: available_width.unwrap(), y: available_height.unwrap() }
@@ -27,7 +27,7 @@ fn arrange(
     final_inner_bounds: Rect,
     state: &mut (Point, bool)
 ) -> Vector {
-    if *window.tag(tree) {
+    if *window.data(tree) {
         let child = window.first_child(tree).unwrap();
         let child_desired_size = child.desired_size(tree);
         child.arrange(tree, Rect { tl: state.0, size: child_desired_size }, state);
@@ -43,7 +43,7 @@ fn render(
     rp: &mut RenderPort,
     _state: &mut (Point, bool)
 ) {
-    if *window.tag(tree) {
+    if *window.data(tree) {
         rp.fill(|rp, p| rp.out(p, Fg::Black, Bg::None, " "));
     } else {
         rp.out(Point { x: 0, y: 0 }, Fg::Green, Bg::None, "╔═══════════╗");
