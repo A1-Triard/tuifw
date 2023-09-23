@@ -15,13 +15,22 @@
 extern crate alloc;
 
 use alloc::boxed::Box;
+use components_arena::{Arena, Component, Id, NewtypeComponentId};
 use core::cmp::{max, min};
 use core::mem::replace;
-use components_arena::{Arena, Component, Id, NewtypeComponentId};
+use core::num::NonZeroU16;
 use educe::Educe;
 use macro_attr_2018::macro_attr;
-use tuifw_screen_base::{Bg, Error, Event, Fg, Point, Rect, Screen, Vector};
+use tuifw_screen_base::{Bg, Error, Fg, Key, Point, Rect, Screen, Vector};
+use tuifw_screen_base::Event as screen_Event;
 use tuifw_screen_base::{HAlign, VAlign, Thickness};
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub enum Event {
+    Key(NonZeroU16, Key),
+    GotFocus,
+    LostFocus,
+}
 
 fn invalidate_rect(screen: &mut dyn Screen, rect: Rect) {
     let rect = rect.intersect(Rect { tl: Point { x: 0, y: 0 }, size: screen.size() });
@@ -330,6 +339,44 @@ impl<Tag> Window<Tag> {
         tree.arena[self.0].next
     }
 
+    pub fn focus<State: ?Sized>(
+        self,
+        tree: &mut WindowTree<Tag, State>,
+        state: &mut State
+    ) -> Window<Tag> {
+        let old_focused = replace(&mut tree.focused, self);
+        if old_focused == self { return old_focused; }
+        let update = tree.update;
+        update(tree, self, Event::GotFocus, false, state);
+        update(tree, old_focused, Event::LostFocus, false, state);
+        old_focused
+    }
+
+    fn update<State: ?Sized>(
+        self,
+        tree: &mut WindowTree<Tag, State>,
+        event: Event,
+        preview: bool,
+        handled: &mut bool,
+        state: &mut State
+    ) {
+        let parent = self.parent(tree);
+        if !*handled && preview {
+            if let Some(parent) = parent {
+                parent.update(tree, event, true, handled, state);
+            }
+        }
+        if !*handled {
+            let update = tree.update;
+            *handled = update(tree, self, event, preview, state);
+        }
+        if !*handled && !preview {
+            if let Some(parent) = parent {
+                parent.update(tree, event, false, handled, state);
+            }
+        }
+    }
+
     fn move_xy_raw<State: ?Sized>(
         self,
         tree: &mut WindowTree<Tag, State>,
@@ -469,6 +516,7 @@ pub struct WindowTree<Tag: 'static, State: ?Sized> {
     screen: Option<Box<dyn Screen>>,
     arena: Arena<WindowNode<Tag>>,
     root: Window<Tag>,
+    focused: Window<Tag>,
     render: fn(
         tree: &WindowTree<Tag, State>,
         window: Window<Tag>,
@@ -488,6 +536,13 @@ pub struct WindowTree<Tag: 'static, State: ?Sized> {
         final_inner_bounds: Rect,
         state: &mut State,
     ) -> Vector,
+    update: fn(
+        tree: &mut WindowTree<Tag, State>,
+        window: Window<Tag>,
+        event: Event,
+        preview: bool,
+        state: &mut State,
+    ) -> bool,
     cursor: Option<Point>,
 }
 
@@ -513,6 +568,13 @@ impl<Tag, State: ?Sized> WindowTree<Tag, State> {
             final_inner_bounds: Rect,
             state: &mut State,
         ) -> Vector,
+        update: fn(
+            tree: &mut WindowTree<Tag, State>,
+            window: Window<Tag>,
+            event: Event,
+            preview: bool,
+            state: &mut State,
+        ) -> bool,
         root_tag: Tag,
     ) -> Result<Self, Error> {
         let mut arena = Arena::new();
@@ -534,10 +596,22 @@ impl<Tag, State: ?Sized> WindowTree<Tag, State> {
             min_size: Vector::null(),
             max_size: Vector { x: -1, y: -1 },
         }, Window(window)));
-        Ok(WindowTree { screen: Some(screen), arena, root, render, measure, arrange, cursor: None })
+        Ok(WindowTree {
+            screen: Some(screen),
+            arena,
+            root,
+            focused: root,
+            render,
+            measure,
+            arrange,
+            update,
+            cursor: None
+        })
     }
 
     pub fn root(&self) -> Window<Tag> { self.root }
+
+    pub fn focused(&self) -> Window<Tag> { self.focused }
 
     fn screen(&mut self) -> &mut dyn Screen {
         self.screen.as_mut().expect("WindowTree is in invalid state").as_mut()
@@ -568,7 +642,7 @@ impl<Tag, State: ?Sized> WindowTree<Tag, State> {
         }
     }
 
-    pub fn update(&mut self, wait: bool, state: &mut State) -> Result<Option<Event>, Error> {
+    pub fn update(&mut self, wait: bool, state: &mut State) -> Result<(), Error> {
         let root = self.root;
         let screen = self.screen.as_mut().expect("WindowTree is in invalid state");
         let screen_size = screen.size();
@@ -582,8 +656,12 @@ impl<Tag, State: ?Sized> WindowTree<Tag, State> {
         }
         self.render_window(self.root, Vector::null(), state);
         let screen = self.screen.as_mut().expect("WindowTree is in invalid state");
-        let event = screen.update(self.cursor, wait)?;
-        Ok(event)
+        if let Some(screen_Event::Key(n, key)) = screen.update(self.cursor, wait)? {
+            let mut handled = false;
+            self.focused.update(self, Event::Key(n, key), true, &mut handled, state);
+            self.focused.update(self, Event::Key(n, key), false, &mut handled, state);
+        }
+        Ok(())
     }
 }
 
@@ -607,9 +685,16 @@ mod tests {
             _: Rect,
             _: &mut State
         ) -> Vector { Vector::null() }
+        fn update<State: ?Sized>(
+            _: &mut WindowTree<(), State>,
+            _: Window<()>,
+            _: Event,
+            _: bool,
+            _: &mut State
+        ) -> bool { true }
         let screen = tuifw_screen_test::Screen::new(Vector::null());
         let screen = Box::new(screen) as _;
-        let tree = &mut WindowTree::<(), ()>::new(screen, render, measure, arrange, ()).unwrap();
+        let tree = &mut WindowTree::<(), ()>::new(screen, render, measure, arrange, update, ()).unwrap();
         let root = tree.root();
         assert!(tree.arena[tree.root.0].first_child.is_none());
         let one = Window::new(tree, (), root, None).unwrap();
@@ -656,9 +741,16 @@ mod tests {
             _: Rect,
             _: &mut State
         ) -> Vector { Vector::null() }
+        fn update<State: ?Sized>(
+            _: &mut WindowTree<(), State>,
+            _: Window<()>,
+            _: Event,
+            _: bool,
+            _: &mut State
+        ) -> bool { true }
         let screen = tuifw_screen_test::Screen::new(Vector::null());
         let screen = Box::new(screen) as _;
-        let tree = &mut WindowTree::<(), ()>::new(screen, render, measure, arrange, ()).unwrap();
+        let tree = &mut WindowTree::<(), ()>::new(screen, render, measure, arrange, update, ()).unwrap();
         let root = tree.root();
         let w = Window::new(tree, (), root, None).unwrap();
         let _ = Window::new(tree, (), w, None).unwrap();

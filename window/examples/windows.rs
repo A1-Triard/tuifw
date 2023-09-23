@@ -2,9 +2,8 @@
 #![allow(unused_variables)]
 
 use core::cmp::min;
-use core::mem::replace;
 use tuifw_screen::{HAlign, VAlign, Bg, Fg};
-use tuifw_screen::{Event, Key, Point, Range1d, Rect, Thickness, Vector};
+use tuifw_screen::{Key, Point, Range1d, Rect, Thickness, Vector};
 use tuifw_window::*;
 use unicode_width::UnicodeWidthStr;
 
@@ -12,7 +11,7 @@ struct State {
     window_1: Window<()>,
     window_2: Window<()>,
     window_3: Window<()>,
-    focused: Window<()>,
+    quit: bool,
 }
 
 fn measure(
@@ -92,7 +91,7 @@ fn render(
         rp.fill(|rp, p| rp.out(p, Fg::White, Bg::None, " "));
         return;
     };
-    let focused = state.focused == window;
+    let focused = tree.focused() == window;
     rp.fill(|rp, p| rp.out(p, Fg::White, Bg::Blue, " "));
     let (tl, t, tr, r, br, b, bl, l) = if focused {
         ("╔", "═", "╗", "║", "╝", "═", "╚", "║")
@@ -133,33 +132,46 @@ fn render(
     }
 }
 
-fn focus_window(tree: &mut WindowTree<(), State>, window: Window<()>, state: &mut State) {
-    let prev = replace(&mut state.focused, window);
-    if prev != window {
-        window.move_z(tree, Some(prev));
+fn update(
+    tree: &mut WindowTree<(), State>,
+    window: Window<()>,
+    event: Event,
+    preview: bool,
+    state: &mut State
+) -> bool {
+    match event {
+        Event::LostFocus => if window != tree.root() {
+            let focused = tree.focused();
+            focused.move_z(tree, Some(window));
+        },
+        Event::Key(_, Key::Escape) => state.quit = true,
+        Event::Key(_, Key::Char('1')) | Event::Key(_, Key::Alt('1')) => {
+            let window_1 = state.window_1;
+            window_1.focus(tree, state);
+        },
+        Event::Key(_, Key::Char('2')) | Event::Key(_, Key::Alt('2')) => {
+            let window_2 = state.window_2;
+            window_2.focus(tree, state);
+        },
+        Event::Key(_, Key::Char('3')) | Event::Key(_, Key::Alt('3')) => {
+            let window_3 = state.window_3;
+            window_3.focus(tree, state);
+        },
+        _ => { },
     }
+    true
 }
-
+ 
 fn main() {
     let screen = unsafe { tuifw_screen::init(None, None) }.unwrap();
-    let mut windows = WindowTree::new(screen, render, measure, arrange, ()).unwrap();
+    let mut windows = WindowTree::new(screen, render, measure, arrange, update, ()).unwrap();
     let root = windows.root();
     let window_1 = Window::new(&mut windows, (), root, None).unwrap();
     let window_2 = Window::new(&mut windows, (), root, None).unwrap();
     let window_3 = Window::new(&mut windows, (), root, Some(window_2)).unwrap();
-    let mut state = State { window_1, window_2, window_3, focused: window_1 };
-    loop { 
-        if let Some(event) = WindowTree::update(&mut windows, true, &mut state).unwrap() {
-            match event {
-                Event::Key(_, Key::Escape) => break,
-                Event::Key(_, Key::Char('1')) | Event::Key(_, Key::Alt('1')) =>
-                    focus_window(&mut windows, window_1, &mut state),
-                Event::Key(_, Key::Char('2')) | Event::Key(_, Key::Alt('2')) =>
-                    focus_window(&mut windows, window_2, &mut state),
-                Event::Key(_, Key::Char('3')) | Event::Key(_, Key::Alt('3')) =>
-                    focus_window(&mut windows, window_3, &mut state),
-                _ => { },
-            }
-        }
+    let mut state = State { window_1, window_2, window_3, quit: false };
+    window_1.focus(&mut windows, &mut state);
+    while !state.quit { 
+        WindowTree::update(&mut windows, true, &mut state).unwrap();
     }
 }
