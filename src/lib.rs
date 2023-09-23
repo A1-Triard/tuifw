@@ -576,6 +576,7 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
             Event::GotFocus => true,
             Event::Key(n, key) => match key {
                 Key::Char(c)  => {
+                    let width = window.bounds(tree).w();
                     let data = window.data_mut(tree).1.downcast_mut::<InputLine>().expect("InputLine");
                     for _ in 0 .. n.get() {
                         if data.value.try_reserve(c.len_utf8()).is_ok() {
@@ -584,6 +585,13 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                             data.cursor_x = data.cursor_x.wrapping_add(
                                 if c == '\0' { 0 } else { i16::try_from(c.width().unwrap_or(0)).unwrap() }
                             );
+                            while data.cursor_x as u16 >= width as u16 {
+                                let c = data.value[data.view_start ..].chars().next().unwrap();
+                                data.view_start += c.len_utf8();
+                                data.cursor_x = data.cursor_x.wrapping_sub(
+                                    if c == '\0' { 0 } else { i16::try_from(c.width().unwrap_or(0)).unwrap() }
+                                );
+                            }
                         }
                     }
                     window.invalidate(tree);
