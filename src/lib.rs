@@ -25,55 +25,9 @@ use core::str::FromStr;
 use dyn_clone::{DynClone, clone_trait_object};
 //use macro_attr_2018::macro_attr;
 //use phantom_type::PhantomType;
-use tuifw_screen_base::{Bg, Error, Fg, Key, Point, Range1d, Rect, Screen, Vector};
+use tuifw_screen_base::{Bg, Error, Fg, Key, Point, Rect, Screen, Vector};
 use tuifw_window::{Event, RenderPort, Window, WindowTree};
 use unicode_width::UnicodeWidthChar;
-
-pub trait RenderPortExt {
-    fn fill_bg(&mut self, bg: Bg, fg: Option<Fg>);
-    fn h_line(&mut self, start: Point, len: i16, double: bool, fg: Fg, bg: Bg);
-    fn v_line(&mut self, start: Point, len: i16, double: bool, fg: Fg, bg: Bg);
-    fn tl_edge(&mut self, p: Point, double: bool, fg: Fg, bg: Bg);
-    fn tr_edge(&mut self, p: Point, double: bool, fg: Fg, bg: Bg);
-    fn bl_edge(&mut self, p: Point, double: bool, fg: Fg, bg: Bg);
-    fn br_edge(&mut self, p: Point, double: bool, fg: Fg, bg: Bg);
-}
-
-impl RenderPortExt for RenderPort {
-    fn fill_bg(&mut self, bg: Bg, fg: Option<Fg>) {
-        self.fill(|rp, p| rp.out(p, fg.unwrap_or(Fg::LightGray), bg, if fg.is_some() { "░" } else { " " }));
-    }
-
-    fn h_line(&mut self, start: Point, len: i16, double: bool, fg: Fg, bg: Bg) {
-        let s = if double { "═" } else { "─" };
-        for x in Range1d::new(start.x, start.x.wrapping_add(len)) {
-            self.out(Point { x, y: start.y }, fg, bg, s);
-        }
-    }
-
-    fn v_line(&mut self, start: Point, len: i16, double: bool, fg: Fg, bg: Bg) {
-        let s = if double { "║" } else { "│" };
-        for y in Range1d::new(start.y, start.y.wrapping_add(len)) {
-            self.out(Point { x: start.x, y }, fg, bg, s);
-        }
-    }
-
-    fn tl_edge(&mut self, p: Point, double: bool, fg: Fg, bg: Bg) {
-        self.out(p, fg, bg, if double { "╔" } else { "┌" });
-    }
-
-    fn tr_edge(&mut self, p: Point, double: bool, fg: Fg, bg: Bg) {
-        self.out(p, fg, bg, if double { "╗" } else { "┐" });
-    }
-
-    fn bl_edge(&mut self, p: Point, double: bool, fg: Fg, bg: Bg) {
-        self.out(p, fg, bg, if double { "╚" } else { "└" });
-    }
-
-    fn br_edge(&mut self, p: Point, double: bool, fg: Fg, bg: Bg) {
-        self.out(p, fg, bg, if double { "╝" } else { "┘" });
-    }
-}
 
 pub struct WidgetData<State: ?Sized> {
     pub widget: Box<dyn Widget<State>>,

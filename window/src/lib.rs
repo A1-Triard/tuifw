@@ -23,7 +23,7 @@ use educe::Educe;
 use macro_attr_2018::macro_attr;
 use tuifw_screen_base::{Bg, Error, Fg, Key, Point, Rect, Screen, Vector};
 use tuifw_screen_base::Event as screen_Event;
-use tuifw_screen_base::{HAlign, VAlign, Thickness};
+use tuifw_screen_base::{HAlign, VAlign, Thickness, Range1d};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum Event {
@@ -124,6 +124,40 @@ impl RenderPort {
                 f(self, Point { x, y }.offset(-self.offset));
             }
         }
+    }
+
+    pub fn fill_bg(&mut self, bg: Bg, fg: Option<Fg>) {
+        self.fill(|rp, p| rp.out(p, fg.unwrap_or(Fg::LightGray), bg, if fg.is_some() { "░" } else { " " }));
+    }
+
+    pub fn h_line(&mut self, start: Point, len: i16, double: bool, fg: Fg, bg: Bg) {
+        let s = if double { "═" } else { "─" };
+        for x in Range1d::new(start.x, start.x.wrapping_add(len)) {
+            self.out(Point { x, y: start.y }, fg, bg, s);
+        }
+    }
+
+    pub fn v_line(&mut self, start: Point, len: i16, double: bool, fg: Fg, bg: Bg) {
+        let s = if double { "║" } else { "│" };
+        for y in Range1d::new(start.y, start.y.wrapping_add(len)) {
+            self.out(Point { x: start.x, y }, fg, bg, s);
+        }
+    }
+
+    pub fn tl_edge(&mut self, p: Point, double: bool, fg: Fg, bg: Bg) {
+        self.out(p, fg, bg, if double { "╔" } else { "┌" });
+    }
+
+    pub fn tr_edge(&mut self, p: Point, double: bool, fg: Fg, bg: Bg) {
+        self.out(p, fg, bg, if double { "╗" } else { "┐" });
+    }
+
+    pub fn bl_edge(&mut self, p: Point, double: bool, fg: Fg, bg: Bg) {
+        self.out(p, fg, bg, if double { "╚" } else { "└" });
+    }
+
+    pub fn br_edge(&mut self, p: Point, double: bool, fg: Fg, bg: Bg) {
+        self.out(p, fg, bg, if double { "╝" } else { "┘" });
     }
 }
 
