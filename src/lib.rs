@@ -483,7 +483,6 @@ pub struct InputLine {
     pub view_start: usize,
     pub cursor_index: usize,
     pub cursor_x: i16,
-    pub focused: bool,
 }
 
 impl InputLine {
@@ -539,7 +538,7 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
         let color = if data.error() { data.error_color } else { data.normal_color };
         rp.fill_bg(color.1, None);
         rp.out(Point { x: 0, y: 0 }, color.0, color.1, &data.value[data.view_start ..]);
-        if data.focused {
+        if tree.focused() == window {
             rp.cursor(Point { x: data.cursor_x, y: 0 });
         }
     }

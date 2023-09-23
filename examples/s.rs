@@ -20,9 +20,9 @@ fn main() {
         error_color: (Fg::White, Bg::Red),
         value: "123x45".to_string(),
         view_start: 0, cursor_index: 0, cursor_x: 0,
-        focused: true
     }.window(tree, panel, Some(text)).unwrap();
     input.move_xy(tree, None, None, Thickness::all(0), Vector { x: 10, y: 0 }, Vector { x: 10, y: -1 });
+    input.focus(tree, &mut ());
     loop {
         tree.update(true, &mut ()).unwrap();
     }
