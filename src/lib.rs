@@ -25,7 +25,7 @@ use core::str::FromStr;
 use dyn_clone::{DynClone, clone_trait_object};
 //use macro_attr_2018::macro_attr;
 //use phantom_type::PhantomType;
-use tuifw_screen_base::{Bg, Error, Fg, /*Key,*/ Point, Range1d, Rect, Screen, Vector};
+use tuifw_screen_base::{Bg, Error, Fg, Key, Point, Range1d, Rect, Screen, Vector};
 use tuifw_window::{Event, RenderPort, Window, WindowTree};
 use unicode_width::UnicodeWidthChar;
 
@@ -566,14 +566,31 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
 
     fn update(
         &self,
-        _tree: &mut WindowTree<WidgetData<State>, State>,
-        _window: Window<WidgetData<State>>,
+        tree: &mut WindowTree<WidgetData<State>, State>,
+        window: Window<WidgetData<State>>,
         event: Event,
         _preview: bool,
         _state: &mut State,
     ) -> bool {
         match event {
             Event::GotFocus => true,
+            Event::Key(n, key) => match key {
+                Key::Char(c)  => {
+                    let data = window.data_mut(tree).1.downcast_mut::<InputLine>().expect("InputLine");
+                    for _ in 0 .. n.get() {
+                        if data.value.try_reserve(c.len_utf8()).is_ok() {
+                            data.value.insert(data.cursor_index, c);
+                            data.cursor_index += c.len_utf8();
+                            data.cursor_x = data.cursor_x.wrapping_add(
+                                if c == '\0' { 0 } else { i16::try_from(c.width().unwrap_or(0)).unwrap() }
+                            );
+                        }
+                    }
+                    window.invalidate(tree);
+                    true
+                },
+                _ => false,
+            },
             _ => false
         }
     }
