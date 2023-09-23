@@ -129,12 +129,12 @@ impl RenderPort {
 
 macro_attr! {
     #[derive(Component!(class=WindowNodeClass))]
-    struct WindowNode<Tag> {
-        parent: Option<Window<Tag>>,
-        prev: Window<Tag>,
-        next: Window<Tag>,
-        first_child: Option<Window<Tag>>,
-        tag: Tag,
+    struct WindowNode<Data> {
+        parent: Option<Window<Data>>,
+        prev: Window<Data>,
+        next: Window<Data>,
+        first_child: Option<Window<Data>>,
+        data: Data,
         measure_size: Option<(Option<i16>, Option<i16>)>,
         desired_size: Vector,
         arrange_bounds: Option<Rect>,
@@ -147,9 +147,9 @@ macro_attr! {
     }
 }
 
-fn offset_from_root<Tag, State: ?Sized>(
-    mut window: Window<Tag>,
-    tree: &WindowTree<Tag, State>
+fn offset_from_root<Data, State: ?Sized>(
+    mut window: Window<Data>,
+    tree: &WindowTree<Data, State>
 ) -> Vector {
     let mut offset = Vector::null();
     loop {
@@ -167,16 +167,16 @@ macro_attr! {
     #[derive(NewtypeComponentId!)]
     #[derive(Educe)]
     #[educe(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
-    pub struct Window<Tag>(Id<WindowNode<Tag>>);
+    pub struct Window<Data>(Id<WindowNode<Data>>);
 }
 
-impl<Tag> Window<Tag> {
+impl<Data> Window<Data> {
     pub fn new<State: ?Sized>(
-        tree: &mut WindowTree<Tag, State>,
-        tag: Tag,
+        tree: &mut WindowTree<Data, State>,
+        data: Data,
         parent: Self,
         prev: Option<Self>,
-    ) -> Result<Window<Tag>, Error> {
+    ) -> Result<Window<Data>, Error> {
         tree.arena.try_reserve().map_err(|_| Error::Oom)?;
         let window = tree.arena.insert(move |window| {
             (WindowNode {
@@ -184,7 +184,7 @@ impl<Tag> Window<Tag> {
                 prev: Window(window),
                 next: Window(window),
                 first_child: None,
-                tag,
+                data,
                 measure_size: None,
                 desired_size: Vector::null(),
                 arrange_bounds: None,
@@ -200,7 +200,7 @@ impl<Tag> Window<Tag> {
         Ok(window)
     }
 
-    pub fn invalidate_measure<State: ?Sized>(self, tree: &mut WindowTree<Tag, State>) {
+    pub fn invalidate_measure<State: ?Sized>(self, tree: &mut WindowTree<Data, State>) {
         let mut window = self;
         loop {
             let node = &mut tree.arena[window.0];
@@ -211,7 +211,7 @@ impl<Tag> Window<Tag> {
         }
     }
 
-    pub fn invalidate_arrange<State: ?Sized>(self, tree: &mut WindowTree<Tag, State>) {
+    pub fn invalidate_arrange<State: ?Sized>(self, tree: &mut WindowTree<Data, State>) {
         let mut window = self;
         loop {
             let node = &mut tree.arena[window.0];
@@ -224,7 +224,7 @@ impl<Tag> Window<Tag> {
 
     pub fn measure<State: ?Sized>(
         self,
-        tree: &mut WindowTree<Tag, State>,
+        tree: &mut WindowTree<Data, State>,
         available_width: Option<i16>,
         available_height: Option<i16>,
         state: &mut State
@@ -242,7 +242,7 @@ impl<Tag> Window<Tag> {
         self.invalidate_arrange(tree);
     }
 
-    pub fn arrange<State: ?Sized>(self, tree: &mut WindowTree<Tag, State>, final_bounds: Rect, state: &mut State) {
+    pub fn arrange<State: ?Sized>(self, tree: &mut WindowTree<Data, State>, final_bounds: Rect, state: &mut State) {
         let node = &mut tree.arena[self.0];
         let shrinked_bounds = node.margin.shrink_rect(final_bounds);
         let shrinked_bounds_size = Vector {
@@ -277,73 +277,73 @@ impl<Tag> Window<Tag> {
 
     pub fn desired_size<State: ?Sized>(
         self,
-        tree: &WindowTree<Tag, State>
+        tree: &WindowTree<Data, State>
     ) -> Vector {
         tree.arena[self.0].desired_size
     }
 
     pub fn bounds<State: ?Sized>(
         self,
-        tree: &WindowTree<Tag, State>
+        tree: &WindowTree<Data, State>
     ) -> Rect {
         tree.arena[self.0].bounds
     }
 
     pub fn inner_bounds<State: ?Sized>(
         self,
-        tree: &WindowTree<Tag, State>
+        tree: &WindowTree<Data, State>
     ) -> Rect {
         let bounds = self.bounds(tree);
         Rect { tl: Point { x: 0, y: 0 }, size: bounds.size }
     }
 
-    pub fn tag<State: ?Sized>(
+    pub fn data<State: ?Sized>(
         self,
-        tree: &WindowTree<Tag, State>
-    ) -> &Tag {
-        &tree.arena[self.0].tag
+        tree: &WindowTree<Data, State>
+    ) -> &Data {
+        &tree.arena[self.0].data
     }
 
-    pub fn tag_mut<State: ?Sized>(
+    pub fn data_mut<State: ?Sized>(
         self,
-        tree: &mut WindowTree<Tag, State>
-    ) -> &mut Tag {
-        &mut tree.arena[self.0].tag
+        tree: &mut WindowTree<Data, State>
+    ) -> &mut Data {
+        &mut tree.arena[self.0].data
     }
 
     pub fn parent<State: ?Sized>(
         self,
-        tree: &WindowTree<Tag, State>
-    ) -> Option<Window<Tag>> {
+        tree: &WindowTree<Data, State>
+    ) -> Option<Window<Data>> {
         tree.arena[self.0].parent
     }
 
     pub fn first_child<State: ?Sized>(
         self,
-        tree: &WindowTree<Tag, State>
-    ) -> Option<Window<Tag>> {
+        tree: &WindowTree<Data, State>
+    ) -> Option<Window<Data>> {
         tree.arena[self.0].first_child
     }
 
     pub fn prev<State: ?Sized>(
         self,
-        tree: &WindowTree<Tag, State>
-    ) -> Window<Tag> {
+        tree: &WindowTree<Data, State>
+    ) -> Window<Data> {
         tree.arena[self.0].prev
     }
 
     pub fn next<State: ?Sized>(
         self,
-        tree: &WindowTree<Tag, State>
-    ) -> Window<Tag> {
+        tree: &WindowTree<Data, State>
+    ) -> Window<Data> {
         tree.arena[self.0].next
     }
 
     pub fn focus<State: ?Sized>(
         self,
-        tree: &mut WindowTree<Tag, State>,
+        tree: &mut WindowTree<Data, State>,
         state: &mut State
-    ) -> Option<Window<Tag>> {
+    ) -> Option<Window<Data>> {
         let old_focused = tree.focused;
         if self == old_focused { return None; }
         let update = tree.update;
@@ -356,7 +356,7 @@ impl<Tag> Window<Tag> {
 
     fn update<State: ?Sized>(
         self,
-        tree: &mut WindowTree<Tag, State>,
+        tree: &mut WindowTree<Data, State>,
         event: Event,
         preview: bool,
         handled: &mut bool,
@@ -381,7 +381,7 @@ impl<Tag> Window<Tag> {
 
     fn move_xy_raw<State: ?Sized>(
         self,
-        tree: &mut WindowTree<Tag, State>,
+        tree: &mut WindowTree<Data, State>,
         bounds: Rect
     ) {
         let Some(parent) = tree.arena[self.0].parent else { return; };
@@ -394,7 +394,7 @@ impl<Tag> Window<Tag> {
 
     pub fn move_xy<State: ?Sized>(
         self,
-        tree: &mut WindowTree<Tag, State>,
+        tree: &mut WindowTree<Data, State>,
         h_align: Option<HAlign>,
         v_align: Option<VAlign>,
         margin: Thickness,
@@ -412,8 +412,8 @@ impl<Tag> Window<Tag> {
 
     pub fn move_z<State: ?Sized>(
         self,
-        tree: &mut WindowTree<Tag, State>,
-        prev: Option<Window<Tag>>
+        tree: &mut WindowTree<Data, State>,
+        prev: Option<Window<Data>>
     ) {
         let parent = self.detach(tree);
         self.attach(tree, parent, prev);
@@ -424,8 +424,8 @@ impl<Tag> Window<Tag> {
 
     fn detach<State: ?Sized>(
         self,
-        tree: &mut WindowTree<Tag, State>
-    ) -> Window<Tag> {
+        tree: &mut WindowTree<Data, State>
+    ) -> Window<Data> {
         let node = &mut tree.arena[self.0];
         let parent = node.parent.take().expect("root can not be detached");
         let prev = replace(&mut node.prev, self);
@@ -442,9 +442,9 @@ impl<Tag> Window<Tag> {
 
     fn attach<State: ?Sized>(
         self,
-        tree: &mut WindowTree<Tag, State>,
-        parent: Window<Tag>,
-        prev: Option<Window<Tag>>
+        tree: &mut WindowTree<Data, State>,
+        parent: Window<Data>,
+        prev: Option<Window<Data>>
     ) {
         let (prev, next) = if let Some(prev) = prev {
             assert_eq!(tree.arena[prev.0].parent.unwrap(), parent);
@@ -467,7 +467,7 @@ impl<Tag> Window<Tag> {
 
     pub fn drop_window<State: ?Sized>(
         self,
-        tree: &mut WindowTree<Tag, State>
+        tree: &mut WindowTree<Data, State>
     ) {
         let parent = self.detach(tree);
         let node = tree.arena.remove(self.0);
@@ -477,8 +477,8 @@ impl<Tag> Window<Tag> {
     }
 
     fn drop_node_tree<State: ?Sized>(
-        node: WindowNode<Tag>,
-        tree: &mut WindowTree<Tag, State>
+        node: WindowNode<Data>,
+        tree: &mut WindowTree<Data, State>
     ) {
         if let Some(first_child) = node.first_child {
             let mut child = first_child;
@@ -493,7 +493,7 @@ impl<Tag> Window<Tag> {
 
     pub fn invalidate_rect<State: ?Sized>(
         self,
-        tree: &mut WindowTree<Tag, State>,
+        tree: &mut WindowTree<Data, State>,
         rect: Rect
     ) {
         let bounds = tree.arena[self.0].bounds;
@@ -505,7 +505,7 @@ impl<Tag> Window<Tag> {
  
     pub fn invalidate<State: ?Sized>(
         self,
-        tree: &mut WindowTree<Tag, State>
+        tree: &mut WindowTree<Data, State>
     ) {
         let bounds = tree.arena[self.0].bounds;
         let parent = tree.arena[self.0].parent.unwrap();
@@ -514,33 +514,33 @@ impl<Tag> Window<Tag> {
     }
 }
 
-pub struct WindowTree<Tag: 'static, State: ?Sized> {
+pub struct WindowTree<Data: 'static, State: ?Sized> {
     screen: Option<Box<dyn Screen>>,
-    arena: Arena<WindowNode<Tag>>,
-    root: Window<Tag>,
-    focused: Window<Tag>,
+    arena: Arena<WindowNode<Data>>,
+    root: Window<Data>,
+    focused: Window<Data>,
     render: fn(
-        tree: &WindowTree<Tag, State>,
-        window: Window<Tag>,
+        tree: &WindowTree<Data, State>,
+        window: Window<Data>,
         port: &mut RenderPort,
         state: &mut State,
     ),
     measure: fn(
-        tree: &mut WindowTree<Tag, State>,
-        window: Window<Tag>,
+        tree: &mut WindowTree<Data, State>,
+        window: Window<Data>,
         available_width: Option<i16>,
         available_height: Option<i16>,
         state: &mut State,
     ) -> Vector,
     arrange: fn(
-        tree: &mut WindowTree<Tag, State>,
-        window: Window<Tag>,
+        tree: &mut WindowTree<Data, State>,
+        window: Window<Data>,
         final_inner_bounds: Rect,
         state: &mut State,
     ) -> Vector,
     update: fn(
-        tree: &mut WindowTree<Tag, State>,
-        window: Window<Tag>,
+        tree: &mut WindowTree<Data, State>,
+        window: Window<Data>,
         event: Event,
         preview: bool,
         state: &mut State,
@@ -548,36 +548,36 @@ pub struct WindowTree<Tag: 'static, State: ?Sized> {
     cursor: Option<Point>,
 }
 
-impl<Tag, State: ?Sized> WindowTree<Tag, State> {
+impl<Data, State: ?Sized> WindowTree<Data, State> {
     pub fn new(
         screen: Box<dyn Screen>,
         render: fn(
-            tree: &WindowTree<Tag, State>,
-            window: Window<Tag>,
+            tree: &WindowTree<Data, State>,
+            window: Window<Data>,
             port: &mut RenderPort,
             state: &mut State,
         ),
         measure: fn(
-            tree: &mut WindowTree<Tag, State>,
-            window: Window<Tag>,
+            tree: &mut WindowTree<Data, State>,
+            window: Window<Data>,
             available_width: Option<i16>,
             available_height: Option<i16>,
             state: &mut State,
         ) -> Vector,
         arrange: fn(
-            tree: &mut WindowTree<Tag, State>,
-            window: Window<Tag>,
+            tree: &mut WindowTree<Data, State>,
+            window: Window<Data>,
             final_inner_bounds: Rect,
             state: &mut State,
         ) -> Vector,
         update: fn(
-            tree: &mut WindowTree<Tag, State>,
-            window: Window<Tag>,
+            tree: &mut WindowTree<Data, State>,
+            window: Window<Data>,
             event: Event,
             preview: bool,
             state: &mut State,
         ) -> bool,
-        root_tag: Tag,
+        root_data: Data,
     ) -> Result<Self, Error> {
         let mut arena = Arena::new();
         arena.try_reserve().map_err(|_| Error::Oom)?;
@@ -587,7 +587,7 @@ impl<Tag, State: ?Sized> WindowTree<Tag, State> {
             prev: Window(window),
             next: Window(window),
             first_child: None,
-            tag: root_tag,
+            data: root_data,
             measure_size: Some((Some(screen_size.x), Some(screen_size.y))),
             desired_size: screen_size,
             arrange_bounds: Some(Rect { tl: Point { x: 0, y: 0 }, size: screen_size }),
@@ -611,15 +611,15 @@ impl<Tag, State: ?Sized> WindowTree<Tag, State> {
         })
     }
 
-    pub fn root(&self) -> Window<Tag> { self.root }
+    pub fn root(&self) -> Window<Data> { self.root }
 
-    pub fn focused(&self) -> Window<Tag> { self.focused }
+    pub fn focused(&self) -> Window<Data> { self.focused }
 
     fn screen(&mut self) -> &mut dyn Screen {
         self.screen.as_mut().expect("WindowTree is in invalid state").as_mut()
     }
 
-    fn render_window(&mut self, window: Window<Tag>, offset: Vector, render_state: &mut State) {
+    fn render_window(&mut self, window: Window<Data>, offset: Vector, render_state: &mut State) {
         let bounds = self.arena[window.0].bounds.offset(offset);
         let screen = self.screen();
         if !rect_invalidated(screen, bounds) { return; }
