@@ -19,7 +19,8 @@ use alloc::string::String;
 //use components_arena::{Arena, Id, Component};
 use core::any::Any;
 //use core::fmt::Debug;
-//use core::ops::Range;
+use core::ops::Range;
+use core::str::FromStr;
 //use downcast_rs::{Downcast, impl_downcast};
 use dyn_clone::{DynClone, clone_trait_object};
 //use macro_attr_2018::macro_attr;
@@ -81,7 +82,7 @@ pub trait Widget<State: ?Sized>: DynClone {
         &self,
         tree: &WindowTree<WidgetTag<State>, State>,
         window: Window<WidgetTag<State>>,
-        port: &mut RenderPort,
+        rp: &mut RenderPort,
         state: &mut State,
     );
 
@@ -101,6 +102,20 @@ pub trait Widget<State: ?Sized>: DynClone {
         final_inner_bounds: Rect,
         state: &mut State,
     ) -> Vector;
+
+    fn focusable(
+        &self,
+        tree: &WindowTree<WidgetTag<State>, State>,
+        window: Window<WidgetTag<State>>,
+        state: &mut State,
+    ) -> bool;
+
+    fn focus(
+        &self,
+        tree: &mut WindowTree<WidgetTag<State>, State>,
+        window: Window<WidgetTag<State>>,
+        state: &mut State,
+    );
 }
 
 clone_trait_object!(<State: ?Sized> Widget<State>);
@@ -108,11 +123,11 @@ clone_trait_object!(<State: ?Sized> Widget<State>);
 pub fn widget_render<State: ?Sized>(
     tree: &WindowTree<WidgetTag<State>, State>,
     window: Window<WidgetTag<State>>,
-    port: &mut RenderPort,
+    rp: &mut RenderPort,
     state: &mut State,
 ) {
     let widget = window.tag(tree).0.clone();
-    widget.render(tree, window, port, state)
+    widget.render(tree, window, rp, state)
 }
 
 pub fn widget_measure<State: ?Sized>(
@@ -170,7 +185,7 @@ impl<State: ?Sized> Widget<State> for StackPanelWidget {
         &self,
         _tree: &WindowTree<WidgetTag<State>, State>,
         _window: Window<WidgetTag<State>>,
-        _port: &mut RenderPort,
+        _rp: &mut RenderPort,
         _state: &mut State,
     ) { }
 
@@ -254,6 +269,24 @@ impl<State: ?Sized> Widget<State> for StackPanelWidget {
             size
         }
     }
+
+    fn focusable(
+        &self,
+        _tree: &WindowTree<WidgetTag<State>, State>,
+        _window: Window<WidgetTag<State>>,
+        _state: &mut State,
+    ) -> bool {
+        false
+    }
+
+    fn focus(
+        &self,
+        _tree: &mut WindowTree<WidgetTag<State>, State>,
+        _window: Window<WidgetTag<State>>,
+        _state: &mut State,
+    ) {
+        unreachable!()
+    }
 }
 
 pub struct StaticText {
@@ -291,11 +324,11 @@ impl<State: ?Sized> Widget<State> for StaticTextWidget {
         &self,
         tree: &WindowTree<WidgetTag<State>, State>,
         window: Window<WidgetTag<State>>,
-        port: &mut RenderPort,
+        rp: &mut RenderPort,
         _state: &mut State,
     ) {
         let data = window.tag(tree).1.downcast_ref::<StaticText>().expect("StaticText");
-        port.out(Point { x: 0, y: 0 }, data.color.0, data.color.1, &data.text);
+        rp.out(Point { x: 0, y: 0 }, data.color.0, data.color.1, &data.text);
     }
 
     fn measure(
@@ -329,6 +362,24 @@ impl<State: ?Sized> Widget<State> for StaticTextWidget {
             .fold(0i16, |s, c| s.wrapping_add(i16::try_from(c).unwrap()))
         ;
         Vector { x: width, y: 1 }
+    }
+
+    fn focusable(
+        &self,
+        _tree: &WindowTree<WidgetTag<State>, State>,
+        _window: Window<WidgetTag<State>>,
+        _state: &mut State,
+    ) -> bool {
+        false
+    }
+
+    fn focus(
+        &self,
+        _tree: &mut WindowTree<WidgetTag<State>, State>,
+        _window: Window<WidgetTag<State>>,
+        _state: &mut State,
+    ) {
+        unreachable!()
     }
 }
 
@@ -367,11 +418,11 @@ impl<State: ?Sized> Widget<State> for BackgroundWidget {
         &self,
         tree: &WindowTree<WidgetTag<State>, State>,
         window: Window<WidgetTag<State>>,
-        port: &mut RenderPort,
+        rp: &mut RenderPort,
         _state: &mut State,
     ) {
         let data = window.tag(tree).1.downcast_ref::<Background>().expect("Background");
-        port.fill_bg(data.bg, data.fg);
+        rp.fill_bg(data.bg, data.fg);
     }
 
     fn measure(
@@ -412,58 +463,140 @@ impl<State: ?Sized> Widget<State> for BackgroundWidget {
         }
         final_inner_bounds.size
     }
-}
 
-/*
-pub struct StackPanel;
+    fn focusable(
+        &self,
+        _tree: &WindowTree<WidgetTag<State>, State>,
+        _window: Window<WidgetTag<State>>,
+        _state: &mut State,
+    ) -> bool {
+        false
+    }
 
-impl 
-
-
-fn stack_panel_measure<Tag, State: ?Sized>(
-    tree: &mut WindowTree<Tag, State>,
-    window: Window<Tag>,
-    available_width: Option<i16>,
-    available_height: Option<i16>,
-    workspace: &mut Workspace,
-) -> Vector {
-    if workspace.data::<StackPanelData>(window).vertical {
-    } else {
+    fn focus(
+        &self,
+        _tree: &mut WindowTree<WidgetTag<State>, State>,
+        _window: Window<WidgetTag<State>>,
+        _state: &mut State,
+    ) {
+        unreachable!()
     }
 }
 
-
-
-fn stack_panel_measure<Tag, State: ?Sized>(
-
-
-pub struct Workspace {
-    pub fn new_stack_panel()
+#[derive(Debug, Clone)]
+pub enum InputLineValueRange {
+    Any,
+    Integer(Range<i64>),
+    Float(Range<f64>),
 }
 
-impl View {
-    pub fn new() -> Self {
-        View { init: |_| { } }
+pub struct InputLine {
+    pub normal_color: (Fg, Bg),
+    pub error_color: (Fg, Bg),
+    pub value_range: InputLineValueRange,
+    pub value: String,
+    pub view_start: usize,
+    pub cursor_index: usize,
+    pub cursor_x: i16,
+    pub focused: bool,
+}
+
+impl InputLine {
+    pub fn widget_tag<State: ?Sized>(self) -> WidgetTag<State> {
+        (Box::new(InputLineWidget), Box::new(self))
+    }
+
+    pub fn window<State: ?Sized>(
+        self,
+        tree: &mut WindowTree<WidgetTag<State>, State>,
+        parent: Window<WidgetTag<State>>,
+        prev: Option<Window<WidgetTag<State>>>
+    ) -> Result<Window<WidgetTag<State>>, Error> {
+        Window::new(tree, self.widget_tag(), parent, prev)
+    }
+
+    pub fn window_tree<State: ?Sized>(
+        self,
+        screen: Box<dyn Screen>
+    ) -> Result<WindowTree<WidgetTag<State>, State>, Error> {
+        WindowTree::new(screen, widget_render, widget_measure, widget_arrange, self.widget_tag())
+    }
+
+    pub fn error(&self) -> bool {
+        match &self.value_range {
+            InputLineValueRange::Any => false,
+            InputLineValueRange::Integer(range) => if let Ok(value) = i64::from_str(&self.value) {
+                !range.contains(&value)
+            } else {
+                true
+            },
+            InputLineValueRange::Float(range) => if let Ok(value) = f64::from_str(&self.value) {
+                !range.contains(&value)
+            } else {
+                true
+            },
+        }
     }
 }
 
-pub struct Group {
-    pub view: View,
-}
+#[derive(Clone)]
+pub struct InputLineWidget;
 
-impl Group {
-    pub fn new() -> Self {
-        Group { view: View::new() }
+impl<State: ?Sized> Widget<State> for InputLineWidget {
+    fn render(
+        &self,
+        tree: &WindowTree<WidgetTag<State>, State>,
+        window: Window<WidgetTag<State>>,
+        rp: &mut RenderPort,
+        _state: &mut State,
+    ) {
+        let data = window.tag(tree).1.downcast_ref::<InputLine>().expect("InputLine");
+        let color = if data.error() { data.error_color } else { data.normal_color };
+        rp.fill_bg(color.1, None);
+        rp.out(Point { x: 0, y: 0 }, color.0, color.1, &data.value[data.view_start ..]);
+        if data.focused {
+            rp.cursor(Point { x: data.cursor_x, y: 0 });
+        }
+    }
+
+    fn measure(
+        &self,
+        _tree: &mut WindowTree<WidgetTag<State>, State>,
+        _window: Window<WidgetTag<State>>,
+        available_width: Option<i16>,
+        _available_height: Option<i16>,
+        _state: &mut State,
+    ) -> Vector {
+        Vector { x: available_width.unwrap_or(1), y: 1 }
+    }
+
+    fn arrange(
+        &self,
+        _tree: &mut WindowTree<WidgetTag<State>, State>,
+        _window: Window<WidgetTag<State>>,
+        final_inner_bounds: Rect,
+        _state: &mut State,
+    ) -> Vector {
+        Vector { x: final_inner_bounds.w(), y: 1 }
+    }
+
+    fn focusable(
+        &self,
+        _tree: &WindowTree<WidgetTag<State>, State>,
+        _window: Window<WidgetTag<State>>,
+        _state: &mut State,
+    ) -> bool {
+        true
+    }
+
+    fn focus(
+        &self,
+        tree: &mut WindowTree<WidgetTag<State>, State>,
+        window: Window<WidgetTag<State>>,
+        _state: &mut State,
+    ) {
+        let data = window.tag_mut(tree).1.downcast_mut::<InputLine>().expect("InputLine");
+        data.focused = true;
+        window.invalidate(tree);
     }
 }
-
-pub struct Application {
-    pub group: Group,
-    base_init: fn(&mut Self),
-}
-
-impl Application {
-    pub fn new() -> Self {
-    }
-}
-*/
