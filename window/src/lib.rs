@@ -426,7 +426,7 @@ impl<State: ?Sized> Window<State> {
         res
     }
 
-    pub fn color(self, tree: &mut WindowTree<State>, i: u8) -> (Fg, Bg) {
+    pub fn color(self, tree: &WindowTree<State>, i: u8) -> (Fg, Bg) {
         let mut window = self;
         let mut index = i;
         loop {

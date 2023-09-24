@@ -28,6 +28,7 @@ exclude = [
 
 [dependencies]
 components-arena = "4.1.0"
+either = { version = "1.9.0", default-features = false }
 macro-attr-2018 = "3.0.0"
 phantom-type = { version = "0.4.2", default-features = false }
 tuifw-screen-base = { path = "screen-base", version = "0.22.0" }
