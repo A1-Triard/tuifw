@@ -2,10 +2,8 @@
 
 #![deny(warnings)]
 
-//use alloc::boxed::Box;
-//use core::any::Any;
 use std::mem::replace;
-use tuifw_screen::{Bg, Fg, HAlign, VAlign};
+use tuifw_screen::{HAlign, VAlign};
 use tuifw::{Background, InputLine, InputLineValueRange, StackPanel, StaticText};
 
 fn main() {
@@ -17,14 +15,10 @@ fn main() {
     panel.set_v_align(tree, Some(VAlign::Center));
     let text = StaticText::new().window(tree, panel, None).unwrap();
     StaticText::text_mut(tree, text, |value| replace(value, "Hello!".to_string()));
-    let input = InputLine {
-        value_range: InputLineValueRange::Integer(0 .. i64::MAX),
-        normal_color: (Fg::White, Bg::Blue),
-        error_color: (Fg::White, Bg::Red),
-        value: "12345".to_string(),
-        view_start: 0, cursor_index: 0, cursor_x: 0,
-    }.window(tree, panel, Some(text)).unwrap();
+    let input = InputLine::new().window(tree, panel, Some(text)).unwrap();
+    InputLine::set_value_range(tree, input, InputLineValueRange::Integer(0 ..= i64::MAX));
     input.set_width(tree, 10);
+    InputLine::value_mut(tree, input, |value| replace(value, "1111222233334444".to_string()));
     input.focus(tree, &mut ());
     loop {
         tree.update(true, &mut ()).unwrap();

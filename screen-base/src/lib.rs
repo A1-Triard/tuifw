@@ -27,8 +27,29 @@ use core::ops::Range;
 use core::option::{Option};
 use enum_derive_2018::{EnumDisplay, EnumFromStr, IterVariants};
 use macro_attr_2018::macro_attr;
+use unicode_width::UnicodeWidthChar;
 
 pub use int_vec_2d::*;
+
+pub fn char_width(c: char) -> i16 {
+    if c == '\0' { 0 } else { c.width().map_or(0, |x| i16::try_from(x).unwrap()) }
+}
+
+pub fn text_width(s: &str) -> i16 {
+    s.chars().map(char_width).fold(0, |s, c| s.wrapping_add(c))
+}
+
+pub fn is_text_fit_in(w: i16, s: &str) -> bool {
+    let mut w = w as u16;
+    for c in s.chars() {
+        if let Some(new_w) = w.checked_sub(char_width(c) as u16) {
+            w = new_w;
+        } else {
+            return false;
+        }
+    }
+    true
+}
 
 macro_attr! {
     #[derive(Eq, PartialEq, Debug, Hash, Clone, Copy, Ord, PartialOrd)]
