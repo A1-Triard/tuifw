@@ -19,6 +19,9 @@ pub use stack_panel::*;
 mod static_text;
 pub use static_text::*;
 
+mod background;
+pub use background::*;
+
 use alloc::boxed::Box;
 use alloc::string::String;
 use core::ops::Range;
@@ -26,95 +29,6 @@ use core::str::FromStr;
 use tuifw_screen_base::{Bg, Error, Fg, Key, Point, Rect, Screen, Vector};
 use tuifw_window::{Event, RenderPort, Widget, Window, WindowTree};
 use unicode_width::UnicodeWidthChar;
-
-pub struct Background {
-    pub bg: Bg,
-    pub fg: Option<Fg>,
-}
-
-impl Background {
-    pub fn window<State: ?Sized>(
-        self,
-        tree: &mut WindowTree<State>,
-        parent: Window<State>,
-        prev: Option<Window<State>>
-    ) -> Result<Window<State>, Error> {
-        Window::new(tree, Box::new(BackgroundWidget), Box::new(self), parent, prev)
-    }
-
-    pub fn window_tree<State: ?Sized>(
-        self,
-        screen: Box<dyn Screen>
-    ) -> Result<WindowTree<State>, Error> {
-        WindowTree::new(screen, Box::new(BackgroundWidget), Box::new(self))
-    }
-}
-
-#[derive(Clone)]
-pub struct BackgroundWidget;
-
-impl<State: ?Sized> Widget<State> for BackgroundWidget {
-    fn render(
-        &self,
-        tree: &WindowTree<State>,
-        window: Window<State>,
-        rp: &mut RenderPort,
-        _state: &mut State,
-    ) {
-        let data = window.data::<Background>(tree);
-        rp.fill_bg(data.bg, data.fg);
-    }
-
-    fn measure(
-        &self,
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
-        available_width: Option<i16>,
-        available_height: Option<i16>,
-        state: &mut State,
-    ) -> Vector {
-        let mut size = Vector::null();
-        if let Some(first_child) = window.first_child(tree) {
-            let mut child = first_child;
-            loop {
-                child.measure(tree, available_width, available_height, state);
-                size = size.max(child.desired_size(tree));
-                child = child.next(tree);
-                if child == first_child { break; }
-            }
-        }
-        size
-    }
-
-    fn arrange(
-        &self,
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
-        final_inner_bounds: Rect,
-        state: &mut State,
-    ) -> Vector {
-        if let Some(first_child) = window.first_child(tree) {
-            let mut child = first_child;
-            loop {
-                child.arrange(tree, final_inner_bounds, state);
-                child = child.next(tree);
-                if child == first_child { break; }
-            }
-        }
-        final_inner_bounds.size
-    }
-
-    fn update(
-        &self,
-        _tree: &mut WindowTree<State>,
-        _window: Window<State>,
-        _event: Event,
-        _preview: bool,
-        _state: &mut State,
-    ) -> bool {
-        false
-    }
- }
 
 #[derive(Debug, Clone)]
 pub enum InputLineValueRange {
@@ -180,7 +94,7 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
     ) {
         let data = window.data::<InputLine>(tree);
         let color = if data.error() { data.error_color } else { data.normal_color };
-        rp.fill_bg(color.1, None);
+        rp.fill_bg(color.1);
         rp.out(Point { x: 0, y: 0 }, color.0, color.1, &data.value[data.view_start ..]);
         if tree.focused() == window {
             rp.cursor(Point { x: data.cursor_x, y: 0 });

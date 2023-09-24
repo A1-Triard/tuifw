@@ -10,7 +10,7 @@ use tuifw::{Background, InputLine, InputLineValueRange, StackPanel, StaticText};
 
 fn main() {
     let screen = unsafe { tuifw_screen::init(None, None) }.unwrap();
-    let tree = &mut Background { bg: Bg::LightGray, fg: Some(Fg::Blue) }.window_tree(screen).unwrap();
+    let tree = &mut Background::new().window_tree(screen).unwrap();
     let root = tree.root();
     let panel = StackPanel::new().window(tree, root, None).unwrap();
     panel.set_h_align(tree, Some(HAlign::Center));

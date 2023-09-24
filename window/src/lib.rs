@@ -130,8 +130,8 @@ impl RenderPort {
         }
     }
 
-    pub fn fill_bg(&mut self, bg: Bg, fg: Option<Fg>) {
-        self.fill(|rp, p| rp.out(p, fg.unwrap_or(Fg::LightGray), bg, if fg.is_some() { "░" } else { " " }));
+    pub fn fill_bg(&mut self, bg: Bg) {
+        self.fill(|rp, p| rp.out(p, Fg::LightGray, bg, " "));
     }
 
     pub fn h_line(&mut self, start: Point, len: i16, double: bool, fg: Fg, bg: Bg) {
