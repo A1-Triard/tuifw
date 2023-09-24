@@ -43,7 +43,7 @@ impl StaticText {
         &self.text
     }
 
-    pub fn set_text<State: ?Sized, T>(
+    pub fn text_mut<State: ?Sized, T>(
         tree: &mut WindowTree<State>,
         window: Window<State>,
         value: impl FnOnce(&mut String) -> T
