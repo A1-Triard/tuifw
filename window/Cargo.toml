@@ -16,6 +16,7 @@ repository = "https://github.com/A1-Triard/tuifw"
 components-arena = "4.1.0"
 dyn-clone = "1.0.14"
 educe = "0.4.23"
+either = { version = "1.9.0", default-features = false }
 macro-attr-2018 = "3.0.0"
 tuifw-screen-base = { path = "../screen-base", version = "0.22.0" }
 

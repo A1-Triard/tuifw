@@ -15,6 +15,7 @@
 extern crate alloc;
 
 use alloc::boxed::Box;
+use alloc::vec::Vec;
 use components_arena::{Arena, Component, Id, NewtypeComponentId};
 use core::any::Any;
 use core::cmp::{max, min};
@@ -22,6 +23,7 @@ use core::mem::replace;
 use core::num::NonZeroU16;
 use dyn_clone::{DynClone, clone_trait_object};
 use educe::Educe;
+use either::{Either, Left, Right};
 use macro_attr_2018::macro_attr;
 use tuifw_screen_base::{Bg, Error, Fg, Key, Point, Rect, Screen, Vector};
 use tuifw_screen_base::Event as screen_Event;
@@ -201,6 +203,25 @@ pub trait Widget<State: ?Sized>: DynClone {
 
 clone_trait_object!(<State: ?Sized> Widget<State>);
 
+pub struct Palette(Vec<Either<u8, (Fg, Bg)>>);
+
+impl Palette {
+    pub fn new() -> Palette {
+        Palette(Vec::new())
+    }
+
+    pub fn get(&self, i: u8) -> Either<u8, (Fg, Bg)> {
+        self.0.get(usize::from(i)).cloned().unwrap_or(Left(i))
+    }
+
+    pub fn set(&mut self, i: u8, o: Either<u8, (Fg, Bg)>) {
+        for k in self.0.len() ..= usize::from(i) {
+            self.0.push(Left(u8::try_from(k).unwrap()));
+        }
+        self.0[usize::from(i)] = o;
+    }
+}
+
 macro_attr! {
     #[derive(Component!(class=WindowNodeClass))]
     struct WindowNode<State: ?Sized> {
@@ -210,6 +231,7 @@ macro_attr! {
         first_child: Option<Window<State>>,
         widget: Box<dyn Widget<State>>,
         data: Box<dyn Any>,
+        palette: Palette,
         measure_size: Option<(Option<i16>, Option<i16>)>,
         desired_size: Vector,
         arrange_bounds: Option<Rect>,
@@ -262,6 +284,7 @@ impl<State: ?Sized> Window<State> {
                 first_child: None,
                 widget,
                 data,
+                palette: Palette::new(),
                 measure_size: None,
                 desired_size: Vector::null(),
                 arrange_bounds: None,
@@ -391,6 +414,44 @@ impl<State: ?Sized> Window<State> {
         tree: &mut WindowTree<State>
     ) -> &mut T {
         tree.arena[self.0].data.downcast_mut::<T>().expect("wrong type")
+    }
+
+    pub fn palette(self, tree: &WindowTree<State>) -> &Palette {
+        &tree.arena[self.0].palette
+    }
+
+    pub fn palette_mut<T>(self, tree: &mut WindowTree<State>, f: impl FnOnce(&mut Palette) -> T) -> T {
+        let res = f(&mut tree.arena[self.0].palette);
+        self.invalidate_subtree(tree);
+        res
+    }
+
+    pub fn color(self, tree: &mut WindowTree<State>, i: u8) -> (Fg, Bg) {
+        let mut window = self;
+        let mut index = i;
+        loop {
+            match window.palette(tree).get(index) {
+                Left(i) => if let Some(parent) = window.parent(tree) {
+                    window = parent;
+                    index = i;
+                } else {
+                    break (Fg::Red, Bg::Green);
+                },
+                Right(c) => break c,
+            }
+        }
+    }
+
+    fn invalidate_subtree(self, tree: &mut WindowTree<State>) {
+        self.invalidate(tree);
+        if let Some(first_child) = self.first_child(tree) {
+            let mut child = first_child;
+            loop {
+                child.invalidate_subtree(tree);
+                child = child.next(tree);
+                if child == first_child { break; }
+            }
+        }
     }
 
     pub fn parent(
@@ -646,6 +707,29 @@ pub struct WindowTree<State: ?Sized + 'static> {
     cursor: Option<Point>,
 }
 
+fn root_palette() -> Palette {
+    let mut p = Palette::new();
+    p.set(0, Right((Fg::Blue, Bg::LightGray)));
+
+    p.set(1, Right((Fg::Black, Bg::LightGray)));
+    p.set(2, Right((Fg::DarkGray, Bg::LightGray)));
+    p.set(3, Right((Fg::Red, Bg::LightGray)));
+    p.set(4, Right((Fg::Black, Bg::Green)));
+    p.set(5, Right((Fg::DarkGray, Bg::Green)));
+    p.set(6, Right((Fg::Red, Bg::Green)));
+
+    p.set(7, Right((Fg::LightGray, Bg::Blue)));
+    p.set(8, Right((Fg::White, Bg::Blue)));
+    p.set(9, Right((Fg::LightGreen, Bg::Blue)));
+
+    p.set(10, Right((Fg::Black, Bg::LightGray)));
+    p.set(11, Right((Fg::Yellow, Bg::LightGray)));
+    p.set(12, Right((Fg::LightGray, Bg::Blue)));
+    p.set(13, Right((Fg::LightGray, Bg::Red)));
+
+    p
+}
+
 impl<State: ?Sized> WindowTree<State> {
     pub fn new(
         screen: Box<dyn Screen>,
@@ -671,6 +755,7 @@ impl<State: ?Sized> WindowTree<State> {
             margin: Thickness::all(0),
             min_size: Vector::null(),
             max_size: Vector { x: -1, y: -1 },
+            palette: root_palette(),
         }, Window(window)));
         Ok(WindowTree {
             screen: Some(screen),
