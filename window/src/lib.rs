@@ -222,6 +222,19 @@ impl Palette {
     }
 }
 
+pub trait EventHandler<State: ?Sized>: DynClone {
+    fn invoke(
+        &self,
+        tree: &mut WindowTree<State>,
+        window: Window<State>,
+        event: Event,
+        preview: bool,
+        state: &mut State,
+    ) -> bool;
+}
+
+clone_trait_object!(<State> EventHandler<State> where State: ?Sized);
+
 macro_attr! {
     #[derive(Component!(class=WindowNodeClass))]
     struct WindowNode<State: ?Sized> {
@@ -241,6 +254,7 @@ macro_attr! {
         margin: Thickness,
         min_size: Vector,
         max_size: Vector,
+        event_handler: Option<Box<dyn EventHandler<State>>>,
     }
 }
 
@@ -282,6 +296,7 @@ impl<State: ?Sized> Window<State> {
                 prev: Window(window),
                 next: Window(window),
                 first_child: None,
+                event_handler: None,
                 widget,
                 data,
                 palette: Palette::new(),
@@ -380,6 +395,14 @@ impl<State: ?Sized> Window<State> {
         self.move_xy_raw(tree, arranged_bounds);
     }
 
+    pub fn set_event_handler(
+        self,
+        tree: &mut WindowTree<State>,
+        handler: Option<Box<dyn EventHandler<State>>>
+    ) {
+        tree.arena[self.0].event_handler = handler;
+    }
+
     pub fn desired_size(
         self,
         tree: &WindowTree<State>
@@ -443,7 +466,7 @@ impl<State: ?Sized> Window<State> {
     }
 
     fn invalidate_subtree(self, tree: &mut WindowTree<State>) {
-        self.invalidate(tree);
+        self.invalidate_render(tree);
         if let Some(first_child) = self.first_child(tree) {
             let mut child = first_child;
             loop {
@@ -490,11 +513,19 @@ impl<State: ?Sized> Window<State> {
         let old_focused = tree.focused;
         if self == old_focused { return None; }
         let widget = tree.arena[self.0].widget.clone();
+        let event_handler = tree.arena[self.0].event_handler.clone();
         let handled = widget.update(tree, self, Event::GotFocus, false, state);
         if !handled { return None; }
+        if let Some(event_handler) = event_handler {
+            event_handler.invoke(tree, self, Event::GotFocus, false, state);
+        }
         tree.focused = self;
         let widget = tree.arena[old_focused.0].widget.clone();
+        let event_handler = tree.arena[old_focused.0].event_handler.clone();
         widget.update(tree, old_focused, Event::LostFocus, false, state);
+        if let Some(event_handler) = event_handler {
+            event_handler.invoke(tree, self, Event::LostFocus, false, state);
+        }
         Some(old_focused)
     }
 
@@ -519,6 +550,33 @@ impl<State: ?Sized> Window<State> {
         if !*handled && !preview {
             if let Some(parent) = parent {
                 parent.update(tree, event, false, handled, state);
+            }
+        }
+    }
+
+    fn invoke_event_handler(
+        self,
+        tree: &mut WindowTree<State>,
+        event: Event,
+        preview: bool,
+        handled: &mut bool,
+        state: &mut State
+    ) {
+        let parent = self.parent(tree);
+        if !*handled && preview {
+            if let Some(parent) = parent {
+                parent.invoke_event_handler(tree, event, true, handled, state);
+            }
+        }
+        if !*handled {
+            let event_handler = tree.arena[self.0].event_handler.clone();
+            if let Some(event_handler) = event_handler {
+                *handled = event_handler.invoke(tree, self, event, preview, state);
+            }
+        }
+        if !*handled && !preview {
+            if let Some(parent) = parent {
+                parent.invoke_event_handler(tree, event, false, handled, state);
             }
         }
     }
@@ -683,18 +741,24 @@ impl<State: ?Sized> Window<State> {
     ) {
         let bounds = tree.arena[self.0].bounds;
         let rect = rect.offset(bounds.tl.offset_from(Point { x: 0, y: 0 })).intersect(bounds);
-        let parent = tree.arena[self.0].parent.unwrap();
-        let screen_rect = rect.offset(offset_from_root(parent, tree));
+        let screen_rect = if let Some(parent) = tree.arena[self.0].parent {
+            rect.offset(offset_from_root(parent, tree))
+        } else {
+            rect
+        };
         invalidate_rect(tree.screen(), screen_rect);
     }
  
-    pub fn invalidate(
+    pub fn invalidate_render(
         self,
         tree: &mut WindowTree<State>
     ) {
         let bounds = tree.arena[self.0].bounds;
-        let parent = tree.arena[self.0].parent.unwrap();
-        let screen_bounds = bounds.offset(offset_from_root(parent, tree));
+        let screen_bounds = if let Some(parent) = tree.arena[self.0].parent {
+            bounds.offset(offset_from_root(parent, tree))
+        } else {
+            bounds
+        };
         invalidate_rect(tree.screen(), screen_bounds);
     }
 }
@@ -744,6 +808,7 @@ impl<State: ?Sized> WindowTree<State> {
             prev: Window(window),
             next: Window(window),
             first_child: None,
+            event_handler: None,
             widget: root_widget,
             data: root_data,
             measure_size: Some((Some(screen_size.x), Some(screen_size.y))),
@@ -818,6 +883,9 @@ impl<State: ?Sized> WindowTree<State> {
             let mut handled = false;
             self.focused.update(self, Event::Key(n, key), true, &mut handled, state);
             self.focused.update(self, Event::Key(n, key), false, &mut handled, state);
+            let mut handled = false;
+            self.focused.invoke_event_handler(self, Event::Key(n, key), true, &mut handled, state);
+            self.focused.invoke_event_handler(self, Event::Key(n, key), false, &mut handled, state);
         }
         Ok(())
     }

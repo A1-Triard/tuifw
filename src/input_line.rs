@@ -122,7 +122,7 @@ impl InputLine {
         value: InputLineValueRange
     ) {
         window.data_mut::<InputLine>(tree).value_range = value;
-        window.invalidate(tree);
+        window.invalidate_render(tree);
     }
 
     pub fn value(&self) -> &String {
@@ -144,7 +144,7 @@ impl InputLine {
         } else {
             data.view = Right(data.cursor);
         }
-        window.invalidate(tree);
+        window.invalidate_render(tree);
         res
     }
 
@@ -154,7 +154,7 @@ impl InputLine {
         let data = &mut window.data_mut::<InputLine>(tree);
         assert!(value <= data.value.len());
         data.cursor = value;
-        window.invalidate(tree);
+        window.invalidate_render(tree);
     }
 
     pub fn view(&self) -> Either<usize, usize> { self.view }
@@ -163,7 +163,7 @@ impl InputLine {
         let data = &mut window.data_mut::<InputLine>(tree);
         assert!(value.map(|x| x <= data.value.len()).into_inner());
         data.view = value;
-        window.invalidate(tree);
+        window.invalidate_render(tree);
     }
 }
 
@@ -244,13 +244,13 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                 } else {
                     data.view = Right(data.cursor);
                 }
-                window.invalidate(tree);
+                window.invalidate_render(tree);
                 true
             },
             Event::LostFocus => {
                 let data = window.data_mut::<InputLine>(tree);
                 data.view = Left(0);
-                window.invalidate(tree);
+                window.invalidate_render(tree);
                 true
             },
             Event::Key(n, key) => match key {
@@ -270,7 +270,7 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                             }
                         }
                     }
-                    window.invalidate(tree);
+                    window.invalidate_render(tree);
                     true
                 },
                 Key::Backspace => {
@@ -291,7 +291,7 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                             }
                         }
                     }
-                    window.invalidate(tree);
+                    window.invalidate_render(tree);
                     true
                 },
                 _ => false,

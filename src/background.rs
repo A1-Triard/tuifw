@@ -34,7 +34,7 @@ impl Background {
 
     pub fn set_show_pattern<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>, value: bool) {
         window.data_mut::<Background>(tree).show_pattern = value;
-        window.invalidate(tree);
+        window.invalidate_render(tree);
     }
 
     pub fn pattern_even(&self) -> &String { &self.pattern_even }
@@ -46,7 +46,7 @@ impl Background {
     ) -> T {
         let value = &mut window.data_mut::<Background>(tree).pattern_even;
         let res = f(value);
-        window.invalidate(tree);
+        window.invalidate_render(tree);
         res
     }
 
@@ -59,7 +59,7 @@ impl Background {
     ) -> T {
         let value = &mut window.data_mut::<Background>(tree).pattern_odd;
         let res = f(value);
-        window.invalidate(tree);
+        window.invalidate_render(tree);
         res
     }
 }
