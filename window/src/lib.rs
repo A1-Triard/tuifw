@@ -21,6 +21,7 @@ use core::any::Any;
 use core::cmp::{max, min};
 use core::mem::replace;
 use core::num::NonZeroU16;
+use downcast_rs::{Downcast, impl_downcast};
 use dyn_clone::{DynClone, clone_trait_object};
 use educe::Educe;
 use either::{Either, Left, Right};
@@ -203,6 +204,10 @@ pub trait Widget<State: ?Sized>: DynClone {
 
 clone_trait_object!(<State: ?Sized> Widget<State>);
 
+pub trait Layout: Downcast { }
+
+impl_downcast!(Layout);
+
 pub struct Palette(Vec<Either<u8, (Fg, Bg)>>);
 
 impl Palette {
@@ -244,6 +249,7 @@ macro_attr! {
         first_child: Option<Window<State>>,
         widget: Box<dyn Widget<State>>,
         data: Box<dyn Any>,
+        layout: Option<Box<dyn Layout>>,
         palette: Palette,
         measure_size: Option<(Option<i16>, Option<i16>)>,
         desired_size: Vector,
@@ -299,6 +305,7 @@ impl<State: ?Sized> Window<State> {
                 event_handler: None,
                 widget,
                 data,
+                layout: None,
                 palette: Palette::new(),
                 measure_size: None,
                 desired_size: Vector::null(),
@@ -437,6 +444,26 @@ impl<State: ?Sized> Window<State> {
         tree: &mut WindowTree<State>
     ) -> &mut T {
         tree.arena[self.0].data.downcast_mut::<T>().expect("wrong type")
+    }
+
+    pub fn layout<T: Layout + 'static>(
+        self,
+        tree: &WindowTree<State>
+    ) -> Option<&T> {
+        tree.arena[self.0].layout.as_ref().and_then(|x| x.downcast_ref::<T>())
+    }
+
+    pub fn layout_mut<R>(
+        self,
+        tree: &mut WindowTree<State>,
+        f: impl FnOnce(&mut Option<Box<dyn Layout>>) -> R
+    ) -> R {
+        let layout = &mut tree.arena[self.0].layout;
+        let res = f(layout);
+        if let Some(parent) = self.parent(tree) {
+            parent.invalidate_measure(tree);
+        }
+        res
     }
 
     pub fn palette(self, tree: &WindowTree<State>) -> &Palette {
@@ -811,6 +838,7 @@ impl<State: ?Sized> WindowTree<State> {
             event_handler: None,
             widget: root_widget,
             data: root_data,
+            layout: None,
             measure_size: Some((Some(screen_size.x), Some(screen_size.y))),
             desired_size: screen_size,
             arrange_bounds: Some(Rect { tl: Point { x: 0, y: 0 }, size: screen_size }),
