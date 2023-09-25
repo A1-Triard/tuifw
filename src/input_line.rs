@@ -139,7 +139,7 @@ impl InputLine {
         let res = value(&mut data.value);
         data.cursor = data.value.len();
         let text_fit_width = (data.width as u16).saturating_sub(1) as i16;
-        if focused || is_text_fit_in(text_fit_width, &data.value) {
+        if !focused || is_text_fit_in(text_fit_width, &data.value) {
             data.view = Left(0);
         } else {
             data.view = Right(data.cursor);
@@ -233,10 +233,23 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
     ) -> bool {
         match event {
             Event::GotFocus => {
+                let data = window.data_mut::<InputLine>(tree);
+                let text_fit_width = if data.cursor == data.value.len() {
+                    (data.width as u16).saturating_sub(1) as i16
+                } else {
+                    data.width
+                };
+                if is_text_fit_in(text_fit_width, &data.value) {
+                    data.view = Left(0);
+                } else {
+                    data.view = Right(data.cursor);
+                }
                 window.invalidate(tree);
                 true
             },
             Event::LostFocus => {
+                let data = window.data_mut::<InputLine>(tree);
+                data.view = Left(0);
                 window.invalidate(tree);
                 true
             },
@@ -281,30 +294,6 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                     window.invalidate(tree);
                     true
                 },
-                /*
-                Key::Backspace => {
-                    let width = window.bounds(tree).w();
-                    let data = window.data_mut::<InputLine>(tree);
-                    for _ in 0 .. n.get() {
-                        if let Some(i) = data.cursor_index.checked_sub(1) {
-                            data.cursor_index = i;
-                            let c = data.value.remove(data.cursor_index);
-                            data.cursor_x = data.cursor_x.wrapping_sub(
-                                if c == '\0' { 0 } else { i16::try_from(c.width().unwrap_or(0)).unwrap() }
-                            );
-                            while data.cursor_x as u16 >= width as u16 {
-                                let c = data.value[.. data.view_start].chars().rev().next().unwrap();
-                                data.view_start -= c.len_utf8();
-                                data.cursor_x = data.cursor_x.wrapping_add(
-                                    if c == '\0' { 0 } else { i16::try_from(c.width().unwrap_or(0)).unwrap() }
-                                );
-                            }
-                        }
-                    }
-                    window.invalidate(tree);
-                    true
-                },
-                */
                 _ => false,
             },
         }
