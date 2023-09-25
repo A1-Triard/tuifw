@@ -18,7 +18,7 @@ fn main() {
     let input = InputLine::new().window(tree, panel, Some(text)).unwrap();
     InputLine::set_value_range(tree, input, InputLineValueRange::Integer(0 ..= i64::MAX));
     input.set_width(tree, 10);
-    InputLine::value_mut(tree, input, |value| replace(value, "1111222233334444".to_string()));
+    //InputLine::value_mut(tree, input, |value| replace(value, "1111222233334444".to_string()));
     input.focus(tree, &mut ());
     loop {
         tree.update(true, &mut ()).unwrap();
