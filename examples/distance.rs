@@ -56,15 +56,16 @@ fn main() {
     a_label.set_margin(tree, Thickness::new(1, 1, 0, 1));
     let a = InputLine::new().window(tree, edits, None).unwrap();
     InputLine::set_value_range(tree, a, InputLineValueRange::Float(f64::from(f32::MIN) ..= f64::from(f32::MAX)));
+    InputLine::value_mut(tree, a, |value| replace(value, "0".to_string()));
     a.set_margin(tree, Thickness::new(1, 1, 1, 1));
     let v_label = StaticText::new().window(tree, labels, Some(a_label)).unwrap();
     StaticText::text_mut(tree, v_label, |value| replace(value, "V:".to_string()));
     v_label.set_margin(tree, Thickness::new(1, 0, 0, 1));
     let v = InputLine::new().window(tree, edits, Some(a)).unwrap();
     InputLine::set_value_range(tree, v, InputLineValueRange::Float(f64::from(f32::MIN) ..= f64::from(f32::MAX)));
+    InputLine::value_mut(tree, v, |value| replace(value, "1".to_string()));
     v.set_margin(tree, Thickness::new(1, 0, 1, 1));
     /*
-    InputLine::value_mut(tree, input, |value| replace(value, "1111222233334444".to_string()));
     input.focus(tree, &mut ());
     */
     let mut state = State { quit: false };
