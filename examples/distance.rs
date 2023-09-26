@@ -85,6 +85,10 @@ fn main() {
     n.set_margin(tree, Thickness::new(1, 0, 1, 1));
 
     let mut state = State { quit: false };
+    a.set_next_focus(tree, v);
+    v.set_next_focus(tree, t);
+    t.set_next_focus(tree, n);
+    n.set_next_focus(tree, a);
     a.focus(tree, &mut state);
     while !state.quit {
         tree.update(true, &mut state).unwrap();

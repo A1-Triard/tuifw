@@ -262,6 +262,7 @@ macro_attr! {
         min_size: Vector,
         max_size: Vector,
         event_handler: Option<Box<dyn EventHandler<State>>>,
+        next_focus: Window<State>,
     }
 }
 
@@ -318,6 +319,7 @@ impl<State: ?Sized> Window<State> {
                 margin: Thickness::all(0),
                 min_size: Vector::null(),
                 max_size: Vector { x: -1, y: -1 },
+                next_focus: Window(window),
             }, Window(window))
         });
         window.attach(tree, parent, prev);
@@ -468,6 +470,14 @@ impl<State: ?Sized> Window<State> {
             parent.invalidate_measure(tree);
         }
         res
+    }
+
+    pub fn next_focus(self, tree: &WindowTree<State>) -> Self {
+        tree.arena[self.0].next_focus
+    }
+
+    pub fn set_next_focus(self, tree: &mut WindowTree<State>, value: Self) {
+        tree.arena[self.0].next_focus = value;
     }
 
     pub fn palette(self, tree: &WindowTree<State>) -> &Palette {
@@ -854,6 +864,7 @@ impl<State: ?Sized> WindowTree<State> {
             min_size: Vector::null(),
             max_size: Vector { x: -1, y: -1 },
             palette: root_palette(),
+            next_focus: Window(window),
         }, Window(window)));
         Ok(WindowTree {
             screen: Some(screen),
@@ -913,6 +924,10 @@ impl<State: ?Sized> WindowTree<State> {
         self.render_window(self.root, Vector::null(), state);
         let screen = self.screen.as_mut().expect("WindowTree is in invalid state");
         if let Some(screen_Event::Key(n, key)) = screen.update(self.cursor, wait)? {
+            if key == Key::Tab {
+                let next_focus = self.focused.next_focus(self);
+                if next_focus.focus(self, state).is_some() { return Ok(()); }
+            }
             let mut handled = false;
             self.focused.update(self, Event::Key(n, key), true, &mut handled, state);
             self.focused.update(self, Event::Key(n, key), false, &mut handled, state);
