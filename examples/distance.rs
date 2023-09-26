@@ -51,20 +51,39 @@ fn main() {
     DockPanel::set_layout(tree, labels, Some(Dock::Left));
     let edits = StackPanel::new().window(tree, panel, Some(labels)).unwrap();
     edits.set_width(tree, 12);
+
     let a_label = StaticText::new().window(tree, labels, None).unwrap();
     StaticText::text_mut(tree, a_label, |value| replace(value, "A:".to_string()));
     a_label.set_margin(tree, Thickness::new(1, 1, 0, 1));
     let a = InputLine::new().window(tree, edits, None).unwrap();
-    InputLine::set_value_range(tree, a, InputLineValueRange::Float(f64::from(f32::MIN) ..= f64::from(f32::MAX)));
+    InputLine::set_value_range(tree, a, InputLineValueRange::Float(f64::MIN ..= f64::MAX));
     InputLine::value_mut(tree, a, |value| replace(value, "0".to_string()));
     a.set_margin(tree, Thickness::new(1, 1, 1, 1));
+
     let v_label = StaticText::new().window(tree, labels, Some(a_label)).unwrap();
     StaticText::text_mut(tree, v_label, |value| replace(value, "V:".to_string()));
     v_label.set_margin(tree, Thickness::new(1, 0, 0, 1));
     let v = InputLine::new().window(tree, edits, Some(a)).unwrap();
-    InputLine::set_value_range(tree, v, InputLineValueRange::Float(f64::from(f32::MIN) ..= f64::from(f32::MAX)));
+    InputLine::set_value_range(tree, v, InputLineValueRange::Float(f64::MIN ..= f64::MAX));
     InputLine::value_mut(tree, v, |value| replace(value, "1".to_string()));
     v.set_margin(tree, Thickness::new(1, 0, 1, 1));
+
+    let t_label = StaticText::new().window(tree, labels, Some(v_label)).unwrap();
+    StaticText::text_mut(tree, t_label, |value| replace(value, "T:".to_string()));
+    t_label.set_margin(tree, Thickness::new(1, 0, 0, 1));
+    let t = InputLine::new().window(tree, edits, Some(v)).unwrap();
+    InputLine::set_value_range(tree, t, InputLineValueRange::Float(f64::MIN ..= f64::MAX));
+    InputLine::value_mut(tree, t, |value| replace(value, "0".to_string()));
+    t.set_margin(tree, Thickness::new(1, 0, 1, 1));
+
+    let n_label = StaticText::new().window(tree, labels, Some(t_label)).unwrap();
+    StaticText::text_mut(tree, n_label, |value| replace(value, "N:".to_string()));
+    n_label.set_margin(tree, Thickness::new(1, 0, 0, 1));
+    let n = InputLine::new().window(tree, edits, Some(t)).unwrap();
+    InputLine::set_value_range(tree, n, InputLineValueRange::Integer(1 ..= i64::from(i32::MAX)));
+    InputLine::value_mut(tree, n, |value| replace(value, "1".to_string()));
+    n.set_margin(tree, Thickness::new(1, 0, 1, 1));
+
     let mut state = State { quit: false };
     a.focus(tree, &mut state);
     while !state.quit {
