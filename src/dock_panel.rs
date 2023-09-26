@@ -3,8 +3,6 @@ use core::mem::replace;
 use tuifw_screen_base::{Error, Rect, Screen, Vector, Thickness, Point};
 use tuifw_window::{Event, Layout, RenderPort, Widget, Window, WindowTree};
 
-extern crate std;
-
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum Dock { Left, Top, Right, Bottom }
 
@@ -128,9 +126,7 @@ impl<State: ?Sized> Widget<State> for DockPanelWidget {
                 child = child.next(tree);
                 if child == first_child { break; }
             }
-            let res = docked.expand_rect_size(size);
-            std::eprintln!("{:?}", res);
-            res
+            docked.expand_rect_size(size)
         } else {
             Vector::null()
         }
@@ -218,7 +214,7 @@ impl<State: ?Sized> Widget<State> for DockPanelWidget {
                 let dock = child.layout::<DockLayout>(tree).and_then(|x| x.dock);
                 if dock.is_none() {
                     child.arrange(tree, bounds, state);
-                    size = size.max(child.bounds(tree).size);
+                    size = size.max(child.render_bounds(tree).size);
                 }
                 child = child.next(tree);
                 if child == first_child { break; }

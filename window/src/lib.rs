@@ -254,7 +254,8 @@ macro_attr! {
         measure_size: Option<(Option<i16>, Option<i16>)>,
         desired_size: Vector,
         arrange_bounds: Option<Rect>,
-        bounds: Rect,
+        render_bounds: Rect,
+        window_bounds: Rect,
         h_align: Option<HAlign>,
         v_align: Option<VAlign>,
         margin: Thickness,
@@ -270,7 +271,7 @@ fn offset_from_root<State: ?Sized>(
 ) -> Vector {
     let mut offset = Vector::null();
     loop {
-        offset += tree.arena[window.0].bounds.tl.offset_from(Point { x: 0, y: 0 });
+        offset += tree.arena[window.0].window_bounds.tl.offset_from(Point { x: 0, y: 0 });
         if let Some(parent) = tree.arena[window.0].parent {
             window = parent;
         } else {
@@ -310,7 +311,8 @@ impl<State: ?Sized> Window<State> {
                 measure_size: None,
                 desired_size: Vector::null(),
                 arrange_bounds: None,
-                bounds: Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() },
+                render_bounds: Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() },
+                window_bounds: Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() },
                 h_align: None,
                 v_align: None,
                 margin: Thickness::all(0),
@@ -360,7 +362,7 @@ impl<State: ?Sized> Window<State> {
         let widget = node.widget.clone();
         let measured_size = widget.measure(tree, self, measure_size.0, measure_size.1, state);
         let node = &mut tree.arena[self.0];
-        node.desired_size = measured_size.min(node.max_size).max(node.min_size);
+        node.desired_size = node.margin.expand_rect_size(measured_size.min(node.max_size).max(node.min_size));
         self.invalidate_arrange(tree);
     }
 
@@ -399,6 +401,8 @@ impl<State: ?Sized> Window<State> {
         );
         let arranged_bounds = arranged_bounds_margin.shrink_rect(arrange_bounds);
         debug_assert_eq!(arranged_bounds.size, arranged_size);
+        let bounds = node.margin.expand_rect(arranged_bounds);
+        node.render_bounds = bounds;
         self.move_xy_raw(tree, arranged_bounds);
     }
 
@@ -417,19 +421,19 @@ impl<State: ?Sized> Window<State> {
         tree.arena[self.0].desired_size
     }
 
-    pub fn bounds(
+    pub fn render_bounds(
         self,
         tree: &WindowTree<State>
     ) -> Rect {
-        tree.arena[self.0].bounds
+        tree.arena[self.0].render_bounds
     }
 
     pub fn inner_bounds(
         self,
         tree: &WindowTree<State>
     ) -> Rect {
-        let bounds = self.bounds(tree);
-        Rect { tl: Point { x: 0, y: 0 }, size: bounds.size }
+        let window_bounds = tree.arena[self.0].window_bounds;
+        Rect { tl: Point { x: 0, y: 0 }, size: window_bounds.size }
     }
 
     pub fn data<T: 'static>(
@@ -611,13 +615,13 @@ impl<State: ?Sized> Window<State> {
     fn move_xy_raw(
         self,
         tree: &mut WindowTree<State>,
-        bounds: Rect
+        window_bounds: Rect
     ) {
         let Some(parent) = tree.arena[self.0].parent else { return; };
-        let screen_bounds = bounds.offset(offset_from_root(parent, tree));
+        let screen_bounds = window_bounds.offset(offset_from_root(parent, tree));
         invalidate_rect(tree.screen(), screen_bounds);
-        let bounds = replace(&mut tree.arena[self.0].bounds, bounds);
-        let screen_bounds = bounds.offset(offset_from_root(parent, tree));
+        let window_bounds = replace(&mut tree.arena[self.0].window_bounds, window_bounds);
+        let screen_bounds = window_bounds.offset(offset_from_root(parent, tree));
         invalidate_rect(tree.screen(), screen_bounds);
     }
 
@@ -687,7 +691,7 @@ impl<State: ?Sized> Window<State> {
     ) {
         let parent = self.detach(tree);
         self.attach(tree, parent, prev);
-        let bounds = tree.arena[self.0].bounds;
+        let bounds = tree.arena[self.0].window_bounds;
         let screen_bounds = bounds.offset(offset_from_root(parent, tree));
         invalidate_rect(tree.screen(), screen_bounds);
     }
@@ -741,7 +745,7 @@ impl<State: ?Sized> Window<State> {
     ) {
         let parent = self.detach(tree);
         let node = tree.arena.remove(self.0);
-        let screen_bounds = node.bounds.offset(offset_from_root(parent, tree));
+        let screen_bounds = node.window_bounds.offset(offset_from_root(parent, tree));
         invalidate_rect(tree.screen(), screen_bounds);
         Self::drop_node_tree(node, tree);
     }
@@ -766,7 +770,7 @@ impl<State: ?Sized> Window<State> {
         tree: &mut WindowTree<State>,
         rect: Rect
     ) {
-        let bounds = tree.arena[self.0].bounds;
+        let bounds = tree.arena[self.0].window_bounds;
         let rect = rect.offset(bounds.tl.offset_from(Point { x: 0, y: 0 })).intersect(bounds);
         let screen_rect = if let Some(parent) = tree.arena[self.0].parent {
             rect.offset(offset_from_root(parent, tree))
@@ -780,7 +784,7 @@ impl<State: ?Sized> Window<State> {
         self,
         tree: &mut WindowTree<State>
     ) {
-        let bounds = tree.arena[self.0].bounds;
+        let bounds = tree.arena[self.0].window_bounds;
         let screen_bounds = if let Some(parent) = tree.arena[self.0].parent {
             bounds.offset(offset_from_root(parent, tree))
         } else {
@@ -842,7 +846,8 @@ impl<State: ?Sized> WindowTree<State> {
             measure_size: Some((Some(screen_size.x), Some(screen_size.y))),
             desired_size: screen_size,
             arrange_bounds: Some(Rect { tl: Point { x: 0, y: 0 }, size: screen_size }),
-            bounds: Rect { tl: Point { x: 0, y: 0 }, size: screen_size },
+            render_bounds: Rect { tl: Point { x: 0, y: 0 }, size: screen_size },
+            window_bounds: Rect { tl: Point { x: 0, y: 0 }, size: screen_size },
             h_align: None,
             v_align: None,
             margin: Thickness::all(0),
@@ -868,7 +873,7 @@ impl<State: ?Sized> WindowTree<State> {
     }
 
     fn render_window(&mut self, window: Window<State>, offset: Vector, render_state: &mut State) {
-        let bounds = self.arena[window.0].bounds.offset(offset);
+        let bounds = self.arena[window.0].window_bounds.offset(offset);
         let screen = self.screen();
         if !rect_invalidated(screen, bounds) { return; }
         let offset = bounds.tl.offset_from(Point { x: 0, y: 0 });

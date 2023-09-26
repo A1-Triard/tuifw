@@ -5,7 +5,7 @@
 use either::Right;
 use std::mem::replace;
 use tuifw::{Background, Dock, DockPanel, InputLine, InputLineValueRange, StackPanel, StaticText};
-use tuifw_screen::{Bg, Fg, HAlign, VAlign, Key};
+use tuifw_screen::{Bg, Fg, HAlign, VAlign, Key, Thickness};
 use tuifw_window::{Event, EventHandler, Window, WindowTree};
 
 struct State {
@@ -49,12 +49,21 @@ fn main() {
     panel.set_v_align(tree, Some(VAlign::Center));
     let labels = StackPanel::new().window(tree, panel, None).unwrap();
     DockPanel::set_layout(tree, labels, Some(Dock::Left));
+    let edits = StackPanel::new().window(tree, panel, Some(labels)).unwrap();
+    edits.set_width(tree, 12);
     let a_label = StaticText::new().window(tree, labels, None).unwrap();
-    StaticText::text_mut(tree, a_label, |value| replace(value, "A: ".to_string()));
+    StaticText::text_mut(tree, a_label, |value| replace(value, "A:".to_string()));
+    a_label.set_margin(tree, Thickness::new(1, 1, 0, 1));
+    let a = InputLine::new().window(tree, edits, None).unwrap();
+    InputLine::set_value_range(tree, a, InputLineValueRange::Float(f64::from(f32::MIN) ..= f64::from(f32::MAX)));
+    a.set_margin(tree, Thickness::new(1, 1, 1, 1));
+    let v_label = StaticText::new().window(tree, labels, Some(a_label)).unwrap();
+    StaticText::text_mut(tree, v_label, |value| replace(value, "V:".to_string()));
+    v_label.set_margin(tree, Thickness::new(1, 0, 0, 1));
+    let v = InputLine::new().window(tree, edits, Some(a)).unwrap();
+    InputLine::set_value_range(tree, v, InputLineValueRange::Float(f64::from(f32::MIN) ..= f64::from(f32::MAX)));
+    v.set_margin(tree, Thickness::new(1, 0, 1, 1));
     /*
-    let input = InputLine::new().window(tree, panel, Some(text)).unwrap();
-    InputLine::set_value_range(tree, input, InputLineValueRange::Integer(0 ..= i64::MAX));
-    input.set_width(tree, 10);
     InputLine::value_mut(tree, input, |value| replace(value, "1111222233334444".to_string()));
     input.focus(tree, &mut ());
     */
