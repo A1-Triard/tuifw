@@ -109,7 +109,7 @@ impl InputLine {
                     }
                     width -= c_width;
                 }
-                unreachable!()
+                (width, 0 .. value_view_end, is_tail_cursor_fit)
             }
         }
     }
@@ -138,11 +138,23 @@ impl InputLine {
         let data = &mut window.data_mut::<InputLine>(tree);
         let res = value(&mut data.value);
         data.cursor = data.value.len();
-        let text_fit_width = (data.width as u16).saturating_sub(1) as i16;
-        if !focused || is_text_fit_in(text_fit_width, &data.value) {
-            data.view = Left(0);
+        if focused {
+            let text_fit_width = (data.width as u16).saturating_sub(1) as i16;
+            if is_text_fit_in(text_fit_width, &data.value) {
+                data.view = if matches!(data.value_range, InputLineValueRange::Any) {
+                    Left(0)
+                } else {
+                    Right(data.value.len())
+                };
+            } else {
+                data.view = Right(data.cursor);
+            }
         } else {
-            data.view = Right(data.cursor);
+            data.view = if matches!(data.value_range, InputLineValueRange::Any) || data.value.is_empty() {
+                Left(0)
+            } else {
+                Right(data.value.len() - 1)
+            };
         }
         window.invalidate_render(tree);
         res
@@ -210,15 +222,28 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
         final_inner_bounds: Rect,
         _state: &mut State,
     ) -> Vector {
+        let focused = tree.focused() == window;
         let data = window.data_mut::<InputLine>(tree);
         data.width = Thickness::new(1, 0, 1, 0).shrink_rect(final_inner_bounds).w();
-        let text_fit_width = if data.cursor == data.value.len() {
+        let text_fit_width = if focused && data.cursor == data.value.len() {
             (data.width as u16).saturating_sub(1) as i16
         } else {
             data.width
         };
         if is_text_fit_in(text_fit_width, &data.value) {
-            data.view = Left(0);
+            if focused && data.cursor == data.value.len() {
+                data.view = if matches!(data.value_range, InputLineValueRange::Any) {
+                    Left(0)
+                } else {
+                    Right(data.value.len())
+                };
+            } else {
+                data.view = if matches!(data.value_range, InputLineValueRange::Any) || data.value.is_empty() {
+                    Left(0)
+                } else {
+                    Right(data.value.len() - 1)
+                };
+            }
         }
         Vector { x: final_inner_bounds.w(), y: 1 }
     }
@@ -240,7 +265,19 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                     data.width
                 };
                 if is_text_fit_in(text_fit_width, &data.value) {
-                    data.view = Left(0);
+                    if data.cursor == data.value.len() {
+                        data.view = if matches!(data.value_range, InputLineValueRange::Any) {
+                            Left(0)
+                        } else {
+                            Right(data.value.len())
+                        };
+                    } else {
+                        data.view = if matches!(data.value_range, InputLineValueRange::Any) || data.value.is_empty() {
+                            Left(0)
+                        } else {
+                            Right(data.value.len() - 1)
+                        };
+                    }
                 } else {
                     data.view = Right(data.cursor);
                 }
@@ -249,7 +286,11 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
             },
             Event::LostFocus => {
                 let data = window.data_mut::<InputLine>(tree);
-                data.view = Left(0);
+                data.view = if matches!(data.value_range, InputLineValueRange::Any) || data.value.is_empty() {
+                    Left(0)
+                } else {
+                    Right(data.value.len() - 1)
+                };
                 window.invalidate_render(tree);
                 true
             },
@@ -285,7 +326,21 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                                 data.width
                             };
                             if is_text_fit_in(text_fit_width, &data.value) {
-                                data.view = Left(0);
+                                if data.cursor == data.value.len() {
+                                    data.view = if matches!(data.value_range, InputLineValueRange::Any) {
+                                        Left(0)
+                                    } else {
+                                        Right(data.value.len())
+                                    };
+                                } else {
+                                    data.view = if
+                                        matches!(data.value_range, InputLineValueRange::Any) || data.value.is_empty()
+                                    {
+                                        Left(0)
+                                    } else {
+                                        Right(data.value.len() - 1)
+                                    };
+                                }
                             } else {
                                 data.view = Right(data.cursor);
                             }

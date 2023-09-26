@@ -65,10 +65,8 @@ fn main() {
     InputLine::set_value_range(tree, v, InputLineValueRange::Float(f64::from(f32::MIN) ..= f64::from(f32::MAX)));
     InputLine::value_mut(tree, v, |value| replace(value, "1".to_string()));
     v.set_margin(tree, Thickness::new(1, 0, 1, 1));
-    /*
-    input.focus(tree, &mut ());
-    */
     let mut state = State { quit: false };
+    a.focus(tree, &mut state);
     while !state.quit {
         tree.update(true, &mut state).unwrap();
     }
