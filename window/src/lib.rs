@@ -28,7 +28,7 @@ use dyn_clone::{DynClone, clone_trait_object};
 use educe::Educe;
 use either::{Either, Left, Right};
 use macro_attr_2018::macro_attr;
-use timer_no_std::MonoClock;
+use timer_no_std::{MonoClock, MonoTime};
 use tuifw_screen_base::{Bg, Error, Fg, Key, Point, Rect, Screen, Vector};
 use tuifw_screen_base::Event as screen_Event;
 use tuifw_screen_base::{HAlign, VAlign, Thickness, Range1d};
@@ -447,24 +447,24 @@ impl<State: ?Sized> Window<State> {
         Rect { tl: Point { x: 0, y: 0 }, size: window_bounds.size }
     }
 
-    pub fn data<T: 'static>(
+    pub fn data<'a, T: 'static>(
         self,
-        tree: &WindowTree<State>
-    ) -> &T {
+        tree: &'a WindowTree<'_, State>
+    ) -> &'a T {
         tree.arena[self.0].data.downcast_ref::<T>().expect("wrong type")
     }
 
-    pub fn data_mut<T: 'static>(
+    pub fn data_mut<'a, T: 'static>(
         self,
-        tree: &mut WindowTree<State>
-    ) -> &mut T {
+        tree: &'a mut WindowTree<'_, State>
+    ) -> &'a mut T {
         tree.arena[self.0].data.downcast_mut::<T>().expect("wrong type")
     }
 
-    pub fn layout<T: Layout + 'static>(
+    pub fn layout<'a, T: Layout + 'static>(
         self,
-        tree: &WindowTree<State>
-    ) -> Option<&T> {
+        tree: &'a WindowTree<'_, State>
+    ) -> Option<&'a T> {
         tree.arena[self.0].layout.as_ref().and_then(|x| x.downcast_ref::<T>())
     }
 
@@ -489,7 +489,7 @@ impl<State: ?Sized> Window<State> {
         tree.arena[self.0].next_focus = value;
     }
 
-    pub fn palette(self, tree: &WindowTree<State>) -> &Palette {
+    pub fn palette<'a>(self, tree: &'a WindowTree<'_, State>) -> &'a Palette {
         &tree.arena[self.0].palette
     }
 
@@ -813,15 +813,6 @@ impl<State: ?Sized> Window<State> {
     }
 }
 
-pub struct WindowTree<State: ?Sized + 'static> {
-    screen: Option<Box<dyn Screen>>,
-    arena: Arena<WindowNode<State>>,
-    root: Window<State>,
-    focused: Window<State>,
-    cursor: Option<Point>,
-    quit: bool,
-}
-
 const FPS: u16 = 40;
 
 fn root_palette() -> Palette {
@@ -847,9 +838,55 @@ fn root_palette() -> Palette {
     p
 }
 
-impl<State: ?Sized> WindowTree<State> {
+macro_attr! {
+    #[derive(Component!(class=TimeDataClass))]
+    struct TimerData<State: ?Sized + 'static> {
+        start: MonoTime,
+        span_ms: u16,
+        alarm: Box<dyn FnOnce(&WindowTree<State>, &mut State)>,
+    }
+}
+
+macro_attr! {
+    #[derive(Educe, NewtypeComponentId!)]
+    #[educe(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+    pub struct Timer<State: ?Sized + 'static>(Id<TimerData<State>>);
+}
+
+impl<State: ?Sized> Timer<State> {
+    pub fn new(
+        tree: &mut WindowTree<State>,
+        span_ms: u16,
+        alarm: Box<dyn FnOnce(&WindowTree<State>, &mut State)>
+    ) -> Self {
+        let start = tree.clock.time();
+        tree.timers.insert(move |id| (TimerData {
+            start,
+            span_ms,
+            alarm
+        }, Timer(id)))
+    }
+
+    pub fn drop_timer(self, tree: &mut WindowTree<State>) {
+        tree.timers.remove(self.0);
+    }
+}
+
+pub struct WindowTree<'clock, State: ?Sized + 'static> {
+    screen: Option<Box<dyn Screen>>,
+    arena: Arena<WindowNode<State>>,
+    root: Window<State>,
+    focused: Window<State>,
+    cursor: Option<Point>,
+    quit: bool,
+    timers: Arena<TimerData<State>>,
+    clock: &'clock MonoClock,
+}
+
+impl<'clock, State: ?Sized> WindowTree<'clock, State> {
     pub fn new(
         screen: Box<dyn Screen>,
+        clock: &'clock MonoClock,
         root_widget: Box<dyn Widget<State>>,
         root_data: Box<dyn Any>,
     ) -> Result<Self, Error> {
@@ -885,6 +922,8 @@ impl<State: ?Sized> WindowTree<State> {
             focused: root,
             cursor: None,
             quit: false,
+            clock,
+            timers: Arena::new(),
         })
     }
 
@@ -926,13 +965,26 @@ impl<State: ?Sized> WindowTree<State> {
         }
     }
 
-    pub fn run(&mut self, clock: &MonoClock, state: &mut State) -> Result<(), Error> {
-        let mut time = clock.time();
+    pub fn run(&mut self, state: &mut State) -> Result<(), Error> {
+        let mut time = self.clock.time();
         while !self.quit {
-            let ms = time.split_ms_u16().unwrap_or(u16::MAX);
+            let timers_time = self.clock.time();
+            loop {
+                let timer = self.timers.items().iter()
+                    .find(|(_, data)| timers_time.delta_ms_u16(data.start).unwrap_or(u16::MAX) >= data.span_ms)
+                    .map(|(id, _)| id)
+                ;
+                if let Some(timer) = timer {
+                    let alarm = self.timers.remove(timer).alarm;
+                    alarm(self, state);
+                } else {
+                    break;
+                }
+            }
+            let ms = time.split_ms_u16(self.clock).unwrap_or(u16::MAX);
             self.update(false, state)?;
             assert!(FPS != 0 && u16::MAX / FPS > 8);
-            clock.sleep_ms_u16((1000 / FPS).saturating_sub(ms));
+            self.clock.sleep_ms_u16((1000 / FPS).saturating_sub(ms));
         }
         Ok(())
     }

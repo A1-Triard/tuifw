@@ -1,5 +1,6 @@
 use alloc::boxed::Box;
 use core::mem::replace;
+use timer_no_std::MonoClock;
 use tuifw_screen_base::{Error, Rect, Screen, Vector, Thickness, Point};
 use tuifw_window::{Event, Layout, RenderPort, Widget, Window, WindowTree};
 
@@ -30,9 +31,10 @@ impl DockPanel {
 
     pub fn window_tree<State: ?Sized>(
         self,
-        screen: Box<dyn Screen>
+        screen: Box<dyn Screen>,
+        clock: &MonoClock,
     ) -> Result<WindowTree<State>, Error> {
-        WindowTree::new(screen, Box::new(DockPanelWidget), Box::new(self))
+        WindowTree::new(screen, clock, Box::new(DockPanelWidget), Box::new(self))
     }
 
     pub fn set_layout<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>, dock: Option<Dock>) {

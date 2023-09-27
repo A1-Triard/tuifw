@@ -1,5 +1,6 @@
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
+use timer_no_std::MonoClock;
 use tuifw_screen_base::{Error, Rect, Screen, Vector};
 use tuifw_window::{Event, RenderPort, Widget, Window, WindowTree};
 
@@ -25,9 +26,10 @@ impl Background {
 
     pub fn window_tree<State: ?Sized>(
         self,
-        screen: Box<dyn Screen>
+        screen: Box<dyn Screen>,
+        clock: &MonoClock,
     ) -> Result<WindowTree<State>, Error> {
-        WindowTree::new(screen, Box::new(BackgroundWidget), Box::new(self))
+        WindowTree::new(screen, clock, Box::new(BackgroundWidget), Box::new(self))
     }
 
     pub fn show_pattern(&self) -> bool { self.show_pattern }

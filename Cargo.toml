@@ -31,13 +31,13 @@ components-arena = "4.1.0"
 either = { version = "1.9.0", default-features = false }
 macro-attr-2018 = "3.0.0"
 phantom-type = { version = "0.4.2", default-features = false }
+timer-no-std = "0.5.0"
 tuifw-screen-base = { path = "screen-base", version = "0.22.0" }
 tuifw-window = { path = "window", version = "0.22.0" }
 unicode-width = "0.1.10"
 
 [dev-dependencies]
 panicking = "0.4.0"
-timer-no-std = "0.4.0"
 tuifw-screen = { path = "screen", version = "0.22.0" }
 
 [badges]

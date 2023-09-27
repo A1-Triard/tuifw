@@ -1,6 +1,7 @@
 use alloc::boxed::Box;
 use alloc::string::String;
 use either::Left;
+use timer_no_std::MonoClock;
 use tuifw_screen_base::{Error, Point, Rect, Screen, Vector};
 use tuifw_window::{Event, RenderPort, Widget, Window, WindowTree};
 use unicode_width::UnicodeWidthChar;
@@ -31,9 +32,10 @@ impl StaticText {
 
     pub fn window_tree<State: ?Sized>(
         self,
-        screen: Box<dyn Screen>
+        screen: Box<dyn Screen>,
+        clock: &MonoClock,
     ) -> Result<WindowTree<State>, Error> {
-        let mut tree = WindowTree::new(screen, Box::new(StaticTextWidget), Box::new(self))?;
+        let mut tree = WindowTree::new(screen, clock, Box::new(StaticTextWidget), Box::new(self))?;
         let w = tree.root();
         Self::set_palette(&mut tree, w);
         Ok(tree)

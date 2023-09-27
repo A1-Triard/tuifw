@@ -3,6 +3,7 @@ use alloc::string::String;
 use core::ops::{Range, RangeInclusive};
 use core::str::FromStr;
 use either::{Either, Left, Right};
+use timer_no_std::MonoClock;
 use tuifw_screen_base::{Error, Key, Point, Rect, Screen, Vector, char_width, text_width, is_text_fit_in};
 use tuifw_screen_base::{Thickness};
 use tuifw_window::{Event, RenderPort, Widget, Window, WindowTree};
@@ -53,9 +54,10 @@ impl InputLine {
 
     pub fn window_tree<State: ?Sized>(
         self,
-        screen: Box<dyn Screen>
+        screen: Box<dyn Screen>,
+        clock: &MonoClock,
     ) -> Result<WindowTree<State>, Error> {
-        let mut tree = WindowTree::new(screen, Box::new(InputLineWidget), Box::new(self))?;
+        let mut tree = WindowTree::new(screen, clock, Box::new(InputLineWidget), Box::new(self))?;
         let w = tree.root();
         Self::set_palette(&mut tree, w);
         Ok(tree)

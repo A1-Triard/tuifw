@@ -37,7 +37,7 @@ impl EventHandler<()> for RootEventHandler {
 fn main() {
     let clock = unsafe { MonoClock::new() };
     let screen = unsafe { tuifw_screen::init(None, None) }.unwrap();
-    let tree = &mut Background::new().window_tree(screen).unwrap();
+    let tree = &mut Background::new().window_tree(screen, &clock).unwrap();
     let root = tree.root();
     Background::set_show_pattern(tree, root, false);
     root.palette_mut(tree, |palette| palette.set(0, Right((Fg::Black, Bg::None))));
@@ -87,5 +87,5 @@ fn main() {
     t.set_next_focus(tree, n);
     n.set_next_focus(tree, a);
     a.focus(tree, &mut ());
-    tree.run(&clock, &mut ()).unwrap();
+    tree.run(&mut ()).unwrap();
 }
