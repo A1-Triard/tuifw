@@ -1,6 +1,6 @@
 #![windows_subsystem = "windows"]
 
-//#![deny(warnings)]
+#![deny(warnings)]
 
 use either::Right;
 use std::mem::replace;
@@ -35,7 +35,7 @@ impl EventHandler<()> for RootEventHandler {
 }
 
 fn main() {
-    let mut clock = unsafe { MonoClock::new() };
+    let clock = unsafe { MonoClock::new() };
     let screen = unsafe { tuifw_screen::init(None, None) }.unwrap();
     let tree = &mut Background::new().window_tree(screen).unwrap();
     let root = tree.root();
@@ -87,5 +87,5 @@ fn main() {
     t.set_next_focus(tree, n);
     n.set_next_focus(tree, a);
     a.focus(tree, &mut ());
-    tree.run(&mut clock, &mut ()).unwrap();
+    tree.run(&clock, &mut ()).unwrap();
 }
