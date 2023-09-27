@@ -1,11 +1,13 @@
 use alloc::boxed::Box;
 use timer_no_std::MonoClock;
 use tuifw_screen_base::{Error, Rect, Screen, Vector};
-use tuifw_window::{Event, RenderPort, Widget, Window, WindowTree};
+use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree};
 
 pub struct StackPanel {
     vertical: bool,
 }
+
+impl<State: ?Sized> WidgetData<State> for StackPanel { }
 
 impl StackPanel {
     pub fn new() -> Self {

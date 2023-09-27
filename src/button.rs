@@ -2,17 +2,26 @@ use alloc::boxed::Box;
 use alloc::string::String;
 use either::Left;
 use timer_no_std::MonoClock;
-use tuifw_screen_base::{Error, Point, Rect, Screen, Vector, text_width};
-use tuifw_window::{Event, RenderPort, Widget, Window, WindowTree, CMD_GOT_FOCUS, CMD_LOST_FOCUS};
+use tuifw_screen_base::{Error, Key, Point, Rect, Screen, Vector, text_width};
+use tuifw_window::{Event, RenderPort, Timer, Widget, WidgetData, Window, WindowTree};
+use tuifw_window::{CMD_GOT_FOCUS, CMD_LOST_FOCUS};
 
 pub struct Button {
     text: String,
-    pressed: bool,
+    release_timer: Option<Timer>,
+}
+
+impl<State: ?Sized> WidgetData<State> for Button {
+    fn drop_widget_data(&mut self, tree: &mut WindowTree<State>, _state: &mut State) {
+        if let Some(release_timer) = self.release_timer.take() {
+            release_timer.drop_timer(tree);
+        }
+    }
 }
 
 impl Button {
     pub fn new() -> Self {
-        Button { text: String::new(), pressed: false }
+        Button { text: String::new(), release_timer: None }
     }
 
     fn set_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
@@ -84,17 +93,18 @@ impl<State: ?Sized> Widget<State> for ButtonWidget {
         let bounds = window.inner_bounds(tree);
         let focused = window == tree.focused();
         let data = window.data::<Button>(tree);
-        let text_color = if data.pressed { 4 } else if focused { 2 } else { 0 };
-        let border_color = if data.pressed { 5 } else if focused { 3 } else { 1 };
+        let pressed = data.release_timer.is_some();
+        let text_color = if pressed { 4 } else if focused { 2 } else { 0 };
+        let border_color = if pressed { 5 } else if focused { 3 } else { 1 };
         let text_color = window.color(tree, text_color);
         let border_color = window.color(tree, border_color);
         rp.out(Point { x: 1, y: 0 }, text_color.0, text_color.1, &data.text);
-        rp.out(Point { x: 0, y: 0 }, border_color.0, border_color.1, if data.pressed { " " } else { "▐" });
+        rp.out(Point { x: 0, y: 0 }, border_color.0, border_color.1, if pressed { " " } else { "▐" });
         rp.out(
             Point { x: bounds.r_inner(), y: 0 },
             border_color.0,
             border_color.1,
-            if data.pressed { " " } else { "▌" }
+            if pressed { " " } else { "▌" }
         );
     }
 
@@ -130,6 +140,19 @@ impl<State: ?Sized> Widget<State> for ButtonWidget {
     ) -> bool {
         match event {
             Event::Cmd(CMD_GOT_FOCUS) | Event::Cmd(CMD_LOST_FOCUS) => {
+                window.invalidate_render(tree);
+                true
+            },
+            Event::Key(_, Key::Enter) => {
+                let release_timer = Timer::new(tree, 100, Box::new(move |tree, _state| {
+                    let data = window.data_mut::<Button>(tree);
+                    data.release_timer = None;
+                    window.invalidate_render(tree);
+                }));
+                let data = window.data_mut::<Button>(tree);
+                if let Some(old_release_timer) = data.release_timer.replace(release_timer) {
+                    old_release_timer.drop_timer(tree);
+                }
                 window.invalidate_render(tree);
                 true
             },

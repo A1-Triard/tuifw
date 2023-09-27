@@ -6,7 +6,7 @@ use either::{Either, Left, Right};
 use timer_no_std::MonoClock;
 use tuifw_screen_base::{Error, Key, Point, Rect, Screen, Vector, char_width, text_width, is_text_fit_in};
 use tuifw_screen_base::{Thickness};
-use tuifw_window::{Event, RenderPort, Widget, Window, WindowTree, CMD_GOT_FOCUS, CMD_LOST_FOCUS};
+use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, CMD_GOT_FOCUS, CMD_LOST_FOCUS};
 
 #[derive(Debug, Clone)]
 pub enum InputLineValueRange {
@@ -22,6 +22,8 @@ pub struct InputLine {
     cursor: usize,
     width: i16,
 }
+
+impl<State: ?Sized> WidgetData<State> for InputLine { }
 
 impl InputLine {
     pub fn new() -> Self {

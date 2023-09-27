@@ -2,13 +2,15 @@ use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use timer_no_std::MonoClock;
 use tuifw_screen_base::{Error, Rect, Screen, Vector};
-use tuifw_window::{Event, RenderPort, Widget, Window, WindowTree};
+use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree};
 
 pub struct Background {
     pattern_even: String,
     pattern_odd: String,
     show_pattern: bool,
 }
+
+impl<State: ?Sized> WidgetData<State> for Background { }
 
 impl Background {
     pub fn new() -> Self {

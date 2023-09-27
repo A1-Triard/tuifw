@@ -3,11 +3,13 @@ use alloc::string::String;
 use either::Left;
 use timer_no_std::MonoClock;
 use tuifw_screen_base::{Error, Point, Rect, Screen, Vector, text_width};
-use tuifw_window::{Event, RenderPort, Widget, Window, WindowTree};
+use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree};
 
 pub struct StaticText {
     text: String,
 }
+
+impl<State: ?Sized> WidgetData<State> for StaticText { }
 
 impl StaticText {
     pub fn new() -> Self {

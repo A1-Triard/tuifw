@@ -85,7 +85,8 @@ fn main() {
     a.set_next_focus(tree, v);
     v.set_next_focus(tree, t);
     t.set_next_focus(tree, n);
-    n.set_next_focus(tree, a);
-    calc.focus(tree, &mut ());
+    n.set_next_focus(tree, calc);
+    calc.set_next_focus(tree, a);
+    a.focus(tree, &mut ());
     tree.run(&mut ()).unwrap();
 }

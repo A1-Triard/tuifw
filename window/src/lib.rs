@@ -18,8 +18,7 @@ extern crate alloc;
 
 use alloc::boxed::Box;
 use alloc::vec::Vec;
-use components_arena::{Arena, Component, Id, NewtypeComponentId};
-use core::any::Any;
+use components_arena::{Arena, Component, ComponentId, Id, NewtypeComponentId, RawId};
 use core::cmp::{max, min};
 use core::mem::replace;
 use core::num::NonZeroU16;
@@ -231,6 +230,12 @@ pub trait Widget<State: ?Sized>: DynClone {
 
 clone_trait_object!(<State: ?Sized> Widget<State>);
 
+pub trait WidgetData<State: ?Sized>: Downcast {
+    fn drop_widget_data(&mut self, _tree: &mut WindowTree<State>, _state: &mut State) { }
+}
+
+impl_downcast!(WidgetData<State> where State: ?Sized);
+
 pub trait Layout: Downcast { }
 
 impl_downcast!(Layout);
@@ -281,7 +286,7 @@ macro_attr! {
         next: Window<State>,
         first_child: Option<Window<State>>,
         widget: Box<dyn Widget<State>>,
-        data: Box<dyn Any>,
+        data: Box<dyn WidgetData<State>>,
         layout: Option<Box<dyn Layout>>,
         palette: Palette,
         measure_size: Option<(Option<i16>, Option<i16>)>,
@@ -326,7 +331,7 @@ impl<State: ?Sized> Window<State> {
     pub fn new(
         tree: &mut WindowTree<State>,
         widget: Box<dyn Widget<State>>,
-        data: Box<dyn Any>,
+        data: Box<dyn WidgetData<State>>,
         parent: Self,
         prev: Option<Self>,
     ) -> Result<Self, Error> {
@@ -461,14 +466,14 @@ impl<State: ?Sized> Window<State> {
         Rect { tl: Point { x: 0, y: 0 }, size: window_bounds.size }
     }
 
-    pub fn data<'a, T: 'static>(
+    pub fn data<'a, T: WidgetData<State> + 'static>(
         self,
         tree: &'a WindowTree<'_, State>
     ) -> &'a T {
         tree.arena[self.0].data.downcast_ref::<T>().expect("wrong type")
     }
 
-    pub fn data_mut<'a, T: 'static>(
+    pub fn data_mut<'a, T: WidgetData<State> + 'static>(
         self,
         tree: &'a mut WindowTree<'_, State>
     ) -> &'a mut T {
@@ -746,25 +751,29 @@ impl<State: ?Sized> Window<State> {
 
     pub fn drop_window(
         self,
-        tree: &mut WindowTree<State>
+        tree: &mut WindowTree<State>,
+        state: &mut State,
     ) {
         let parent = self.detach(tree);
-        let node = tree.arena.remove(self.0);
+        let mut node = tree.arena.remove(self.0);
+        node.data.drop_widget_data(tree, state);
         let screen_bounds = node.window_bounds.offset(offset_from_root(parent, tree));
         invalidate_rect(tree.screen(), screen_bounds);
-        Self::drop_node_tree(node, tree);
+        Self::drop_node_tree(node.first_child, tree, state);
     }
 
     fn drop_node_tree(
-        node: WindowNode<State>,
-        tree: &mut WindowTree<State>
+        first_child: Option<Window<State>>,
+        tree: &mut WindowTree<State>,
+        state: &mut State,
     ) {
-        if let Some(first_child) = node.first_child {
+        if let Some(first_child) = first_child {
             let mut child = first_child;
             loop {
-                let child_node = tree.arena.remove(child.0);
+                let mut child_node = tree.arena.remove(child.0);
+                child_node.data.drop_widget_data(tree, state);
                 child = child_node.next;
-                Self::drop_node_tree(child_node, tree);
+                Self::drop_node_tree(child_node.first_child, tree, state);
                 if child == first_child { break; }
             }
         }
@@ -799,7 +808,7 @@ impl<State: ?Sized> Window<State> {
     }
 }
 
-const FPS: u16 = 40;
+const FPS: u16 = 30;
 
 fn root_palette() -> Palette {
     let mut p = Palette::new();
@@ -825,32 +834,32 @@ macro_attr! {
     struct TimerData<State: ?Sized + 'static> {
         start: MonoTime,
         span_ms: u16,
-        alarm: Box<dyn FnOnce(&WindowTree<State>, &mut State)>,
+        alarm: Box<dyn FnOnce(&mut WindowTree<State>, &mut State)>,
     }
 }
 
 macro_attr! {
-    #[derive(Educe, NewtypeComponentId!)]
-    #[educe(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-    pub struct Timer<State: ?Sized + 'static>(Id<TimerData<State>>);
+    #[derive(NewtypeComponentId!)]
+    #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+    pub struct Timer(RawId);
 }
 
-impl<State: ?Sized> Timer<State> {
-    pub fn new(
+impl Timer {
+    pub fn new<State: ?Sized>(
         tree: &mut WindowTree<State>,
         span_ms: u16,
-        alarm: Box<dyn FnOnce(&WindowTree<State>, &mut State)>
+        alarm: Box<dyn FnOnce(&mut WindowTree<State>, &mut State)>
     ) -> Self {
         let start = tree.clock.time();
         tree.timers.insert(move |id| (TimerData {
             start,
             span_ms,
             alarm
-        }, Timer(id)))
+        }, Timer(id.into_raw())))
     }
 
-    pub fn drop_timer(self, tree: &mut WindowTree<State>) {
-        tree.timers.remove(self.0);
+    pub fn drop_timer<State: ?Sized>(self, tree: &mut WindowTree<State>) {
+        tree.timers.remove(Id::from_raw(self.0));
     }
 }
 
@@ -870,7 +879,7 @@ impl<'clock, State: ?Sized> WindowTree<'clock, State> {
         screen: Box<dyn Screen>,
         clock: &'clock MonoClock,
         root_widget: Box<dyn Widget<State>>,
-        root_data: Box<dyn Any>,
+        root_data: Box<dyn WidgetData<State>>,
     ) -> Result<Self, Error> {
         let mut arena = Arena::new();
         arena.try_reserve().map_err(|_| Error::Oom)?;

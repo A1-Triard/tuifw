@@ -2,7 +2,7 @@ use alloc::boxed::Box;
 use core::mem::replace;
 use timer_no_std::MonoClock;
 use tuifw_screen_base::{Error, Rect, Screen, Vector, Thickness, Point};
-use tuifw_window::{Event, Layout, RenderPort, Widget, Window, WindowTree};
+use tuifw_window::{Event, Layout, RenderPort, Widget, WidgetData, Window, WindowTree};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum Dock { Left, Top, Right, Bottom }
@@ -14,6 +14,8 @@ pub struct DockLayout {
 impl Layout for DockLayout { }
 
 pub struct DockPanel { }
+
+impl<State: ?Sized> WidgetData<State> for DockPanel { }
 
 impl DockPanel {
     pub fn new() -> Self {
