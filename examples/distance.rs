@@ -2,11 +2,10 @@
 
 #![deny(warnings)]
 
-use either::Right;
 use std::mem::replace;
 use timer_no_std::MonoClock;
-use tuifw::{Background, Dock, DockPanel, InputLine, InputLineValueRange, StackPanel, StaticText};
-use tuifw_screen::{Bg, Fg, HAlign, VAlign, Key, Thickness};
+use tuifw::{Background, Button, Dock, DockPanel, InputLine, InputLineValueRange, StackPanel, StaticText};
+use tuifw_screen::{HAlign, VAlign, Key, Thickness};
 use tuifw_window::{Event, EventHandler, Window, WindowTree};
 
 #[derive(Clone)]
@@ -39,15 +38,16 @@ fn main() {
     let screen = unsafe { tuifw_screen::init(None, None) }.unwrap();
     let tree = &mut Background::new().window_tree(screen, &clock).unwrap();
     let root = tree.root();
-    Background::set_show_pattern(tree, root, false);
-    root.palette_mut(tree, |palette| palette.set(0, Right((Fg::Black, Bg::None))));
     root.set_event_handler(tree, Some(Box::new(RootEventHandler)));
-    let panel = DockPanel::new().window(tree, root, None).unwrap();
-    panel.set_h_align(tree, Some(HAlign::Center));
-    panel.set_v_align(tree, Some(VAlign::Center));
-    let labels = StackPanel::new().window(tree, panel, None).unwrap();
+
+    let controls = StackPanel::new().window(tree, root, None).unwrap();
+    controls.set_h_align(tree, Some(HAlign::Center));
+    controls.set_v_align(tree, Some(VAlign::Center));
+
+    let edits_with_labels = DockPanel::new().window(tree, controls, None).unwrap();
+    let labels = StackPanel::new().window(tree, edits_with_labels, None).unwrap();
     DockPanel::set_layout(tree, labels, Some(Dock::Left));
-    let edits = StackPanel::new().window(tree, panel, Some(labels)).unwrap();
+    let edits = StackPanel::new().window(tree, edits_with_labels, Some(labels)).unwrap();
     edits.set_width(tree, 12);
 
     let a_label = StaticText::new().window(tree, labels, None).unwrap();
@@ -82,10 +82,14 @@ fn main() {
     InputLine::value_mut(tree, n, |value| replace(value, "1".to_string()));
     n.set_margin(tree, Thickness::new(1, 0, 1, 1));
 
+    let calc = Button::new().window(tree, controls, Some(edits_with_labels)).unwrap();
+    Button::text_mut(tree, calc, |value| replace(value, "Calculate".to_string()));
+    calc.set_h_align(tree, Some(HAlign::Center));
+
     a.set_next_focus(tree, v);
     v.set_next_focus(tree, t);
     t.set_next_focus(tree, n);
     n.set_next_focus(tree, a);
-    a.focus(tree, &mut ());
+    calc.focus(tree, &mut ());
     tree.run(&mut ()).unwrap();
 }

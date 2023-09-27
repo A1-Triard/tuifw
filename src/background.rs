@@ -12,7 +12,7 @@ pub struct Background {
 
 impl Background {
     pub fn new() -> Self {
-        Background { pattern_even: "░".to_string(), pattern_odd: "░".to_string(), show_pattern: true }
+        Background { pattern_even: "░".to_string(), pattern_odd: "░".to_string(), show_pattern: false }
     }
 
     pub fn window<State: ?Sized>(
@@ -89,7 +89,13 @@ impl<State: ?Sized> Widget<State> for BackgroundWidget {
             p,
             color.0,
             color.1,
-            if p.x % 2 == 0 { data.pattern_even() } else { data.pattern_odd() }
+            if !data.show_pattern {
+                " "
+            } else if p.x % 2 == 0 {
+                data.pattern_even()
+            } else {
+                data.pattern_odd()
+            }
         ));
     }
 

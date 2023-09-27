@@ -5,17 +5,25 @@ use timer_no_std::MonoClock;
 use tuifw_screen_base::{Error, Point, Rect, Screen, Vector, text_width};
 use tuifw_window::{Event, RenderPort, Widget, Window, WindowTree};
 
-pub struct StaticText {
+pub struct Button {
     text: String,
+    pressed: bool,
 }
 
-impl StaticText {
+impl Button {
     pub fn new() -> Self {
-        StaticText { text: String::new() }
+        Button { text: String::new(), pressed: false }
     }
 
     fn set_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
-        window.palette_mut(tree, |palette| palette.set(0, Left(11)));
+        window.palette_mut(tree, |palette| {
+            palette.set(0, Left(14));
+            palette.set(1, Left(15));
+            palette.set(2, Left(16));
+            palette.set(3, Left(17));
+            palette.set(4, Left(18));
+            palette.set(5, Left(19));
+        });
     }
 
     pub fn window<State: ?Sized>(
@@ -24,7 +32,7 @@ impl StaticText {
         parent: Window<State>,
         prev: Option<Window<State>>
     ) -> Result<Window<State>, Error> {
-        let w = Window::new(tree, Box::new(StaticTextWidget), Box::new(self), parent, prev)?;
+        let w = Window::new(tree, Box::new(ButtonWidget), Box::new(self), parent, prev)?;
         Self::set_palette(tree, w);
         Ok(w)
     }
@@ -34,7 +42,7 @@ impl StaticText {
         screen: Box<dyn Screen>,
         clock: &MonoClock,
     ) -> Result<WindowTree<State>, Error> {
-        let mut tree = WindowTree::new(screen, clock, Box::new(StaticTextWidget), Box::new(self))?;
+        let mut tree = WindowTree::new(screen, clock, Box::new(ButtonWidget), Box::new(self))?;
         let w = tree.root();
         Self::set_palette(&mut tree, w);
         Ok(tree)
@@ -49,23 +57,23 @@ impl StaticText {
         window: Window<State>,
         value: impl FnOnce(&mut String) -> T
     ) -> T {
-        let data = &mut window.data_mut::<StaticText>(tree).text;
+        let data = &mut window.data_mut::<Button>(tree).text;
         let res = value(data);
         window.invalidate_measure(tree);
         res
     }
 }
 
-impl Default for StaticText {
+impl Default for Button {
     fn default() -> Self {
         Self::new()
     }
 }
 
 #[derive(Clone, Default)]
-pub struct StaticTextWidget;
+pub struct ButtonWidget;
 
-impl<State: ?Sized> Widget<State> for StaticTextWidget {
+impl<State: ?Sized> Widget<State> for ButtonWidget {
     fn render(
         &self,
         tree: &WindowTree<State>,
@@ -73,9 +81,21 @@ impl<State: ?Sized> Widget<State> for StaticTextWidget {
         rp: &mut RenderPort,
         _state: &mut State,
     ) {
-        let color = window.color(tree, 0);
-        let data = window.data::<StaticText>(tree);
-        rp.out(Point { x: 0, y: 0 }, color.0, color.1, &data.text);
+        let bounds = window.inner_bounds(tree);
+        let focused = window == tree.focused();
+        let data = window.data::<Button>(tree);
+        let text_color = if data.pressed { 4 } else if focused { 2 } else { 0 };
+        let border_color = if data.pressed { 5 } else if focused { 3 } else { 1 };
+        let text_color = window.color(tree, text_color);
+        let border_color = window.color(tree, border_color);
+        rp.out(Point { x: 1, y: 0 }, text_color.0, text_color.1, &data.text);
+        rp.out(Point { x: 0, y: 0 }, border_color.0, border_color.1, if data.pressed { " " } else { "▐" });
+        rp.out(
+            Point { x: bounds.r_inner(), y: 0 },
+            border_color.0,
+            border_color.1,
+            if data.pressed { " " } else { "▌" }
+        );
     }
 
     fn measure(
@@ -86,19 +106,18 @@ impl<State: ?Sized> Widget<State> for StaticTextWidget {
         _available_height: Option<i16>,
         _state: &mut State,
     ) -> Vector {
-        let data = window.data::<StaticText>(tree);
-        Vector { x: text_width(&data.text), y: 1 }
+        let data = window.data::<Button>(tree);
+        Vector { x: text_width(&data.text).wrapping_add(2), y: 1 }
     }
 
     fn arrange(
         &self,
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
-        _final_inner_bounds: Rect,
+        _tree: &mut WindowTree<State>,
+        _window: Window<State>,
+        final_inner_bounds: Rect,
         _state: &mut State,
     ) -> Vector {
-        let data = window.data::<StaticText>(tree);
-        Vector { x: text_width(&data.text), y: 1 }
+        final_inner_bounds.size
     }
 
     fn update(

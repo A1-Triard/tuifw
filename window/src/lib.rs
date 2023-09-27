@@ -817,23 +817,19 @@ const FPS: u16 = 40;
 
 fn root_palette() -> Palette {
     let mut p = Palette::new();
-    p.set(0, Right((Fg::Blue, Bg::LightGray)));
+    p.set(0, Right((Fg::LightGray, Bg::None))); // background
 
-    p.set(1, Right((Fg::Black, Bg::LightGray)));
-    p.set(2, Right((Fg::DarkGray, Bg::LightGray)));
-    p.set(3, Right((Fg::Red, Bg::LightGray)));
-    p.set(4, Right((Fg::Black, Bg::Green)));
-    p.set(5, Right((Fg::DarkGray, Bg::Green)));
-    p.set(6, Right((Fg::Red, Bg::Green)));
+    p.set(11, Right((Fg::LightGray, Bg::None))); // static text
 
-    p.set(7, Right((Fg::LightGray, Bg::Blue)));
-    p.set(8, Right((Fg::White, Bg::Blue)));
-    p.set(9, Right((Fg::LightGreen, Bg::Blue)));
+    p.set(12, Right((Fg::LightGray, Bg::Blue))); // input line normal
+    p.set(13, Right((Fg::LightGray, Bg::Red))); // input line error
 
-    p.set(10, Right((Fg::Black, Bg::LightGray)));
-    p.set(11, Right((Fg::Yellow, Bg::LightGray)));
-    p.set(12, Right((Fg::LightGray, Bg::Blue)));
-    p.set(13, Right((Fg::LightGray, Bg::Red)));
+    p.set(14, Right((Fg::Black, Bg::Cyan))); // button normal text
+    p.set(15, Right((Fg::Cyan, Bg::None))); // button normal border
+    p.set(16, Right((Fg::Black, Bg::Brown))); // button focused text
+    p.set(17, Right((Fg::Brown, Bg::None))); // button focused border
+    p.set(18, Right((Fg::Cyan, Bg::None))); // button pressed text
+    p.set(19, Right((Fg::Cyan, Bg::None))); // button pressed border
 
     p
 }

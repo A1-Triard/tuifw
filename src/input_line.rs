@@ -203,7 +203,6 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
         let color = if data.error() { 1 } else { 0 };
         let color = window.color(tree, color);
         rp.fill_bg(color.1);
-        let data = window.data::<InputLine>(tree);
         let (padding, view, is_tail_cursor_fit) = data.calc_value_padding_view_and_is_tail_cursor_fit();
         rp.out(Point { x: padding.wrapping_add(1), y: 0 }, color.0, color.1, &data.value[view.clone()]);
         if focused && (view.contains(&data.cursor) || data.cursor == data.value.len() && is_tail_cursor_fit) {
