@@ -107,11 +107,11 @@ impl<State: ?Sized> Widget<State> for StackPanelWidget {
             if let Some(first_child) = window.first_child(tree) {
                 let mut child = first_child;
                 loop {
-                    let child_desired_size = child.desired_size(tree);
-                    child.arrange(tree, Rect { tl: pos, size: child_desired_size }, state);
-                    pos = pos.offset(Vector { x: 0, y: child_desired_size.y });
-                    size += Vector { x: 0, y: child.desired_size(tree).y };
-                    size = size.max(Vector { x: child.desired_size(tree).x, y: 0 });
+                    let child_size = Vector { x: final_inner_bounds.w(), y: child.desired_size(tree).y };
+                    child.arrange(tree, Rect { tl: pos, size: child_size }, state);
+                    pos = pos.offset(Vector { x: 0, y: child_size.y });
+                    size += Vector { x: 0, y: child_size.y };
+                    size = size.max(Vector { x: child_size.x, y: 0 });
                     child = child.next(tree);
                     if child == first_child { break; }
                 }
@@ -123,11 +123,11 @@ impl<State: ?Sized> Widget<State> for StackPanelWidget {
             if let Some(first_child) = window.first_child(tree) {
                 let mut child = first_child;
                 loop {
-                    let child_desired_size = child.desired_size(tree);
-                    child.arrange(tree, Rect { tl: pos, size: child_desired_size }, state);
-                    pos = pos.offset(Vector { x: child_desired_size.x, y: 0 });
-                    size += Vector { x: child.desired_size(tree).x, y: 0 };
-                    size = size.max(Vector { x: 0, y: child.desired_size(tree).y });
+                    let child_size = Vector { x: child.desired_size(tree).x, y: final_inner_bounds.h() };
+                    child.arrange(tree, Rect { tl: pos, size: child_size }, state);
+                    pos = pos.offset(Vector { x: child_size.x, y: 0 });
+                    size += Vector { x: child_size.x, y: 0 };
+                    size = size.max(Vector { x: 0, y: child_size.y });
                     child = child.next(tree);
                     if child == first_child { break; }
                 }

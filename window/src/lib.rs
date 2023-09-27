@@ -262,7 +262,7 @@ macro_attr! {
         palette: Palette,
         measure_size: Option<(Option<i16>, Option<i16>)>,
         desired_size: Vector,
-        arrange_bounds: Option<Rect>,
+        arrange_size: Option<Vector>,
         render_bounds: Rect,
         window_bounds: Rect,
         h_align: Option<HAlign>,
@@ -320,7 +320,7 @@ impl<State: ?Sized> Window<State> {
                 palette: Palette::new(),
                 measure_size: None,
                 desired_size: Vector::null(),
-                arrange_bounds: None,
+                arrange_size: None,
                 render_bounds: Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() },
                 window_bounds: Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() },
                 h_align: None,
@@ -350,8 +350,8 @@ impl<State: ?Sized> Window<State> {
         let mut window = self;
         loop {
             let node = &mut tree.arena[window.0];
-            let old_arrange_bounds = node.arrange_bounds.take();
-            if old_arrange_bounds.is_none() { break; }
+            let old_arrange_size = node.arrange_size.take();
+            if old_arrange_size.is_none() { break; }
             let Some(parent) = node.parent else { break; };
             window = parent;
         }
@@ -379,41 +379,31 @@ impl<State: ?Sized> Window<State> {
 
     pub fn arrange(self, tree: &mut WindowTree<State>, final_bounds: Rect, state: &mut State) {
         let node = &mut tree.arena[self.0];
-        let shrinked_bounds = node.margin.shrink_rect(final_bounds);
-        let shrinked_bounds_size = Vector {
-            x: if node.h_align.is_none() { shrinked_bounds.w() } else { node.desired_size.x },
-            y: if node.v_align.is_none() { shrinked_bounds.h() } else { node.desired_size.y }
+        let margined_bounds = node.margin.shrink_rect(final_bounds);
+        let arrange_size = Vector {
+            x: if node.h_align.is_none() { margined_bounds.w() } else { node.desired_size.x },
+            y: if node.v_align.is_none() { margined_bounds.h() } else { node.desired_size.y }
         };
-        let arrange_bounds_size = shrinked_bounds_size.min(node.max_size).max(node.min_size);
-        let arrange_bounds_margin = Thickness::align(
-            arrange_bounds_size,
-            shrinked_bounds.size,
-            node.h_align.unwrap_or(HAlign::Left),
-            node.v_align.unwrap_or(VAlign::Top)
-        );
-        let arrange_bounds = arrange_bounds_margin.shrink_rect(shrinked_bounds);
-        debug_assert_eq!(arrange_bounds.size, arrange_bounds_size);
-        if node.arrange_bounds == Some(arrange_bounds) { return; }
-        node.arrange_bounds = Some(arrange_bounds);
+        let arrange_size = arrange_size.min(node.max_size).max(node.min_size);
+        if node.arrange_size == Some(arrange_size) { return; }
+        node.arrange_size = Some(arrange_size);
         let widget = node.widget.clone();
         let arranged_size = widget.arrange(
             tree,
             self,
-            Rect { tl: Point { x: 0, y: 0 }, size: arrange_bounds.size },
+            Rect { tl: Point { x: 0, y: 0 }, size: arrange_size },
             state
         );
         let node = &mut tree.arena[self.0];
         let arranged_size = arranged_size.min(node.max_size).max(node.min_size);
-        let arranged_bounds_margin = Thickness::align(
+        let arranged_bounds = Thickness::align(
             arranged_size,
-            arrange_bounds.size,
+            margined_bounds.size,
             node.h_align.unwrap_or(HAlign::Left),
             node.v_align.unwrap_or(VAlign::Top)
-        );
-        let arranged_bounds = arranged_bounds_margin.shrink_rect(arrange_bounds);
+        ).shrink_rect(margined_bounds);
         debug_assert_eq!(arranged_bounds.size, arranged_size);
-        let bounds = node.margin.expand_rect(arranged_bounds);
-        node.render_bounds = bounds;
+        node.render_bounds = final_bounds;
         self.move_xy_raw(tree, arranged_bounds);
     }
 
@@ -900,7 +890,7 @@ impl<'clock, State: ?Sized> WindowTree<'clock, State> {
             layout: None,
             measure_size: Some((Some(screen_size.x), Some(screen_size.y))),
             desired_size: screen_size,
-            arrange_bounds: Some(Rect { tl: Point { x: 0, y: 0 }, size: screen_size }),
+            arrange_size: Some(screen_size),
             render_bounds: Rect { tl: Point { x: 0, y: 0 }, size: screen_size },
             window_bounds: Rect { tl: Point { x: 0, y: 0 }, size: screen_size },
             h_align: None,
