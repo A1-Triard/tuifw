@@ -5,6 +5,7 @@
 #![doc(test(attr(deny(warnings))))]
 #![doc(test(attr(allow(dead_code))))]
 #![doc(test(attr(allow(unused_variables))))]
+#![allow(clippy::assertions_on_constants)]
 #![allow(clippy::blocks_in_if_conditions)]
 #![allow(clippy::collapsible_else_if)]
 #![allow(clippy::collapsible_if)]
@@ -918,7 +919,7 @@ impl<State: ?Sized> WindowTree<State> {
         }
     }
 
-    pub fn run(&mut self, clock: &mut MonoClock, state: &mut State) -> Result<(), Error> {
+    pub fn run(&mut self, clock: &MonoClock, state: &mut State) -> Result<(), Error> {
         let mut time = clock.time();
         while !self.quit {
             let ms = time.split_ms_u16().unwrap_or(u16::MAX);
