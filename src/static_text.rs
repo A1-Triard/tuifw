@@ -106,7 +106,7 @@ impl<State: ?Sized> Widget<State> for StaticTextWidget {
         _tree: &mut WindowTree<State>,
         _window: Window<State>,
         _event: Event,
-        _preview: bool,
+        _event_source: Window<State>,
         _state: &mut State,
     ) -> bool {
         false

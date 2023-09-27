@@ -6,7 +6,7 @@ use either::{Either, Left, Right};
 use timer_no_std::MonoClock;
 use tuifw_screen_base::{Error, Key, Point, Rect, Screen, Vector, char_width, text_width, is_text_fit_in};
 use tuifw_screen_base::{Thickness};
-use tuifw_window::{Event, RenderPort, Widget, Window, WindowTree};
+use tuifw_window::{Event, RenderPort, Widget, Window, WindowTree, CMD_GOT_FOCUS, CMD_LOST_FOCUS};
 
 #[derive(Debug, Clone)]
 pub enum InputLineValueRange {
@@ -260,11 +260,11 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
         tree: &mut WindowTree<State>,
         window: Window<State>,
         event: Event,
-        _preview: bool,
+        _event_source: Window<State>,
         _state: &mut State,
     ) -> bool {
         match event {
-            Event::GotFocus => {
+            Event::Cmd(CMD_GOT_FOCUS) => {
                 let data = window.data_mut::<InputLine>(tree);
                 let text_fit_width = if data.cursor == data.value.len() {
                     (data.width as u16).saturating_sub(1) as i16
@@ -291,7 +291,7 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                 window.invalidate_render(tree);
                 true
             },
-            Event::LostFocus => {
+            Event::Cmd(CMD_LOST_FOCUS) => {
                 let data = window.data_mut::<InputLine>(tree);
                 data.view = if matches!(data.value_range, InputLineValueRange::Any) || data.value.is_empty() {
                     Left(0)
@@ -358,6 +358,7 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                 },
                 _ => false,
             },
+            _ => false,
         }
     }
 }

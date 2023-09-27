@@ -17,16 +17,12 @@ impl EventHandler<()> for RootEventHandler {
         tree: &mut WindowTree<()>,
         _window: Window<()>,
         event: Event,
-        preview: bool,
+        _event_source: Window<()>,
         _state: &mut ()
     ) -> bool {
-        if !preview {
-            if let Event::Key(_, Key::Escape) = event {
-                tree.quit();
-                true
-            } else {
-                false
-            }
+        if let Event::Key(_, Key::Escape) = event {
+            tree.quit();
+            true
         } else {
             false
         }

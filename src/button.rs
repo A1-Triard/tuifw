@@ -3,7 +3,7 @@ use alloc::string::String;
 use either::Left;
 use timer_no_std::MonoClock;
 use tuifw_screen_base::{Error, Point, Rect, Screen, Vector, text_width};
-use tuifw_window::{Event, RenderPort, Widget, Window, WindowTree};
+use tuifw_window::{Event, RenderPort, Widget, Window, WindowTree, CMD_GOT_FOCUS, CMD_LOST_FOCUS};
 
 pub struct Button {
     text: String,
@@ -122,12 +122,18 @@ impl<State: ?Sized> Widget<State> for ButtonWidget {
 
     fn update(
         &self,
-        _tree: &mut WindowTree<State>,
-        _window: Window<State>,
-        _event: Event,
-        _preview: bool,
+        tree: &mut WindowTree<State>,
+        window: Window<State>,
+        event: Event,
+        _event_source: Window<State>,
         _state: &mut State,
     ) -> bool {
-        false
+        match event {
+            Event::Cmd(CMD_GOT_FOCUS) | Event::Cmd(CMD_LOST_FOCUS) => {
+                window.invalidate_render(tree);
+                true
+            },
+            _ => false
+        }
     }
 }
