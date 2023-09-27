@@ -26,6 +26,7 @@ use dyn_clone::{DynClone, clone_trait_object};
 use educe::Educe;
 use either::{Either, Left, Right};
 use macro_attr_2018::macro_attr;
+use timer_no_std::MonoClock;
 use tuifw_screen_base::{Bg, Error, Fg, Key, Point, Rect, Screen, Vector};
 use tuifw_screen_base::Event as screen_Event;
 use tuifw_screen_base::{HAlign, VAlign, Thickness, Range1d};
@@ -810,7 +811,10 @@ pub struct WindowTree<State: ?Sized + 'static> {
     root: Window<State>,
     focused: Window<State>,
     cursor: Option<Point>,
+    quit: bool,
 }
+
+const FPS: u16 = 40;
 
 fn root_palette() -> Palette {
     let mut p = Palette::new();
@@ -871,13 +875,18 @@ impl<State: ?Sized> WindowTree<State> {
             arena,
             root,
             focused: root,
-            cursor: None
+            cursor: None,
+            quit: false,
         })
     }
 
     pub fn root(&self) -> Window<State> { self.root }
 
     pub fn focused(&self) -> Window<State> { self.focused }
+
+    pub fn quit(&mut self) {
+        self.quit = true;
+    }
 
     fn screen(&mut self) -> &mut dyn Screen {
         self.screen.as_mut().expect("WindowTree is in invalid state").as_mut()
@@ -909,7 +918,18 @@ impl<State: ?Sized> WindowTree<State> {
         }
     }
 
-    pub fn update(&mut self, wait: bool, state: &mut State) -> Result<(), Error> {
+    pub fn run(&mut self, clock: &mut MonoClock, state: &mut State) -> Result<(), Error> {
+        let mut time = clock.time();
+        while !self.quit {
+            let ms = time.split_ms_u16().unwrap_or(u16::MAX);
+            self.update(false, state)?;
+            assert!(FPS != 0 && u16::MAX / FPS > 8);
+            clock.sleep_ms_u16((1000 / FPS).saturating_sub(ms));
+        }
+        Ok(())
+    }
+
+    fn update(&mut self, wait: bool, state: &mut State) -> Result<(), Error> {
         let root = self.root;
         let screen = self.screen.as_mut().expect("WindowTree is in invalid state");
         let screen_size = screen.size();

@@ -4,29 +4,26 @@
 
 use either::Right;
 use std::mem::replace;
+use timer_no_std::MonoClock;
 use tuifw::{Background, Dock, DockPanel, InputLine, InputLineValueRange, StackPanel, StaticText};
 use tuifw_screen::{Bg, Fg, HAlign, VAlign, Key, Thickness};
 use tuifw_window::{Event, EventHandler, Window, WindowTree};
 
-struct State {
-    quit: bool,
-}
-
 #[derive(Clone)]
 struct RootEventHandler;
 
-impl EventHandler<State> for RootEventHandler {
+impl EventHandler<()> for RootEventHandler {
     fn invoke(
         &self,
-        _tree: &mut WindowTree<State>,
-        _window: Window<State>,
+        tree: &mut WindowTree<()>,
+        _window: Window<()>,
         event: Event,
         preview: bool,
-        state: &mut State
+        _state: &mut ()
     ) -> bool {
         if !preview {
             if let Event::Key(_, Key::Escape) = event {
-                state.quit = true;
+                tree.quit();
                 true
             } else {
                 false
@@ -38,6 +35,7 @@ impl EventHandler<State> for RootEventHandler {
 }
 
 fn main() {
+    let mut clock = unsafe { MonoClock::new() };
     let screen = unsafe { tuifw_screen::init(None, None) }.unwrap();
     let tree = &mut Background::new().window_tree(screen).unwrap();
     let root = tree.root();
@@ -84,13 +82,10 @@ fn main() {
     InputLine::value_mut(tree, n, |value| replace(value, "1".to_string()));
     n.set_margin(tree, Thickness::new(1, 0, 1, 1));
 
-    let mut state = State { quit: false };
     a.set_next_focus(tree, v);
     v.set_next_focus(tree, t);
     t.set_next_focus(tree, n);
     n.set_next_focus(tree, a);
-    a.focus(tree, &mut state);
-    while !state.quit {
-        tree.update(true, &mut state).unwrap();
-    }
+    a.focus(tree, &mut ());
+    tree.run(&mut clock, &mut ()).unwrap();
 }

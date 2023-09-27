@@ -37,6 +37,7 @@ unicode-width = "0.1.10"
 
 [dev-dependencies]
 panicking = "0.4.0"
+timer-no-std = "0.4.0"
 tuifw-screen = { path = "screen", version = "0.22.0" }
 
 [badges]
