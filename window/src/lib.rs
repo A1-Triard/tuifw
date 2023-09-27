@@ -9,6 +9,7 @@
 #![allow(clippy::blocks_in_if_conditions)]
 #![allow(clippy::collapsible_else_if)]
 #![allow(clippy::collapsible_if)]
+#![allow(clippy::non_canonical_partial_ord_impl)]
 #![allow(clippy::type_complexity)]
 
 #![no_std]
@@ -226,6 +227,12 @@ impl Palette {
             self.0.push(Left(u8::try_from(k).unwrap()));
         }
         self.0[usize::from(i)] = o;
+    }
+}
+
+impl Default for Palette {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

@@ -40,7 +40,13 @@ impl DockPanel {
     }
 }
 
-#[derive(Clone)]
+impl Default for DockPanel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(Clone, Default)]
 pub struct DockPanelWidget;
 
 impl<State: ?Sized> Widget<State> for DockPanelWidget {

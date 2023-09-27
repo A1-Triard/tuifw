@@ -35,7 +35,13 @@ impl StackPanel {
     }
 }
 
-#[derive(Clone)]
+impl Default for StackPanel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(Clone, Default)]
 pub struct StackPanelWidget;
 
 impl<State: ?Sized> Widget<State> for StackPanelWidget {

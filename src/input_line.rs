@@ -179,7 +179,13 @@ impl InputLine {
     }
 }
 
-#[derive(Clone)]
+impl Default for InputLine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(Clone, Default)]
 pub struct InputLineWidget;
 
 impl<State: ?Sized> Widget<State> for InputLineWidget {
@@ -317,7 +323,7 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                 Key::Backspace => {
                     let data = window.data_mut::<InputLine>(tree);
                     for _ in 0 .. n.get() {
-                        if let Some((i, c)) = data.value[.. data.cursor].char_indices().rev().next() {
+                        if let Some((i, c)) = data.value[.. data.cursor].char_indices().next_back() {
                             data.value.remove(i);
                             data.cursor -= c.len_utf8();
                             let text_fit_width = if data.cursor == data.value.len() {

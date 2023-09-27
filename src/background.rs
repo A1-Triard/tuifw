@@ -64,7 +64,13 @@ impl Background {
     }
 }
 
-#[derive(Clone)]
+impl Default for Background {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(Clone, Default)]
 pub struct BackgroundWidget;
 
 impl<State: ?Sized> Widget<State> for BackgroundWidget {

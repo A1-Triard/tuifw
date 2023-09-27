@@ -7,6 +7,7 @@
 #![allow(clippy::blocks_in_if_conditions)]
 #![allow(clippy::collapsible_else_if)]
 #![allow(clippy::collapsible_if)]
+#![allow(clippy::nonminimal_bool)]
 #![allow(clippy::type_complexity)]
 
 #![no_std]

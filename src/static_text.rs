@@ -55,7 +55,13 @@ impl StaticText {
     }
 }
 
-#[derive(Clone)]
+impl Default for StaticText {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(Clone, Default)]
 pub struct StaticTextWidget;
 
 impl<State: ?Sized> Widget<State> for StaticTextWidget {
