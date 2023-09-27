@@ -808,7 +808,7 @@ impl<State: ?Sized> Window<State> {
     }
 }
 
-const FPS: u16 = 30;
+const FPS: u16 = 40;
 
 fn root_palette() -> Palette {
     let mut p = Palette::new();
@@ -819,12 +819,9 @@ fn root_palette() -> Palette {
     p.set(12, Right((Fg::LightGray, Bg::Blue))); // input line normal
     p.set(13, Right((Fg::LightGray, Bg::Red))); // input line error
 
-    p.set(14, Right((Fg::Black, Bg::Cyan))); // button normal text
-    p.set(15, Right((Fg::Cyan, Bg::None))); // button normal border
-    p.set(16, Right((Fg::Black, Bg::Brown))); // button focused text
-    p.set(17, Right((Fg::Brown, Bg::None))); // button focused border
-    p.set(18, Right((Fg::Cyan, Bg::None))); // button pressed text
-    p.set(19, Right((Fg::Cyan, Bg::None))); // button pressed border
+    p.set(14, Right((Fg::Cyan, Bg::None))); // button normal
+    p.set(15, Right((Fg::Black, Bg::Cyan))); // button focused
+    p.set(16, Right((Fg::Cyan, Bg::None))); // button pressed
 
     p
 }

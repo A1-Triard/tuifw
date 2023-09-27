@@ -1,5 +1,5 @@
 use alloc::boxed::Box;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use either::Left;
 use timer_no_std::MonoClock;
 use tuifw_screen_base::{Error, Key, Point, Rect, Screen, Vector, text_width};
@@ -7,6 +7,7 @@ use tuifw_window::{Event, RenderPort, Timer, Widget, WidgetData, Window, WindowT
 use tuifw_window::{CMD_GOT_FOCUS, CMD_LOST_FOCUS};
 
 pub struct Button {
+    border: (String, String),
     text: String,
     release_timer: Option<Timer>,
 }
@@ -21,7 +22,7 @@ impl<State: ?Sized> WidgetData<State> for Button {
 
 impl Button {
     pub fn new() -> Self {
-        Button { text: String::new(), release_timer: None }
+        Button { border: ("[".to_string(), "]".to_string()), text: String::new(), release_timer: None }
     }
 
     fn set_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
@@ -29,9 +30,6 @@ impl Button {
             palette.set(0, Left(14));
             palette.set(1, Left(15));
             palette.set(2, Left(16));
-            palette.set(3, Left(17));
-            palette.set(4, Left(18));
-            palette.set(5, Left(19));
         });
     }
 
@@ -71,6 +69,21 @@ impl Button {
         window.invalidate_measure(tree);
         res
     }
+
+    pub fn border(&self) -> &(String, String) {
+        &self.border
+    }
+
+    pub fn border_mut<State: ?Sized, T>(
+        tree: &mut WindowTree<State>,
+        window: Window<State>,
+        value: impl FnOnce(&mut (String, String)) -> T
+    ) -> T {
+        let data = &mut window.data_mut::<Button>(tree).border;
+        let res = value(data);
+        window.invalidate_measure(tree);
+        res
+    }
 }
 
 impl Default for Button {
@@ -94,17 +107,20 @@ impl<State: ?Sized> Widget<State> for ButtonWidget {
         let focused = window == tree.focused();
         let data = window.data::<Button>(tree);
         let pressed = data.release_timer.is_some();
-        let text_color = if pressed { 4 } else if focused { 2 } else { 0 };
-        let border_color = if pressed { 5 } else if focused { 3 } else { 1 };
-        let text_color = window.color(tree, text_color);
-        let border_color = window.color(tree, border_color);
-        rp.out(Point { x: 1, y: 0 }, text_color.0, text_color.1, &data.text);
-        rp.out(Point { x: 0, y: 0 }, border_color.0, border_color.1, if pressed { " " } else { "▐" });
+        let color = if pressed { 2 } else if focused { 1 } else { 0 };
+        let color = window.color(tree, color);
+        rp.out(Point { x: 1, y: 0 }, color.0, color.1, &data.text);
+        rp.out(
+            Point { x: 0, y: 0 },
+            color.0,
+            color.1,
+            if pressed { " " } else { &data.border.0 }
+        );
         rp.out(
             Point { x: bounds.r_inner(), y: 0 },
-            border_color.0,
-            border_color.1,
-            if pressed { " " } else { "▌" }
+            color.0,
+            color.1,
+            if pressed { " " } else { &data.border.1 }
         );
     }
 
