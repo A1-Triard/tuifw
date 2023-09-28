@@ -118,10 +118,10 @@ fn main() {
     a.set_next_focus(tree, v);
     v.set_next_focus(tree, t);
     t.set_next_focus(tree, n);
-    n.set_next_focus(tree, calc);
-    calc.set_next_focus(tree, a);
+    n.set_next_focus(tree, a);
 
     let state = &mut State { a, v, t, n, s };
-    a.focus(tree, state);
+    a.focus(tree, true, state);
+    calc.focus(tree, false, state);
     tree.run(state).unwrap();
 }

@@ -1,10 +1,10 @@
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use either::Left;
-use timer_no_std::MonoClock;
-use tuifw_screen_base::{Error, Key, Point, Rect, Screen, Vector, text_width};
+use tuifw_screen_base::{Error, Key, Point, Rect, Vector, text_width};
 use tuifw_window::{Event, RenderPort, Timer, Widget, WidgetData, Window, WindowTree};
-use tuifw_window::{CMD_GOT_FOCUS, CMD_LOST_FOCUS};
+use tuifw_window::{CMD_GOT_PRIMARY_FOCUS, CMD_LOST_PRIMARY_FOCUS};
+use tuifw_window::{CMD_GOT_SECONDARY_FOCUS, CMD_LOST_SECONDARY_FOCUS};
 
 pub const CMD_CLICK: u16 = 100;
 
@@ -50,17 +50,6 @@ impl Button {
         let w = Window::new(tree, Box::new(ButtonWidget), Box::new(self), parent, prev)?;
         Self::set_palette(tree, w);
         Ok(w)
-    }
-
-    pub fn window_tree<State: ?Sized>(
-        self,
-        screen: Box<dyn Screen>,
-        clock: &MonoClock,
-    ) -> Result<WindowTree<State>, Error> {
-        let mut tree = WindowTree::new(screen, clock, Box::new(ButtonWidget), Box::new(self))?;
-        let w = tree.root();
-        Self::set_palette(&mut tree, w);
-        Ok(tree)
     }
 
     pub fn text(&self) -> &String {
@@ -124,7 +113,7 @@ impl<State: ?Sized> Widget<State> for ButtonWidget {
         _state: &mut State,
     ) {
         let bounds = window.inner_bounds(tree);
-        let focused = window == tree.focused();
+        let focused = window.is_focused(tree);
         let data = window.data::<Button>(tree);
         let pressed = data.release_timer.is_some();
         let color = if pressed { 2 } else if focused { 1 } else { 0 };
@@ -175,7 +164,8 @@ impl<State: ?Sized> Widget<State> for ButtonWidget {
         state: &mut State,
     ) -> bool {
         match event {
-            Event::Cmd(CMD_GOT_FOCUS) | Event::Cmd(CMD_LOST_FOCUS) => {
+            Event::Cmd(CMD_GOT_PRIMARY_FOCUS) | Event::Cmd(CMD_LOST_PRIMARY_FOCUS) |
+            Event::Cmd(CMD_GOT_SECONDARY_FOCUS) | Event::Cmd(CMD_LOST_SECONDARY_FOCUS) => {
                 window.invalidate_render(tree);
                 true
             },

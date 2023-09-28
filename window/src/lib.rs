@@ -59,9 +59,13 @@ impl Event {
     }
 }
 
-pub const CMD_GOT_FOCUS: u16 = 0;
+pub const CMD_GOT_PRIMARY_FOCUS: u16 = 0;
 
-pub const CMD_LOST_FOCUS: u16 = 1;
+pub const CMD_LOST_PRIMARY_FOCUS: u16 = 1;
+
+pub const CMD_GOT_SECONDARY_FOCUS: u16 = 2;
+
+pub const CMD_LOST_SECONDARY_FOCUS: u16 = 3;
 
 fn invalidate_rect(screen: &mut dyn Screen, rect: Rect) {
     let rect = rect.intersect(Rect { tl: Point { x: 0, y: 0 }, size: screen.size() });
@@ -562,18 +566,33 @@ impl<State: ?Sized> Window<State> {
         tree.arena[self.0].next
     }
 
+    pub fn is_focused(self, tree: &WindowTree<State>) -> bool {
+        tree.primary_focused == self || tree.secondary_focused == self
+    }
+
     pub fn focus(
         self,
         tree: &mut WindowTree<State>,
+        primary: bool,
         state: &mut State
     ) -> Option<Self> {
-        let old_focused = tree.focused;
-        if self == old_focused { return None; }
-        let handled = self.raise(tree, Event::Cmd(CMD_GOT_FOCUS), state);
-        if !handled { return None; }
-        tree.focused = self;
-        old_focused.raise(tree, Event::Cmd(CMD_LOST_FOCUS), state);
-        Some(old_focused)
+        if primary {
+            let old_focused = tree.primary_focused;
+            if self == old_focused { return None; }
+            let handled = self.raise(tree, Event::Cmd(CMD_GOT_PRIMARY_FOCUS), state);
+            if !handled { return None; }
+            tree.primary_focused = self;
+            old_focused.raise(tree, Event::Cmd(CMD_LOST_PRIMARY_FOCUS), state);
+            Some(old_focused)
+        } else {
+            let old_focused = tree.secondary_focused;
+            if self == old_focused { return None; }
+            let handled = self.raise(tree, Event::Cmd(CMD_GOT_SECONDARY_FOCUS), state);
+            if !handled { return None; }
+            tree.secondary_focused = self;
+            old_focused.raise(tree, Event::Cmd(CMD_LOST_SECONDARY_FOCUS), state);
+            Some(old_focused)
+        }
     }
 
     pub fn raise(
@@ -864,7 +883,8 @@ pub struct WindowTree<'clock, State: ?Sized + 'static> {
     screen: Option<Box<dyn Screen>>,
     arena: Arena<WindowNode<State>>,
     root: Window<State>,
-    focused: Window<State>,
+    primary_focused: Window<State>,
+    secondary_focused: Window<State>,
     cursor: Option<Point>,
     quit: bool,
     timers: Arena<TimerData<State>>,
@@ -907,7 +927,8 @@ impl<'clock, State: ?Sized> WindowTree<'clock, State> {
             screen: Some(screen),
             arena,
             root,
-            focused: root,
+            primary_focused: root,
+            secondary_focused: root,
             cursor: None,
             quit: false,
             clock,
@@ -917,7 +938,9 @@ impl<'clock, State: ?Sized> WindowTree<'clock, State> {
 
     pub fn root(&self) -> Window<State> { self.root }
 
-    pub fn focused(&self) -> Window<State> { self.focused }
+    pub fn primary_focused(&self) -> Window<State> { self.primary_focused }
+
+    pub fn secondary_focused(&self) -> Window<State> { self.secondary_focused }
 
     pub fn quit(&mut self) {
         self.quit = true;
@@ -993,10 +1016,13 @@ impl<'clock, State: ?Sized> WindowTree<'clock, State> {
         let screen = self.screen.as_mut().expect("WindowTree is in invalid state");
         if let Some(screen_Event::Key(n, key)) = screen.update(self.cursor, wait)? {
             if key == Key::Tab {
-                let next_focus = self.focused.next_focus(self);
-                if next_focus.focus(self, state).is_some() { return Ok(()); }
+                let next_focus = self.primary_focused.next_focus(self);
+                if next_focus.focus(self, true, state).is_some() { return Ok(()); }
             }
-            self.focused.raise(self, Event::Key(n, key), state);
+            let handled = self.primary_focused.raise(self, Event::Key(n, key), state);
+            if !handled {
+                self.secondary_focused.raise(self, Event::Key(n, key), state);
+            }
         }
         Ok(())
     }
