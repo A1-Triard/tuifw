@@ -1,6 +1,5 @@
 use alloc::boxed::Box;
-use timer_no_std::MonoClock;
-use tuifw_screen_base::{Error, Rect, Screen, Vector};
+use tuifw_screen_base::{Error, Rect, Vector};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree};
 
 pub struct StackPanel {
@@ -23,14 +22,6 @@ impl StackPanel {
         prev: Option<Window<State>>
     ) -> Result<Window<State>, Error> {
         Window::new(tree, Box::new(StackPanelWidget), Box::new(self), parent, prev)
-    }
-
-    pub fn window_tree<State: ?Sized>(
-        self,
-        screen: Box<dyn Screen>,
-        clock: &MonoClock,
-    ) -> Result<WindowTree<State>, Error> {
-        WindowTree::new(screen, clock, Box::new(StackPanelWidget), Box::new(self))
     }
 
     pub fn set_vertical<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>, value: bool) {
