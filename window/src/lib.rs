@@ -305,6 +305,7 @@ macro_attr! {
         max_size: Vector,
         event_handler: Option<Box<dyn EventHandler<State>>>,
         next_focus: Window<State>,
+        contains_primary_focus: bool,
     }
 }
 
@@ -362,6 +363,7 @@ impl<State: ?Sized> Window<State> {
                 min_size: Vector::null(),
                 max_size: Vector { x: -1, y: -1 },
                 next_focus: Window(window),
+                contains_primary_focus: false,
             }, Window(window))
         });
         window.attach(tree, parent, prev);
@@ -581,7 +583,27 @@ impl<State: ?Sized> Window<State> {
             if self == old_focused { return None; }
             let handled = self.raise(tree, Event::Cmd(CMD_GOT_PRIMARY_FOCUS), state);
             if !handled { return None; }
+
+            let mut window = tree.primary_focused;
+            loop {
+                tree.arena[window.0].contains_primary_focus = false;
+                if let Some(parent) = window.parent(tree) {
+                    window = parent;
+                } else {
+                    break;
+                }
+            }
             tree.primary_focused = self;
+            let mut window = tree.primary_focused;
+            loop {
+                tree.arena[window.0].contains_primary_focus = true;
+                if let Some(parent) = window.parent(tree) {
+                    window = parent;
+                } else {
+                    break;
+                }
+            }
+
             old_focused.raise(tree, Event::Cmd(CMD_LOST_PRIMARY_FOCUS), state);
             Some(old_focused)
         } else {
@@ -601,26 +623,38 @@ impl<State: ?Sized> Window<State> {
         event: Event,
         state: &mut State
     ) -> bool {
-        let mut handled = false;
-        self.raise_raw(tree, event.preview(), self, &mut handled, state);
-        if !handled {
-            self.raise_raw(tree, event, self, &mut handled, state);
-        }
-        handled
+        self.raise_raw(tree, event, false, state)
     }
 
     fn raise_raw(
         self,
         tree: &mut WindowTree<State>,
         event: Event,
+        secondary: bool,
+        state: &mut State
+    ) -> bool {
+        let mut handled = false;
+        self.raise_core(tree, event.preview(), self, secondary, &mut handled, state);
+        if !handled {
+            self.raise_core(tree, event, self, secondary, &mut handled, state);
+        }
+        handled
+    }
+
+    fn raise_core(
+        self,
+        tree: &mut WindowTree<State>,
+        event: Event,
         event_source: Window<State>,
+        secondary: bool,
         handled: &mut bool,
         state: &mut State
     ) {
+        if secondary && tree.arena[self.0].contains_primary_focus { return; }
         let parent = self.parent(tree);
         if !*handled && event.is_preview() {
             if let Some(parent) = parent {
-                parent.raise_raw(tree, event, event_source, handled, state);
+                parent.raise_core(tree, event, event_source, secondary, handled, state);
             }
         }
         if !*handled {
@@ -636,7 +670,7 @@ impl<State: ?Sized> Window<State> {
         }
         if !*handled && !event.is_preview() {
             if let Some(parent) = parent {
-                parent.raise_raw(tree, event, event_source, handled, state);
+                parent.raise_core(tree, event, event_source, secondary, handled, state);
             }
         }
     }
@@ -922,6 +956,7 @@ impl<'clock, State: ?Sized> WindowTree<'clock, State> {
             max_size: Vector { x: -1, y: -1 },
             palette: root_palette(),
             next_focus: Window(window),
+            contains_primary_focus: true,
         }, Window(window)));
         Ok(WindowTree {
             screen: Some(screen),
@@ -1019,9 +1054,9 @@ impl<'clock, State: ?Sized> WindowTree<'clock, State> {
                 let next_focus = self.primary_focused.next_focus(self);
                 if next_focus.focus(self, true, state).is_some() { return Ok(()); }
             }
-            let handled = self.primary_focused.raise(self, Event::Key(n, key), state);
+            let handled = self.primary_focused.raise_raw(self, Event::Key(n, key), false, state);
             if !handled {
-                self.secondary_focused.raise(self, Event::Key(n, key), state);
+                self.secondary_focused.raise_raw(self, Event::Key(n, key), true, state);
             }
         }
         Ok(())
