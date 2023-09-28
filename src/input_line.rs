@@ -17,7 +17,7 @@ pub enum InputLineValueRange {
 
 pub struct InputLine {
     value_range: InputLineValueRange,
-    value: String,
+    text: String,
     view: Either<usize, usize>,
     cursor: usize,
     width: i16,
@@ -29,7 +29,7 @@ impl InputLine {
     pub fn new() -> Self {
         InputLine {
             value_range: InputLineValueRange::Any,
-            value: String::new(),
+            text: String::new(),
             view: Left(0),
             cursor: 0,
             width: 0
@@ -66,15 +66,15 @@ impl InputLine {
     }
 
     pub fn error(&self) -> bool {
-        if self.value.is_empty() { return false; }
+        if self.text.is_empty() { return false; }
         match &self.value_range {
             InputLineValueRange::Any => false,
-            InputLineValueRange::Integer(range) => if let Ok(value) = i64::from_str(&self.value) {
+            InputLineValueRange::Integer(range) => if let Ok(value) = i64::from_str(&self.text) {
                 !range.contains(&value)
             } else {
                 true
             },
-            InputLineValueRange::Float(range) => if let Ok(value) = f64::from_str(&self.value) {
+            InputLineValueRange::Float(range) => if let Ok(value) = f64::from_str(&self.text) {
                 !range.contains(&value)
             } else {
                 true
@@ -86,27 +86,27 @@ impl InputLine {
         match self.view {
             Left(view_start) => 'r: {
                 let mut width = self.width;
-                for (i, c) in self.value[view_start ..].char_indices() {
+                for (i, c) in self.text[view_start ..].char_indices() {
                     let c_width = char_width(c);
                     if c_width as u16 > width as u16 {
                         break 'r (0, view_start .. i, false);
                     }
                     width = width.wrapping_sub(c_width);
                 }
-                (0, view_start .. self.value.len(), width != 0)
+                (0, view_start .. self.text.len(), width != 0)
             },
             Right(view_end) => 'r: {
-                let (value_width, value_view_end, is_tail_cursor_fit) = if view_end == self.value.len() {
+                let (text_width, value_view_end, is_tail_cursor_fit) = if view_end == self.text.len() {
                     (
                         (self.width as u16).saturating_sub(1) as i16,
-                        self.value.len(),
+                        self.text.len(),
                         self.width != 0
                     )
                 } else {
                     (self.width, view_end + 1, false)
                 };
-                let mut width = value_width;
-                for (i, c) in self.value[.. value_view_end].char_indices().rev() {
+                let mut width = text_width;
+                for (i, c) in self.text[.. value_view_end].char_indices().rev() {
                     let c_width = char_width(c);
                     if c_width as u16 > width as u16 {
                         break 'r (width, i + c.len_utf8() .. value_view_end, is_tail_cursor_fit);
@@ -129,35 +129,35 @@ impl InputLine {
         window.invalidate_render(tree);
     }
 
-    pub fn value(&self) -> &String {
-        &self.value
+    pub fn text(&self) -> &String {
+        &self.text
     }
 
-    pub fn value_mut<State: ?Sized, T>(
+    pub fn text_mut<State: ?Sized, T>(
         tree: &mut WindowTree<State>,
         window: Window<State>,
         value: impl FnOnce(&mut String) -> T
     ) -> T {
         let focused = tree.focused() == window;
         let data = &mut window.data_mut::<InputLine>(tree);
-        let res = value(&mut data.value);
-        data.cursor = data.value.len();
+        let res = value(&mut data.text);
+        data.cursor = data.text.len();
         if focused {
             let text_fit_width = (data.width as u16).saturating_sub(1) as i16;
-            if is_text_fit_in(text_fit_width, &data.value) {
+            if is_text_fit_in(text_fit_width, &data.text) {
                 data.view = if matches!(data.value_range, InputLineValueRange::Any) {
                     Left(0)
                 } else {
-                    Right(data.value.len())
+                    Right(data.text.len())
                 };
             } else {
                 data.view = Right(data.cursor);
             }
         } else {
-            data.view = if matches!(data.value_range, InputLineValueRange::Any) || data.value.is_empty() {
+            data.view = if matches!(data.value_range, InputLineValueRange::Any) || data.text.is_empty() {
                 Left(0)
             } else {
-                Right(data.value.len() - 1)
+                Right(data.text.len() - 1)
             };
         }
         window.invalidate_render(tree);
@@ -168,7 +168,7 @@ impl InputLine {
 
     pub fn set_cursor<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>, value: usize) {
         let data = &mut window.data_mut::<InputLine>(tree);
-        assert!(value <= data.value.len());
+        assert!(value <= data.text.len());
         data.cursor = value;
         window.invalidate_render(tree);
     }
@@ -177,7 +177,7 @@ impl InputLine {
 
     pub fn set_view<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>, value: Either<usize, usize>) {
         let data = &mut window.data_mut::<InputLine>(tree);
-        assert!(value.map(|x| x <= data.value.len()).into_inner());
+        assert!(value.map(|x| x <= data.text.len()).into_inner());
         data.view = value;
         window.invalidate_render(tree);
     }
@@ -206,9 +206,9 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
         let color = window.color(tree, color);
         rp.fill_bg(color.1);
         let (padding, view, is_tail_cursor_fit) = data.calc_value_padding_view_and_is_tail_cursor_fit();
-        rp.out(Point { x: padding.wrapping_add(1), y: 0 }, color.0, color.1, &data.value[view.clone()]);
-        if focused && (view.contains(&data.cursor) || data.cursor == data.value.len() && is_tail_cursor_fit) {
-            let cursor_x = text_width(&data.value[view.start .. data.cursor]);
+        rp.out(Point { x: padding.wrapping_add(1), y: 0 }, color.0, color.1, &data.text[view.clone()]);
+        if focused && (view.contains(&data.cursor) || data.cursor == data.text.len() && is_tail_cursor_fit) {
+            let cursor_x = text_width(&data.text[view.start .. data.cursor]);
             rp.cursor(Point { x: cursor_x.wrapping_add(padding).wrapping_add(1), y: 0 });
         }
     }
@@ -234,23 +234,23 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
         let focused = tree.focused() == window;
         let data = window.data_mut::<InputLine>(tree);
         data.width = Thickness::new(1, 0, 1, 0).shrink_rect(final_inner_bounds).w();
-        let text_fit_width = if focused && data.cursor == data.value.len() {
+        let text_fit_width = if focused && data.cursor == data.text.len() {
             (data.width as u16).saturating_sub(1) as i16
         } else {
             data.width
         };
-        if is_text_fit_in(text_fit_width, &data.value) {
-            if focused && data.cursor == data.value.len() {
+        if is_text_fit_in(text_fit_width, &data.text) {
+            if focused && data.cursor == data.text.len() {
                 data.view = if matches!(data.value_range, InputLineValueRange::Any) {
                     Left(0)
                 } else {
-                    Right(data.value.len())
+                    Right(data.text.len())
                 };
             } else {
-                data.view = if matches!(data.value_range, InputLineValueRange::Any) || data.value.is_empty() {
+                data.view = if matches!(data.value_range, InputLineValueRange::Any) || data.text.is_empty() {
                     Left(0)
                 } else {
-                    Right(data.value.len() - 1)
+                    Right(data.text.len() - 1)
                 };
             }
         }
@@ -268,23 +268,25 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
         match event {
             Event::Cmd(CMD_GOT_FOCUS) => {
                 let data = window.data_mut::<InputLine>(tree);
-                let text_fit_width = if data.cursor == data.value.len() {
+                let text_fit_width = if data.cursor == data.text.len() {
                     (data.width as u16).saturating_sub(1) as i16
                 } else {
                     data.width
                 };
-                if is_text_fit_in(text_fit_width, &data.value) {
-                    if data.cursor == data.value.len() {
+                if is_text_fit_in(text_fit_width, &data.text) {
+                    if data.cursor == data.text.len() {
                         data.view = if matches!(data.value_range, InputLineValueRange::Any) {
                             Left(0)
                         } else {
-                            Right(data.value.len())
+                            Right(data.text.len())
                         };
                     } else {
-                        data.view = if matches!(data.value_range, InputLineValueRange::Any) || data.value.is_empty() {
+                        data.view = if
+                            matches!(data.value_range, InputLineValueRange::Any) || data.text.is_empty()
+                        {
                             Left(0)
                         } else {
-                            Right(data.value.len() - 1)
+                            Right(data.text.len() - 1)
                         };
                     }
                 } else {
@@ -295,10 +297,10 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
             },
             Event::Cmd(CMD_LOST_FOCUS) => {
                 let data = window.data_mut::<InputLine>(tree);
-                data.view = if matches!(data.value_range, InputLineValueRange::Any) || data.value.is_empty() {
+                data.view = if matches!(data.value_range, InputLineValueRange::Any) || data.text.is_empty() {
                     Left(0)
                 } else {
-                    Right(data.value.len() - 1)
+                    Right(data.text.len() - 1)
                 };
                 window.invalidate_render(tree);
                 true
@@ -307,13 +309,14 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                 Key::Char(c) => {
                     let data = window.data_mut::<InputLine>(tree);
                     for _ in 0 .. n.get() {
-                        if data.value.try_reserve(c.len_utf8()).is_ok() {
-                            data.value.insert(data.cursor, c);
+                        if data.text.try_reserve(c.len_utf8()).is_ok() {
+                            data.text.insert(data.cursor, c);
                             data.cursor += c.len_utf8();
-                            let (_, view, is_tail_cursor_fit) = data.calc_value_padding_view_and_is_tail_cursor_fit();
+                            let (_, view, is_tail_cursor_fit) =
+                                data.calc_value_padding_view_and_is_tail_cursor_fit();
                             if
                                 !view.contains(&data.cursor) && !(
-                                    data.cursor == data.value.len() && is_tail_cursor_fit
+                                    data.cursor == data.text.len() && is_tail_cursor_fit
                                 )
                             {
                                 data.view = Right(data.cursor);
@@ -326,28 +329,29 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                 Key::Backspace => {
                     let data = window.data_mut::<InputLine>(tree);
                     for _ in 0 .. n.get() {
-                        if let Some((i, c)) = data.value[.. data.cursor].char_indices().next_back() {
-                            data.value.remove(i);
+                        if let Some((i, c)) = data.text[.. data.cursor].char_indices().next_back() {
+                            data.text.remove(i);
                             data.cursor -= c.len_utf8();
-                            let text_fit_width = if data.cursor == data.value.len() {
+                            let text_fit_width = if data.cursor == data.text.len() {
                                 (data.width as u16).saturating_sub(1) as i16
                             } else {
                                 data.width
                             };
-                            if is_text_fit_in(text_fit_width, &data.value) {
-                                if data.cursor == data.value.len() {
+                            if is_text_fit_in(text_fit_width, &data.text) {
+                                if data.cursor == data.text.len() {
                                     data.view = if matches!(data.value_range, InputLineValueRange::Any) {
                                         Left(0)
                                     } else {
-                                        Right(data.value.len())
+                                        Right(data.text.len())
                                     };
                                 } else {
                                     data.view = if
-                                        matches!(data.value_range, InputLineValueRange::Any) || data.value.is_empty()
+                                        matches!(data.value_range, InputLineValueRange::Any) ||
+                                        data.text.is_empty()
                                     {
                                         Left(0)
                                     } else {
-                                        Right(data.value.len() - 1)
+                                        Right(data.text.len() - 1)
                                     };
                                 }
                             } else {

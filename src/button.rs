@@ -6,10 +6,13 @@ use tuifw_screen_base::{Error, Key, Point, Rect, Screen, Vector, text_width};
 use tuifw_window::{Event, RenderPort, Timer, Widget, WidgetData, Window, WindowTree};
 use tuifw_window::{CMD_GOT_FOCUS, CMD_LOST_FOCUS};
 
+pub const CMD_CLICK: u16 = 100;
+
 pub struct Button {
     border: (String, String),
     text: String,
     release_timer: Option<Timer>,
+    cmd: u16,
 }
 
 impl<State: ?Sized> WidgetData<State> for Button {
@@ -22,7 +25,12 @@ impl<State: ?Sized> WidgetData<State> for Button {
 
 impl Button {
     pub fn new() -> Self {
-        Button { border: ("[".to_string(), "]".to_string()), text: String::new(), release_timer: None }
+        Button {
+            border: ("[".to_string(), "]".to_string()),
+            text: String::new(),
+            release_timer: None,
+            cmd: CMD_CLICK,
+        }
     }
 
     fn set_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
@@ -83,6 +91,18 @@ impl Button {
         let res = value(data);
         window.invalidate_measure(tree);
         res
+    }
+
+    pub fn cmd(&self) -> u16 {
+        self.cmd
+    }
+
+    pub fn set_cmd<State: ?Sized>(
+        tree: &mut WindowTree<State>,
+        window: Window<State>,
+        value: u16
+    ) {
+        window.data_mut::<Button>(tree).cmd = value;
     }
 }
 
@@ -152,7 +172,7 @@ impl<State: ?Sized> Widget<State> for ButtonWidget {
         window: Window<State>,
         event: Event,
         _event_source: Window<State>,
-        _state: &mut State,
+        state: &mut State,
     ) -> bool {
         match event {
             Event::Cmd(CMD_GOT_FOCUS) | Event::Cmd(CMD_LOST_FOCUS) => {
@@ -166,10 +186,12 @@ impl<State: ?Sized> Widget<State> for ButtonWidget {
                     window.invalidate_render(tree);
                 }));
                 let data = window.data_mut::<Button>(tree);
+                let cmd = data.cmd;
                 if let Some(old_release_timer) = data.release_timer.replace(release_timer) {
                     old_release_timer.drop_timer(tree);
                 }
                 window.invalidate_render(tree);
+                window.raise(tree, Event::Cmd(cmd), state);
                 true
             },
             _ => false

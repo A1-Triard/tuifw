@@ -3,28 +3,49 @@
 #![deny(warnings)]
 
 use std::mem::replace;
+use std::str::FromStr;
 use timer_no_std::MonoClock;
 use tuifw::{Background, Button, Dock, DockPanel, InputLine, InputLineValueRange, StackPanel, StaticText};
 use tuifw_screen::{HAlign, VAlign, Key, Thickness};
 use tuifw_window::{Event, EventHandler, Window, WindowTree};
 
+const CMD_CALC: u16 = 1000;
+
+struct State {
+    a: Window<State>,
+    v: Window<State>,
+    t: Window<State>,
+    n: Window<State>,
+    s: Window<State>,
+}
+
 #[derive(Clone)]
 struct RootEventHandler;
 
-impl EventHandler<()> for RootEventHandler {
+impl EventHandler<State> for RootEventHandler {
     fn invoke(
         &self,
-        tree: &mut WindowTree<()>,
-        _window: Window<()>,
+        tree: &mut WindowTree<State>,
+        _window: Window<State>,
         event: Event,
-        _event_source: Window<()>,
-        _state: &mut ()
+        _event_source: Window<State>,
+        state: &mut State
     ) -> bool {
-        if let Event::Key(_, Key::Escape) = event {
-            tree.quit();
-            true
-        } else {
-            false
+        match event {
+            Event::Key(_, Key::Escape) => {
+                tree.quit();
+                true
+            },
+            Event::Cmd(CMD_CALC) => {
+                let a = f64::from_str(state.a.data::<InputLine>(tree).text()).unwrap();
+                let v = f64::from_str(state.v.data::<InputLine>(tree).text()).unwrap();
+                let t = f64::from_str(state.t.data::<InputLine>(tree).text()).unwrap();
+                let n = f64::from(i32::from_str(state.n.data::<InputLine>(tree).text()).unwrap());
+                let s = v * t + a * t * (n - 1.0) / (2.0 * n);
+                StaticText::text_mut(tree, state.s, |value| replace(value, s.to_string()));
+                true
+            },
+            _ => false
         }
     }
 }
@@ -47,46 +68,60 @@ fn main() {
     edits.set_width(tree, 12);
 
     let a_label = StaticText::new().window(tree, labels, None).unwrap();
-    StaticText::text_mut(tree, a_label, |value| replace(value, "A:".to_string()));
+    StaticText::text_mut(tree, a_label, |value| replace(value, "A =".to_string()));
     a_label.set_margin(tree, Thickness::new(1, 1, 0, 1));
     let a = InputLine::new().window(tree, edits, None).unwrap();
     InputLine::set_value_range(tree, a, InputLineValueRange::Float(f64::MIN ..= f64::MAX));
-    InputLine::value_mut(tree, a, |value| replace(value, "0".to_string()));
+    InputLine::text_mut(tree, a, |value| replace(value, "0".to_string()));
     a.set_margin(tree, Thickness::new(1, 1, 1, 1));
 
     let v_label = StaticText::new().window(tree, labels, Some(a_label)).unwrap();
-    StaticText::text_mut(tree, v_label, |value| replace(value, "V:".to_string()));
+    StaticText::text_mut(tree, v_label, |value| replace(value, "V =".to_string()));
     v_label.set_margin(tree, Thickness::new(1, 0, 0, 1));
     let v = InputLine::new().window(tree, edits, Some(a)).unwrap();
     InputLine::set_value_range(tree, v, InputLineValueRange::Float(f64::MIN ..= f64::MAX));
-    InputLine::value_mut(tree, v, |value| replace(value, "1".to_string()));
+    InputLine::text_mut(tree, v, |value| replace(value, "1".to_string()));
     v.set_margin(tree, Thickness::new(1, 0, 1, 1));
 
     let t_label = StaticText::new().window(tree, labels, Some(v_label)).unwrap();
-    StaticText::text_mut(tree, t_label, |value| replace(value, "T:".to_string()));
+    StaticText::text_mut(tree, t_label, |value| replace(value, "T =".to_string()));
     t_label.set_margin(tree, Thickness::new(1, 0, 0, 1));
     let t = InputLine::new().window(tree, edits, Some(v)).unwrap();
     InputLine::set_value_range(tree, t, InputLineValueRange::Float(f64::MIN ..= f64::MAX));
-    InputLine::value_mut(tree, t, |value| replace(value, "0".to_string()));
+    InputLine::text_mut(tree, t, |value| replace(value, "0".to_string()));
     t.set_margin(tree, Thickness::new(1, 0, 1, 1));
 
     let n_label = StaticText::new().window(tree, labels, Some(t_label)).unwrap();
-    StaticText::text_mut(tree, n_label, |value| replace(value, "N:".to_string()));
+    StaticText::text_mut(tree, n_label, |value| replace(value, "N =".to_string()));
     n_label.set_margin(tree, Thickness::new(1, 0, 0, 1));
     let n = InputLine::new().window(tree, edits, Some(t)).unwrap();
     InputLine::set_value_range(tree, n, InputLineValueRange::Integer(1 ..= i64::from(i32::MAX)));
-    InputLine::value_mut(tree, n, |value| replace(value, "1".to_string()));
+    InputLine::text_mut(tree, n, |value| replace(value, "1".to_string()));
     n.set_margin(tree, Thickness::new(1, 0, 1, 1));
 
     let calc = Button::new().window(tree, controls, Some(edits_with_labels)).unwrap();
     Button::text_mut(tree, calc, |value| replace(value, "Calculate".to_string()));
+    Button::set_cmd(tree, calc, CMD_CALC);
     calc.set_h_align(tree, Some(HAlign::Center));
+
+    let result = DockPanel::new().window(tree, controls, Some(calc)).unwrap();
+    let s_label = StaticText::new().window(tree, result, None).unwrap();
+    s_label.set_margin(tree, Thickness::new(1, 1, 0, 1));
+    StaticText::text_mut(tree, s_label, |value| replace(value, "S =".to_string()));
+    DockPanel::set_layout(tree, s_label, Some(Dock::Left));
+    let result_value = Background::new().window(tree, result, Some(s_label)).unwrap();
+    result_value.set_width(tree, 12);
+    let s = StaticText::new().window(tree, result_value, None).unwrap();
+    s.set_h_align(tree, Some(HAlign::Right));
+    s.set_margin(tree, Thickness::new(1, 1, 1, 1));
 
     a.set_next_focus(tree, v);
     v.set_next_focus(tree, t);
     t.set_next_focus(tree, n);
     n.set_next_focus(tree, calc);
     calc.set_next_focus(tree, a);
-    a.focus(tree, &mut ());
-    tree.run(&mut ()).unwrap();
+
+    let state = &mut State { a, v, t, n, s };
+    a.focus(tree, state);
+    tree.run(state).unwrap();
 }

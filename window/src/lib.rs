@@ -569,28 +569,28 @@ impl<State: ?Sized> Window<State> {
     ) -> Option<Self> {
         let old_focused = tree.focused;
         if self == old_focused { return None; }
-        let handled = self.update(tree, Event::Cmd(CMD_GOT_FOCUS), state);
+        let handled = self.raise(tree, Event::Cmd(CMD_GOT_FOCUS), state);
         if !handled { return None; }
         tree.focused = self;
-        old_focused.update(tree, Event::Cmd(CMD_LOST_FOCUS), state);
+        old_focused.raise(tree, Event::Cmd(CMD_LOST_FOCUS), state);
         Some(old_focused)
     }
 
-    fn update(
+    pub fn raise(
         self,
         tree: &mut WindowTree<State>,
         event: Event,
         state: &mut State
     ) -> bool {
         let mut handled = false;
-        self.update_raw(tree, event.preview(), self, &mut handled, state);
+        self.raise_raw(tree, event.preview(), self, &mut handled, state);
         if !handled {
-            self.update_raw(tree, event, self, &mut handled, state);
+            self.raise_raw(tree, event, self, &mut handled, state);
         }
         handled
     }
 
-    fn update_raw(
+    fn raise_raw(
         self,
         tree: &mut WindowTree<State>,
         event: Event,
@@ -601,7 +601,7 @@ impl<State: ?Sized> Window<State> {
         let parent = self.parent(tree);
         if !*handled && event.is_preview() {
             if let Some(parent) = parent {
-                parent.update_raw(tree, event, event_source, handled, state);
+                parent.raise_raw(tree, event, event_source, handled, state);
             }
         }
         if !*handled {
@@ -617,7 +617,7 @@ impl<State: ?Sized> Window<State> {
         }
         if !*handled && !event.is_preview() {
             if let Some(parent) = parent {
-                parent.update_raw(tree, event, event_source, handled, state);
+                parent.raise_raw(tree, event, event_source, handled, state);
             }
         }
     }
@@ -996,7 +996,7 @@ impl<'clock, State: ?Sized> WindowTree<'clock, State> {
                 let next_focus = self.focused.next_focus(self);
                 if next_focus.focus(self, state).is_some() { return Ok(()); }
             }
-            self.focused.update(self, Event::Key(n, key), state);
+            self.focused.raise(self, Event::Key(n, key), state);
         }
         Ok(())
     }
