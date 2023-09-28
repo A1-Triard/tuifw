@@ -8,7 +8,7 @@ use tuifw_screen_base::{Thickness};
 use tuifw_window::{Event, RenderPort, Timer, Widget, WidgetData, Window, WindowTree};
 use tuifw_window::{CMD_GOT_PRIMARY_FOCUS, CMD_LOST_PRIMARY_FOCUS};
 
-pub const CMD_ERROR_CHANGED: u16 = 110;
+pub const CMD_IS_VALID_EMPTY_CHANGED: u16 = 110;
 
 #[derive(Debug, Clone)]
 pub enum InputLineValueRange {
@@ -21,16 +21,17 @@ pub struct InputLine {
     value_range: InputLineValueRange,
     default: String,
     text: String,
-    error: bool,
+    is_valid: bool,
+    is_empty: bool,
     view: Either<usize, usize>,
     cursor: usize,
     width: i16,
-    error_timer: Option<Timer>,
+    is_valid_empty_timer: Option<Timer>,
 }
 
 impl<State: ?Sized> WidgetData<State> for InputLine {
     fn drop_widget_data(&mut self, tree: &mut WindowTree<State>, _state: &mut State) {
-        if let Some(timer) = self.error_timer.take() {
+        if let Some(timer) = self.is_valid_empty_timer.take() {
             timer.drop_timer(tree);
         }
     }
@@ -42,11 +43,12 @@ impl InputLine {
             value_range: InputLineValueRange::Any,
             default: String::new(),
             text: String::new(),
-            error: false,
+            is_valid: true,
+            is_empty: true,
             view: Left(0),
             cursor: 0,
             width: 0,
-            error_timer: None,
+            is_valid_empty_timer: None,
         }
     }
 
@@ -68,39 +70,42 @@ impl InputLine {
         Ok(w)
     }
 
-    fn update_error<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
+    fn update_is_valid_empty<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
         let data = window.data_mut::<InputLine>(tree);
-        let error = if data.text.is_empty() {
-            false
+        let (is_valid, is_empty) = if data.text.is_empty() {
+            (true, true)
         } else {
-            match &data.value_range {
-                InputLineValueRange::Any => false,
+            (match &data.value_range {
+                InputLineValueRange::Any => true,
                 InputLineValueRange::Integer(range) => if let Ok(value) = i64::from_str(&data.text) {
-                    !range.contains(&value)
+                    range.contains(&value)
                 } else {
-                    true
+                    false
                 },
                 InputLineValueRange::Float(range) => if let Ok(value) = f64::from_str(&data.text) {
-                    !range.contains(&value)
+                    range.contains(&value)
                 } else {
-                    true
+                    false
                 },
-            }
+            }, false)
         };
-        if error != data.error {
-            data.error = error;
-            let error_timer = Timer::new(tree, 0, Box::new(move |tree, state| {
-                window.data_mut::<InputLine>(tree).error_timer = None;
-                window.raise(tree, Event::Cmd(CMD_ERROR_CHANGED), state);
+        if is_valid != data.is_valid || is_empty != data.is_empty {
+            data.is_valid = is_valid;
+            data.is_empty = is_empty;
+            let is_valid_empty_timer = Timer::new(tree, 0, Box::new(move |tree, state| {
+                window.data_mut::<InputLine>(tree).is_valid_empty_timer = None;
+                window.raise(tree, Event::Cmd(CMD_IS_VALID_EMPTY_CHANGED), state);
             }));
             let data = window.data_mut::<InputLine>(tree);
-            if let Some(timer) = data.error_timer.replace(error_timer) {
+            if let Some(timer) = data.is_valid_empty_timer.replace(is_valid_empty_timer) {
                 timer.drop_timer(tree);
             }
         }
     }
 
-    pub fn error(&self) -> bool { self.error }
+    pub fn is_valid(&self) -> bool { self.is_valid }
+
+    pub fn is_empty(&self) -> bool { self.is_empty }
 
     fn calc_value_padding_view_and_is_tail_cursor_fit(&self) -> (i16, Range<usize>, bool) {
         match self.view {
@@ -194,7 +199,7 @@ impl InputLine {
                 Right(data.text.len() - 1)
             };
         }
-        Self::update_error(tree, window);
+        Self::update_is_valid_empty(tree, window);
         window.invalidate_render(tree);
         res
     }
@@ -237,7 +242,7 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
     ) {
         let focused = window.is_focused(tree);
         let data = window.data::<InputLine>(tree);
-        let color = if data.error() { 1 } else { 0 };
+        let color = if !data.is_valid() { 1 } else { 0 };
         let color = window.color(tree, color);
         rp.fill_bg(color.1);
         let (padding, view, is_tail_cursor_fit) = data.calc_value_padding_view_and_is_tail_cursor_fit();
@@ -343,7 +348,7 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                 } else {
                     Right(data.text.len() - 1)
                 };
-                InputLine::update_error(tree, window);
+                InputLine::update_is_valid_empty(tree, window);
                 window.invalidate_render(tree);
                 true
             },
@@ -365,7 +370,7 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                             }
                         }
                     }
-                    InputLine::update_error(tree, window);
+                    InputLine::update_is_valid_empty(tree, window);
                     window.invalidate_render(tree);
                     true
                 },
@@ -402,7 +407,7 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                             }
                         }
                     }
-                    InputLine::update_error(tree, window);
+                    InputLine::update_is_valid_empty(tree, window);
                     window.invalidate_render(tree);
                     true
                 },

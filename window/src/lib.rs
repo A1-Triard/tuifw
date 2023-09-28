@@ -869,7 +869,7 @@ fn root_palette() -> Palette {
     p.set(11, Right((Fg::LightGray, Bg::None))); // static text
 
     p.set(12, Right((Fg::LightGray, Bg::Blue))); // input line normal
-    p.set(13, Right((Fg::LightGray, Bg::Red))); // input line error
+    p.set(13, Right((Fg::LightGray, Bg::Red))); // input line invalid
 
     p.set(14, Right((Fg::Cyan, Bg::None))); // button normal
     p.set(15, Right((Fg::Black, Bg::Cyan))); // button focused

@@ -6,7 +6,7 @@ use std::mem::replace;
 use std::str::FromStr;
 use timer_no_std::MonoClock;
 use tuifw::{Background, Button, Dock, DockPanel, InputLine, InputLineValueRange, StackPanel, StaticText};
-use tuifw::CMD_ERROR_CHANGED;
+use tuifw::CMD_IS_VALID_EMPTY_CHANGED;
 use tuifw_screen::{HAlign, VAlign, Key, Thickness};
 use tuifw_window::{Event, EventHandler, Window, WindowTree};
 
@@ -47,12 +47,18 @@ impl EventHandler<State> for RootEventHandler {
                 StaticText::text_mut(tree, state.s, |value| replace(value, s.to_string()));
                 true
             },
-            Event::Cmd(CMD_ERROR_CHANGED) => {
-                let a_valid = !state.a.data::<InputLine>(tree).error();
-                let v_valid = !state.v.data::<InputLine>(tree).error();
-                let t_valid = !state.t.data::<InputLine>(tree).error();
-                let n_valid = !state.n.data::<InputLine>(tree).error();
-                Button::set_is_enabled(tree, state.calc, a_valid && v_valid && t_valid && n_valid);
+            Event::Cmd(CMD_IS_VALID_EMPTY_CHANGED) => {
+                let a_empty = state.a.data::<InputLine>(tree).is_empty();
+                let v_empty = state.v.data::<InputLine>(tree).is_empty();
+                let t_empty = state.t.data::<InputLine>(tree).is_empty();
+                let n_empty = state.n.data::<InputLine>(tree).is_empty();
+                let a_valid = state.a.data::<InputLine>(tree).is_valid();
+                let v_valid = state.v.data::<InputLine>(tree).is_valid();
+                let t_valid = state.t.data::<InputLine>(tree).is_valid();
+                let n_valid = state.n.data::<InputLine>(tree).is_valid();
+                Button::set_is_enabled(tree, state.calc,
+                    a_valid && v_valid && t_valid && n_valid && !a_empty && !v_empty && !t_empty && !n_empty
+                );
                 true
             },
             _ => false
