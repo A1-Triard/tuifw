@@ -436,8 +436,7 @@ impl<State: ?Sized> Window<State> {
             margined_bounds.size,
             node.h_align.unwrap_or(HAlign::Left),
             node.v_align.unwrap_or(VAlign::Top)
-        ).shrink_rect(margined_bounds);
-        debug_assert_eq!(arranged_bounds.size, arranged_size);
+        ).shrink_rect(margined_bounds).intersect(margined_bounds);
         node.render_bounds = final_bounds;
         self.move_xy_raw(tree, arranged_bounds);
     }
