@@ -17,6 +17,7 @@ pub enum InputLineValueRange {
 
 pub struct InputLine {
     value_range: InputLineValueRange,
+    default: String,
     text: String,
     view: Either<usize, usize>,
     cursor: usize,
@@ -29,6 +30,7 @@ impl InputLine {
     pub fn new() -> Self {
         InputLine {
             value_range: InputLineValueRange::Any,
+            default: String::new(),
             text: String::new(),
             view: Left(0),
             cursor: 0,
@@ -116,6 +118,20 @@ impl InputLine {
     ) {
         window.data_mut::<InputLine>(tree).value_range = value;
         window.invalidate_render(tree);
+    }
+
+    pub fn default(&self) -> &String {
+        &self.default
+    }
+
+    pub fn default_mut<State: ?Sized, T>(
+        tree: &mut WindowTree<State>,
+        window: Window<State>,
+        value: impl FnOnce(&mut String) -> T
+    ) -> T {
+        let data = &mut window.data_mut::<InputLine>(tree);
+        let res = value(&mut data.default);
+        res
     }
 
     pub fn text(&self) -> &String {
@@ -286,6 +302,12 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
             },
             Event::Cmd(CMD_LOST_PRIMARY_FOCUS) => {
                 let data = window.data_mut::<InputLine>(tree);
+                if data.text.is_empty() {
+                    data.text = data.default.clone();
+                    if !data.text.is_empty() {
+                        data.cursor = data.text.len();
+                    }
+                }
                 data.view = if matches!(data.value_range, InputLineValueRange::Any) || data.text.is_empty() {
                     Left(0)
                 } else {

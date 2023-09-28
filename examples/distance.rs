@@ -72,6 +72,7 @@ fn main() {
     a_label.set_margin(tree, Thickness::new(1, 1, 0, 1));
     let a = InputLine::new().window(tree, edits, None).unwrap();
     InputLine::set_value_range(tree, a, InputLineValueRange::Float(f64::MIN ..= f64::MAX));
+    InputLine::default_mut(tree, a, |value| replace(value, "0".to_string()));
     InputLine::text_mut(tree, a, |value| replace(value, "0".to_string()));
     a.set_margin(tree, Thickness::new(1, 1, 1, 1));
 
@@ -80,6 +81,7 @@ fn main() {
     v_label.set_margin(tree, Thickness::new(1, 0, 0, 1));
     let v = InputLine::new().window(tree, edits, Some(a)).unwrap();
     InputLine::set_value_range(tree, v, InputLineValueRange::Float(f64::MIN ..= f64::MAX));
+    InputLine::default_mut(tree, v, |value| replace(value, "0".to_string()));
     InputLine::text_mut(tree, v, |value| replace(value, "1".to_string()));
     v.set_margin(tree, Thickness::new(1, 0, 1, 1));
 
@@ -88,6 +90,7 @@ fn main() {
     t_label.set_margin(tree, Thickness::new(1, 0, 0, 1));
     let t = InputLine::new().window(tree, edits, Some(v)).unwrap();
     InputLine::set_value_range(tree, t, InputLineValueRange::Float(f64::MIN ..= f64::MAX));
+    InputLine::default_mut(tree, t, |value| replace(value, "0".to_string()));
     InputLine::text_mut(tree, t, |value| replace(value, "0".to_string()));
     t.set_margin(tree, Thickness::new(1, 0, 1, 1));
 
@@ -96,6 +99,7 @@ fn main() {
     n_label.set_margin(tree, Thickness::new(1, 0, 0, 1));
     let n = InputLine::new().window(tree, edits, Some(t)).unwrap();
     InputLine::set_value_range(tree, n, InputLineValueRange::Integer(1 ..= i64::from(i32::MAX)));
+    InputLine::default_mut(tree, n, |value| replace(value, "1".to_string()));
     InputLine::text_mut(tree, n, |value| replace(value, "1".to_string()));
     n.set_margin(tree, Thickness::new(1, 0, 1, 1));
 
