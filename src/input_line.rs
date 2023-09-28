@@ -164,8 +164,7 @@ impl InputLine {
         value: impl FnOnce(&mut String) -> T
     ) -> T {
         let data = &mut window.data_mut::<InputLine>(tree);
-        let res = value(&mut data.default);
-        res
+        value(&mut data.default)
     }
 
     pub fn text(&self) -> &String {
