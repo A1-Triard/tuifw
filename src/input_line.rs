@@ -5,8 +5,10 @@ use core::str::FromStr;
 use either::{Either, Left, Right};
 use tuifw_screen_base::{Error, Key, Point, Rect, Vector, char_width, text_width, is_text_fit_in};
 use tuifw_screen_base::{Thickness};
-use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree};
+use tuifw_window::{Event, RenderPort, Timer, Widget, WidgetData, Window, WindowTree};
 use tuifw_window::{CMD_GOT_PRIMARY_FOCUS, CMD_LOST_PRIMARY_FOCUS};
+
+pub const CMD_ERROR_CHANGED: u16 = 110;
 
 #[derive(Debug, Clone)]
 pub enum InputLineValueRange {
@@ -19,12 +21,20 @@ pub struct InputLine {
     value_range: InputLineValueRange,
     default: String,
     text: String,
+    error: bool,
     view: Either<usize, usize>,
     cursor: usize,
     width: i16,
+    error_timer: Option<Timer>,
 }
 
-impl<State: ?Sized> WidgetData<State> for InputLine { }
+impl<State: ?Sized> WidgetData<State> for InputLine {
+    fn drop_widget_data(&mut self, tree: &mut WindowTree<State>, _state: &mut State) {
+        if let Some(timer) = self.error_timer.take() {
+            timer.drop_timer(tree);
+        }
+    }
+}
 
 impl InputLine {
     pub fn new() -> Self {
@@ -32,9 +42,11 @@ impl InputLine {
             value_range: InputLineValueRange::Any,
             default: String::new(),
             text: String::new(),
+            error: false,
             view: Left(0),
             cursor: 0,
-            width: 0
+            width: 0,
+            error_timer: None,
         }
     }
 
@@ -56,22 +68,39 @@ impl InputLine {
         Ok(w)
     }
 
-    pub fn error(&self) -> bool {
-        if self.text.is_empty() { return false; }
-        match &self.value_range {
-            InputLineValueRange::Any => false,
-            InputLineValueRange::Integer(range) => if let Ok(value) = i64::from_str(&self.text) {
-                !range.contains(&value)
-            } else {
-                true
-            },
-            InputLineValueRange::Float(range) => if let Ok(value) = f64::from_str(&self.text) {
-                !range.contains(&value)
-            } else {
-                true
-            },
+    fn update_error<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
+        let data = window.data_mut::<InputLine>(tree);
+        let error = if data.text.is_empty() {
+            false
+        } else {
+            match &data.value_range {
+                InputLineValueRange::Any => false,
+                InputLineValueRange::Integer(range) => if let Ok(value) = i64::from_str(&data.text) {
+                    !range.contains(&value)
+                } else {
+                    true
+                },
+                InputLineValueRange::Float(range) => if let Ok(value) = f64::from_str(&data.text) {
+                    !range.contains(&value)
+                } else {
+                    true
+                },
+            }
+        };
+        if error != data.error {
+            data.error = error;
+            let error_timer = Timer::new(tree, 0, Box::new(move |tree, state| {
+                window.data_mut::<InputLine>(tree).error_timer = None;
+                window.raise(tree, Event::Cmd(CMD_ERROR_CHANGED), state);
+            }));
+            let data = window.data_mut::<InputLine>(tree);
+            if let Some(timer) = data.error_timer.replace(error_timer) {
+                timer.drop_timer(tree);
+            }
         }
     }
+
+    pub fn error(&self) -> bool { self.error }
 
     fn calc_value_padding_view_and_is_tail_cursor_fit(&self) -> (i16, Range<usize>, bool) {
         match self.view {
@@ -165,6 +194,7 @@ impl InputLine {
                 Right(data.text.len() - 1)
             };
         }
+        Self::update_error(tree, window);
         window.invalidate_render(tree);
         res
     }
@@ -313,6 +343,7 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                 } else {
                     Right(data.text.len() - 1)
                 };
+                InputLine::update_error(tree, window);
                 window.invalidate_render(tree);
                 true
             },
@@ -334,6 +365,7 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                             }
                         }
                     }
+                    InputLine::update_error(tree, window);
                     window.invalidate_render(tree);
                     true
                 },
@@ -370,6 +402,7 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                             }
                         }
                     }
+                    InputLine::update_error(tree, window);
                     window.invalidate_render(tree);
                     true
                 },

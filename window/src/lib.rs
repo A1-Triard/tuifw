@@ -874,6 +874,7 @@ fn root_palette() -> Palette {
     p.set(14, Right((Fg::Cyan, Bg::None))); // button normal
     p.set(15, Right((Fg::Black, Bg::Cyan))); // button focused
     p.set(16, Right((Fg::Cyan, Bg::None))); // button pressed
+    p.set(17, Right((Fg::LightGray, Bg::None))); // button disabled
 
     p
 }

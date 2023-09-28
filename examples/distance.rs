@@ -6,6 +6,7 @@ use std::mem::replace;
 use std::str::FromStr;
 use timer_no_std::MonoClock;
 use tuifw::{Background, Button, Dock, DockPanel, InputLine, InputLineValueRange, StackPanel, StaticText};
+use tuifw::CMD_ERROR_CHANGED;
 use tuifw_screen::{HAlign, VAlign, Key, Thickness};
 use tuifw_window::{Event, EventHandler, Window, WindowTree};
 
@@ -17,6 +18,7 @@ struct State {
     t: Window<State>,
     n: Window<State>,
     s: Window<State>,
+    calc: Window<State>,
 }
 
 #[derive(Clone)]
@@ -43,6 +45,14 @@ impl EventHandler<State> for RootEventHandler {
                 let n = f64::from(i32::from_str(state.n.data::<InputLine>(tree).text()).unwrap());
                 let s = v * t + a * t * (n - 1.0) / (2.0 * n);
                 StaticText::text_mut(tree, state.s, |value| replace(value, s.to_string()));
+                true
+            },
+            Event::Cmd(CMD_ERROR_CHANGED) => {
+                let a_valid = !state.a.data::<InputLine>(tree).error();
+                let v_valid = !state.v.data::<InputLine>(tree).error();
+                let t_valid = !state.t.data::<InputLine>(tree).error();
+                let n_valid = !state.n.data::<InputLine>(tree).error();
+                Button::set_is_enabled(tree, state.calc, a_valid && v_valid && t_valid && n_valid);
                 true
             },
             _ => false
@@ -124,7 +134,7 @@ fn main() {
     t.set_next_focus(tree, n);
     n.set_next_focus(tree, a);
 
-    let state = &mut State { a, v, t, n, s };
+    let state = &mut State { a, v, t, n, s, calc };
     a.focus(tree, true, state);
     calc.focus(tree, false, state);
     tree.run(state).unwrap();
