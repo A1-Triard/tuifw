@@ -21,6 +21,7 @@ members = [
     "screen-test",
     "screen-winapi",
     "window",
+    "xaml",
 ]
 exclude = [
     "ensure_no_std",

@@ -1,0 +1,21 @@
+[package]
+edition = "2021"
+name = "tuifw-xaml"
+version = "0.23.0"
+#rust-version = "nightly"
+authors = ["warlock <internalmike@gmail.com>"]
+description = "Text User Interface Framework. XAML preprocesser."
+readme = "README.md"
+documentation = "https://docs.rs/tuifw-xaml/"
+keywords = ["tui", "xaml", "parser"]
+categories = ["command-line-interface"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/A1-Triard/tuifw"
+
+[dependencies]
+components-arena = "4.1.1"
+macro-attr-2018 = "3.0.0"
+xml-rs = "0.8.19"
+
+[badges]
+maintenance = { status = "experimental" }
