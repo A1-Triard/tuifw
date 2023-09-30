@@ -197,6 +197,13 @@ impl<'a, R: Read, W: Write> XamlProcesser<'a, R, W> {
             return self.error(format!("unexpected attribute '{}'", Self::name(&attributes[0].name)));
         }
         self.next_event()?;
+        let res = self.process_literal_value(ty)?;
+        assert!(matches!(&self.event, XmlEvent::EndElement { .. }));
+        self.next_event()?;
+        Ok(res)
+    }
+
+    fn process_literal_value(&mut self, ty: Id<XamlLiteral>) -> xml_Result<String> {
         let value = match self.event.clone() {
             XmlEvent::Characters(s) => {
                 self.next_event()?;
@@ -209,8 +216,6 @@ impl<'a, R: Read, W: Write> XamlProcesser<'a, R, W> {
             XmlEvent::EndElement { .. } => String::new(),
             _ => return self.error("unsupported XML feature"),
         };
-        assert!(matches!(&self.event, XmlEvent::EndElement { .. }));
-        self.next_event()?;
         let ty = &self.xaml.literals[ty];
         if let Some(value) = (ty.new)(&value) {
             Ok(value)
@@ -292,9 +297,9 @@ impl<'a, R: Read, W: Write> XamlProcesser<'a, R, W> {
                     let XamlType::Literal(prop_ty) = self.xaml.props[prop].ty else {
                         return self.error(format!("invalid '{}' property value", self.xaml.props[prop].name));
                     };
-                    self.process_literal(prop_ty, Vec::new())?
+                    self.process_literal_value(prop_ty)?
                 },
-                x => return self.error(format!("unsupported XML feature 2 {x:?}")),
+                _ => return self.error("unsupported XML feature"),
             };
             write!(self.dest, "{}", (self.xaml.props[prop].set)(&obj, &value))?;
             prev_value = Some(value);
@@ -371,6 +376,34 @@ mod tests {
         let source = "
             <Background xmlns='https://a1-triard.github.io/tuifw/2023/xaml'>
                 <Background.ShowPattern><Bool>True</Bool></Background.ShowPattern>
+            </Background>
+        ";
+        let mut dest = Vec::new();
+        xaml.process(source.as_bytes(), &mut dest).unwrap();
+        assert_eq!(str::from_utf8(&dest[..]).unwrap(), "\
+            let mut obj_1 = Background::new();\n\
+            Background::set_show_pattern(obj_1, true);\n\
+            obj_1\
+        ");
+    }
+
+    #[test]
+    fn process_struct_with_expanded_property_2() {
+        let mut xaml = Xaml::new(Box::new(|x| x.to_string()));
+        let b = xaml.reg_literal("{https://a1-triard.github.io/tuifw/2023/xaml}Bool", Box::new(|x| match x {
+            "True" => Some("true".to_string()),
+            "False" => Some("false".to_string()),
+            _ => None,
+        }));
+        let bg = xaml.reg_struct("{https://a1-triard.github.io/tuifw/2023/xaml}Background", Box::new(|x, _|
+            format!("let mut {x} = Background::new();\n")
+        ));
+        xaml.reg_prop(bg, "ShowPattern", XamlType::Literal(b), Box::new(|o, x|
+            format!("Background::set_show_pattern({o}, {x});\n")
+        ));
+        let source = "
+            <Background xmlns='https://a1-triard.github.io/tuifw/2023/xaml'>
+                <Background.ShowPattern>True</Background.ShowPattern>
             </Background>
         ";
         let mut dest = Vec::new();
