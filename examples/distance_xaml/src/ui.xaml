@@ -8,7 +8,11 @@
         <StaticText Text="N =" Margin="0,1,0,0" />
       </StackPanel>
       <StackPanel Width="12" Margin="1,0,0,0">
-        <InputLine Text="0" />
+        <InputLine Text="0">
+	  <InputLine.Validator>
+	    <FloatRangeValidator />
+	  </InputLine.Validator>
+	</InputLine>
         <InputLine Text="0" Margin="0,1,0,0" />
         <InputLine Text="0" Margin="0,1,0,0" />
         <InputLine Text="1" Margin="0,1,0,0" />
