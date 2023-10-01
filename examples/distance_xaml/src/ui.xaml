@@ -10,12 +10,24 @@
       <StackPanel Width="12" Margin="1,0,0,0">
         <InputLine Text="0">
 	  <InputLine.Validator>
-	    <FloatRangeValidator />
+	    <FloatValidator />
 	  </InputLine.Validator>
 	</InputLine>
-        <InputLine Text="0" Margin="0,1,0,0" />
-        <InputLine Text="0" Margin="0,1,0,0" />
-        <InputLine Text="1" Margin="0,1,0,0" />
+        <InputLine Text="0" Margin="0,1,0,0">
+	  <InputLine.Validator>
+	    <FloatValidator />
+	  </InputLine.Validator>
+	</InputLine>
+        <InputLine Text="0" Margin="0,1,0,0">
+	  <InputLine.Validator>
+	    <FloatValidator />
+	  </InputLine.Validator>
+	</InputLine>
+        <InputLine Text="1" Margin="0,1,0,0">
+	  <InputLine.Validator>
+	    <IntValidator Min="1" />
+	  </InputLine.Validator>
+	</InputLine>
       </StackPanel>
     </DockPanel>
   </StackPanel>

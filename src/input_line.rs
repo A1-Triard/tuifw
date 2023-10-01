@@ -16,12 +16,12 @@ pub trait Validator {
     fn is_valid(&self, text: &str) -> bool;
 }
 
-pub struct IntRangeValidator {
+pub struct IntValidator {
     pub min: i32,
     pub max: i32,
 }
 
-impl Validator for IntRangeValidator {
+impl Validator for IntValidator {
     fn is_numeric(&self) -> bool { true }
 
     fn is_valid(&self, text: &str) -> bool {
@@ -33,12 +33,12 @@ impl Validator for IntRangeValidator {
     }
 }
 
-pub struct FloatRangeValidator {
+pub struct FloatValidator {
     pub min: f64,
     pub max: f64,
 }
 
-impl Validator for FloatRangeValidator {
+impl Validator for FloatValidator {
     fn is_numeric(&self) -> bool { true }
 
     fn is_valid(&self, text: &str) -> bool {

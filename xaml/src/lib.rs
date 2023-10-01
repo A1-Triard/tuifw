@@ -31,12 +31,12 @@ pub fn reg_widgets(xaml: &mut Xaml) {
     let v_align = xaml.reg_literal(xmlns!("VAlign"));
     let dock = xaml.reg_literal(xmlns!("Dock"));
     let validator = xaml.reg_struct(xmlns!("Validator"), None);
-    let int_range_validator = xaml.reg_struct(xmlns!("IntRangeValidator"), Some(validator));
-    let int_range_validator_min = xaml.reg_prop(int_range_validator, "Min", XamlType::Literal(int_32));
-    let int_range_validator_max = xaml.reg_prop(int_range_validator, "Max", XamlType::Literal(int_32));
-    let float_range_validator = xaml.reg_struct(xmlns!("FloatRangeValidator"), Some(validator));
-    let float_range_validator_min = xaml.reg_prop(float_range_validator, "Min", XamlType::Literal(float_64));
-    let float_range_validator_max = xaml.reg_prop(float_range_validator, "Max", XamlType::Literal(float_64));
+    let int_validator = xaml.reg_struct(xmlns!("IntValidator"), Some(validator));
+    let int_validator_min = xaml.reg_prop(int_validator, "Min", XamlType::Literal(int_32));
+    let int_validator_max = xaml.reg_prop(int_validator, "Max", XamlType::Literal(int_32));
+    let float_validator = xaml.reg_struct(xmlns!("FloatValidator"), Some(validator));
+    let float_validator_min = xaml.reg_prop(float_validator, "Min", XamlType::Literal(float_64));
+    let float_validator_max = xaml.reg_prop(float_validator, "Max", XamlType::Literal(float_64));
     let widget = xaml.reg_struct(xmlns!("Widget"), None);
     let widget_children = xaml.reg_prop(widget, "Children", XamlType::Struct(widget));
     xaml.set_as_content_prop(widget_children);
@@ -133,30 +133,30 @@ pub fn reg_widgets(xaml: &mut Xaml) {
     xaml.set_res(Box::new(|_| indent_all_by(4, format!(indoc! { "
         Ok(tree)
     " }))));
-    xaml.set_struct_new(int_range_validator, Some(Box::new(|obj, _parent| {
+    xaml.set_struct_new(int_validator, Some(Box::new(|obj, _parent| {
         indent_all_by(4, format!(indoc! { "
             #[allow(unused_mut)]
             #[allow(unused_variables)]
-            let mut {} = IntRangeValidator {{ min: i32::MIN, max: i32::MAX }};
+            let mut {} = IntValidator {{ min: i32::MIN, max: i32::MAX }};
         " }, obj))
     })));
-    xaml.set_prop_set(int_range_validator_min, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    xaml.set_prop_set(int_validator_min, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.min = {};
     " }, obj, value))));
-    xaml.set_prop_set(int_range_validator_max, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    xaml.set_prop_set(int_validator_max, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.max = {};
     " }, obj, value))));
-    xaml.set_struct_new(float_range_validator, Some(Box::new(|obj, _parent| {
+    xaml.set_struct_new(float_validator, Some(Box::new(|obj, _parent| {
         indent_all_by(4, format!(indoc! { "
             #[allow(unused_mut)]
             #[allow(unused_variables)]
-            let mut {} = FloatRangeValidator {{ min: f64::MIN, max: f64::MAX }};
+            let mut {} = FloatValidator {{ min: f64::MIN, max: f64::MAX }};
         " }, obj))
     })));
-    xaml.set_prop_set(float_range_validator_min, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    xaml.set_prop_set(float_validator_min, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.min = {};
     " }, obj, value))));
-    xaml.set_prop_set(float_range_validator_max, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    xaml.set_prop_set(float_validator_max, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.max = {};
     " }, obj, value))));
     xaml.set_prop_set(widget_children, Box::new(|_obj, _value| String::new()));
