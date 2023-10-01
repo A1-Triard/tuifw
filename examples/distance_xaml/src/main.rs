@@ -90,5 +90,7 @@ fn start() -> Result<(), Error> {
     let tree = &mut ui::build_tree(screen, &clock)?;
     let root = tree.root();
     root.set_event_handler(tree, Some(Box::new(RootEventHandler)));
+    let a = tree.window_by_tag(1).unwrap();
+    a.focus(tree, true, &mut ());
     tree.run(&mut ())
 }

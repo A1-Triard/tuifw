@@ -24,6 +24,7 @@ pub fn reg_widgets(xaml: &mut Xaml) {
     let boolean = xaml.reg_literal(xmlns!("Bool"));
     let string = xaml.reg_literal(xmlns!("String"));
     let int_16 = xaml.reg_literal(xmlns!("I16"));
+    let uint_16 = xaml.reg_literal(xmlns!("U16"));
     let int_32 = xaml.reg_literal(xmlns!("I32"));
     let float_64 = xaml.reg_literal(xmlns!("F64"));
     let thickness = xaml.reg_literal(xmlns!("Thickness"));
@@ -40,6 +41,7 @@ pub fn reg_widgets(xaml: &mut Xaml) {
     let widget = xaml.reg_struct(xmlns!("Widget"), None);
     let widget_children = xaml.reg_prop(widget, "Children", XamlType::Struct(widget));
     xaml.set_as_content_prop(widget_children);
+    let widget_tag = xaml.reg_prop(widget, "Tag", XamlType::Literal(uint_16));
     let widget_h_align = xaml.reg_prop(widget, "HAlign", XamlType::Literal(h_align));
     let widget_v_align = xaml.reg_prop(widget, "VAlign", XamlType::Literal(v_align));
     let widget_width = xaml.reg_prop(widget, "Width", XamlType::Literal(int_16));
@@ -63,6 +65,7 @@ pub fn reg_widgets(xaml: &mut Xaml) {
     }));
     xaml.set_literal_new(string, Box::new(|x| Some(format!("\"{}\"", x.escape_debug()))));
     xaml.set_literal_new(int_16, Box::new(|x| i16::from_str(x).ok().map(|x| x.to_string())));
+    xaml.set_literal_new(uint_16, Box::new(|x| u16::from_str(x).ok().map(|x| x.to_string())));
     xaml.set_literal_new(int_32, Box::new(|x| i32::from_str(x).ok().map(|x| x.to_string())));
     xaml.set_literal_new(float_64, Box::new(|x| f64::from_str(x).ok().map(|x| x.to_string())));
     xaml.set_literal_new(thickness, Box::new(|x| {
@@ -160,6 +163,9 @@ pub fn reg_widgets(xaml: &mut Xaml) {
         {}.max = {};
     " }, obj, value))));
     xaml.set_prop_set(widget_children, Box::new(|_obj, _value| String::new()));
+    xaml.set_prop_set(widget_tag, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_tag(&mut tree, {});
+    " }, obj, value))));
     xaml.set_prop_set(widget_h_align, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_h_align(&mut tree, {});
     " }, obj, value))));

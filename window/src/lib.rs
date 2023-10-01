@@ -306,6 +306,7 @@ macro_attr! {
         event_handler: Option<Box<dyn EventHandler<State>>>,
         next_focus: Window<State>,
         contains_primary_focus: bool,
+        tag: u16,
     }
 }
 
@@ -364,6 +365,7 @@ impl<State: ?Sized> Window<State> {
                 max_size: Vector { x: -1, y: -1 },
                 next_focus: Window(window),
                 contains_primary_focus: false,
+                tag: 0,
             }, Window(window))
         });
         window.attach(tree, parent, prev);
@@ -758,6 +760,24 @@ impl<State: ?Sized> Window<State> {
         invalidate_rect(tree.screen(), screen_bounds);
     }
 
+    pub fn tag(self, tree: &WindowTree<State>) -> u16 {
+        tree.arena[self.0].tag
+    }
+
+    pub fn set_tag(self, tree: &mut WindowTree<State>, value: u16) {
+        let old_tag = tree.arena[self.0].tag;
+        if old_tag != 0 {
+            tree.tagged[usize::from(old_tag - 1)] = None;
+        }
+        tree.arena[self.0].tag = value;
+        if value != 0 {
+            if usize::from(value) > tree.tagged.len() {
+                tree.tagged.resize(usize::from(value), None);
+            }
+            assert!(tree.tagged[usize::from(value - 1)].replace(self).is_none());
+        }
+    }
+
     fn detach(
         self,
         tree: &mut WindowTree<State>
@@ -923,6 +943,7 @@ pub struct WindowTree<'clock, State: ?Sized + 'static> {
     quit: bool,
     timers: Arena<TimerData<State>>,
     clock: &'clock MonoClock,
+    tagged: Vec<Option<Window<State>>>,
 }
 
 impl<'clock, State: ?Sized> WindowTree<'clock, State> {
@@ -957,6 +978,7 @@ impl<'clock, State: ?Sized> WindowTree<'clock, State> {
             palette: root_palette(),
             next_focus: Window(window),
             contains_primary_focus: true,
+            tag: 0,
         }, Window(window)));
         Ok(WindowTree {
             screen: Some(screen),
@@ -968,7 +990,16 @@ impl<'clock, State: ?Sized> WindowTree<'clock, State> {
             quit: false,
             clock,
             timers: Arena::new(),
+            tagged: Vec::new(),
         })
+    }
+
+    pub fn window_by_tag(&self, tag: u16) -> Option<Window<State>> {
+        if tag != 0 && usize::from(tag) <= self.tagged.len() {
+            self.tagged[usize::from(tag - 1)]
+        } else {
+            None
+        }
     }
 
     pub fn root(&self) -> Window<State> { self.root }
