@@ -1,0 +1,18 @@
+<Background xmlns='https://a1-triard.github.io/tuifw/2023/xaml'>
+  <StackPanel HAlign="Center" VAlign="Center">
+    <DockPanel Margin="1">
+      <StackPanel Dock="Left">
+        <StaticText Text="A =" />
+        <StaticText Text="V =" Margin="0,1,0,0" />
+        <StaticText Text="T =" Margin="0,1,0,0" />
+        <StaticText Text="N =" Margin="0,1,0,0" />
+      </StackPanel>
+      <StackPanel Width="12" Margin="1,0,0,0">
+        <InputLine Text="0" />
+        <InputLine Text="0" Margin="0,1,0,0" />
+        <InputLine Text="0" Margin="0,1,0,0" />
+        <InputLine Text="1" Margin="0,1,0,0" />
+      </StackPanel>
+    </DockPanel>
+  </StackPanel>
+</Background>
