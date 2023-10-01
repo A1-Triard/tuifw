@@ -58,6 +58,8 @@ pub fn reg_widgets(xaml: &mut Xaml) {
     let input_line = xaml.reg_struct(xmlns!("InputLine"), Some(widget));
     let input_line_text = xaml.reg_prop(input_line, "Text", XamlType::Literal(string));
     let input_line_validator = xaml.reg_prop(input_line, "Validator", XamlType::Struct(validator));
+    let button = xaml.reg_struct(xmlns!("Button"), Some(widget));
+    let button_text = xaml.reg_prop(button, "Text", XamlType::Literal(string));
     xaml.set_literal_new(boolean, Box::new(|x| match x {
         "True" => Some("true".to_string()),
         "False" => Some("false".to_string()),
@@ -308,5 +310,30 @@ pub fn reg_widgets(xaml: &mut Xaml) {
     " }, obj, value))));
     xaml.set_prop_set(input_line_validator, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         InputLine::validator_mut(&mut tree, {}, |value| value.replace(Box::new({})));
+    " }, obj, value))));
+    xaml.set_struct_new(button, Some(Box::new(|obj, parent| {
+        if let Some((parent, _parent_prop, prev)) = parent {
+            if let Some(prev) = prev {
+                indent_all_by(4, format!(indoc! { "
+                    #[allow(unused_variables)]
+                    let {} = Button::new().window(&mut tree, {}, Some({}))?;
+                " }, obj, parent, prev))
+            } else {
+                indent_all_by(4, format!(indoc! { "
+                    #[allow(unused_variables)]
+                    let {} = Button::new().window(&mut tree, {}, None)?;
+                " }, obj, parent))
+            }
+        } else {
+            indent_all_by(4, format!(indoc! { "
+                #[allow(unused_mut)]
+                let mut tree = Button::new().window_tree(screen, clock)?;
+                #[allow(unused_variables)]
+                let {} = tree.root();
+            " }, obj))
+        }
+    })));
+    xaml.set_prop_set(button_text, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        Button::text_mut(&mut tree, {}, |value| replace(value, {}.to_string()));
     " }, obj, value))));
 }

@@ -418,10 +418,10 @@ impl<State: ?Sized> Window<State> {
         let node = &mut tree.arena[self.0];
         let margined_bounds = node.margin.shrink_rect(final_bounds);
         let arrange_size = Vector {
-            x: if node.h_align.is_none() { margined_bounds.w() } else { node.desired_size.x },
-            y: if node.v_align.is_none() { margined_bounds.h() } else { node.desired_size.y }
+            x: if node.h_align.is_none() { final_bounds.w() } else { node.desired_size.x },
+            y: if node.v_align.is_none() { final_bounds.h() } else { node.desired_size.y }
         };
-        let arrange_size = arrange_size.min(node.max_size).max(node.min_size);
+        let arrange_size = node.margin.shrink_rect_size(arrange_size).min(node.max_size).max(node.min_size);
         if node.arrange_size == Some(arrange_size) { return; }
         node.arrange_size = Some(arrange_size);
         let widget = node.widget.clone();
