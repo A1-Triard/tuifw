@@ -209,14 +209,14 @@ impl Xaml {
         let event = source.next()?;
         write!(dest, "{}", self.preamble)?;
         write!(dest, "{}", self.header)?;
-        let mut processer = XamlProcesser { xaml: self, source, dest, event, obj_n: 0 };
-        processer.process()?;
-        write!(processer.dest, "{}", self.footer)?;
+        let mut processor = XamlProcessor { xaml: self, source, dest, event, obj_n: 0 };
+        processor.process()?;
+        write!(processor.dest, "{}", self.footer)?;
         Ok(())
     }
 }
 
-struct XamlProcesser<'a, R: Read, W: Write> {
+struct XamlProcessor<'a, R: Read, W: Write> {
     xaml: &'a Xaml,
     source: EventReader<R>,
     dest: W,
@@ -224,7 +224,7 @@ struct XamlProcesser<'a, R: Read, W: Write> {
     obj_n: u16,
 }
 
-impl<'a, R: Read, W: Write> XamlProcesser<'a, R, W> {
+impl<'a, R: Read, W: Write> XamlProcessor<'a, R, W> {
     fn next_event(&mut self) -> xml_Result<()> {
         self.event = self.source.next()?;
         while matches!(&self.event, XmlEvent::Comment(_)) || matches!(&self.event, XmlEvent::Whitespace(_)) {

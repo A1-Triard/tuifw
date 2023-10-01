@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
 use alloc::string::String;
-use core::ops::{Range, RangeInclusive};
+use core::ops::Range;
 use core::str::FromStr;
 use either::{Either, Left, Right};
 use tuifw_screen_base::{Error, Key, Point, Rect, Vector, char_width, text_width, is_text_fit_in};
@@ -10,15 +10,48 @@ use tuifw_window::{CMD_GOT_PRIMARY_FOCUS, CMD_LOST_PRIMARY_FOCUS};
 
 pub const CMD_IS_VALID_EMPTY_CHANGED: u16 = 110;
 
-#[derive(Debug, Clone)]
-pub enum InputLineValueRange {
-    Any,
-    Integer(RangeInclusive<i64>),
-    Float(RangeInclusive<f64>),
+pub trait Validator {
+    fn is_numeric(&self) -> bool;
+
+    fn is_valid(&self, text: &str) -> bool;
+}
+
+pub struct IntRangeValidator {
+    pub min: i32,
+    pub max: i32,
+}
+
+impl Validator for IntRangeValidator {
+    fn is_numeric(&self) -> bool { true }
+
+    fn is_valid(&self, text: &str) -> bool {
+        if let Ok(value) = i32::from_str(text) {
+            (self.min ..= self.max).contains(&value)
+        } else {
+            false
+        }
+    }
+}
+
+pub struct FloatRangeValidator {
+    pub min: f64,
+    pub max: f64,
+}
+
+impl Validator for FloatRangeValidator {
+    fn is_numeric(&self) -> bool { true }
+
+    fn is_valid(&self, text: &str) -> bool {
+        if let Ok(value) = f64::from_str(text) {
+            (self.min ..= self.max).contains(&value)
+        } else {
+            false
+        }
+    }
 }
 
 pub struct InputLine {
-    value_range: InputLineValueRange,
+    validator: Option<Box<dyn Validator>>,
     default: String,
     text: String,
     is_valid: bool,
@@ -40,7 +73,7 @@ impl<State: ?Sized> WidgetData<State> for InputLine {
 impl InputLine {
     pub fn new() -> Self {
         InputLine {
-            value_range: InputLineValueRange::Any,
+            validator: None,
             default: String::new(),
             text: String::new(),
             is_valid: true,
@@ -74,20 +107,10 @@ impl InputLine {
         let data = window.data_mut::<InputLine>(tree);
         let (is_valid, is_empty) = if data.text.is_empty() {
             (true, true)
+        } else if let Some(validator) = data.validator.as_deref() {
+            (validator.is_valid(&data.text), false)
         } else {
-            (match &data.value_range {
-                InputLineValueRange::Any => true,
-                InputLineValueRange::Integer(range) => if let Ok(value) = i64::from_str(&data.text) {
-                    range.contains(&value)
-                } else {
-                    false
-                },
-                InputLineValueRange::Float(range) => if let Ok(value) = f64::from_str(&data.text) {
-                    range.contains(&value)
-                } else {
-                    false
-                },
-            }, false)
+            (true, false)
         };
         if is_valid != data.is_valid || is_empty != data.is_empty {
             data.is_valid = is_valid;
@@ -143,15 +166,21 @@ impl InputLine {
         }
     }
 
-    pub fn value_range(&self) -> InputLineValueRange { self.value_range.clone() }
+    pub fn validator(&self) -> &Option<Box<dyn Validator>> { &self.validator }
 
-    pub fn set_value_range<State: ?Sized>(
+    pub fn validator_mut<State: ?Sized, T>(
         tree: &mut WindowTree<State>,
         window: Window<State>,
-        value: InputLineValueRange
-    ) {
-        window.data_mut::<InputLine>(tree).value_range = value;
+        value: impl FnOnce(&mut Option<Box<dyn Validator>>) -> T
+    ) -> T {
+        let data = &mut window.data_mut::<InputLine>(tree);
+        let res = value(&mut data.validator);
         window.invalidate_render(tree);
+        res
+    }
+
+    pub fn is_numeric(&self) -> bool {
+        self.validator.as_deref().map_or(false, |x| x.is_numeric())
     }
 
     pub fn default(&self) -> &String {
@@ -183,7 +212,7 @@ impl InputLine {
         if focused {
             let text_fit_width = (data.width as u16).saturating_sub(1) as i16;
             if is_text_fit_in(text_fit_width, &data.text) {
-                data.view = if matches!(data.value_range, InputLineValueRange::Any) {
+                data.view = if !data.is_numeric() {
                     Left(0)
                 } else {
                     Right(data.text.len())
@@ -192,7 +221,7 @@ impl InputLine {
                 data.view = Right(data.cursor);
             }
         } else {
-            data.view = if matches!(data.value_range, InputLineValueRange::Any) || data.text.is_empty() {
+            data.view = if !data.is_numeric() || data.text.is_empty() {
                 Left(0)
             } else {
                 Right(data.text.len() - 1)
@@ -280,13 +309,13 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
         };
         if is_text_fit_in(text_fit_width, &data.text) {
             if focused && data.cursor == data.text.len() {
-                data.view = if matches!(data.value_range, InputLineValueRange::Any) {
+                data.view = if !data.is_numeric() {
                     Left(0)
                 } else {
                     Right(data.text.len())
                 };
             } else {
-                data.view = if matches!(data.value_range, InputLineValueRange::Any) || data.text.is_empty() {
+                data.view = if !data.is_numeric() || data.text.is_empty() {
                     Left(0)
                 } else {
                     Right(data.text.len() - 1)
@@ -314,15 +343,13 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                 };
                 if is_text_fit_in(text_fit_width, &data.text) {
                     if data.cursor == data.text.len() {
-                        data.view = if matches!(data.value_range, InputLineValueRange::Any) {
+                        data.view = if !data.is_numeric() {
                             Left(0)
                         } else {
                             Right(data.text.len())
                         };
                     } else {
-                        data.view = if
-                            matches!(data.value_range, InputLineValueRange::Any) || data.text.is_empty()
-                        {
+                        data.view = if !data.is_numeric() || data.text.is_empty() {
                             Left(0)
                         } else {
                             Right(data.text.len() - 1)
@@ -342,7 +369,7 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                         data.cursor = data.text.len();
                     }
                 }
-                data.view = if matches!(data.value_range, InputLineValueRange::Any) || data.text.is_empty() {
+                data.view = if !data.is_numeric() || data.text.is_empty() {
                     Left(0)
                 } else {
                     Right(data.text.len() - 1)
@@ -386,16 +413,13 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                             };
                             if is_text_fit_in(text_fit_width, &data.text) {
                                 if data.cursor == data.text.len() {
-                                    data.view = if matches!(data.value_range, InputLineValueRange::Any) {
+                                    data.view = if !data.is_numeric() {
                                         Left(0)
                                     } else {
                                         Right(data.text.len())
                                     };
                                 } else {
-                                    data.view = if
-                                        matches!(data.value_range, InputLineValueRange::Any) ||
-                                        data.text.is_empty()
-                                    {
+                                    data.view = if !data.is_numeric() || data.text.is_empty() {
                                         Left(0)
                                     } else {
                                         Right(data.text.len() - 1)

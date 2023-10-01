@@ -5,8 +5,8 @@
 use std::mem::replace;
 use std::str::FromStr;
 use timer_no_std::MonoClock;
-use tuifw::{Background, Button, Dock, DockPanel, InputLine, InputLineValueRange, StackPanel, StaticText};
-use tuifw::CMD_IS_VALID_EMPTY_CHANGED;
+use tuifw::{Background, Button, Dock, DockPanel, InputLine, StackPanel, StaticText};
+use tuifw::{CMD_IS_VALID_EMPTY_CHANGED, IntRangeValidator, FloatRangeValidator};
 use tuifw_screen::{HAlign, VAlign, Key, Thickness};
 use tuifw_window::{Event, EventHandler, Window, WindowTree};
 
@@ -87,7 +87,9 @@ fn main() {
     StaticText::text_mut(tree, a_label, |value| replace(value, "A =".to_string()));
     a_label.set_margin(tree, Thickness::new(1, 1, 0, 1));
     let a = InputLine::new().window(tree, edits, None).unwrap();
-    InputLine::set_value_range(tree, a, InputLineValueRange::Float(f64::MIN ..= f64::MAX));
+    InputLine::validator_mut(tree, a, |value| value.replace(
+        Box::new(FloatRangeValidator { min: f64::MIN, max: f64::MAX })
+    ));
     InputLine::default_mut(tree, a, |value| replace(value, "0".to_string()));
     InputLine::text_mut(tree, a, |value| replace(value, "0".to_string()));
     a.set_margin(tree, Thickness::new(1, 1, 1, 1));
@@ -96,7 +98,9 @@ fn main() {
     StaticText::text_mut(tree, v_label, |value| replace(value, "V =".to_string()));
     v_label.set_margin(tree, Thickness::new(1, 0, 0, 1));
     let v = InputLine::new().window(tree, edits, Some(a)).unwrap();
-    InputLine::set_value_range(tree, v, InputLineValueRange::Float(f64::MIN ..= f64::MAX));
+    InputLine::validator_mut(tree, v, |value| value.replace(
+        Box::new(FloatRangeValidator { min: f64::MIN, max: f64::MAX })
+    ));
     InputLine::default_mut(tree, v, |value| replace(value, "0".to_string()));
     InputLine::text_mut(tree, v, |value| replace(value, "1".to_string()));
     v.set_margin(tree, Thickness::new(1, 0, 1, 1));
@@ -105,7 +109,9 @@ fn main() {
     StaticText::text_mut(tree, t_label, |value| replace(value, "T =".to_string()));
     t_label.set_margin(tree, Thickness::new(1, 0, 0, 1));
     let t = InputLine::new().window(tree, edits, Some(v)).unwrap();
-    InputLine::set_value_range(tree, t, InputLineValueRange::Float(f64::MIN ..= f64::MAX));
+    InputLine::validator_mut(tree, t, |value| value.replace(
+        Box::new(FloatRangeValidator { min: f64::MIN, max: f64::MAX })
+    ));
     InputLine::default_mut(tree, t, |value| replace(value, "0".to_string()));
     InputLine::text_mut(tree, t, |value| replace(value, "0".to_string()));
     t.set_margin(tree, Thickness::new(1, 0, 1, 1));
@@ -114,7 +120,9 @@ fn main() {
     StaticText::text_mut(tree, n_label, |value| replace(value, "N =".to_string()));
     n_label.set_margin(tree, Thickness::new(1, 0, 0, 1));
     let n = InputLine::new().window(tree, edits, Some(t)).unwrap();
-    InputLine::set_value_range(tree, n, InputLineValueRange::Integer(1 ..= i64::from(i32::MAX)));
+    InputLine::validator_mut(tree, n, |value| value.replace(
+        Box::new(IntRangeValidator { min: 1, max: i32::MAX })
+    ));
     InputLine::default_mut(tree, n, |value| replace(value, "1".to_string()));
     InputLine::text_mut(tree, n, |value| replace(value, "1".to_string()));
     n.set_margin(tree, Thickness::new(1, 0, 1, 1));
