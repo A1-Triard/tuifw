@@ -133,8 +133,6 @@ fn start() -> Result<(), Error> {
     let calc = tree.window_by_tag(5).unwrap();
     let s = tree.window_by_tag(6).unwrap();
     let state = &mut State { a, v, t, n, s, calc };
-    a.focus(tree, true, state);
-    calc.focus(tree, false, state);
     Button::set_cmd(tree, calc, CMD_CALC);
     tree.run(state)
 }
