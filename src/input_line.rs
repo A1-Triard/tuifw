@@ -1,9 +1,10 @@
+use crate::{prop_obj_render, prop_string, prop_string_render, prop_value_render, widget};
 use alloc::boxed::Box;
 use alloc::string::String;
 use core::ops::Range;
 use core::str::FromStr;
 use either::{Either, Left, Right};
-use tuifw_screen_base::{Error, Key, Point, Rect, Vector, char_width, text_width, is_text_fit_in};
+use tuifw_screen_base::{Key, Point, Rect, Vector, char_width, text_width, is_text_fit_in};
 use tuifw_screen_base::{Thickness};
 use tuifw_window::{Event, RenderPort, Timer, Widget, WidgetData, Window, WindowTree};
 use tuifw_window::{CMD_GOT_PRIMARY_FOCUS, CMD_LOST_PRIMARY_FOCUS};
@@ -85,22 +86,25 @@ impl InputLine {
         }
     }
 
-    fn set_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
+    fn init_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
         window.palette_mut(tree, |palette| {
             palette.set(0, Left(12));
             palette.set(1, Left(13));
         });
     }
 
-    pub fn window<State: ?Sized>(
-        self,
-        tree: &mut WindowTree<State>,
-        parent: Window<State>,
-        prev: Option<Window<State>>
-    ) -> Result<Window<State>, Error> {
-        let w = Window::new(tree, Box::new(InputLineWidget), Box::new(self), parent, prev)?;
-        Self::set_palette(tree, w);
-        Ok(w)
+    widget!(InputLineWidget; init_palette);
+    prop_string!(default);
+    prop_string_render!(text; on_text_changed);
+    prop_value_render!(cursor: usize | assert_cursor);
+    prop_value_render!(view: Either<usize, usize> | assert_view);
+
+    fn assert_view(&self, value: Either<usize, usize>) {
+        assert!(value.map(|x| x <= self.text.len()).into_inner());
+    }
+
+    fn assert_cursor(&self, value: usize) {
+        assert!(value <= self.text.len());
     }
 
     fn update_is_valid_empty<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
@@ -166,48 +170,15 @@ impl InputLine {
         }
     }
 
-    pub fn validator(&self) -> &Option<Box<dyn Validator>> { &self.validator }
-
-    pub fn validator_mut<State: ?Sized, T>(
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
-        value: impl FnOnce(&mut Option<Box<dyn Validator>>) -> T
-    ) -> T {
-        let data = &mut window.data_mut::<InputLine>(tree);
-        let res = value(&mut data.validator);
-        window.invalidate_render(tree);
-        res
-    }
+    prop_obj_render!(validator: Option<Box<dyn Validator>>);
 
     pub fn is_numeric(&self) -> bool {
         self.validator.as_deref().map_or(false, |x| x.is_numeric())
     }
 
-    pub fn default(&self) -> &String {
-        &self.default
-    }
-
-    pub fn default_mut<State: ?Sized, T>(
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
-        value: impl FnOnce(&mut String) -> T
-    ) -> T {
-        let data = &mut window.data_mut::<InputLine>(tree);
-        value(&mut data.default)
-    }
-
-    pub fn text(&self) -> &String {
-        &self.text
-    }
-
-    pub fn text_mut<State: ?Sized, T>(
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
-        value: impl FnOnce(&mut String) -> T
-    ) -> T {
+    fn on_text_changed<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
         let focused = window.is_focused(tree);
         let data = &mut window.data_mut::<InputLine>(tree);
-        let res = value(&mut data.text);
         data.cursor = data.text.len();
         if focused {
             let text_fit_width = (data.width as u16).saturating_sub(1) as i16;
@@ -228,26 +199,6 @@ impl InputLine {
             };
         }
         Self::update_is_valid_empty(tree, window);
-        window.invalidate_render(tree);
-        res
-    }
-
-    pub fn cursor(&self) -> usize { self.cursor }
-
-    pub fn set_cursor<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>, value: usize) {
-        let data = &mut window.data_mut::<InputLine>(tree);
-        assert!(value <= data.text.len());
-        data.cursor = value;
-        window.invalidate_render(tree);
-    }
-
-    pub fn view(&self) -> Either<usize, usize> { self.view }
-
-    pub fn set_view<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>, value: Either<usize, usize>) {
-        let data = &mut window.data_mut::<InputLine>(tree);
-        assert!(value.map(|x| x <= data.text.len()).into_inner());
-        data.view = value;
-        window.invalidate_render(tree);
     }
 }
 

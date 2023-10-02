@@ -1,5 +1,5 @@
-use alloc::boxed::Box;
-use tuifw_screen_base::{Error, Rect, Vector};
+use crate::{prop_value_measure, widget};
+use tuifw_screen_base::{Rect, Vector};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree};
 
 pub struct StackPanel {
@@ -13,21 +13,8 @@ impl StackPanel {
         StackPanel { vertical: true }
     }
 
-    pub fn vertical(&self) -> bool { self.vertical }
-
-    pub fn window<State: ?Sized>(
-        self,
-        tree: &mut WindowTree<State>,
-        parent: Window<State>,
-        prev: Option<Window<State>>
-    ) -> Result<Window<State>, Error> {
-        Window::new(tree, Box::new(StackPanelWidget), Box::new(self), parent, prev)
-    }
-
-    pub fn set_vertical<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>, value: bool) {
-        window.data_mut::<StackPanel>(tree).vertical = value;
-        window.invalidate_measure(tree);
-    }
+    widget!(StackPanelWidget);
+    prop_value_measure!(vertical: bool);
 }
 
 impl Default for StackPanel {

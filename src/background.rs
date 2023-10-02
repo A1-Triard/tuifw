@@ -1,7 +1,7 @@
-use alloc::boxed::Box;
+use crate::{prop_string_render, prop_value_render, widget};
 use alloc::string::{String, ToString};
-use timer_no_std::MonoClock;
-use tuifw_screen_base::{Error, Rect, Screen, Vector};
+use either::Left;
+use tuifw_screen_base::{Rect, Vector};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree};
 
 pub struct Background {
@@ -17,55 +17,14 @@ impl Background {
         Background { pattern_even: "░".to_string(), pattern_odd: "░".to_string(), show_pattern: false }
     }
 
-    pub fn window<State: ?Sized>(
-        self,
-        tree: &mut WindowTree<State>,
-        parent: Window<State>,
-        prev: Option<Window<State>>
-    ) -> Result<Window<State>, Error> {
-        Window::new(tree, Box::new(BackgroundWidget), Box::new(self), parent, prev)
+    fn init_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
+        window.palette_mut(tree, |palette| palette.set(0, Left(10)));
     }
 
-    pub fn window_tree<State: ?Sized>(
-        self,
-        screen: Box<dyn Screen>,
-        clock: &MonoClock,
-    ) -> Result<WindowTree<State>, Error> {
-        WindowTree::new(screen, clock, Box::new(BackgroundWidget), Box::new(self))
-    }
-
-    pub fn show_pattern(&self) -> bool { self.show_pattern }
-
-    pub fn set_show_pattern<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>, value: bool) {
-        window.data_mut::<Background>(tree).show_pattern = value;
-        window.invalidate_render(tree);
-    }
-
-    pub fn pattern_even(&self) -> &String { &self.pattern_even }
-
-    pub fn pattern_even_mut<State: ?Sized, T>(
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
-        f: impl FnOnce(&mut String) -> T
-    ) -> T {
-        let value = &mut window.data_mut::<Background>(tree).pattern_even;
-        let res = f(value);
-        window.invalidate_render(tree);
-        res
-    }
-
-    pub fn pattern_odd(&self) -> &String { &self.pattern_odd }
-
-    pub fn pattern_odd_mut<State: ?Sized, T>(
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
-        f: impl FnOnce(&mut String) -> T
-    ) -> T {
-        let value = &mut window.data_mut::<Background>(tree).pattern_odd;
-        let res = f(value);
-        window.invalidate_render(tree);
-        res
-    }
+    widget!(BackgroundWidget; init_palette);
+    prop_value_render!(show_pattern: bool);
+    prop_string_render!(pattern_even);
+    prop_string_render!(pattern_odd);
 }
 
 impl Default for Background {
@@ -94,9 +53,9 @@ impl<State: ?Sized> Widget<State> for BackgroundWidget {
             if !data.show_pattern {
                 " "
             } else if p.x % 2 == 0 {
-                data.pattern_even()
+                &data.pattern_even
             } else {
-                data.pattern_odd()
+                &data.pattern_odd
             }
         ));
     }

@@ -1,8 +1,7 @@
-use alloc::boxed::Box;
+use crate::{prop_string_measure, widget};
 use alloc::string::String;
 use either::Left;
-use timer_no_std::MonoClock;
-use tuifw_screen_base::{Error, Point, Rect, Screen, Vector, text_width};
+use tuifw_screen_base::{Point, Rect, Vector, text_width};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree};
 
 pub struct StaticText {
@@ -16,46 +15,12 @@ impl StaticText {
         StaticText { text: String::new() }
     }
 
-    fn set_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
+    fn init_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
         window.palette_mut(tree, |palette| palette.set(0, Left(11)));
     }
 
-    pub fn window<State: ?Sized>(
-        self,
-        tree: &mut WindowTree<State>,
-        parent: Window<State>,
-        prev: Option<Window<State>>
-    ) -> Result<Window<State>, Error> {
-        let w = Window::new(tree, Box::new(StaticTextWidget), Box::new(self), parent, prev)?;
-        Self::set_palette(tree, w);
-        Ok(w)
-    }
-
-    pub fn window_tree<State: ?Sized>(
-        self,
-        screen: Box<dyn Screen>,
-        clock: &MonoClock,
-    ) -> Result<WindowTree<State>, Error> {
-        let mut tree = WindowTree::new(screen, clock, Box::new(StaticTextWidget), Box::new(self))?;
-        let w = tree.root();
-        Self::set_palette(&mut tree, w);
-        Ok(tree)
-    }
-
-    pub fn text(&self) -> &String {
-        &self.text
-    }
-
-    pub fn text_mut<State: ?Sized, T>(
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
-        value: impl FnOnce(&mut String) -> T
-    ) -> T {
-        let data = &mut window.data_mut::<StaticText>(tree).text;
-        let res = value(data);
-        window.invalidate_measure(tree);
-        res
-    }
+    widget!(StaticTextWidget; init_palette);
+    prop_string_measure!(text);
 }
 
 impl Default for StaticText {

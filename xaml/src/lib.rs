@@ -119,10 +119,6 @@ pub fn reg_widgets(xaml: &mut Xaml) {
         extern crate alloc;
 
         use alloc::boxed::Box;
-        #[allow(unused_imports)]
-        use alloc::string::ToString;
-        #[allow(unused_imports)]
-        use core::mem::replace;
         use timer_no_std::MonoClock;
         use tuifw::*;
         use tuifw_screen::*;
@@ -218,10 +214,10 @@ pub fn reg_widgets(xaml: &mut Xaml) {
         Background::set_show_pattern(&mut tree, {}, {});
     " }, obj, value))));
     xaml.set_prop_set(background_pattern_even, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        Background::pattern_even_mut(&mut tree, {}, |value| replace(value, {}.to_string()));
+        Background::set_pattern_even(&mut tree, {}, {});
     " }, obj, value))));
     xaml.set_prop_set(background_pattern_odd, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        Background::pattern_odd_mut(&mut tree, {}, |value| replace(value, {}.to_string()));
+        Background::set_pattern_odd(&mut tree, {}, {});
     " }, obj, value))));
     xaml.set_struct_new(stack_panel, Some(Box::new(|obj, parent| {
         if let Some((parent, _parent_prop, prev)) = parent {

@@ -1,13 +1,14 @@
+use crate::widget;
 use alloc::boxed::Box;
 use core::mem::replace;
-use tuifw_screen_base::{Error, Rect, Vector, Thickness, Point};
+use tuifw_screen_base::{Rect, Vector, Thickness, Point};
 use tuifw_window::{Event, Layout, RenderPort, Widget, WidgetData, Window, WindowTree};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum Dock { Left, Top, Right, Bottom }
 
-pub struct DockLayout {
-    pub dock: Option<Dock>,
+struct DockLayout {
+    dock: Option<Dock>,
 }
 
 impl Layout for DockLayout { }
@@ -21,17 +22,14 @@ impl DockPanel {
         DockPanel { }
     }
 
-    pub fn window<State: ?Sized>(
-        self,
-        tree: &mut WindowTree<State>,
-        parent: Window<State>,
-        prev: Option<Window<State>>
-    ) -> Result<Window<State>, Error> {
-        Window::new(tree, Box::new(DockPanelWidget), Box::new(self), parent, prev)
+    widget!(DockPanelWidget);
+
+    pub fn dock<State: ?Sized>(tree: &WindowTree<State>, window: Window<State>) -> Option<Dock> {
+        window.layout::<DockLayout>(tree).and_then(|x| x.dock)
     }
 
-    pub fn set_layout<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>, dock: Option<Dock>) {
-        window.layout_mut(tree, |layout| replace(layout, Some(Box::new(DockLayout { dock }))));
+    pub fn set_dock<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>, value: Option<Dock>) {
+        window.layout_mut(tree, |layout| replace(layout, Some(Box::new(DockLayout { dock: value }))));
     }
 }
 
@@ -66,7 +64,7 @@ impl<State: ?Sized> Widget<State> for DockPanelWidget {
             let mut docked = Thickness::all(0);
             let mut child = first_child;
             loop {
-                let dock = child.layout::<DockLayout>(tree).and_then(|x| x.dock);
+                let dock = DockPanel::dock(tree, child);
                 match dock {
                     None => { },
                     Some(Dock::Left) => {
@@ -119,7 +117,7 @@ impl<State: ?Sized> Widget<State> for DockPanelWidget {
             }
             let mut child = first_child;
             loop {
-                let dock = child.layout::<DockLayout>(tree).and_then(|x| x.dock);
+                let dock = DockPanel::dock(tree, child);
                 if dock.is_none() {
                     child.measure(tree, available_width, available_height, state);
                     size = size.max(child.desired_size(tree));
@@ -146,7 +144,7 @@ impl<State: ?Sized> Widget<State> for DockPanelWidget {
             let mut child = first_child;
             loop {
                 let bounds = docked.shrink_rect(final_inner_bounds);
-                let dock = child.layout::<DockLayout>(tree).and_then(|x| x.dock);
+                let dock = DockPanel::dock(tree, child);
                 match dock {
                     None => { },
                     Some(Dock::Left) => {
@@ -212,7 +210,7 @@ impl<State: ?Sized> Widget<State> for DockPanelWidget {
             let bounds = docked.shrink_rect(final_inner_bounds);
             let mut child = first_child;
             loop {
-                let dock = child.layout::<DockLayout>(tree).and_then(|x| x.dock);
+                let dock = DockPanel::dock(tree, child);
                 if dock.is_none() {
                     child.arrange(tree, bounds, state);
                     size = size.max(child.render_bounds(tree).size);

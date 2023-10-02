@@ -1,7 +1,8 @@
+use crate::{prop_string_measure, prop_string_render, prop_value, prop_value_render, widget};
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use either::Left;
-use tuifw_screen_base::{Error, Key, Point, Rect, Vector, text_width};
+use tuifw_screen_base::{Key, Point, Rect, Vector, text_width};
 use tuifw_window::{Event, RenderPort, Timer, Widget, WidgetData, Window, WindowTree};
 use tuifw_window::{CMD_GOT_PRIMARY_FOCUS, CMD_LOST_PRIMARY_FOCUS};
 use tuifw_window::{CMD_GOT_SECONDARY_FOCUS, CMD_LOST_SECONDARY_FOCUS};
@@ -9,7 +10,8 @@ use tuifw_window::{CMD_GOT_SECONDARY_FOCUS, CMD_LOST_SECONDARY_FOCUS};
 pub const CMD_CLICK: u16 = 100;
 
 pub struct Button {
-    border: (String, String),
+    border_left: String,
+    border_right: String,
     text: String,
     release_timer: Option<Timer>,
     cmd: u16,
@@ -27,7 +29,8 @@ impl<State: ?Sized> WidgetData<State> for Button {
 impl Button {
     pub fn new() -> Self {
         Button {
-            border: ("[".to_string(), "]".to_string()),
+            border_left: "[".to_string(),
+            border_right: "]".to_string(),
             text: String::new(),
             release_timer: None,
             cmd: CMD_CLICK,
@@ -35,7 +38,7 @@ impl Button {
         }
     }
 
-    fn set_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
+    fn init_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
         window.palette_mut(tree, |palette| {
             palette.set(0, Left(14));
             palette.set(1, Left(15));
@@ -44,71 +47,12 @@ impl Button {
         });
     }
 
-    pub fn window<State: ?Sized>(
-        self,
-        tree: &mut WindowTree<State>,
-        parent: Window<State>,
-        prev: Option<Window<State>>
-    ) -> Result<Window<State>, Error> {
-        let w = Window::new(tree, Box::new(ButtonWidget), Box::new(self), parent, prev)?;
-        Self::set_palette(tree, w);
-        Ok(w)
-    }
-
-    pub fn text(&self) -> &String {
-        &self.text
-    }
-
-    pub fn text_mut<State: ?Sized, T>(
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
-        value: impl FnOnce(&mut String) -> T
-    ) -> T {
-        let data = &mut window.data_mut::<Button>(tree).text;
-        let res = value(data);
-        window.invalidate_measure(tree);
-        res
-    }
-
-    pub fn border(&self) -> &(String, String) {
-        &self.border
-    }
-
-    pub fn border_mut<State: ?Sized, T>(
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
-        value: impl FnOnce(&mut (String, String)) -> T
-    ) -> T {
-        let data = &mut window.data_mut::<Button>(tree).border;
-        let res = value(data);
-        window.invalidate_measure(tree);
-        res
-    }
-
-    pub fn cmd(&self) -> u16 {
-        self.cmd
-    }
-
-    pub fn set_cmd<State: ?Sized>(
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
-        value: u16
-    ) {
-        window.data_mut::<Button>(tree).cmd = value;
-    }
-
-    pub fn is_enabled(&self) -> bool {
-        self.is_enabled
-    }
-
-    pub fn set_is_enabled<State: ?Sized>(
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
-        value: bool
-    ) {
-        window.data_mut::<Button>(tree).is_enabled = value;
-        window.invalidate_render(tree);
-    }
+    widget!(ButtonWidget; init_palette);
+    prop_string_measure!(text);
+    prop_string_render!(border_left);
+    prop_string_render!(border_right);
+    prop_value!(cmd: u16);
+    prop_value_render!(is_enabled: bool);
 }
 
 impl Default for Button {
@@ -139,13 +83,13 @@ impl<State: ?Sized> Widget<State> for ButtonWidget {
             Point { x: 0, y: 0 },
             color.0,
             color.1,
-            if pressed { " " } else { &data.border.0 }
+            if pressed { " " } else { &data.border_left }
         );
         rp.out(
             Point { x: bounds.r_inner(), y: 0 },
             color.0,
             color.1,
-            if pressed { " " } else { &data.border.1 }
+            if pressed { " " } else { &data.border_right }
         );
     }
 
