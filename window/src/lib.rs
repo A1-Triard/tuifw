@@ -301,8 +301,12 @@ macro_attr! {
         h_align: Option<HAlign>,
         v_align: Option<VAlign>,
         margin: Thickness,
-        min_size: Vector,
-        max_size: Vector,
+        width: Option<i16>,
+        min_width: i16,
+        max_width: i16,
+        height: Option<i16>,
+        min_height: i16,
+        max_height: i16,
         event_handler: Option<Box<dyn EventHandler<State>>>,
         next_focused: Window<State>,
         next_focused_tag: u16,
@@ -362,8 +366,12 @@ impl<State: ?Sized> Window<State> {
                 h_align: None,
                 v_align: None,
                 margin: Thickness::all(0),
-                min_size: Vector::null(),
-                max_size: Vector { x: -1, y: -1 },
+                width: None,
+                min_width: 0,
+                max_width: -1,
+                height: None,
+                min_height: 0,
+                max_height: -1,
                 next_focused: Window(window),
                 next_focused_tag: 0,
                 contains_primary_focus: false,
@@ -404,26 +412,42 @@ impl<State: ?Sized> Window<State> {
         state: &mut State
     ) {
         let node = &mut tree.arena[self.0];
+        let min_size = Vector {
+            x: node.width.unwrap_or(node.min_width),
+            y: node.height.unwrap_or(node.min_height)
+        };
+        let max_size = Vector {
+            x: node.width.unwrap_or(node.max_width),
+            y: node.height.unwrap_or(node.max_height)
+        };
         let available_size = Vector { x: available_width.unwrap_or(0), y: available_height.unwrap_or(0) };
-        let measure_size = node.margin.shrink_rect_size(available_size).min(node.max_size).max(node.min_size);
+        let measure_size = node.margin.shrink_rect_size(available_size).min(max_size).max(min_size);
         let measure_size = (available_width.map(|_| measure_size.x), available_height.map(|_| measure_size.y));
         if node.measure_size == Some(measure_size) { return; }
         node.measure_size = Some(measure_size);
         let widget = node.widget.clone();
         let measured_size = widget.measure(tree, self, measure_size.0, measure_size.1, state);
         let node = &mut tree.arena[self.0];
-        node.desired_size = node.margin.expand_rect_size(measured_size.min(node.max_size).max(node.min_size));
+        node.desired_size = node.margin.expand_rect_size(measured_size.min(max_size).max(min_size));
         self.invalidate_arrange(tree);
     }
 
     pub fn arrange(self, tree: &mut WindowTree<State>, final_bounds: Rect, state: &mut State) {
         let node = &mut tree.arena[self.0];
+        let min_size = Vector {
+            x: node.width.unwrap_or(node.min_width),
+            y: node.height.unwrap_or(node.min_height)
+        };
+        let max_size = Vector {
+            x: node.width.unwrap_or(node.max_width),
+            y: node.height.unwrap_or(node.max_height)
+        };
         let margined_bounds = node.margin.shrink_rect(final_bounds);
         let arrange_size = Vector {
             x: if node.h_align.is_none() { final_bounds.w() } else { node.desired_size.x },
             y: if node.v_align.is_none() { final_bounds.h() } else { node.desired_size.y }
         };
-        let arrange_size = node.margin.shrink_rect_size(arrange_size).min(node.max_size).max(node.min_size);
+        let arrange_size = node.margin.shrink_rect_size(arrange_size).min(max_size).max(min_size);
         if node.arrange_size == Some(arrange_size) { return; }
         node.arrange_size = Some(arrange_size);
         let widget = node.widget.clone();
@@ -434,7 +458,7 @@ impl<State: ?Sized> Window<State> {
             state
         );
         let node = &mut tree.arena[self.0];
-        let arranged_size = arranged_size.min(node.max_size).max(node.min_size);
+        let arranged_size = arranged_size.min(max_size).max(min_size);
         let arranged_bounds = Thickness::align(
             arranged_size,
             margined_bounds.size,
@@ -694,6 +718,7 @@ impl<State: ?Sized> Window<State> {
     }
 
     pub fn set_h_align(self, tree: &mut WindowTree<State>, value: Option<HAlign>) {
+        if self == tree.root { return; }
         tree.arena[self.0].h_align = value;
         self.invalidate_measure(tree);
     }
@@ -703,6 +728,7 @@ impl<State: ?Sized> Window<State> {
     }
 
     pub fn set_v_align(self, tree: &mut WindowTree<State>, value: Option<VAlign>) {
+        if self == tree.root { return; }
         tree.arena[self.0].v_align = value;
         self.invalidate_measure(tree);
     }
@@ -712,39 +738,68 @@ impl<State: ?Sized> Window<State> {
     }
 
     pub fn set_margin(self, tree: &mut WindowTree<State>, value: Thickness) {
+        if self == tree.root { return; }
         tree.arena[self.0].margin = value;
         self.invalidate_measure(tree);
     }
 
-    pub fn min_size(self, tree: &WindowTree<State>) -> Vector {
-        tree.arena[self.0].min_size
+    pub fn min_width(self, tree: &WindowTree<State>) -> i16 {
+        tree.arena[self.0].min_width
     }
 
-    pub fn set_min_size(self, tree: &mut WindowTree<State>, value: Vector) {
-        tree.arena[self.0].min_size = value;
+    pub fn set_min_width(self, tree: &mut WindowTree<State>, value: i16) {
+        if self == tree.root { return; }
+        tree.arena[self.0].min_width = value;
         self.invalidate_measure(tree);
     }
 
-    pub fn max_size(self, tree: &WindowTree<State>) -> Vector {
-        tree.arena[self.0].max_size
+    pub fn min_height(self, tree: &WindowTree<State>) -> i16 {
+        tree.arena[self.0].min_height
     }
 
-    pub fn set_max_size(self, tree: &mut WindowTree<State>, value: Vector) {
-        tree.arena[self.0].max_size = value;
+    pub fn set_min_height(self, tree: &mut WindowTree<State>, value: i16) {
+        if self == tree.root { return; }
+        tree.arena[self.0].min_height = value;
         self.invalidate_measure(tree);
     }
 
-    pub fn set_width(self, tree: &mut WindowTree<State>, value: i16) {
-        let node = &mut tree.arena[self.0];
-        node.min_size.x = value;
-        node.max_size.x = value;
+    pub fn max_width(self, tree: &WindowTree<State>) -> i16 {
+        tree.arena[self.0].max_width
+    }
+
+    pub fn set_max_width(self, tree: &mut WindowTree<State>, value: i16) {
+        if self == tree.root { return; }
+        tree.arena[self.0].max_width = value;
         self.invalidate_measure(tree);
     }
 
-    pub fn set_height(self, tree: &mut WindowTree<State>, value: i16) {
-        let node = &mut tree.arena[self.0];
-        node.min_size.y = value;
-        node.max_size.y = value;
+    pub fn max_height(self, tree: &WindowTree<State>) -> i16 {
+        tree.arena[self.0].max_height
+    }
+
+    pub fn set_max_height(self, tree: &mut WindowTree<State>, value: i16) {
+        if self == tree.root { return; }
+        tree.arena[self.0].max_height = value;
+        self.invalidate_measure(tree);
+    }
+
+    pub fn width(self, tree: &WindowTree<State>) -> Option<i16> {
+        tree.arena[self.0].width
+    }
+
+    pub fn set_width(self, tree: &mut WindowTree<State>, value: Option<i16>) {
+        if self == tree.root { return; }
+        tree.arena[self.0].width = value;
+        self.invalidate_measure(tree);
+    }
+
+    pub fn height(self, tree: &WindowTree<State>) -> Option<i16> {
+        tree.arena[self.0].height
+    }
+
+    pub fn set_height(self, tree: &mut WindowTree<State>, value: Option<i16>) {
+        if self == tree.root { return; }
+        tree.arena[self.0].height = value;
         self.invalidate_measure(tree);
     }
 
@@ -976,8 +1031,12 @@ impl<'clock, State: ?Sized> WindowTree<'clock, State> {
             h_align: None,
             v_align: None,
             margin: Thickness::all(0),
-            min_size: Vector::null(),
-            max_size: Vector { x: -1, y: -1 },
+            width: None,
+            height: None,
+            min_width: 0,
+            min_height: 0,
+            max_width: -1,
+            max_height: -1,
             palette: Palette::new(),
             next_focused: Window(window),
             next_focused_tag: 0,

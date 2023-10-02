@@ -81,7 +81,7 @@ fn main() {
     let labels = StackPanel::new().window(tree, edits_with_labels, None).unwrap();
     DockPanel::set_dock(tree, labels, Some(Dock::Left));
     let edits = StackPanel::new().window(tree, edits_with_labels, Some(labels)).unwrap();
-    edits.set_width(tree, 12);
+    edits.set_width(tree, Some(12));
 
     let a_label = StaticText::new().window(tree, labels, None).unwrap();
     StaticText::text_mut(tree, a_label, |value| replace(value, "A =".to_string()));
@@ -138,7 +138,7 @@ fn main() {
     StaticText::text_mut(tree, s_label, |value| replace(value, "S =".to_string()));
     DockPanel::set_dock(tree, s_label, Some(Dock::Left));
     let result_value = Background::new().window(tree, result, Some(s_label)).unwrap();
-    result_value.set_width(tree, 12);
+    result_value.set_width(tree, Some(12));
     let s = StaticText::new().window(tree, result_value, None).unwrap();
     s.set_h_align(tree, Some(HAlign::Right));
     s.set_margin(tree, Thickness::new(1, 1, 1, 1));
