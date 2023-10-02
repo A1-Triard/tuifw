@@ -22,39 +22,6 @@ mod no_std {
     extern fn rust_eh_personality() { }
 }
 
-mod ui {
-    include!(concat!(env!("OUT_DIR"), "/ui.rs"));
-}
-
-use alloc::boxed::Box;
-use timer_no_std::MonoClock;
-use tuifw_screen::{Error, Key};
-use tuifw_window::{Event, EventHandler, Window, WindowTree};
-
-#[derive(Clone)]
-struct RootEventHandler;
-
-type State = ();
-
-impl EventHandler<State> for RootEventHandler {
-    fn invoke(
-        &self,
-        tree: &mut WindowTree<State>,
-        _window: Window<State>,
-        event: Event,
-        _event_source: Window<State>,
-        _state: &mut State
-    ) -> bool {
-        match event {
-            Event::Key(_, Key::Escape) => {
-                tree.quit();
-                true
-            },
-            _ => false
-        }
-    }
-}
-
 #[cfg(any(target_os="dos", windows))]
 extern {
     type PEB;
@@ -84,6 +51,75 @@ fn start_and_print_err() -> u64 {
     }
 }
 
+mod ui {
+    include!(concat!(env!("OUT_DIR"), "/ui.rs"));
+}
+
+use alloc::boxed::Box;
+use alloc::string::ToString;
+use core::mem::replace;
+use core::str::FromStr;
+use timer_no_std::MonoClock;
+use tuifw_screen::{Error, Key};
+use tuifw_window::{Event, EventHandler, Window, WindowTree};
+use tuifw::{Button, InputLine, StaticText, CMD_IS_VALID_EMPTY_CHANGED};
+
+const CMD_CALC: u16 = 1000;
+
+struct State {
+    a: Window<State>,
+    v: Window<State>,
+    t: Window<State>,
+    n: Window<State>,
+    s: Window<State>,
+    calc: Window<State>,
+}
+
+#[derive(Clone)]
+struct RootEventHandler;
+
+impl EventHandler<State> for RootEventHandler {
+    fn invoke(
+        &self,
+        tree: &mut WindowTree<State>,
+        _window: Window<State>,
+        event: Event,
+        _event_source: Window<State>,
+        state: &mut State
+    ) -> bool {
+        match event {
+            Event::Key(_, Key::Escape) => {
+                tree.quit();
+                true
+            },
+            Event::Cmd(CMD_CALC) => {
+                let a = f64::from_str(state.a.data::<InputLine>(tree).text()).unwrap();
+                let v = f64::from_str(state.v.data::<InputLine>(tree).text()).unwrap();
+                let t = f64::from_str(state.t.data::<InputLine>(tree).text()).unwrap();
+                let n = f64::from(i32::from_str(state.n.data::<InputLine>(tree).text()).unwrap());
+                let s = v * t + a * t * (n - 1.0) / (2.0 * n);
+                StaticText::text_mut(tree, state.s, |value| replace(value, s.to_string()));
+                true
+            },
+            Event::Cmd(CMD_IS_VALID_EMPTY_CHANGED) => {
+                let a_empty = state.a.data::<InputLine>(tree).is_empty();
+                let v_empty = state.v.data::<InputLine>(tree).is_empty();
+                let t_empty = state.t.data::<InputLine>(tree).is_empty();
+                let n_empty = state.n.data::<InputLine>(tree).is_empty();
+                let a_valid = state.a.data::<InputLine>(tree).is_valid();
+                let v_valid = state.v.data::<InputLine>(tree).is_valid();
+                let t_valid = state.t.data::<InputLine>(tree).is_valid();
+                let n_valid = state.n.data::<InputLine>(tree).is_valid();
+                Button::set_is_enabled(tree, state.calc,
+                    a_valid && v_valid && t_valid && n_valid && !a_empty && !v_empty && !t_empty && !n_empty
+                );
+                true
+            },
+            _ => false
+        }
+    }
+}
+
 fn start() -> Result<(), Error> {
     let clock = unsafe { MonoClock::new() };
     let screen = unsafe { tuifw_screen::init(None, None) }?;
@@ -91,6 +127,14 @@ fn start() -> Result<(), Error> {
     let root = tree.root();
     root.set_event_handler(tree, Some(Box::new(RootEventHandler)));
     let a = tree.window_by_tag(1).unwrap();
-    a.focus(tree, true, &mut ());
-    tree.run(&mut ())
+    let v = tree.window_by_tag(2).unwrap();
+    let t = tree.window_by_tag(3).unwrap();
+    let n = tree.window_by_tag(4).unwrap();
+    let calc = tree.window_by_tag(5).unwrap();
+    let s = tree.window_by_tag(6).unwrap();
+    let state = &mut State { a, v, t, n, s, calc };
+    a.focus(tree, true, state);
+    calc.focus(tree, false, state);
+    Button::set_cmd(tree, calc, CMD_CALC);
+    tree.run(state)
 }

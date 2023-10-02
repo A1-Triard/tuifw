@@ -305,6 +305,7 @@ macro_attr! {
         max_size: Vector,
         event_handler: Option<Box<dyn EventHandler<State>>>,
         next_focus: Window<State>,
+        next_focus_tag: u16,
         contains_primary_focus: bool,
         tag: u16,
     }
@@ -364,6 +365,7 @@ impl<State: ?Sized> Window<State> {
                 min_size: Vector::null(),
                 max_size: Vector { x: -1, y: -1 },
                 next_focus: Window(window),
+                next_focus_tag: 0,
                 contains_primary_focus: false,
                 tag: 0,
             }, Window(window))
@@ -507,12 +509,29 @@ impl<State: ?Sized> Window<State> {
         res
     }
 
+    pub fn actual_next_focus(self, tree: &WindowTree<State>) -> Self {
+        let node = &tree.arena[self.0];
+        if node.next_focus_tag == 0 {
+            node.next_focus
+        } else {
+            tree.window_by_tag(node.next_focus_tag).unwrap()
+        }
+    }
+
     pub fn next_focus(self, tree: &WindowTree<State>) -> Self {
         tree.arena[self.0].next_focus
     }
 
     pub fn set_next_focus(self, tree: &mut WindowTree<State>, value: Self) {
         tree.arena[self.0].next_focus = value;
+    }
+
+    pub fn next_focus_tag(self, tree: &WindowTree<State>) -> u16 {
+        tree.arena[self.0].next_focus_tag
+    }
+
+    pub fn set_next_focus_tag(self, tree: &mut WindowTree<State>, value: u16) {
+        tree.arena[self.0].next_focus_tag = value;
     }
 
     pub fn palette<'a>(self, tree: &'a WindowTree<'_, State>) -> &'a Palette {
@@ -977,6 +996,7 @@ impl<'clock, State: ?Sized> WindowTree<'clock, State> {
             max_size: Vector { x: -1, y: -1 },
             palette: root_palette(),
             next_focus: Window(window),
+            next_focus_tag: 0,
             contains_primary_focus: true,
             tag: 0,
         }, Window(window)));
@@ -1082,7 +1102,7 @@ impl<'clock, State: ?Sized> WindowTree<'clock, State> {
         let screen = self.screen.as_mut().expect("WindowTree is in invalid state");
         if let Some(screen_Event::Key(n, key)) = screen.update(self.cursor, wait)? {
             if key == Key::Tab {
-                let next_focus = self.primary_focused.next_focus(self);
+                let next_focus = self.primary_focused.actual_next_focus(self);
                 if next_focus.focus(self, true, state).is_some() { return Ok(()); }
             }
             let handled = self.primary_focused.raise_raw(self, Event::Key(n, key), false, state);
