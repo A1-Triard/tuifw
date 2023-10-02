@@ -108,6 +108,22 @@ impl InputLine {
         assert!(value <= self.text.len());
     }
 
+    pub fn is_valid<State: ?Sized>(tree: &WindowTree<State>, window: Window<State>) -> bool {
+        window.data::<InputLine>(tree).is_valid
+    }
+
+    pub fn is_empty<State: ?Sized>(tree: &WindowTree<State>, window: Window<State>) -> bool {
+        window.data::<InputLine>(tree).is_empty
+    }
+
+    fn is_numeric_raw(&self) -> bool {
+        self.validator.as_deref().map_or(false, |x| x.is_numeric())
+    }
+
+    pub fn is_numeric<State: ?Sized>(tree: &WindowTree<State>, window: Window<State>) -> bool {
+        window.data::<InputLine>(tree).is_numeric_raw()
+    }
+
     fn update_is_valid_empty<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
         let data = window.data_mut::<InputLine>(tree);
         let (is_valid, is_empty) = if data.text.is_empty() {
@@ -130,10 +146,6 @@ impl InputLine {
             }
         }
     }
-
-    pub fn is_valid(&self) -> bool { self.is_valid }
-
-    pub fn is_empty(&self) -> bool { self.is_empty }
 
     fn calc_value_padding_view_and_is_tail_cursor_fit(&self) -> (i16, Range<usize>, bool) {
         match self.view {
@@ -171,10 +183,6 @@ impl InputLine {
         }
     }
 
-    pub fn is_numeric(&self) -> bool {
-        self.validator.as_deref().map_or(false, |x| x.is_numeric())
-    }
-
     fn on_text_changed<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
         let focused = window.is_focused(tree);
         let data = &mut window.data_mut::<InputLine>(tree);
@@ -182,7 +190,7 @@ impl InputLine {
         if focused {
             let text_fit_width = (data.width as u16).saturating_sub(1) as i16;
             if is_text_fit_in(text_fit_width, &data.text) {
-                data.view = if !data.is_numeric() {
+                data.view = if !data.is_numeric_raw() {
                     Left(0)
                 } else {
                     Right(data.text.len())
@@ -191,7 +199,7 @@ impl InputLine {
                 data.view = Right(data.cursor);
             }
         } else {
-            data.view = if !data.is_numeric() || data.text.is_empty() {
+            data.view = if !data.is_numeric_raw() || data.text.is_empty() {
                 Left(0)
             } else {
                 Right(data.text.len() - 1)
@@ -220,7 +228,7 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
     ) {
         let focused = window.is_focused(tree);
         let data = window.data::<InputLine>(tree);
-        let color = if !data.is_valid() { 1 } else { 0 };
+        let color = if !data.is_valid { 1 } else { 0 };
         let color = window.color(tree, color);
         rp.fill_bg(color.1);
         let (padding, view, is_tail_cursor_fit) = data.calc_value_padding_view_and_is_tail_cursor_fit();
@@ -259,13 +267,13 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
         };
         if is_text_fit_in(text_fit_width, &data.text) {
             if focused && data.cursor == data.text.len() {
-                data.view = if !data.is_numeric() {
+                data.view = if !data.is_numeric_raw() {
                     Left(0)
                 } else {
                     Right(data.text.len())
                 };
             } else {
-                data.view = if !data.is_numeric() || data.text.is_empty() {
+                data.view = if !data.is_numeric_raw() || data.text.is_empty() {
                     Left(0)
                 } else {
                     Right(data.text.len() - 1)
@@ -293,13 +301,13 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                 };
                 if is_text_fit_in(text_fit_width, &data.text) {
                     if data.cursor == data.text.len() {
-                        data.view = if !data.is_numeric() {
+                        data.view = if !data.is_numeric_raw() {
                             Left(0)
                         } else {
                             Right(data.text.len())
                         };
                     } else {
-                        data.view = if !data.is_numeric() || data.text.is_empty() {
+                        data.view = if !data.is_numeric_raw() || data.text.is_empty() {
                             Left(0)
                         } else {
                             Right(data.text.len() - 1)
@@ -319,7 +327,7 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                         data.cursor = data.text.len();
                     }
                 }
-                data.view = if !data.is_numeric() || data.text.is_empty() {
+                data.view = if !data.is_numeric_raw() || data.text.is_empty() {
                     Left(0)
                 } else {
                     Right(data.text.len() - 1)
@@ -363,13 +371,13 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                             };
                             if is_text_fit_in(text_fit_width, &data.text) {
                                 if data.cursor == data.text.len() {
-                                    data.view = if !data.is_numeric() {
+                                    data.view = if !data.is_numeric_raw() {
                                         Left(0)
                                     } else {
                                         Right(data.text.len())
                                     };
                                 } else {
-                                    data.view = if !data.is_numeric() || data.text.is_empty() {
+                                    data.view = if !data.is_numeric_raw() || data.text.is_empty() {
                                         Left(0)
                                     } else {
                                         Right(data.text.len() - 1)

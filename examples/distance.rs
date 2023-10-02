@@ -48,14 +48,14 @@ impl EventHandler<State> for RootEventHandler {
                 true
             },
             Event::Cmd(CMD_IS_VALID_EMPTY_CHANGED) => {
-                let a_empty = state.a.data::<InputLine>(tree).is_empty();
-                let v_empty = state.v.data::<InputLine>(tree).is_empty();
-                let t_empty = state.t.data::<InputLine>(tree).is_empty();
-                let n_empty = state.n.data::<InputLine>(tree).is_empty();
-                let a_valid = state.a.data::<InputLine>(tree).is_valid();
-                let v_valid = state.v.data::<InputLine>(tree).is_valid();
-                let t_valid = state.t.data::<InputLine>(tree).is_valid();
-                let n_valid = state.n.data::<InputLine>(tree).is_valid();
+                let a_empty = InputLine::is_empty(tree, state.a);
+                let v_empty = InputLine::is_empty(tree, state.v);
+                let t_empty = InputLine::is_empty(tree, state.t);
+                let n_empty = InputLine::is_empty(tree, state.n);
+                let a_valid = InputLine::is_valid(tree, state.a);
+                let v_valid = InputLine::is_valid(tree, state.v);
+                let t_valid = InputLine::is_valid(tree, state.t);
+                let n_valid = InputLine::is_valid(tree, state.n);
                 Button::set_is_enabled(tree, state.calc,
                     a_valid && v_valid && t_valid && n_valid && !a_empty && !v_empty && !t_empty && !n_empty
                 );
