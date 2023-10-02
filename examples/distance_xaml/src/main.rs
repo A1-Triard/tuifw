@@ -93,10 +93,10 @@ impl EventHandler<State> for RootEventHandler {
                 true
             },
             Event::Cmd(CMD_CALC) => {
-                let a = f64::from_str(state.a.data::<InputLine>(tree).text()).unwrap();
-                let v = f64::from_str(state.v.data::<InputLine>(tree).text()).unwrap();
-                let t = f64::from_str(state.t.data::<InputLine>(tree).text()).unwrap();
-                let n = f64::from(i32::from_str(state.n.data::<InputLine>(tree).text()).unwrap());
+                let a = f64::from_str(InputLine::text(tree, state.a)).unwrap();
+                let v = f64::from_str(InputLine::text(tree, state.v)).unwrap();
+                let t = f64::from_str(InputLine::text(tree, state.t)).unwrap();
+                let n = f64::from(i32::from_str(InputLine::text(tree, state.n)).unwrap());
                 let s = v * t + a * t * (n - 1.0) / (2.0 * n);
                 StaticText::text_mut(tree, state.s, |value| replace(value, s.to_string()));
                 true

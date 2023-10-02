@@ -98,6 +98,7 @@ impl InputLine {
     prop_string_render!(text; on_text_changed);
     prop_value_render!(cursor: usize | assert_cursor);
     prop_value_render!(view: Either<usize, usize> | assert_view);
+    prop_obj_render!(validator: Option<Box<dyn Validator>>);
 
     fn assert_view(&self, value: Either<usize, usize>) {
         assert!(value.map(|x| x <= self.text.len()).into_inner());
@@ -169,8 +170,6 @@ impl InputLine {
             }
         }
     }
-
-    prop_obj_render!(validator: Option<Box<dyn Validator>>);
 
     pub fn is_numeric(&self) -> bool {
         self.validator.as_deref().map_or(false, |x| x.is_numeric())
