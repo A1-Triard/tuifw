@@ -575,11 +575,15 @@ impl<State: ?Sized> Window<State> {
         let mut index = i;
         loop {
             match window.palette(tree).get(index) {
-                Left(i) => if let Some(parent) = window.parent(tree) {
-                    window = parent;
-                    index = i;
-                } else {
-                    break (Fg::Red, Bg::Green);
+                Left(i) => {
+                    if let Some(parent) = window.parent(tree) {
+                        window = parent;
+                        index = i;
+                    } else if let Right(color) = tree.palette().get(i) {
+                        break color;
+                    } else {
+                        break (Fg::Red, Bg::Green);
+                    }
                 },
                 Right(c) => break c,
             }
@@ -880,7 +884,7 @@ const FPS: u16 = 40;
 
 fn root_palette() -> Palette {
     let mut p = Palette::new();
-    p.set(0, Right((Fg::LightGray, Bg::None))); // background
+    p.set(10, Right((Fg::LightGray, Bg::None))); // background
 
     p.set(11, Right((Fg::LightGray, Bg::None))); // static text
 
@@ -942,6 +946,7 @@ pub struct WindowTree<'clock, State: ?Sized + 'static> {
     timers: Arena<TimerData<State>>,
     clock: &'clock MonoClock,
     tagged: Vec<Option<Window<State>>>,
+    palette: Palette,
 }
 
 impl<'clock, State: ?Sized> WindowTree<'clock, State> {
@@ -973,7 +978,7 @@ impl<'clock, State: ?Sized> WindowTree<'clock, State> {
             margin: Thickness::all(0),
             min_size: Vector::null(),
             max_size: Vector { x: -1, y: -1 },
-            palette: root_palette(),
+            palette: Palette::new(),
             next_focused: Window(window),
             next_focused_tag: 0,
             contains_primary_focus: true,
@@ -992,7 +997,18 @@ impl<'clock, State: ?Sized> WindowTree<'clock, State> {
             clock,
             timers: Arena::new(),
             tagged: Vec::new(),
+            palette: root_palette(),
         })
+    }
+
+    pub fn palette(&self) -> &Palette {
+        &self.palette
+    }
+
+    pub fn palette_mut<T>(&mut self, f: impl FnOnce(&mut Palette) -> T) -> T {
+        let res = f(&mut self.palette);
+        self.root.invalidate_render(self);
+        res
     }
 
     pub fn window_by_tag(&self, tag: u16) -> Option<Window<State>> {
