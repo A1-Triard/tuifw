@@ -32,6 +32,9 @@ pub use input_line::*;
 mod button;
 pub use button::*;
 
+mod frame;
+pub use frame::*;
+
 #[doc(hidden)]
 pub use alloc::boxed::Box as alloc_boxed_Box;
 #[doc(hidden)]

@@ -939,17 +939,24 @@ const FPS: u16 = 40;
 
 fn root_palette() -> Palette {
     let mut p = Palette::new();
-    p.set(10, Right((Fg::LightGray, Bg::None))); // background
+    p.set(11, Right((Fg::LightGray, Bg::None))); // background
+    p.set(12, Right((Fg::LightGray, Bg::None))); // static text
+    p.set(13, Right((Fg::LightGray, Bg::Blue))); // input line normal
+    p.set(14, Right((Fg::LightGray, Bg::Red))); // input line invalid
+    p.set(15, Right((Fg::Cyan, Bg::None))); // button normal
+    p.set(16, Right((Fg::Black, Bg::Cyan))); // button focused
+    p.set(17, Right((Fg::Cyan, Bg::None))); // button pressed
+    p.set(18, Right((Fg::LightGray, Bg::None))); // button disabled
 
-    p.set(11, Right((Fg::LightGray, Bg::None))); // static text
-
-    p.set(12, Right((Fg::LightGray, Bg::Blue))); // input line normal
-    p.set(13, Right((Fg::LightGray, Bg::Red))); // input line invalid
-
-    p.set(14, Right((Fg::Cyan, Bg::None))); // button normal
-    p.set(15, Right((Fg::Black, Bg::Cyan))); // button focused
-    p.set(16, Right((Fg::Cyan, Bg::None))); // button pressed
-    p.set(17, Right((Fg::LightGray, Bg::None))); // button disabled
+    p.set(20, Right((Fg::LightGray, Bg::Black))); // frame
+    p.set(21, Right((Fg::LightGray, Bg::Black))); // background in frame
+    p.set(22, Right((Fg::LightGray, Bg::Black))); // static text in frame
+    p.set(23, Right((Fg::LightGray, Bg::Blue))); // input line normal in frame
+    p.set(24, Right((Fg::LightGray, Bg::Red))); // input line invalid in frame
+    p.set(25, Right((Fg::Cyan, Bg::Black))); // button normal in frame
+    p.set(26, Right((Fg::Black, Bg::Cyan))); // button focused in frame
+    p.set(27, Right((Fg::Cyan, Bg::Black))); // button pressed in frame
+    p.set(28, Right((Fg::LightGray, Bg::Black))); // button disabled in frame
 
     p
 }

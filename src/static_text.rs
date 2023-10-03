@@ -16,7 +16,7 @@ impl StaticText {
     }
 
     fn init_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
-        window.palette_mut(tree, |palette| palette.set(0, Left(11)));
+        window.palette_mut(tree, |palette| palette.set(0, Left(12)));
     }
 
     widget!(StaticTextWidget; init_palette);

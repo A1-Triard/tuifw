@@ -83,6 +83,10 @@ pub fn reg_widgets(xaml: &mut Xaml) {
     let input_line_text = xaml.reg_prop(input_line, "Text", XamlType::Literal(string));
     let input_line_validator = xaml.reg_prop(input_line, "Validator", XamlType::Struct(validator));
 
+    let frame = xaml.reg_struct(xmlns!("Frame"), Some(widget));
+    let frame_double = xaml.reg_prop(frame, "Double", XamlType::Literal(boolean));
+    let frame_text = xaml.reg_prop(frame, "Text", XamlType::Literal(string));
+
     xaml.set_literal_new(boolean, Box::new(|x| match x {
         "True" => Some("true".to_string()),
         "False" => Some("false".to_string()),
@@ -397,5 +401,34 @@ pub fn reg_widgets(xaml: &mut Xaml) {
     " }, obj, value))));
     xaml.set_prop_set(input_line_validator, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         InputLine::set_validator(&mut tree, {}, Some(Box::new({})));
+    " }, obj, value))));
+
+    xaml.set_struct_new(frame, Some(Box::new(|obj, parent| {
+        if let Some((parent, _parent_prop, prev)) = parent {
+            if let Some(prev) = prev {
+                indent_all_by(4, format!(indoc! { "
+                    #[allow(unused_variables)]
+                    let {} = Frame::new().window(&mut tree, {}, Some({}))?;
+                " }, obj, parent, prev))
+            } else {
+                indent_all_by(4, format!(indoc! { "
+                    #[allow(unused_variables)]
+                    let {} = Frame::new().window(&mut tree, {}, None)?;
+                " }, obj, parent))
+            }
+        } else {
+            indent_all_by(4, format!(indoc! { "
+                #[allow(unused_mut)]
+                let mut tree = Frame::new().window_tree(screen, clock)?;
+                #[allow(unused_variables)]
+                let {} = tree.root();
+            " }, obj))
+        }
+    })));
+    xaml.set_prop_set(frame_double, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        Frame::set_double(&mut tree, {}, {});
+    " }, obj, value))));
+    xaml.set_prop_set(frame_text, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        Frame::set_text(&mut tree, {}, {});
     " }, obj, value))));
 }

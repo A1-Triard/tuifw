@@ -88,8 +88,8 @@ impl InputLine {
 
     fn init_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
         window.palette_mut(tree, |palette| {
-            palette.set(0, Left(12));
-            palette.set(1, Left(13));
+            palette.set(0, Left(13));
+            palette.set(1, Left(14));
         });
     }
 
