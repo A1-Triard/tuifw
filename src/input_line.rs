@@ -209,6 +209,11 @@ impl InputLine {
             };
         }
         Self::update_is_valid(tree, window, None);
+        let data = &mut window.data_mut::<InputLine>(tree);
+        if data.is_valid && !data.editing && focused {
+            data.editing = true;
+            Self::update_is_valid(tree, window, None);
+        }
     }
 }
 
