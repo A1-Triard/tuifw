@@ -13,6 +13,7 @@ pub struct Button {
     border_left: String,
     border_right: String,
     text: String,
+    click_timer: Option<Timer>,
     release_timer: Option<Timer>,
     cmd: u16,
     is_enabled: bool,
@@ -22,6 +23,9 @@ impl<State: ?Sized> WidgetData<State> for Button {
     fn drop_widget_data(&mut self, tree: &mut WindowTree<State>, _state: &mut State) {
         if let Some(release_timer) = self.release_timer.take() {
             release_timer.drop_timer(tree);
+        }
+        if let Some(click_timer) = self.click_timer.take() {
+            click_timer.drop_timer(tree);
         }
     }
 }
@@ -33,6 +37,7 @@ impl Button {
             border_right: "]".to_string(),
             text: String::new(),
             release_timer: None,
+            click_timer: None,
             cmd: CMD_CLICK,
             is_enabled: true,
         }
@@ -123,7 +128,7 @@ impl<State: ?Sized> Widget<State> for ButtonWidget {
         window: Window<State>,
         event: Event,
         _event_source: Window<State>,
-        state: &mut State,
+        _state: &mut State,
     ) -> bool {
         match event {
             Event::Cmd(CMD_GOT_PRIMARY_FOCUS) | Event::Cmd(CMD_LOST_PRIMARY_FOCUS) |
@@ -134,18 +139,28 @@ impl<State: ?Sized> Widget<State> for ButtonWidget {
             Event::Key(_, Key::Enter) => {
                 let data = window.data_mut::<Button>(tree);
                 if data.is_enabled {
-                    let release_timer = Timer::new(tree, 100, Box::new(move |tree, _state| {
+                    let click_timer = Timer::new(tree, 0, Box::new(move |tree, state| {
                         let data = window.data_mut::<Button>(tree);
-                        data.release_timer = None;
-                        window.invalidate_render(tree);
+                        data.click_timer = None;
+                        if data.is_enabled {
+                            let release_timer = Timer::new(tree, 100, Box::new(move |tree, _state| {
+                                let data = window.data_mut::<Button>(tree);
+                                data.release_timer = None;
+                                window.invalidate_render(tree);
+                            }));
+                            let data = window.data_mut::<Button>(tree);
+                            let cmd = data.cmd;
+                            if let Some(old_release_timer) = data.release_timer.replace(release_timer) {
+                                old_release_timer.drop_timer(tree);
+                            }
+                            window.invalidate_render(tree);
+                            window.raise(tree, Event::Cmd(cmd), state);
+                        }
                     }));
                     let data = window.data_mut::<Button>(tree);
-                    let cmd = data.cmd;
-                    if let Some(old_release_timer) = data.release_timer.replace(release_timer) {
-                        old_release_timer.drop_timer(tree);
+                    if let Some(old_click_timer) = data.click_timer.replace(click_timer) {
+                        old_click_timer.drop_timer(tree);
                     }
-                    window.invalidate_render(tree);
-                    window.raise(tree, Event::Cmd(cmd), state);
                     true
                 } else {
                     false
