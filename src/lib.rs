@@ -353,7 +353,7 @@ macro_rules! prop_obj_render {
                 res
             }
 
-            pub fn [< set_ $name >] <'a, State: ?Sized>(
+            pub fn [< set_ $name >] <State: ?Sized>(
                 tree: &mut $crate::tuifw_window_WindowTree<State>,
                 window: $crate::tuifw_window_Window<State>,
                 value: $ty

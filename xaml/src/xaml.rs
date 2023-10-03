@@ -62,6 +62,12 @@ pub struct Xaml {
     props: Arena<XamlProp>,
 }
 
+impl Default for Xaml {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Xaml {
     pub fn new() -> Self {
         Xaml {

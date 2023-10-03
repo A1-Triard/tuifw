@@ -10,6 +10,7 @@
 #![allow(clippy::collapsible_else_if)]
 #![allow(clippy::collapsible_if)]
 #![allow(clippy::non_canonical_partial_ord_impl)]
+#![allow(clippy::partialeq_to_none)]
 #![allow(clippy::type_complexity)]
 
 #![no_std]
