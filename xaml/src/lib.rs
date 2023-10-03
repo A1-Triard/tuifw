@@ -79,7 +79,6 @@ pub fn reg_widgets(xaml: &mut Xaml) {
     let button_border_right = xaml.reg_prop(button, "BorderRight", XamlType::Literal(string));
 
     let input_line = xaml.reg_struct(xmlns!("InputLine"), Some(widget));
-    let input_line_default = xaml.reg_prop(input_line, "Default", XamlType::Literal(string));
     let input_line_text = xaml.reg_prop(input_line, "Text", XamlType::Literal(string));
     let input_line_validator = xaml.reg_prop(input_line, "Validator", XamlType::Struct(validator));
 
@@ -393,9 +392,6 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             " }, obj))
         }
     })));
-    xaml.set_prop_set(input_line_default, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        InputLine::set_default(&mut tree, {}, {});
-    " }, obj, value))));
     xaml.set_prop_set(input_line_text, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         InputLine::set_text(&mut tree, {}, {});
     " }, obj, value))));

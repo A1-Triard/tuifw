@@ -1,4 +1,4 @@
-use crate::{prop_obj_render, prop_string, prop_string_render, prop_value_render, widget};
+use crate::{prop_obj_render, prop_string_render, prop_value_render, widget};
 use alloc::boxed::Box;
 use alloc::string::String;
 use core::ops::Range;
@@ -7,14 +7,14 @@ use either::{Either, Left, Right};
 use tuifw_screen_base::{Key, Point, Rect, Vector, char_width, text_width, is_text_fit_in};
 use tuifw_screen_base::{Thickness};
 use tuifw_window::{Event, RenderPort, Timer, Widget, WidgetData, Window, WindowTree};
-use tuifw_window::{CMD_GOT_PRIMARY_FOCUS, CMD_LOST_PRIMARY_FOCUS};
+use tuifw_window::{CMD_GOT_PRIMARY_FOCUS, CMD_LOST_PRIMARY_FOCUS, CMD_LOST_ATTENTION};
 
-pub const CMD_IS_VALID_EMPTY_CHANGED: u16 = 110;
+pub const CMD_IS_VALID_CHANGED: u16 = 110;
 
 pub trait Validator {
     fn is_numeric(&self) -> bool;
 
-    fn is_valid(&self, text: &str) -> bool;
+    fn is_valid(&self, editing: bool, text: &str) -> bool;
 }
 
 pub struct IntValidator {
@@ -25,7 +25,8 @@ pub struct IntValidator {
 impl Validator for IntValidator {
     fn is_numeric(&self) -> bool { true }
 
-    fn is_valid(&self, text: &str) -> bool {
+    fn is_valid(&self, editing: bool, text: &str) -> bool {
+        if editing && text.is_empty() { return true; }
         if let Ok(value) = i32::from_str(text) {
             (self.min ..= self.max).contains(&value)
         } else {
@@ -42,7 +43,15 @@ pub struct FloatValidator {
 impl Validator for FloatValidator {
     fn is_numeric(&self) -> bool { true }
 
-    fn is_valid(&self, text: &str) -> bool {
+    fn is_valid(&self, editing: bool, text: &str) -> bool {
+        if editing && text.is_empty() { return true; }
+        let text = if editing && (text.ends_with('e') || text.ends_with('E')) {
+            let text = &text[.. text.len() - 1];
+            if text.contains(|c| c == 'e' || c == 'E') { return false; }
+            text
+        } else {
+            text
+        };
         if let Ok(value) = f64::from_str(text) {
             (self.min ..= self.max).contains(&value)
         } else {
@@ -53,19 +62,18 @@ impl Validator for FloatValidator {
 
 pub struct InputLine {
     validator: Option<Box<dyn Validator>>,
-    default: String,
     text: String,
     is_valid: bool,
-    is_empty: bool,
+    editing: bool,
     view: Either<usize, usize>,
     cursor: usize,
     width: i16,
-    is_valid_empty_timer: Option<Timer>,
+    is_valid_timer: Option<Timer>,
 }
 
 impl<State: ?Sized> WidgetData<State> for InputLine {
     fn drop_widget_data(&mut self, tree: &mut WindowTree<State>, _state: &mut State) {
-        if let Some(timer) = self.is_valid_empty_timer.take() {
+        if let Some(timer) = self.is_valid_timer.take() {
             timer.drop_timer(tree);
         }
     }
@@ -75,14 +83,13 @@ impl InputLine {
     pub fn new() -> Self {
         InputLine {
             validator: None,
-            default: String::new(),
             text: String::new(),
             is_valid: true,
-            is_empty: true,
+            editing: false,
             view: Left(0),
             cursor: 0,
             width: 0,
-            is_valid_empty_timer: None,
+            is_valid_timer: None,
         }
     }
 
@@ -94,7 +101,6 @@ impl InputLine {
     }
 
     widget!(InputLineWidget; init_palette);
-    prop_string!(default);
     prop_string_render!(text; on_text_changed);
     prop_value_render!(cursor: usize | assert_cursor);
     prop_value_render!(view: Either<usize, usize> | assert_view);
@@ -112,10 +118,6 @@ impl InputLine {
         window.data::<InputLine>(tree).is_valid
     }
 
-    pub fn is_empty<State: ?Sized>(tree: &WindowTree<State>, window: Window<State>) -> bool {
-        window.data::<InputLine>(tree).is_empty
-    }
-
     fn is_numeric_raw(&self) -> bool {
         self.validator.as_deref().map_or(false, |x| x.is_numeric())
     }
@@ -124,25 +126,26 @@ impl InputLine {
         window.data::<InputLine>(tree).is_numeric_raw()
     }
 
-    fn update_is_valid_empty<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
+    fn update_is_valid<State: ?Sized>(
+        tree: &mut WindowTree<State>,
+        window: Window<State>,
+        state: Option<&mut State>
+    ) {
         let data = window.data_mut::<InputLine>(tree);
-        let (is_valid, is_empty) = if data.text.is_empty() {
-            (true, true)
-        } else if let Some(validator) = data.validator.as_deref() {
-            (validator.is_valid(&data.text), false)
-        } else {
-            (true, false)
-        };
-        if is_valid != data.is_valid || is_empty != data.is_empty {
+        let is_valid = data.validator.as_deref().map_or(true, |x| x.is_valid(data.editing, &data.text));
+        if is_valid != data.is_valid {
             data.is_valid = is_valid;
-            data.is_empty = is_empty;
-            let is_valid_empty_timer = Timer::new(tree, 0, Box::new(move |tree, state| {
-                window.data_mut::<InputLine>(tree).is_valid_empty_timer = None;
-                window.raise(tree, Event::Cmd(CMD_IS_VALID_EMPTY_CHANGED), state);
-            }));
-            let data = window.data_mut::<InputLine>(tree);
-            if let Some(timer) = data.is_valid_empty_timer.replace(is_valid_empty_timer) {
-                timer.drop_timer(tree);
+            if let Some(state) = state {
+                window.raise(tree, Event::Cmd(CMD_IS_VALID_CHANGED), state);
+            } else {
+                let is_valid_timer = Timer::new(tree, 0, Box::new(move |tree, state| {
+                    window.data_mut::<InputLine>(tree).is_valid_timer = None;
+                    window.raise(tree, Event::Cmd(CMD_IS_VALID_CHANGED), state);
+                }));
+                let data = window.data_mut::<InputLine>(tree);
+                if let Some(timer) = data.is_valid_timer.replace(is_valid_timer) {
+                    timer.drop_timer(tree);
+                }
             }
         }
     }
@@ -205,7 +208,7 @@ impl InputLine {
                 Right(data.text.len() - 1)
             };
         }
-        Self::update_is_valid_empty(tree, window);
+        Self::update_is_valid(tree, window, None);
     }
 }
 
@@ -291,7 +294,7 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
         window: Window<State>,
         event: Event,
         _event_source: Window<State>,
-        _state: &mut State,
+        state: &mut State,
     ) -> bool {
         match event {
             Event::Cmd(CMD_GOT_PRIMARY_FOCUS) => {
@@ -318,23 +321,34 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                 } else {
                     data.view = Right(data.cursor);
                 }
+                if data.is_valid {
+                    data.editing = true;
+                    InputLine::update_is_valid(tree, window, Some(state));
+                }
                 window.invalidate_render(tree);
                 false
             },
             Event::Cmd(CMD_LOST_PRIMARY_FOCUS) => {
                 let data = window.data_mut::<InputLine>(tree);
-                if data.text.is_empty() {
-                    data.text = data.default.clone();
-                    if !data.text.is_empty() {
-                        data.cursor = data.text.len();
-                    }
-                }
                 data.view = if !data.is_numeric_raw() || data.text.is_empty() {
                     Left(0)
                 } else {
                     Right(data.text.len() - 1)
                 };
-                InputLine::update_is_valid_empty(tree, window);
+                data.editing = false;
+                InputLine::update_is_valid(tree, window, Some(state));
+                window.invalidate_render(tree);
+                false
+            },
+            Event::Cmd(CMD_LOST_ATTENTION) => {
+                let data = window.data_mut::<InputLine>(tree);
+                data.editing = false;
+                InputLine::update_is_valid(tree, window, Some(state));
+                let data = window.data_mut::<InputLine>(tree);
+                if data.is_valid {
+                    data.editing = true;
+                    InputLine::update_is_valid(tree, window, Some(state));
+                }
                 window.invalidate_render(tree);
                 false
             },
@@ -356,7 +370,12 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                             }
                         }
                     }
-                    InputLine::update_is_valid_empty(tree, window);
+                    InputLine::update_is_valid(tree, window, Some(state));
+                    let data = window.data_mut::<InputLine>(tree);
+                    if data.is_valid && !data.editing {
+                        data.editing = true;
+                        InputLine::update_is_valid(tree, window, Some(state));
+                    }
                     window.invalidate_render(tree);
                     true
                 },
@@ -390,7 +409,12 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                             }
                         }
                     }
-                    InputLine::update_is_valid_empty(tree, window);
+                    InputLine::update_is_valid(tree, window, Some(state));
+                    let data = window.data_mut::<InputLine>(tree);
+                    if data.is_valid && !data.editing {
+                        data.editing = true;
+                        InputLine::update_is_valid(tree, window, Some(state));
+                    }
                     window.invalidate_render(tree);
                     true
                 },

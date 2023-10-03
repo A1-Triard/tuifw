@@ -62,7 +62,7 @@ use core::str::FromStr;
 use timer_no_std::MonoClock;
 use tuifw_screen::{Error, Key};
 use tuifw_window::{Event, EventHandler, Window, WindowTree};
-use tuifw::{Button, InputLine, StaticText, CMD_IS_VALID_EMPTY_CHANGED};
+use tuifw::{Button, InputLine, StaticText, CMD_IS_VALID_CHANGED};
 
 const CMD_CALC: u16 = 1000;
 
@@ -101,17 +101,13 @@ impl EventHandler<State> for RootEventHandler {
                 StaticText::text_mut(tree, state.s, |value| replace(value, s.to_string()));
                 true
             },
-            Event::Cmd(CMD_IS_VALID_EMPTY_CHANGED) => {
-                let a_empty = InputLine::is_empty(tree, state.a);
-                let v_empty = InputLine::is_empty(tree, state.v);
-                let t_empty = InputLine::is_empty(tree, state.t);
-                let n_empty = InputLine::is_empty(tree, state.n);
+            Event::Cmd(CMD_IS_VALID_CHANGED) => {
                 let a_valid = InputLine::is_valid(tree, state.a);
                 let v_valid = InputLine::is_valid(tree, state.v);
                 let t_valid = InputLine::is_valid(tree, state.t);
                 let n_valid = InputLine::is_valid(tree, state.n);
                 Button::set_is_enabled(tree, state.calc,
-                    a_valid && v_valid && t_valid && n_valid && !a_empty && !v_empty && !t_empty && !n_empty
+                    a_valid && v_valid && t_valid && n_valid
                 );
                 true
             },
