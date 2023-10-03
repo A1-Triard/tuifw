@@ -67,6 +67,8 @@ pub const CMD_GOT_SECONDARY_FOCUS: u16 = 2;
 
 pub const CMD_LOST_SECONDARY_FOCUS: u16 = 3;
 
+pub const CMD_LOST_ATTENTION: u16 = 4;
+
 fn invalidate_rect(screen: &mut dyn Screen, rect: Rect) {
     let rect = rect.intersect(Rect { tl: Point { x: 0, y: 0 }, size: screen.size() });
     if rect.is_empty() { return; }
@@ -1178,11 +1180,14 @@ impl<'clock, State: ?Sized> WindowTree<'clock, State> {
                     if self.focus_primary(Some(next_focused), state) { return Ok(()); }
                 }
             }
-            let handled = self.primary_focused.map_or(false, |x|
+            let handled_primary = self.primary_focused.map_or(false, |x|
                 x.raise_raw(self, Event::Key(n, key), false, state)
             );
-            if !handled {
-                self.secondary_focused.map(|x| x.raise_raw(self, Event::Key(n, key), true, state));
+            if
+                !handled_primary &&
+                self.secondary_focused.map_or(false, |x| x.raise_raw(self, Event::Key(n, key), true, state))
+            {
+                self.primary_focused.map(|x| x.raise_raw(self, Event::Cmd(CMD_LOST_ATTENTION), false, state));
             }
         }
         Ok(())
