@@ -230,6 +230,8 @@ pub trait Widget<State: ?Sized>: DynClone {
         event_source: Window<State>,
         state: &mut State,
     ) -> bool;
+
+    fn focusable(&self, _primary_focus: bool) -> bool { false }
 }
 
 clone_trait_object!(<State: ?Sized> Widget<State>);
@@ -1193,8 +1195,9 @@ impl<'clock, State: ?Sized> WindowTree<'clock, State> {
     ) -> bool {
         let old_focused = self.primary_focused;
         if window == old_focused { return false; }
-        let handled = window.map_or(true, |x| x.raise(self, Event::Cmd(CMD_GOT_PRIMARY_FOCUS), state));
-        if !handled { return false; }
+        let focusable = window.map_or(true, |x| self.arena[x.0].widget.focusable(true));
+        if !focusable { return false; }
+        window.map(|x| x.raise(self, Event::Cmd(CMD_GOT_PRIMARY_FOCUS), state));
 
         if let Some(mut window) = self.primary_focused {
             loop {
@@ -1229,8 +1232,9 @@ impl<'clock, State: ?Sized> WindowTree<'clock, State> {
     ) -> bool {
         let old_focused = self.secondary_focused;
         if window == old_focused { return false; }
-        let handled = window.map_or(true, |x| x.raise(self, Event::Cmd(CMD_GOT_SECONDARY_FOCUS), state));
-        if !handled { return false; }
+        let focusable = window.map_or(true, |x| self.arena[x.0].widget.focusable(false));
+        if !focusable { return false; }
+        window.map(|x| x.raise(self, Event::Cmd(CMD_GOT_SECONDARY_FOCUS), state));
         self.secondary_focused = window;
         old_focused.map(|x| x.raise(self, Event::Cmd(CMD_LOST_SECONDARY_FOCUS), state));
         true

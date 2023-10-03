@@ -115,6 +115,8 @@ impl<State: ?Sized> Widget<State> for ButtonWidget {
         final_inner_bounds.size
     }
 
+    fn focusable(&self, _primary_focus: bool) -> bool { true }
+
     fn update(
         &self,
         tree: &mut WindowTree<State>,
@@ -127,7 +129,7 @@ impl<State: ?Sized> Widget<State> for ButtonWidget {
             Event::Cmd(CMD_GOT_PRIMARY_FOCUS) | Event::Cmd(CMD_LOST_PRIMARY_FOCUS) |
             Event::Cmd(CMD_GOT_SECONDARY_FOCUS) | Event::Cmd(CMD_LOST_SECONDARY_FOCUS) => {
                 window.invalidate_render(tree);
-                true
+                false
             },
             Event::Key(_, Key::Enter) => {
                 let data = window.data_mut::<Button>(tree);

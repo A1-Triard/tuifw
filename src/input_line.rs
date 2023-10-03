@@ -283,6 +283,8 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
         Vector { x: final_inner_bounds.w(), y: 1 }
     }
 
+    fn focusable(&self, primary_focus: bool) -> bool { primary_focus }
+
     fn update(
         &self,
         tree: &mut WindowTree<State>,
@@ -317,7 +319,7 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                     data.view = Right(data.cursor);
                 }
                 window.invalidate_render(tree);
-                true
+                false
             },
             Event::Cmd(CMD_LOST_PRIMARY_FOCUS) => {
                 let data = window.data_mut::<InputLine>(tree);
@@ -334,7 +336,7 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                 };
                 InputLine::update_is_valid_empty(tree, window);
                 window.invalidate_render(tree);
-                true
+                false
             },
             Event::Key(n, key) => match key {
                 Key::Char(c) => {
