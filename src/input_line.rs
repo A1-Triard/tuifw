@@ -351,60 +351,49 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                 window.invalidate_render(tree);
                 false
             },
-            Event::Key(n, key) => match key {
-                Key::Char(c) => {
-                    let data = window.data_mut::<InputLine>(tree);
-                    for _ in 0 .. n.get() {
-                        if data.text.try_reserve(c.len_utf8()).is_ok() {
-                            data.text.insert(data.cursor, c);
-                            data.calc_view_end(data.view.start, true);
-                            data.cursor_right();
-                        }
-                    }
+            Event::Key(Key::Char(c)) => {
+                let data = window.data_mut::<InputLine>(tree);
+                if data.text.try_reserve(c.len_utf8()).is_ok() {
+                    data.text.insert(data.cursor, c);
+                    data.calc_view_end(data.view.start, true);
+                    data.cursor_right();
+                }
+                InputLine::update_is_valid(tree, window, Some(state));
+                let data = window.data_mut::<InputLine>(tree);
+                if data.is_valid && !data.editing {
+                    data.editing = true;
                     InputLine::update_is_valid(tree, window, Some(state));
-                    let data = window.data_mut::<InputLine>(tree);
-                    if data.is_valid && !data.editing {
-                        data.editing = true;
-                        InputLine::update_is_valid(tree, window, Some(state));
-                    }
-                    window.invalidate_render(tree);
-                    true
-                },
-                Key::Backspace => {
-                    let data = window.data_mut::<InputLine>(tree);
-                    for _ in 0 .. n.get() {
-                        if !data.text.is_empty() {
-                            data.cursor_left();
-                            let c = data.text.remove(data.cursor);
-                            data.calc_view_start(data.view.end - c.len_utf8(), true);
-                        }
-                    }
+                }
+                window.invalidate_render(tree);
+                true
+            },
+            Event::Key(Key::Backspace) => {
+                let data = window.data_mut::<InputLine>(tree);
+                if !data.text.is_empty() {
+                    data.cursor_left();
+                    let c = data.text.remove(data.cursor);
+                    data.calc_view_start(data.view.end - c.len_utf8(), true);
+                }
+                InputLine::update_is_valid(tree, window, Some(state));
+                let data = window.data_mut::<InputLine>(tree);
+                if data.is_valid && !data.editing {
+                    data.editing = true;
                     InputLine::update_is_valid(tree, window, Some(state));
-                    let data = window.data_mut::<InputLine>(tree);
-                    if data.is_valid && !data.editing {
-                        data.editing = true;
-                        InputLine::update_is_valid(tree, window, Some(state));
-                    }
-                    window.invalidate_render(tree);
-                    true
-                },
-                Key::Left => {
-                    let data = window.data_mut::<InputLine>(tree);
-                    for _ in 0 .. n.get() {
-                        data.cursor_left();
-                    }
-                    window.invalidate_render(tree);
-                    true
-                },
-                Key::Right => {
-                    let data = window.data_mut::<InputLine>(tree);
-                    for _ in 0 .. n.get() {
-                        data.cursor_right();
-                    }
-                    window.invalidate_render(tree);
-                    true
-                },
-                _ => false,
+                }
+                window.invalidate_render(tree);
+                true
+            },
+            Event::Key(Key::Left) => {
+                let data = window.data_mut::<InputLine>(tree);
+                data.cursor_left();
+                window.invalidate_render(tree);
+                true
+            },
+            Event::Key(Key::Right) => {
+                let data = window.data_mut::<InputLine>(tree);
+                data.cursor_right();
+                window.invalidate_render(tree);
+                true
             },
             _ => false,
         }

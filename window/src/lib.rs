@@ -22,7 +22,6 @@ use alloc::vec::Vec;
 use components_arena::{Arena, Component, ComponentId, Id, NewtypeComponentId, RawId};
 use core::cmp::{max, min};
 use core::mem::replace;
-use core::num::NonZeroU16;
 use downcast_rs::{Downcast, impl_downcast};
 use dyn_clone::{DynClone, clone_trait_object};
 use educe::Educe;
@@ -35,8 +34,8 @@ use tuifw_screen_base::{HAlign, VAlign, Thickness, Range1d};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum Event {
-    Key(NonZeroU16, Key),
-    PreviewKey(NonZeroU16, Key),
+    Key(Key),
+    PreviewKey(Key),
     Cmd(u16),
     PreviewCmd(u16),
 }
@@ -44,8 +43,8 @@ pub enum Event {
 impl Event {
     pub fn is_preview(self) -> bool {
         match self {
-            Event::Key(_, _) => false,
-            Event::PreviewKey(_, _) => true,
+            Event::Key(_) => false,
+            Event::PreviewKey(_) => true,
             Event::Cmd(_) => false,
             Event::PreviewCmd(_) => true,
         }
@@ -53,7 +52,7 @@ impl Event {
 
     fn preview(self) -> Self {
         match self {
-            Event::Key(n, k) => Event::PreviewKey(n, k),
+            Event::Key(k) => Event::PreviewKey(k),
             Event::Cmd(n) => Event::PreviewCmd(n),
             _ => unreachable!(),
         }
@@ -1175,20 +1174,24 @@ impl<'clock, State: ?Sized> WindowTree<'clock, State> {
         }
         let screen = self.screen.as_mut().expect("WindowTree is in invalid state");
         if let Some(screen_Event::Key(n, key)) = screen.update(self.cursor, wait)? {
-            if key == Key::Tab {
-                if let Some(primary_focused) = self.primary_focused {
-                    let next_focused = primary_focused.actual_next_focused(self);
-                    if self.focus_primary(Some(next_focused), state) { return Ok(()); }
+            for _ in 0 .. n.get() {
+                if key == Key::Tab {
+                    if let Some(primary_focused) = self.primary_focused {
+                        let next_focused = primary_focused.actual_next_focused(self);
+                        if self.focus_primary(Some(next_focused), state) { return Ok(()); }
+                    }
                 }
-            }
-            let handled_primary = self.primary_focused.map_or(false, |x|
-                x.raise_raw(self, Event::Key(n, key), false, state)
-            );
-            if
-                !handled_primary &&
-                self.secondary_focused.map_or(false, |x| x.raise_raw(self, Event::Key(n, key), true, state))
-            {
-                self.primary_focused.map(|x| x.raise_raw(self, Event::Cmd(CMD_LOST_ATTENTION), false, state));
+                let handled_primary = self.primary_focused.map_or(false, |x|
+                    x.raise_raw(self, Event::Key(key), false, state)
+                );
+                if
+                    !handled_primary &&
+                    self.secondary_focused.map_or(false, |x| x.raise_raw(self, Event::Key(key), true, state))
+                {
+                    self.primary_focused.map(|x|
+                        x.raise_raw(self, Event::Cmd(CMD_LOST_ATTENTION), false, state)
+                    );
+                }
             }
         }
         Ok(())

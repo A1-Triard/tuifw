@@ -136,7 +136,7 @@ impl<State: ?Sized> Widget<State> for ButtonWidget {
                 window.invalidate_render(tree);
                 false
             },
-            Event::Key(_, Key::Enter) => {
+            Event::Key(Key::Enter) => {
                 let data = window.data_mut::<Button>(tree);
                 if data.is_enabled {
                     let click_timer = Timer::new(tree, 0, Box::new(move |tree, state| {

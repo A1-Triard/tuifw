@@ -88,7 +88,7 @@ impl EventHandler<State> for RootEventHandler {
         state: &mut State
     ) -> bool {
         match event {
-            Event::Key(_, Key::Escape) => {
+            Event::Key(Key::Escape) => {
                 tree.quit();
                 true
             },
