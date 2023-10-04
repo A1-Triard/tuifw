@@ -1,10 +1,10 @@
-use crate::{prop_obj_render, prop_string_render, prop_value_render, widget};
+use crate::{prop_obj_render, prop_string_render, widget};
 use alloc::boxed::Box;
 use alloc::string::String;
 use core::ops::Range;
 use core::str::FromStr;
-use either::{Either, Left, Right};
-use tuifw_screen_base::{Key, Point, Rect, Vector, char_width, text_width, is_text_fit_in};
+use either::Left;
+use tuifw_screen_base::{Key, Point, Rect, Vector, char_width, text_width};
 use tuifw_screen_base::{Thickness};
 use tuifw_window::{Event, RenderPort, Timer, Widget, WidgetData, Window, WindowTree};
 use tuifw_window::{CMD_GOT_PRIMARY_FOCUS, CMD_LOST_PRIMARY_FOCUS, CMD_LOST_ATTENTION};
@@ -65,7 +65,9 @@ pub struct InputLine {
     text: String,
     is_valid: bool,
     editing: bool,
-    view: Either<usize, usize>,
+    view_left_padding: i16,
+    view: Range<usize>,
+    view_right_padding: i16,
     cursor: usize,
     width: i16,
     is_valid_timer: Option<Timer>,
@@ -86,7 +88,9 @@ impl InputLine {
             text: String::new(),
             is_valid: true,
             editing: false,
-            view: Left(0),
+            view_left_padding: 0,
+            view: 0 .. 0,
+            view_right_padding: 0,
             cursor: 0,
             width: 0,
             is_valid_timer: None,
@@ -102,17 +106,7 @@ impl InputLine {
 
     widget!(InputLineWidget; init_palette);
     prop_string_render!(text; on_text_changed);
-    prop_value_render!(cursor: usize | assert_cursor);
-    prop_value_render!(view: Either<usize, usize> | assert_view);
     prop_obj_render!(validator: Option<Box<dyn Validator>>);
-
-    fn assert_view(&self, value: Either<usize, usize>) {
-        assert!(value.map(|x| x <= self.text.len()).into_inner());
-    }
-
-    fn assert_cursor(&self, value: usize) {
-        assert!(value <= self.text.len());
-    }
 
     pub fn is_valid<State: ?Sized>(tree: &WindowTree<State>, window: Window<State>) -> bool {
         window.data::<InputLine>(tree).is_valid
@@ -150,64 +144,98 @@ impl InputLine {
         }
     }
 
-    fn calc_value_padding_view_and_is_tail_cursor_fit(&self) -> (i16, Range<usize>, bool) {
-        match self.view {
-            Left(view_start) => 'r: {
-                let mut width = self.width;
-                for (i, c) in self.text[view_start ..].char_indices() {
-                    let c_width = char_width(c);
-                    if c_width as u16 > width as u16 {
-                        break 'r (0, view_start .. i, false);
-                    }
-                    width = width.wrapping_sub(c_width);
+    fn reset_view(&mut self, focused: bool) {
+        self.cursor = self.text.len();
+        if focused || self.is_numeric_raw() {
+            self.calc_view_start(self.text.len(), focused);
+        } else {
+            self.calc_view_end(0, focused);
+        }
+    }
+
+    fn calc_view_start(&mut self, view_end: usize, focused: bool) {
+        if self.width == 0 {
+            self.view_left_padding = 0;
+            self.view_right_padding = 0;
+            self.view = view_end .. view_end;
+            return;
+        }
+        let mut width = if focused && self.cursor == self.text.len() { 1 } else { 0 };
+        let view_start = 'r: {
+            for (i, c) in self.text[.. view_end].char_indices().rev() {
+                let c_width = char_width(c);
+                if (self.width.wrapping_sub(width) as u16) < c_width as u16 {
+                    break 'r i + c.len_utf8();
                 }
-                (0, view_start .. self.text.len(), width != 0)
-            },
-            Right(view_end) => 'r: {
-                let (text_width, value_view_end, is_tail_cursor_fit) = if view_end == self.text.len() {
-                    (
-                        (self.width as u16).saturating_sub(1) as i16,
-                        self.text.len(),
-                        self.width != 0
-                    )
-                } else {
-                    (self.width, view_end + 1, false)
-                };
-                let mut width = text_width;
-                for (i, c) in self.text[.. value_view_end].char_indices().rev() {
-                    let c_width = char_width(c);
-                    if c_width as u16 > width as u16 {
-                        break 'r (width, i + c.len_utf8() .. value_view_end, is_tail_cursor_fit);
-                    }
-                    width -= c_width;
-                }
-                (width, 0 .. value_view_end, is_tail_cursor_fit)
+                width = width.wrapping_add(c_width);
             }
+            0
+        };
+        self.view = view_start ..  view_end;
+        if self.is_numeric_raw() {
+            self.view_left_padding = self.width.wrapping_sub(width);
+            self.view_right_padding = if focused && self.cursor == self.text.len() { 1 } else { 0 };
+        } else {
+            self.view_left_padding = 0;
+            self.view_right_padding = self.width.wrapping_sub(width)
+                .wrapping_add(if focused && self.cursor == self.text.len() { 1 } else { 0 });
+        }
+    }
+
+    fn calc_view_end(&mut self, view_start: usize, focused: bool) {
+        if self.width == 0 {
+            self.view_left_padding = 0;
+            self.view_right_padding = 0;
+            self.view = view_start .. view_start;
+            return;
+        }
+        let mut width = if focused && self.cursor == self.text.len() { 1 } else { 0 };
+        let view_end = 'r: {
+            for (i, c) in self.text[view_start ..].char_indices() {
+                let c_width = char_width(c);
+                if (self.width.wrapping_sub(width) as u16) < c_width as u16 {
+                    break 'r view_start + i;
+                }
+                width = width.wrapping_add(c_width);
+            }
+            self.text.len()
+        };
+        self.view = view_start ..  view_end;
+        if self.is_numeric_raw() {
+            self.view_left_padding = self.width.wrapping_sub(width);
+            self.view_right_padding = if focused && self.cursor == self.text.len() { 1 } else { 0 };
+        } else {
+            self.view_left_padding = 0;
+            self.view_right_padding = self.width.wrapping_sub(width)
+                .wrapping_add(if focused && self.cursor == self.text.len() { 1 } else { 0 });
+        }
+    }
+
+    fn cursor_left(&mut self) {
+        let Some(c) = self.text[.. self.cursor].chars().next_back() else { return; };
+        self.cursor -= c.len_utf8();
+        if self.cursor < self.view.start {
+            self.calc_view_end(self.cursor, true);
+        }
+    }
+
+    fn cursor_right(&mut self) {
+        let Some(c) = self.text[self.cursor ..].chars().next() else { return; };
+        self.cursor += c.len_utf8();
+        if self.cursor >= self.view.end && !(self.cursor == self.text.len() && self.view_right_padding != 0) {
+            let view_end = if let Some(c) = self.text[self.cursor ..].chars().next() {
+                self.cursor + c.len_utf8()
+            } else {
+                self.text.len()
+            };
+            self.calc_view_start(view_end, true);
         }
     }
 
     fn on_text_changed<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
         let focused = window.is_focused(tree);
         let data = &mut window.data_mut::<InputLine>(tree);
-        data.cursor = data.text.len();
-        if focused {
-            let text_fit_width = (data.width as u16).saturating_sub(1) as i16;
-            if is_text_fit_in(text_fit_width, &data.text) {
-                data.view = if !data.is_numeric_raw() {
-                    Left(0)
-                } else {
-                    Right(data.text.len())
-                };
-            } else {
-                data.view = Right(data.cursor);
-            }
-        } else {
-            data.view = if !data.is_numeric_raw() || data.text.is_empty() {
-                Left(0)
-            } else {
-                Right(data.text.len() - 1)
-            };
-        }
+        data.reset_view(focused);
         Self::update_is_valid(tree, window, None);
         let data = &mut window.data_mut::<InputLine>(tree);
         if data.is_valid && !data.editing && focused {
@@ -239,11 +267,18 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
         let color = if !data.is_valid { 1 } else { 0 };
         let color = window.color(tree, color);
         rp.fill_bg(color.1);
-        let (padding, view, is_tail_cursor_fit) = data.calc_value_padding_view_and_is_tail_cursor_fit();
-        rp.out(Point { x: padding.wrapping_add(1), y: 0 }, color.0, color.1, &data.text[view.clone()]);
-        if focused && (view.contains(&data.cursor) || data.cursor == data.text.len() && is_tail_cursor_fit) {
-            let cursor_x = text_width(&data.text[view.start .. data.cursor]);
-            rp.cursor(Point { x: cursor_x.wrapping_add(padding).wrapping_add(1), y: 0 });
+        rp.out(
+            Point { x: data.view_left_padding.wrapping_add(1), y: 0 },
+            color.0,
+            color.1,
+            &data.text[data.view.clone()]
+        );
+        if
+            focused &&
+            (data.view.contains(&data.cursor) || data.cursor == data.text.len() && data.view_right_padding != 0)
+        {
+            let cursor_x = text_width(&data.text[data.view.start .. data.cursor]);
+            rp.cursor(Point { x: cursor_x.wrapping_add(data.view_left_padding).wrapping_add(1), y: 0 });
         }
     }
 
@@ -268,26 +303,7 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
         let focused = window.is_focused(tree);
         let data = window.data_mut::<InputLine>(tree);
         data.width = Thickness::new(1, 0, 1, 0).shrink_rect(final_inner_bounds).w();
-        let text_fit_width = if focused && data.cursor == data.text.len() {
-            (data.width as u16).saturating_sub(1) as i16
-        } else {
-            data.width
-        };
-        if is_text_fit_in(text_fit_width, &data.text) {
-            if focused && data.cursor == data.text.len() {
-                data.view = if !data.is_numeric_raw() {
-                    Left(0)
-                } else {
-                    Right(data.text.len())
-                };
-            } else {
-                data.view = if !data.is_numeric_raw() || data.text.is_empty() {
-                    Left(0)
-                } else {
-                    Right(data.text.len() - 1)
-                };
-            }
-        }
+        data.reset_view(focused);
         Vector { x: final_inner_bounds.w(), y: 1 }
     }
 
@@ -304,28 +320,7 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
         match event {
             Event::Cmd(CMD_GOT_PRIMARY_FOCUS) => {
                 let data = window.data_mut::<InputLine>(tree);
-                let text_fit_width = if data.cursor == data.text.len() {
-                    (data.width as u16).saturating_sub(1) as i16
-                } else {
-                    data.width
-                };
-                if is_text_fit_in(text_fit_width, &data.text) {
-                    if data.cursor == data.text.len() {
-                        data.view = if !data.is_numeric_raw() {
-                            Left(0)
-                        } else {
-                            Right(data.text.len())
-                        };
-                    } else {
-                        data.view = if !data.is_numeric_raw() || data.text.is_empty() {
-                            Left(0)
-                        } else {
-                            Right(data.text.len() - 1)
-                        };
-                    }
-                } else {
-                    data.view = Right(data.cursor);
-                }
+                data.reset_view(true);
                 if data.is_valid {
                     data.editing = true;
                     InputLine::update_is_valid(tree, window, Some(state));
@@ -335,11 +330,7 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
             },
             Event::Cmd(CMD_LOST_PRIMARY_FOCUS) => {
                 let data = window.data_mut::<InputLine>(tree);
-                data.view = if !data.is_numeric_raw() || data.text.is_empty() {
-                    Left(0)
-                } else {
-                    Right(data.text.len() - 1)
-                };
+                data.reset_view(false);
                 data.editing = false;
                 InputLine::update_is_valid(tree, window, Some(state));
                 window.invalidate_render(tree);
@@ -363,16 +354,8 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                     for _ in 0 .. n.get() {
                         if data.text.try_reserve(c.len_utf8()).is_ok() {
                             data.text.insert(data.cursor, c);
-                            data.cursor += c.len_utf8();
-                            let (_, view, is_tail_cursor_fit) =
-                                data.calc_value_padding_view_and_is_tail_cursor_fit();
-                            if
-                                !view.contains(&data.cursor) && !(
-                                    data.cursor == data.text.len() && is_tail_cursor_fit
-                                )
-                            {
-                                data.view = Right(data.cursor);
-                            }
+                            data.calc_view_end(data.view.start, true);
+                            data.cursor_right();
                         }
                     }
                     InputLine::update_is_valid(tree, window, Some(state));
@@ -387,31 +370,10 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                 Key::Backspace => {
                     let data = window.data_mut::<InputLine>(tree);
                     for _ in 0 .. n.get() {
-                        if let Some((i, c)) = data.text[.. data.cursor].char_indices().next_back() {
-                            data.text.remove(i);
-                            data.cursor -= c.len_utf8();
-                            let text_fit_width = if data.cursor == data.text.len() {
-                                (data.width as u16).saturating_sub(1) as i16
-                            } else {
-                                data.width
-                            };
-                            if is_text_fit_in(text_fit_width, &data.text) {
-                                if data.cursor == data.text.len() {
-                                    data.view = if !data.is_numeric_raw() {
-                                        Left(0)
-                                    } else {
-                                        Right(data.text.len())
-                                    };
-                                } else {
-                                    data.view = if !data.is_numeric_raw() || data.text.is_empty() {
-                                        Left(0)
-                                    } else {
-                                        Right(data.text.len() - 1)
-                                    };
-                                }
-                            } else {
-                                data.view = Right(data.cursor);
-                            }
+                        if !data.text.is_empty() {
+                            data.cursor_left();
+                            let c = data.text.remove(data.cursor);
+                            data.calc_view_start(data.view.end - c.len_utf8(), true);
                         }
                     }
                     InputLine::update_is_valid(tree, window, Some(state));
