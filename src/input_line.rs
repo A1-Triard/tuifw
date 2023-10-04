@@ -65,9 +65,8 @@ pub struct InputLine {
     text: String,
     is_valid: bool,
     editing: bool,
-    view_left_padding: i16,
+    view_padding: i16,
     view: Range<usize>,
-    view_right_padding: i16,
     cursor: usize,
     width: i16,
     is_valid_timer: Option<Timer>,
@@ -88,9 +87,8 @@ impl InputLine {
             text: String::new(),
             is_valid: true,
             editing: false,
-            view_left_padding: 0,
+            view_padding: 0,
             view: 0 .. 0,
-            view_right_padding: 0,
             cursor: 0,
             width: 0,
             is_valid_timer: None,
@@ -167,11 +165,9 @@ impl InputLine {
         };
         self.view = view_start ..  view_end;
         if self.is_numeric_raw() {
-            self.view_left_padding = self.width.wrapping_sub(width);
-            self.view_right_padding = 0;
+            self.view_padding = self.width.wrapping_sub(width);
         } else {
-            self.view_left_padding = 0;
-            self.view_right_padding = self.width.wrapping_sub(width);
+            self.view_padding = 0;
         }
     }
 
@@ -189,11 +185,9 @@ impl InputLine {
         };
         self.view = view_start ..  view_end;
         if self.is_numeric_raw() {
-            self.view_left_padding = self.width.wrapping_sub(width);
-            self.view_right_padding = 0;
+            self.view_padding = self.width.wrapping_sub(width);
         } else {
-            self.view_left_padding = 0;
-            self.view_right_padding = self.width.wrapping_sub(width);
+            self.view_padding = 0;
         }
     }
 
@@ -254,14 +248,14 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
         let color = window.color(tree, color);
         rp.fill_bg(color.1);
         rp.out(
-            Point { x: data.view_left_padding.wrapping_add(1), y: 0 },
+            Point { x: data.view_padding.wrapping_add(1), y: 0 },
             color.0,
             color.1,
             &data.text[data.view.clone()]
         );
         if focused {
             let cursor_x = text_width(&data.text[data.view.start .. data.cursor]);
-            rp.cursor(Point { x: cursor_x.wrapping_add(data.view_left_padding).wrapping_add(1), y: 0 });
+            rp.cursor(Point { x: cursor_x.wrapping_add(data.view_padding).wrapping_add(1), y: 0 });
         }
     }
 
