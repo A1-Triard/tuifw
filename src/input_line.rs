@@ -364,6 +364,21 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                 window.invalidate_render(tree);
                 true
             },
+            Event::Key(Key::Delete) => {
+                let data = window.data_mut::<InputLine>(tree);
+                if !data.text.is_empty() {
+                    let c = data.text.remove(data.cursor);
+                    data.calc_view_start(data.view.end - c.len_utf8());
+                }
+                InputLine::update_is_valid(tree, window, Some(state));
+                let data = window.data_mut::<InputLine>(tree);
+                if data.is_valid && !data.editing {
+                    data.editing = true;
+                    InputLine::update_is_valid(tree, window, Some(state));
+                }
+                window.invalidate_render(tree);
+                true
+            },
             Event::Key(Key::Left) => {
                 let data = window.data_mut::<InputLine>(tree);
                 data.cursor_left();
@@ -373,6 +388,20 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
             Event::Key(Key::Right) => {
                 let data = window.data_mut::<InputLine>(tree);
                 data.cursor_right();
+                window.invalidate_render(tree);
+                true
+            },
+            Event::Key(Key::Home) => {
+                let data = window.data_mut::<InputLine>(tree);
+                data.cursor = 0;
+                data.calc_view_end(0);
+                window.invalidate_render(tree);
+                true
+            },
+            Event::Key(Key::End) => {
+                let data = window.data_mut::<InputLine>(tree);
+                data.cursor = data.text.len();
+                data.calc_view_start(data.text.len());
                 window.invalidate_render(tree);
                 true
             },
