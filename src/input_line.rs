@@ -213,9 +213,12 @@ impl InputLine {
 
     fn cursor_left(&mut self) {
         let Some(c) = self.text[.. self.cursor].chars().next_back() else { return; };
+        let cursor_at_end = self.cursor == self.text.len();
         self.cursor -= c.len_utf8();
         if self.cursor < self.view.start {
             self.calc_view_end(self.cursor, true);
+        } else if cursor_at_end && self.view_right_padding != 0 {
+            self.calc_view_start(self.text.len(), true);
         }
     }
 
@@ -381,6 +384,22 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                     if data.is_valid && !data.editing {
                         data.editing = true;
                         InputLine::update_is_valid(tree, window, Some(state));
+                    }
+                    window.invalidate_render(tree);
+                    true
+                },
+                Key::Left => {
+                    let data = window.data_mut::<InputLine>(tree);
+                    for _ in 0 .. n.get() {
+                        data.cursor_left();
+                    }
+                    window.invalidate_render(tree);
+                    true
+                },
+                Key::Right => {
+                    let data = window.data_mut::<InputLine>(tree);
+                    for _ in 0 .. n.get() {
+                        data.cursor_right();
                     }
                     window.invalidate_render(tree);
                     true
