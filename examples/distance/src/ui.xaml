@@ -1,6 +1,6 @@
 <Background xmlns='https://a1-triard.github.io/tuifw/2023/xaml'>
   <Frame HAlign="Center" VAlign="Center">
-    <StackPanel Margin="2,1,2,1">
+    <StackPanel Margin="3,1,3,1">
       <DockPanel Margin="0,0,0,1">
         <StackPanel Dock="Left">
           <StaticText Text="A =" />
