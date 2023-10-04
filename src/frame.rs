@@ -7,13 +7,14 @@ use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree};
 pub struct Frame {
     double: bool,
     text: String,
+    text_align: HAlign,
 }
 
 impl<State: ?Sized> WidgetData<State> for Frame { }
 
 impl Frame {
     pub fn new() -> Self {
-        Frame { double: false, text: String::new() }
+        Frame { double: false, text: String::new(), text_align: HAlign::Left }
     }
 
     fn init_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
@@ -33,6 +34,7 @@ impl Frame {
     widget!(FrameWidget; init_palette);
     prop_value_render!(double: bool);
     prop_string_render!(text);
+    prop_value_render!(text_align: HAlign);
 }
 
 impl Default for Frame {
@@ -71,15 +73,17 @@ impl<State: ?Sized> Widget<State> for FrameWidget {
                 let margin = Thickness::align(
                     Vector { x: text_width, y: 1 },
                     text_area_bounds.size,
-                    HAlign::Center,
+                    data.text_align,
                     VAlign::Top
                 );
                 let text_bounds = margin.shrink_rect(text_area_bounds);
+                rp.out(text_bounds.tl.offset(Vector { x: -1, y: 0 }), color.0, color.1, " ");
                 rp.out(text_bounds.tl, color.0, color.1, &data.text);
+                rp.out(text_bounds.tr(), color.0, color.1, " ");
             } else {
+                rp.out(text_area_bounds.tl.offset(Vector { x: -1, y: 0 }), color.0, color.1, " ");
                 rp.out(text_area_bounds.tl, color.0, color.1, &data.text);
-                rp.out(text_area_bounds.tr_inner(), color.0, color.1, "_");
-                rp.out(text_area_bounds.tr(), color.0, color.1, if data.double { "═" } else { "─" });
+                rp.out(text_area_bounds.tr(), color.0, color.1, "►");
                 rp.tr_edge(bounds.tr_inner(), data.double, color.0, color.1);
             }
         }

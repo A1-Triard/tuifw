@@ -85,6 +85,7 @@ pub fn reg_widgets(xaml: &mut Xaml) {
     let frame = xaml.reg_struct(xmlns!("Frame"), Some(widget));
     let frame_double = xaml.reg_prop(frame, "Double", XamlType::Literal(boolean));
     let frame_text = xaml.reg_prop(frame, "Text", XamlType::Literal(string));
+    let frame_text_align = xaml.reg_prop(frame, "TextAlign", XamlType::Literal(h_align));
 
     xaml.set_literal_new(boolean, Box::new(|x| match x {
         "True" => Some("true".to_string()),
@@ -426,5 +427,8 @@ pub fn reg_widgets(xaml: &mut Xaml) {
     " }, obj, value))));
     xaml.set_prop_set(frame_text, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         Frame::set_text(&mut tree, {}, {});
+    " }, obj, value))));
+    xaml.set_prop_set(frame_text_align, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        Frame::set_text_align(&mut tree, {}, {});
     " }, obj, value))));
 }
