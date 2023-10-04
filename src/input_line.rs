@@ -243,6 +243,7 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
         _state: &mut State,
     ) {
         let focused = window.is_focused(tree);
+        let bounds = window.inner_bounds(tree);
         let data = window.data::<InputLine>(tree);
         let color = if !data.is_valid { 1 } else { 0 };
         let color = window.color(tree, color);
@@ -253,6 +254,12 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
             color.1,
             &data.text[data.view.clone()]
         );
+        if data.view.start > 0 {
+            rp.out(Point { x: 0, y: 0 }, color.0, color.1, "◄");
+        }
+        if data.view.end < data.text.len() {
+            rp.out(bounds.tr_inner(), color.0, color.1, "►");
+        }
         if focused {
             let cursor_x = text_width(&data.text[data.view.start .. data.cursor]);
             rp.cursor(Point { x: cursor_x.wrapping_add(data.view_padding).wrapping_add(1), y: 0 });
