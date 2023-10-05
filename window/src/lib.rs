@@ -234,6 +234,10 @@ pub trait Widget<State: ?Sized>: DynClone {
     ) -> bool;
 
     fn focusable(&self, _primary_focus: bool) -> bool { false }
+
+    fn pre_process(&self) -> bool { false }
+
+    fn post_process(&self) -> bool { false }
 }
 
 clone_trait_object!(<State: ?Sized> Widget<State>);
@@ -316,6 +320,8 @@ macro_attr! {
         next_focused_tag: u16,
         contains_primary_focus: bool,
         tag: u16,
+        pre_process: Option<Id<PrePostProcess<State>>>,
+        post_process: Option<Id<PrePostProcess<State>>>,
     }
 }
 
@@ -350,6 +356,8 @@ impl<State: ?Sized> Window<State> {
         parent: Self,
         prev: Option<Self>,
     ) -> Result<Self, Error> {
+        let pre_process = widget.pre_process();
+        let post_process = widget.post_process();
         tree.arena.try_reserve().map_err(|_| Error::Oom)?;
         let window = tree.arena.insert(move |window| {
             (WindowNode {
@@ -380,9 +388,19 @@ impl<State: ?Sized> Window<State> {
                 next_focused_tag: 0,
                 contains_primary_focus: false,
                 tag: 0,
+                pre_process: None,
+                post_process: None,
             }, Window(window))
         });
         window.attach(tree, parent, prev);
+        if pre_process {
+            let id = tree.pre_process.insert(|id| (PrePostProcess(window), id));
+            tree.arena[window.0].pre_process = Some(id);
+        }
+        if post_process {
+            let id = tree.post_process.insert(|id| (PrePostProcess(window), id));
+            tree.arena[window.0].post_process = Some(id);
+        }
         Ok(window)
     }
 
@@ -887,6 +905,12 @@ impl<State: ?Sized> Window<State> {
     ) {
         let parent = self.detach(tree);
         let mut node = tree.arena.remove(self.0);
+        if let Some(pre_process) = node.pre_process {
+            tree.pre_process.remove(pre_process);
+        }
+        if let Some(post_process) = node.post_process {
+            tree.post_process.remove(post_process);
+        }
         node.data.drop_widget_data(tree, state);
         let screen_bounds = node.window_bounds.offset(offset_from_root(parent, tree));
         invalidate_rect(tree.screen(), screen_bounds);
@@ -999,6 +1023,13 @@ impl Timer {
     }
 }
 
+macro_attr! {
+    #[derive(Component!(class=PrePostProcessClass))]
+    #[derive(Educe)]
+    #[educe(Clone)]
+    struct PrePostProcess<State: ?Sized>(Window<State>);
+}
+
 pub struct WindowTree<'clock, State: ?Sized + 'static> {
     screen: Option<Box<dyn Screen>>,
     arena: Arena<WindowNode<State>>,
@@ -1013,6 +1044,8 @@ pub struct WindowTree<'clock, State: ?Sized + 'static> {
     clock: &'clock MonoClock,
     tagged: Vec<Option<Window<State>>>,
     palette: Palette,
+    pre_process: Arena<PrePostProcess<State>>,
+    post_process: Arena<PrePostProcess<State>>,
 }
 
 impl<'clock, State: ?Sized> WindowTree<'clock, State> {
@@ -1022,6 +1055,8 @@ impl<'clock, State: ?Sized> WindowTree<'clock, State> {
         root_widget: Box<dyn Widget<State>>,
         root_data: Box<dyn WidgetData<State>>,
     ) -> Result<Self, Error> {
+        let pre_process = root_widget.pre_process();
+        let post_process = root_widget.post_process();
         let mut arena = Arena::new();
         arena.try_reserve().map_err(|_| Error::Oom)?;
         let screen_size = screen.size();
@@ -1053,8 +1088,10 @@ impl<'clock, State: ?Sized> WindowTree<'clock, State> {
             next_focused_tag: 0,
             contains_primary_focus: true,
             tag: 0,
+            pre_process: None,
+            post_process: None,
         }, Window(window)));
-        Ok(WindowTree {
+        let mut tree = WindowTree {
             screen: Some(screen),
             arena,
             root,
@@ -1068,7 +1105,18 @@ impl<'clock, State: ?Sized> WindowTree<'clock, State> {
             timers: Arena::new(),
             tagged: Vec::new(),
             palette: root_palette(),
-        })
+            pre_process: Arena::new(),
+            post_process: Arena::new(),
+        };
+        if pre_process {
+            let id = tree.pre_process.insert(|id| (PrePostProcess(root), id));
+            tree.arena[root.0].pre_process = Some(id);
+        }
+        if post_process {
+            let id = tree.post_process.insert(|id| (PrePostProcess(root), id));
+            tree.arena[root.0].post_process = Some(id);
+        }
+        Ok(tree)
     }
 
     pub fn palette(&self) -> &Palette {
@@ -1181,6 +1229,9 @@ impl<'clock, State: ?Sized> WindowTree<'clock, State> {
                         if self.focus_primary(Some(next_focused), state) { return Ok(()); }
                     }
                 }
+                for pre_process in self.pre_process.items().clone().values() {
+                    pre_process.0.raise_raw(self, Event::Key(key), false, state);
+                }
                 let handled_primary = self.primary_focused.map_or(false, |x|
                     x.raise_raw(self, Event::Key(key), false, state)
                 );
@@ -1191,6 +1242,9 @@ impl<'clock, State: ?Sized> WindowTree<'clock, State> {
                     self.primary_focused.map(|x|
                         x.raise_raw(self, Event::Cmd(CMD_LOST_ATTENTION), false, state)
                     );
+                }
+                for post_process in self.post_process.items().clone().values() {
+                    post_process.0.raise_raw(self, Event::Key(key), false, state);
                 }
             }
         }
