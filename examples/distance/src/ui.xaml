@@ -4,9 +4,9 @@
       <DockPanel Margin="0,0,0,1">
         <StackPanel Dock="Left">
           <Label Text="~A~ =" NextFocusedTag="1" />
-          <StaticText Text="V =" Margin="0,1,0,0" />
-          <StaticText Text="T =" Margin="0,1,0,0" />
-          <StaticText Text="N =" Margin="0,1,0,0" />
+          <Label Text="~V~ =" Margin="0,1,0,0" NextFocusedTag="2" />
+          <Label Text="~T~ =" Margin="0,1,0,0" NextFocusedTag="3" />
+          <Label Text="~N~ =" Margin="0,1,0,0" NextFocusedTag="4" />
         </StackPanel>
         <StackPanel Width="13" Margin="1,0,0,0">
           <InputLine Text="0" Tag="1" NextFocusedTag="2" FocusedPrimary="True">
