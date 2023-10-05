@@ -3,28 +3,28 @@
     <StackPanel Margin="3,1,3,1" HAlign="Center">
       <DockPanel Margin="0,0,0,1">
         <StackPanel Dock="Left">
-          <Label Text="~A~ =" NextFocusedTag="1" />
-          <Label Text="~V~ =" Margin="0,1,0,0" NextFocusedTag="2" />
-          <Label Text="~T~ =" Margin="0,1,0,0" NextFocusedTag="3" />
-          <Label Text="~N~ =" Margin="0,1,0,0" NextFocusedTag="4" />
+          <Label Text="~A~ =" FocusTabTag="1" />
+          <Label Text="~V~ =" Margin="0,1,0,0" FocusTabTag="2" />
+          <Label Text="~T~ =" Margin="0,1,0,0" FocusTabTag="3" />
+          <Label Text="~N~ =" Margin="0,1,0,0" FocusTabTag="4" />
         </StackPanel>
         <StackPanel Width="13" Margin="1,0,0,0">
-          <InputLine Text="0" Tag="1" NextFocusedTag="2" FocusedPrimary="True">
+          <InputLine Text="0" Tag="1" FocusTabTag="2" FocusDownTag="2" FocusUpTag="4" FocusedPrimary="True">
 	    <InputLine.Validator>
 	      <FloatValidator />
 	    </InputLine.Validator>
 	  </InputLine>
-          <InputLine Text="0" Margin="0,1,0,0" Tag="2" NextFocusedTag="3">
+          <InputLine Text="0" Margin="0,1,0,0" Tag="2" FocusTabTag="3" FocusDownTag="3" FocusUpTag="1">
 	    <InputLine.Validator>
 	      <FloatValidator />
 	    </InputLine.Validator>
 	  </InputLine>
-          <InputLine Text="0" Margin="0,1,0,0" Tag="3" NextFocusedTag="4">
+          <InputLine Text="0" Margin="0,1,0,0" Tag="3" FocusTabTag="4" FocusDownTag="4" FocusUpTag="2">
 	    <InputLine.Validator>
 	      <FloatValidator />
 	    </InputLine.Validator>
 	  </InputLine>
-          <InputLine Text="1" Margin="0,1,0,0" Tag="4" NextFocusedTag="1">
+          <InputLine Text="1" Margin="0,1,0,0" Tag="4" FocusTabTag="1" FocusDownTag="1" FocusUpTag="3">
 	    <InputLine.Validator>
 	      <IntValidator Min="1" />
 	    </InputLine.Validator>

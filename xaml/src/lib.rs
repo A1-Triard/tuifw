@@ -46,7 +46,11 @@ pub fn reg_widgets(xaml: &mut Xaml) {
     let widget_children = xaml.reg_prop(widget, "Children", XamlType::Struct(widget));
     xaml.set_as_content_prop(widget_children);
     let widget_tag = xaml.reg_prop(widget, "Tag", XamlType::Literal(uint_16));
-    let widget_next_focused_tag = xaml.reg_prop(widget, "NextFocusedTag", XamlType::Literal(uint_16));
+    let widget_focus_tab_tag = xaml.reg_prop(widget, "FocusTabTag", XamlType::Literal(uint_16));
+    let widget_focus_right_tag = xaml.reg_prop(widget, "FocusRightTag", XamlType::Literal(uint_16));
+    let widget_focus_left_tag = xaml.reg_prop(widget, "FocusLeftTag", XamlType::Literal(uint_16));
+    let widget_focus_up_tag = xaml.reg_prop(widget, "FocusUpTag", XamlType::Literal(uint_16));
+    let widget_focus_down_tag = xaml.reg_prop(widget, "FocusDownTag", XamlType::Literal(uint_16));
     let widget_focused_primary = xaml.reg_prop(widget, "FocusedPrimary", XamlType::Literal(boolean));
     let widget_focused_secondary = xaml.reg_prop(widget, "FocusedSecondary", XamlType::Literal(boolean));
     let widget_h_align = xaml.reg_prop(widget, "HAlign", XamlType::Literal(h_align));
@@ -195,8 +199,20 @@ pub fn reg_widgets(xaml: &mut Xaml) {
     xaml.set_prop_set(widget_tag, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_tag(&mut tree, {});
     " }, obj, value))));
-    xaml.set_prop_set(widget_next_focused_tag, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        {}.set_next_focused_tag(&mut tree, {});
+    xaml.set_prop_set(widget_focus_tab_tag, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_focus_tab_tag(&mut tree, {});
+    " }, obj, value))));
+    xaml.set_prop_set(widget_focus_right_tag, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_focus_right_tag(&mut tree, {});
+    " }, obj, value))));
+    xaml.set_prop_set(widget_focus_left_tag, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_focus_left_tag(&mut tree, {});
+    " }, obj, value))));
+    xaml.set_prop_set(widget_focus_up_tag, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_focus_up_tag(&mut tree, {});
+    " }, obj, value))));
+    xaml.set_prop_set(widget_focus_down_tag, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_focus_down_tag(&mut tree, {});
     " }, obj, value))));
     xaml.set_prop_set(widget_focused_primary, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_focused_primary(&mut tree, {});

@@ -131,8 +131,8 @@ impl<State: ?Sized> Widget<State> for LabelWidget {
                         let data = window.data_mut::<Label>(tree);
                         let cmd = data.cmd;
                         window.raise(tree, Event::Cmd(cmd), state);
-                        let next_focused = window.actual_next_focused(tree);
-                        next_focused.set_focused_primary(tree, true);
+                        let focus = window.actual_focus_tab(tree);
+                        focus.set_focused_primary(tree, true);
                     }
                 }));
                 let data = window.data_mut::<Label>(tree);
