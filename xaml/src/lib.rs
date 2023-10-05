@@ -87,6 +87,9 @@ pub fn reg_widgets(xaml: &mut Xaml) {
     let frame_text = xaml.reg_prop(frame, "Text", XamlType::Literal(string));
     let frame_text_align = xaml.reg_prop(frame, "TextAlign", XamlType::Literal(h_align));
 
+    let label = xaml.reg_struct(xmlns!("Label"), Some(widget));
+    let label_text = xaml.reg_prop(label, "Text", XamlType::Literal(string));
+
     xaml.set_literal_new(boolean, Box::new(|x| match x {
         "True" => Some("true".to_string()),
         "False" => Some("false".to_string()),
@@ -430,5 +433,31 @@ pub fn reg_widgets(xaml: &mut Xaml) {
     " }, obj, value))));
     xaml.set_prop_set(frame_text_align, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         Frame::set_text_align(&mut tree, {}, {});
+    " }, obj, value))));
+
+    xaml.set_struct_new(label, Some(Box::new(|obj, parent| {
+        if let Some((parent, _parent_prop, prev)) = parent {
+            if let Some(prev) = prev {
+                indent_all_by(4, format!(indoc! { "
+                    #[allow(unused_variables)]
+                    let {} = Label::new().window(&mut tree, {}, Some({}))?;
+                " }, obj, parent, prev))
+            } else {
+                indent_all_by(4, format!(indoc! { "
+                    #[allow(unused_variables)]
+                    let {} = Label::new().window(&mut tree, {}, None)?;
+                " }, obj, parent))
+            }
+        } else {
+            indent_all_by(4, format!(indoc! { "
+                #[allow(unused_mut)]
+                let mut tree = Label::new().window_tree(screen, clock)?;
+                #[allow(unused_variables)]
+                let {} = tree.root();
+            " }, obj))
+        }
+    })));
+    xaml.set_prop_set(label_text, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        Label::set_text(&mut tree, {}, {});
     " }, obj, value))));
 }

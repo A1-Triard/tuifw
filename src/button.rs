@@ -45,10 +45,10 @@ impl Button {
 
     fn init_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
         window.palette_mut(tree, |palette| {
-            palette.set(0, Left(15));
-            palette.set(1, Left(16));
-            palette.set(2, Left(17));
-            palette.set(3, Left(18));
+            palette.set(0, Left(16));
+            palette.set(1, Left(17));
+            palette.set(2, Left(18));
+            palette.set(3, Left(19));
         });
     }
 

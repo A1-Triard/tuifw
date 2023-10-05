@@ -36,6 +36,8 @@ use tuifw_screen_base::{HAlign, VAlign, Thickness, Range1d};
 pub enum Event {
     Key(Key),
     PreviewKey(Key),
+    PreProcessKey(Key),
+    PostProcessKey(Key),
     Cmd(u16),
     PreviewCmd(u16),
 }
@@ -47,6 +49,8 @@ impl Event {
             Event::PreviewKey(_) => true,
             Event::Cmd(_) => false,
             Event::PreviewCmd(_) => true,
+            Event::PreProcessKey(_) => false,
+            Event::PostProcessKey(_) => false,
         }
     }
 
@@ -670,10 +674,10 @@ impl<State: ?Sized> Window<State> {
         event: Event,
         state: &mut State
     ) -> bool {
-        self.raise_raw(tree, event, false, state)
+        self.raise_priv(tree, event, false, state)
     }
 
-    fn raise_raw(
+    fn raise_priv(
         self,
         tree: &mut WindowTree<State>,
         event: Event,
@@ -681,14 +685,14 @@ impl<State: ?Sized> Window<State> {
         state: &mut State
     ) -> bool {
         let mut handled = false;
-        self.raise_core(tree, event.preview(), self, secondary, &mut handled, state);
+        self.raise_raw(tree, event.preview(), self, secondary, &mut handled, state);
         if !handled {
-            self.raise_core(tree, event, self, secondary, &mut handled, state);
+            self.raise_raw(tree, event, self, secondary, &mut handled, state);
         }
         handled
     }
 
-    fn raise_core(
+    fn raise_raw(
         self,
         tree: &mut WindowTree<State>,
         event: Event,
@@ -701,25 +705,36 @@ impl<State: ?Sized> Window<State> {
         let parent = self.parent(tree);
         if !*handled && event.is_preview() {
             if let Some(parent) = parent {
-                parent.raise_core(tree, event, event_source, secondary, handled, state);
+                parent.raise_raw(tree, event, event_source, secondary, handled, state);
             }
         }
         if !*handled {
-            let node = &tree.arena[self.0];
-            let widget = node.widget.clone();
-            let event_handler = node.event_handler.clone();
-            *handled = widget.update(tree, self, event, event_source, state);
-            if !*handled {
-                if let Some(event_handler) = event_handler {
-                    *handled = event_handler.invoke(tree, self, event, event_source, state);
-                }
-            }
+            *handled = self.raise_core(tree, event, event_source, state);
         }
         if !*handled && !event.is_preview() {
             if let Some(parent) = parent {
-                parent.raise_core(tree, event, event_source, secondary, handled, state);
+                parent.raise_raw(tree, event, event_source, secondary, handled, state);
             }
         }
+    }
+
+    fn raise_core(
+        self,
+        tree: &mut WindowTree<State>,
+        event: Event,
+        event_source: Window<State>,
+        state: &mut State
+    ) -> bool {
+        let node = &tree.arena[self.0];
+        let widget = node.widget.clone();
+        let event_handler = node.event_handler.clone();
+        let mut handled = widget.update(tree, self, event, event_source, state);
+        if !handled {
+            if let Some(event_handler) = event_handler {
+                handled = event_handler.invoke(tree, self, event, event_source, state);
+            }
+        }
+        handled
     }
 
     fn move_xy_raw(
@@ -969,22 +984,24 @@ fn root_palette() -> Palette {
     let mut p = Palette::new();
     p.set(11, Right((Fg::LightGray, Bg::None))); // background
     p.set(12, Right((Fg::LightGray, Bg::None))); // static text
-    p.set(13, Right((Fg::LightGray, Bg::Blue))); // input line normal
-    p.set(14, Right((Fg::LightGray, Bg::Red))); // input line invalid
-    p.set(15, Right((Fg::Cyan, Bg::None))); // button normal
-    p.set(16, Right((Fg::Black, Bg::Cyan))); // button focused
-    p.set(17, Right((Fg::Cyan, Bg::None))); // button pressed
-    p.set(18, Right((Fg::LightGray, Bg::None))); // button disabled
+    p.set(13, Right((Fg::White, Bg::None))); // label
+    p.set(14, Right((Fg::LightGray, Bg::Blue))); // input line normal
+    p.set(15, Right((Fg::LightGray, Bg::Red))); // input line invalid
+    p.set(16, Right((Fg::Cyan, Bg::None))); // button normal
+    p.set(17, Right((Fg::Black, Bg::Cyan))); // button focused
+    p.set(18, Right((Fg::Cyan, Bg::None))); // button pressed
+    p.set(19, Right((Fg::LightGray, Bg::None))); // button disabled
 
     p.set(20, Right((Fg::LightGray, Bg::Black))); // frame
     p.set(21, Right((Fg::LightGray, Bg::Black))); // background in frame
     p.set(22, Right((Fg::LightGray, Bg::Black))); // static text in frame
-    p.set(23, Right((Fg::LightGray, Bg::Blue))); // input line normal in frame
-    p.set(24, Right((Fg::LightGray, Bg::Red))); // input line invalid in frame
-    p.set(25, Right((Fg::Cyan, Bg::Black))); // button normal in frame
-    p.set(26, Right((Fg::Black, Bg::Cyan))); // button focused in frame
-    p.set(27, Right((Fg::Cyan, Bg::Black))); // button pressed in frame
-    p.set(28, Right((Fg::LightGray, Bg::Black))); // button disabled in frame
+    p.set(23, Right((Fg::White, Bg::Black))); // label in frame
+    p.set(24, Right((Fg::LightGray, Bg::Blue))); // input line normal in frame
+    p.set(25, Right((Fg::LightGray, Bg::Red))); // input line invalid in frame
+    p.set(26, Right((Fg::Cyan, Bg::Black))); // button normal in frame
+    p.set(27, Right((Fg::Black, Bg::Cyan))); // button focused in frame
+    p.set(28, Right((Fg::Cyan, Bg::Black))); // button pressed in frame
+    p.set(29, Right((Fg::LightGray, Bg::Black))); // button disabled in frame
 
     p
 }
@@ -1230,21 +1247,21 @@ impl<'clock, State: ?Sized> WindowTree<'clock, State> {
                     }
                 }
                 for pre_process in self.pre_process.items().clone().values() {
-                    pre_process.0.raise_raw(self, Event::Key(key), false, state);
+                    pre_process.0.raise_core(self, Event::PreProcessKey(key), pre_process.0, state);
                 }
                 let handled_primary = self.primary_focused.map_or(false, |x|
-                    x.raise_raw(self, Event::Key(key), false, state)
+                    x.raise_priv(self, Event::Key(key), false, state)
                 );
                 if
                     !handled_primary &&
-                    self.secondary_focused.map_or(false, |x| x.raise_raw(self, Event::Key(key), true, state))
+                    self.secondary_focused.map_or(false, |x| x.raise_priv(self, Event::Key(key), true, state))
                 {
                     self.primary_focused.map(|x|
-                        x.raise_raw(self, Event::Cmd(CMD_LOST_ATTENTION), false, state)
+                        x.raise_priv(self, Event::Cmd(CMD_LOST_ATTENTION), false, state)
                     );
                 }
                 for post_process in self.post_process.items().clone().values() {
-                    post_process.0.raise_raw(self, Event::Key(key), false, state);
+                    post_process.0.raise_core(self, Event::PostProcessKey(key), post_process.0, state);
                 }
             }
         }

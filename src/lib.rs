@@ -35,6 +35,9 @@ pub use button::*;
 mod frame;
 pub use frame::*;
 
+mod label;
+pub use label::*;
+
 #[doc(hidden)]
 pub use alloc::boxed::Box as alloc_boxed_Box;
 #[doc(hidden)]
