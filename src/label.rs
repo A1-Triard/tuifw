@@ -1,18 +1,30 @@
-use crate::{prop_string_measure, widget};
+use crate::{prop_string_measure, prop_value, prop_value_render, widget};
+use alloc::boxed::Box;
 use alloc::string::String;
 use either::Left;
 use tuifw_screen_base::{Point, Rect, Vector, text_width, Key};
-use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree};
+use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, Timer};
+
+pub const CMD_LABEL_CLICK: u16 = 110;
 
 pub struct Label {
     text: String,
+    click_timer: Option<Timer>,
+    cmd: u16,
+    is_enabled: bool,
 }
 
-impl<State: ?Sized> WidgetData<State> for Label { }
+impl<State: ?Sized> WidgetData<State> for Label {
+    fn drop_widget_data(&mut self, tree: &mut WindowTree<State>, _state: &mut State) {
+        if let Some(click_timer) = self.click_timer.take() {
+            click_timer.drop_timer(tree);
+        }
+    }
+}
 
 impl Label {
     pub fn new() -> Self {
-        Label { text: String::new() }
+        Label { text: String::new(), click_timer: None, cmd: CMD_LABEL_CLICK, is_enabled: true }
     }
 
     fn init_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
@@ -24,6 +36,8 @@ impl Label {
 
     widget!(LabelWidget; init_palette);
     prop_string_measure!(text);
+    prop_value!(cmd: u16);
+    prop_value_render!(is_enabled: bool);
 }
 
 impl Default for Label {
@@ -43,9 +57,9 @@ impl<State: ?Sized> Widget<State> for LabelWidget {
         rp: &mut RenderPort,
         _state: &mut State,
     ) {
-        let color_text = window.color(tree, 0);
-        let color_label = window.color(tree, 1);
         let data = window.data::<Label>(tree);
+        let color_text = window.color(tree, 0);
+        let color_label = if data.is_enabled { window.color(tree, 1) } else { color_text };
         let mut text_parts = data.text.split("~");
         let text_1 = text_parts.next().unwrap_or("");
         let label = text_parts.next().unwrap_or("");
@@ -108,9 +122,25 @@ impl<State: ?Sized> Widget<State> for LabelWidget {
             .chars().next().and_then(|x| x.to_lowercase().next());
         let Some(label) = label else { return false; };
         if event == Event::PostProcessKey(Key::Alt(label)) || event == Event::PostProcessKey(Key::Char(label)) {
-            let next_focused = window.actual_next_focused(tree);
-            next_focused.set_focused_primary(tree, true);
-            return true;
+            let data = window.data_mut::<Label>(tree);
+            if data.is_enabled {
+                let click_timer = Timer::new(tree, 0, Box::new(move |tree, state| {
+                    let data = window.data_mut::<Label>(tree);
+                    data.click_timer = None;
+                    if data.is_enabled {
+                        let data = window.data_mut::<Label>(tree);
+                        let cmd = data.cmd;
+                        window.raise(tree, Event::Cmd(cmd), state);
+                        let next_focused = window.actual_next_focused(tree);
+                        next_focused.set_focused_primary(tree, true);
+                    }
+                }));
+                let data = window.data_mut::<Label>(tree);
+                if let Some(old_click_timer) = data.click_timer.replace(click_timer) {
+                    old_click_timer.drop_timer(tree);
+                }
+                return true;
+            }
         }
         false
     }

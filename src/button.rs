@@ -7,7 +7,7 @@ use tuifw_window::{Event, RenderPort, Timer, Widget, WidgetData, Window, WindowT
 use tuifw_window::{CMD_GOT_PRIMARY_FOCUS, CMD_LOST_PRIMARY_FOCUS};
 use tuifw_window::{CMD_GOT_SECONDARY_FOCUS, CMD_LOST_SECONDARY_FOCUS};
 
-pub const CMD_CLICK: u16 = 100;
+pub const CMD_BUTTON_CLICK: u16 = 100;
 
 pub struct Button {
     border_left: String,
@@ -38,7 +38,7 @@ impl Button {
             text: String::new(),
             release_timer: None,
             click_timer: None,
-            cmd: CMD_CLICK,
+            cmd: CMD_BUTTON_CLICK,
             is_enabled: true,
         }
     }
