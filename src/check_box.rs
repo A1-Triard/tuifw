@@ -73,7 +73,7 @@ impl<State: ?Sized> Widget<State> for CheckBoxWidget {
         );
         if !data.text.is_empty() {
             rp.out(Point { x: 3, y: 0 }, color_text.0, color_text.1, " ");
-            let mut text_parts = data.text.split("~");
+            let mut text_parts = data.text.split('~');
             let text_1 = text_parts.next().unwrap_or("");
             let label = text_parts.next().unwrap_or("");
             let text_2 = text_parts.next().unwrap_or("");
@@ -103,7 +103,7 @@ impl<State: ?Sized> Widget<State> for CheckBoxWidget {
         if data.text.is_empty() {
             Vector { x: 3, y: 1 }
         } else {
-            let mut text_parts = data.text.split("~");
+            let mut text_parts = data.text.split('~');
             let text_1 = text_parts.next().unwrap_or("");
             let label = text_parts.next().unwrap_or("");
             let text_2 = text_parts.next().unwrap_or("");
@@ -128,7 +128,7 @@ impl<State: ?Sized> Widget<State> for CheckBoxWidget {
         if data.text.is_empty() {
             Vector { x: 3, y: 1 }
         } else {
-            let mut text_parts = data.text.split("~");
+            let mut text_parts = data.text.split('~');
             let text_1 = text_parts.next().unwrap_or("");
             let label = text_parts.next().unwrap_or("");
             let text_2 = text_parts.next().unwrap_or("");
@@ -168,7 +168,7 @@ impl<State: ?Sized> Widget<State> for CheckBoxWidget {
             Event::PostProcessKey(Key::Alt(c)) | Event::PostProcessKey(Key::Char(c)) => {
                 let data = window.data_mut::<CheckBox>(tree);
                 let label = data.text
-                    .split("~").skip(1).next().unwrap_or("")
+                    .split('~').nth(1).unwrap_or("")
                     .chars().next().and_then(|x| x.to_lowercase().next());
                 if Some(c) == label {
                     let cmd = data.cmd;

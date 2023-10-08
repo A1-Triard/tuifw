@@ -60,7 +60,7 @@ impl<State: ?Sized> Widget<State> for LabelWidget {
         let data = window.data::<Label>(tree);
         let color_text = window.color(tree, 0);
         let color_label = if data.is_enabled { window.color(tree, 1) } else { color_text };
-        let mut text_parts = data.text.split("~");
+        let mut text_parts = data.text.split('~');
         let text_1 = text_parts.next().unwrap_or("");
         let label = text_parts.next().unwrap_or("");
         let text_2 = text_parts.next().unwrap_or("");
@@ -80,7 +80,7 @@ impl<State: ?Sized> Widget<State> for LabelWidget {
         _state: &mut State,
     ) -> Vector {
         let data = window.data::<Label>(tree);
-        let mut text_parts = data.text.split("~");
+        let mut text_parts = data.text.split('~');
         let text_1 = text_parts.next().unwrap_or("");
         let label = text_parts.next().unwrap_or("");
         let text_2 = text_parts.next().unwrap_or("");
@@ -98,7 +98,7 @@ impl<State: ?Sized> Widget<State> for LabelWidget {
         _state: &mut State,
     ) -> Vector {
         let data = window.data::<Label>(tree);
-        let mut text_parts = data.text.split("~");
+        let mut text_parts = data.text.split('~');
         let text_1 = text_parts.next().unwrap_or("");
         let label = text_parts.next().unwrap_or("");
         let text_2 = text_parts.next().unwrap_or("");
@@ -118,7 +118,7 @@ impl<State: ?Sized> Widget<State> for LabelWidget {
     ) -> bool {
         let data = window.data::<Label>(tree);
         let label = data.text
-            .split("~").skip(1).next().unwrap_or("")
+            .split('~').nth(1).unwrap_or("")
             .chars().next().and_then(|x| x.to_lowercase().next());
         let Some(label) = label else { return false; };
         if event == Event::PostProcessKey(Key::Alt(label)) || event == Event::PostProcessKey(Key::Char(label)) {
