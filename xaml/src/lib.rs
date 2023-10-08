@@ -163,9 +163,9 @@ pub fn reg_widgets(xaml: &mut Xaml) {
     xaml.set_footer(indoc! {"
         }
     " });
-    xaml.set_res(Box::new(|_| indent_all_by(4, format!(indoc! { "
+    xaml.set_res(Box::new(|_| indent_all_by(4, indoc! { "
         Ok(tree)
-    " }))));
+    " })));
 
     xaml.set_struct_new(int_validator, Some(Box::new(|obj, _parent| {
         indent_all_by(4, format!(indoc! { "
