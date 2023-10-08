@@ -171,10 +171,7 @@ impl<State: ?Sized> Widget<State> for CheckBoxWidget {
                     .split('~').nth(1).unwrap_or("")
                     .chars().next().and_then(|x| x.to_lowercase().next());
                 if Some(c) == label {
-                    let cmd = data.cmd;
-                    window.raise(tree, Event::Cmd(cmd), state);
-                    let focus = window.actual_focus_tab(tree);
-                    focus.set_focused_primary(tree, true);
+                    window.set_focused_primary(tree, true);
                     true
                 } else {
                     false
