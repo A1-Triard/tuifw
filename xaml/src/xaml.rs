@@ -429,8 +429,10 @@ mod tests {
 
     #[test]
     fn process_literal() {
-        let mut xaml = Xaml::new(Box::new(|x| x.to_string()));
-        xaml.reg_literal("{https://a1-triard.github.io/tuifw/2023/xaml}Bool", Box::new(|x| match x {
+        let mut xaml = Xaml::new();
+        let t = xaml.reg_literal("{https://a1-triard.github.io/tuifw/2023/xaml}Bool");
+        xaml.set_res(Box::new(|x| x.to_string()));
+        xaml.set_literal_new(t, Box::new(|x| match x {
             "True" => Some("true".to_string()),
             "False" => Some("false".to_string()),
             _ => None,
@@ -443,16 +445,20 @@ mod tests {
 
     #[test]
     fn process_struct_with_property() {
-        let mut xaml = Xaml::new(Box::new(|x| x.to_string()));
-        let b = xaml.reg_literal("{https://a1-triard.github.io/tuifw/2023/xaml}Bool", Box::new(|x| match x {
+        let mut xaml = Xaml::new();
+        let b = xaml.reg_literal("{https://a1-triard.github.io/tuifw/2023/xaml}Bool");
+        let bg = xaml.reg_struct("{https://a1-triard.github.io/tuifw/2023/xaml}Background", None);
+        let bg_sp = xaml.reg_prop(bg, "ShowPattern", XamlType::Literal(b));
+        xaml.set_res(Box::new(|x| x.to_string()));
+        xaml.set_literal_new(b, Box::new(|x| match x {
             "True" => Some("true".to_string()),
             "False" => Some("false".to_string()),
             _ => None,
         }));
-        let bg = xaml.reg_struct("{https://a1-triard.github.io/tuifw/2023/xaml}Background", Box::new(|x, _|
+        xaml.set_struct_new(bg, Some(Box::new(|x, _|
             format!("let mut {x} = Background::new();\n")
-        ));
-        xaml.reg_prop(bg, "ShowPattern", XamlType::Literal(b), Box::new(|o, x|
+        )));
+        xaml.set_prop_set(bg_sp, Box::new(|o, x|
             format!("Background::set_show_pattern({o}, {x});\n")
         ));
         let source = "
@@ -472,16 +478,20 @@ mod tests {
 
     #[test]
     fn process_struct_with_expanded_property() {
-        let mut xaml = Xaml::new(Box::new(|x| x.to_string()));
-        let b = xaml.reg_literal("{https://a1-triard.github.io/tuifw/2023/xaml}Bool", Box::new(|x| match x {
+        let mut xaml = Xaml::new();
+        let b = xaml.reg_literal("{https://a1-triard.github.io/tuifw/2023/xaml}Bool");
+        let bg = xaml.reg_struct("{https://a1-triard.github.io/tuifw/2023/xaml}Background", None);
+        let bg_sp = xaml.reg_prop(bg, "ShowPattern", XamlType::Literal(b));
+        xaml.set_res(Box::new(|x| x.to_string()));
+        xaml.set_literal_new(b, Box::new(|x| match x {
             "True" => Some("true".to_string()),
             "False" => Some("false".to_string()),
             _ => None,
         }));
-        let bg = xaml.reg_struct("{https://a1-triard.github.io/tuifw/2023/xaml}Background", Box::new(|x, _|
+        xaml.set_struct_new(bg, Some(Box::new(|x, _|
             format!("let mut {x} = Background::new();\n")
-        ));
-        xaml.reg_prop(bg, "ShowPattern", XamlType::Literal(b), Box::new(|o, x|
+        )));
+        xaml.set_prop_set(bg_sp, Box::new(|o, x|
             format!("Background::set_show_pattern({o}, {x});\n")
         ));
         let source = "
@@ -500,16 +510,20 @@ mod tests {
 
     #[test]
     fn process_struct_with_expanded_property_2() {
-        let mut xaml = Xaml::new(Box::new(|x| x.to_string()));
-        let b = xaml.reg_literal("{https://a1-triard.github.io/tuifw/2023/xaml}Bool", Box::new(|x| match x {
+        let mut xaml = Xaml::new();
+        let b = xaml.reg_literal("{https://a1-triard.github.io/tuifw/2023/xaml}Bool");
+        let bg = xaml.reg_struct("{https://a1-triard.github.io/tuifw/2023/xaml}Background", None);
+        let bg_sp = xaml.reg_prop(bg, "ShowPattern", XamlType::Literal(b));
+        xaml.set_res(Box::new(|x| x.to_string()));
+        xaml.set_literal_new(b, Box::new(|x| match x {
             "True" => Some("true".to_string()),
             "False" => Some("false".to_string()),
             _ => None,
         }));
-        let bg = xaml.reg_struct("{https://a1-triard.github.io/tuifw/2023/xaml}Background", Box::new(|x, _|
+        xaml.set_struct_new(bg, Some(Box::new(|x, _|
             format!("let mut {x} = Background::new();\n")
-        ));
-        xaml.reg_prop(bg, "ShowPattern", XamlType::Literal(b), Box::new(|o, x|
+        )));
+        xaml.set_prop_set(bg_sp, Box::new(|o, x|
             format!("Background::set_show_pattern({o}, {x});\n")
         ));
         let source = "
