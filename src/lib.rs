@@ -38,6 +38,9 @@ pub use frame::*;
 mod label;
 pub use label::*;
 
+mod check_box;
+pub use check_box::*;
+
 #[doc(hidden)]
 pub use alloc::boxed::Box as alloc_boxed_Box;
 #[doc(hidden)]
