@@ -9,6 +9,7 @@ pub const CMD_RADIO_BUTTON_CLICK: u16 = 100;
 
 pub struct RadioButton {
     is_on: bool,
+    allow_turn_off: bool,
     cmd: u16,
     text: String,
 }
@@ -19,6 +20,7 @@ impl RadioButton {
     pub fn new() -> Self {
         RadioButton {
             is_on: false,
+            allow_turn_off: false,
             cmd: CMD_RADIO_BUTTON_CLICK,
             text: String::new(),
         }
@@ -33,6 +35,7 @@ impl RadioButton {
 
     widget!(RadioButtonWidget; init_palette);
     prop_value_render!(is_on: bool);
+    prop_value!(allow_turn_off: bool);
     prop_value!(cmd: u16);
     prop_string_measure!(text);
 }
@@ -159,11 +162,23 @@ impl<State: ?Sized> Widget<State> for RadioButtonWidget {
             },
             Event::Key(Key::Char(' ')) => {
                 let data = window.data_mut::<RadioButton>(tree);
-                data.is_on = !data.is_on;
-                let cmd = data.cmd;
-                window.invalidate_render(tree);
-                window.raise(tree, Event::Cmd(cmd), state);
-                true
+                if !data.is_on || data.allow_turn_off {
+                    data.is_on = !data.is_on;
+                    let cmd = data.cmd;
+                    if data.is_on {
+                        let mut sibling = window.next(tree);
+                        while sibling != window {
+                            sibling.data_mut::<RadioButton>(tree).is_on = false;
+                            sibling.invalidate_render(tree);
+                            sibling = sibling.next(tree);
+                        }
+                    }
+                    window.invalidate_render(tree);
+                    window.raise(tree, Event::Cmd(cmd), state);
+                    true
+                } else {
+                    false
+                }
             },
             Event::PostProcessKey(Key::Alt(c)) | Event::PostProcessKey(Key::Char(c)) => {
                 let data = window.data_mut::<RadioButton>(tree);

@@ -2,14 +2,28 @@
   <Frame HAlign="Center" VAlign="Center" TextAlign="Center" Text="Options">
     <StackPanel Margin="3,1,3,1" HAlign="Center">
       <StackPanel Margin="0,0,0,1">
-        <CheckBox Text="Option ~1~" Tag="1" FocusTabTag="2" FocusDownTag="2" FocusUpTag="4"
-	  FocusedPrimary="True"
+        <CheckBox
+          Text="Option ~1~"
+	  Tag="1"
+	  FocusTabTag="2" FocusDownTag="2" FocusUpTag="4" FocusedPrimary="True"
 	/>
-        <CheckBox Text="Option ~2~" Tag="2" FocusTabTag="3" FocusDownTag="3" FocusUpTag="1" />
+        <CheckBox
+	  Text="Option ~2~" IsOn="True"
+	  Tag="2"
+	  FocusTabTag="3" FocusDownTag="3" FocusUpTag="1"
+	/>
 	<Frame Text="Radio Buttons">
 	  <StackPanel>
-	    <RadioButton Text="~R~adio Button 1" Tag="3" FocusTabTag="4" FocusDownTag="4" FocusUpTag="2" />
-	    <RadioButton Text="R~a~dio Button 2" Tag="4" FocusTabTag="1" FocusDownTag="1" FocusUpTag="3" />
+	    <RadioButton
+	      Text="~R~adio Button 1" IsOn="True"
+	      Tag="3"
+	      FocusTabTag="4" FocusDownTag="4" FocusUpTag="2"
+	    />
+	    <RadioButton
+	      Text="R~a~dio Button 2"
+	      Tag="4"
+	      FocusTabTag="1" FocusDownTag="1" FocusUpTag="3"
+	    />
 	  </StackPanel>
 	</Frame>
       </StackPanel>
