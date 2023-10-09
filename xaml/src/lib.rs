@@ -98,6 +98,10 @@ pub fn reg_widgets(xaml: &mut Xaml) {
     let check_box_text = xaml.reg_prop(check_box, "Text", XamlType::Literal(string));
     let check_box_is_on = xaml.reg_prop(check_box, "IsOn", XamlType::Literal(boolean));
 
+    let radio_button = xaml.reg_struct(xmlns!("RadioButton"), Some(widget));
+    let radio_button_text = xaml.reg_prop(radio_button, "Text", XamlType::Literal(string));
+    let radio_button_is_on = xaml.reg_prop(radio_button, "IsOn", XamlType::Literal(boolean));
+
     xaml.set_literal_new(boolean, Box::new(|x| match x {
         "True" => Some("true".to_string()),
         "False" => Some("false".to_string()),
@@ -508,5 +512,34 @@ pub fn reg_widgets(xaml: &mut Xaml) {
     " }, obj, value))));
     xaml.set_prop_set(check_box_is_on, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         CheckBox::set_is_on(&mut tree, {}, {});
+    " }, obj, value))));
+
+    xaml.set_struct_new(radio_button, Some(Box::new(|obj, parent| {
+        if let Some((parent, _parent_prop, prev)) = parent {
+            if let Some(prev) = prev {
+                indent_all_by(4, format!(indoc! { "
+                    #[allow(unused_variables)]
+                    let {} = RadioButton::new().window(&mut tree, {}, Some({}))?;
+                " }, obj, parent, prev))
+            } else {
+                indent_all_by(4, format!(indoc! { "
+                    #[allow(unused_variables)]
+                    let {} = RadioButton::new().window(&mut tree, {}, None)?;
+                " }, obj, parent))
+            }
+        } else {
+            indent_all_by(4, format!(indoc! { "
+                #[allow(unused_mut)]
+                let mut tree = RadioButton::new().window_tree(screen, clock)?;
+                #[allow(unused_variables)]
+                let {} = tree.root();
+            " }, obj))
+        }
+    })));
+    xaml.set_prop_set(radio_button_text, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        RadioButton::set_text(&mut tree, {}, {});
+    " }, obj, value))));
+    xaml.set_prop_set(radio_button_is_on, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        RadioButton::set_is_on(&mut tree, {}, {});
     " }, obj, value))));
 }

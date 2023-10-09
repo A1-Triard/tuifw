@@ -41,6 +41,9 @@ pub use label::*;
 mod check_box;
 pub use check_box::*;
 
+mod radio_button;
+pub use radio_button::*;
+
 #[doc(hidden)]
 pub use alloc::boxed::Box as alloc_boxed_Box;
 #[doc(hidden)]
