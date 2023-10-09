@@ -1,0 +1,14 @@
+<Background xmlns='https://a1-triard.github.io/tuifw/2023/xaml'>
+  <Frame HAlign="Center" VAlign="Center" TextAlign="Center" Text="Options">
+    <StackPanel Margin="3,1,3,1" HAlign="Center">
+      <StackPanel Margin="0,0,0,1">
+        <CheckBox Text="Option ~1~" Tag="1" FocusDownTag="2" FocusUpTag="2" FocusedPrimary="True" />
+        <CheckBox Text="Option ~2~" Tag="2" FocusDownTag="1" FocusUpTag="1" />
+      </StackPanel>
+      <StackPanel Vertical="False" HAlign="Center">
+        <Button Text="OK" Tag="10" FocusRightTag="11" FocusLeftTag="11" FocusedSecondary="True" />
+	<Button Text="Cancel" Margin="3,0,0,0" Tag="11" FocusRightTag="10" FocusLeftTag="10" />
+      </StackPanel>
+    </StackPanel>
+  </Frame>
+</Background>
