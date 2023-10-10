@@ -39,6 +39,27 @@ impl RadioButton {
     prop_value!(allow_turn_off: bool);
     prop_value!(cmd: u16);
     prop_string_measure!(text);
+
+    fn click<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>, state: &mut State) -> bool {
+        let data = window.data_mut::<RadioButton>(tree);
+        if !data.is_on || data.allow_turn_off {
+            data.is_on = !data.is_on;
+            let cmd = data.cmd;
+            if data.is_on {
+                let mut sibling = window.next(tree);
+                while sibling != window {
+                    sibling.data_mut::<RadioButton>(tree).is_on = false;
+                    sibling.invalidate_render(tree);
+                    sibling = sibling.next(tree);
+                }
+            }
+            window.invalidate_render(tree);
+            window.raise(tree, Event::Cmd(cmd), state);
+            true
+        } else {
+            false
+        }
+    }
 }
 
 impl Default for RadioButton {
@@ -121,24 +142,7 @@ impl<State: ?Sized> Widget<State> for RadioButtonWidget {
             },
             Event::Key(Key::Char(' ')) => {
                 if window.is_enabled(tree) {
-                    let data = window.data_mut::<RadioButton>(tree);
-                    if !data.is_on || data.allow_turn_off {
-                        data.is_on = !data.is_on;
-                        let cmd = data.cmd;
-                        if data.is_on {
-                            let mut sibling = window.next(tree);
-                            while sibling != window {
-                                sibling.data_mut::<RadioButton>(tree).is_on = false;
-                                sibling.invalidate_render(tree);
-                                sibling = sibling.next(tree);
-                            }
-                        }
-                        window.invalidate_render(tree);
-                        window.raise(tree, Event::Cmd(cmd), state);
-                        true
-                    } else {
-                        false
-                    }
+                    RadioButton::click(tree, window, state)
                 } else {
                     false
                 }
@@ -149,21 +153,7 @@ impl<State: ?Sized> Widget<State> for RadioButtonWidget {
                     let label = label(&data.text);
                     if Some(c) == label {
                         window.set_focused_primary(tree, true);
-                        let data = window.data_mut::<RadioButton>(tree);
-                        if !data.is_on || data.allow_turn_off {
-                            data.is_on = !data.is_on;
-                            let cmd = data.cmd;
-                            if data.is_on {
-                                let mut sibling = window.next(tree);
-                                while sibling != window {
-                                    sibling.data_mut::<RadioButton>(tree).is_on = false;
-                                    sibling.invalidate_render(tree);
-                                    sibling = sibling.next(tree);
-                                }
-                            }
-                            window.invalidate_render(tree);
-                            window.raise(tree, Event::Cmd(cmd), state);
-                        }
+                        RadioButton::click(tree, window, state);
                         true
                     } else {
                         false

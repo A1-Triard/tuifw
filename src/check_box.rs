@@ -36,6 +36,14 @@ impl CheckBox {
     prop_value_render!(is_on: bool);
     prop_value!(cmd: u16);
     prop_string_measure!(text);
+
+    fn click<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>, state: &mut State) {
+        let data = window.data_mut::<CheckBox>(tree);
+        data.is_on = !data.is_on;
+        let cmd = data.cmd;
+        window.invalidate_render(tree);
+        window.raise(tree, Event::Cmd(cmd), state);
+    }
 }
 
 impl Default for CheckBox {
@@ -118,11 +126,7 @@ impl<State: ?Sized> Widget<State> for CheckBoxWidget {
             },
             Event::Key(Key::Char(' ')) => {
                 if window.is_enabled(tree) {
-                    let data = window.data_mut::<CheckBox>(tree);
-                    data.is_on = !data.is_on;
-                    let cmd = data.cmd;
-                    window.invalidate_render(tree);
-                    window.raise(tree, Event::Cmd(cmd), state);
+                    CheckBox::click(tree, window, state);
                     true
                 } else {
                     false
@@ -134,11 +138,7 @@ impl<State: ?Sized> Widget<State> for CheckBoxWidget {
                     let label = label(&data.text);
                     if Some(c) == label {
                         window.set_focused_primary(tree, true);
-                        let data = window.data_mut::<CheckBox>(tree);
-                        data.is_on = !data.is_on;
-                        let cmd = data.cmd;
-                        window.invalidate_render(tree);
-                        window.raise(tree, Event::Cmd(cmd), state);
+                        CheckBox::click(tree, window, state);
                         true
                     } else {
                         false
