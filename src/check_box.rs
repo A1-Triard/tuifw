@@ -3,7 +3,7 @@ use alloc::string::String;
 use either::Left;
 use tuifw_screen_base::{Key, Point, Rect, Vector};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree};
-use tuifw_window::{CMD_GOT_PRIMARY_FOCUS, CMD_LOST_PRIMARY_FOCUS, label_width};
+use tuifw_window::{CMD_GOT_PRIMARY_FOCUS, CMD_LOST_PRIMARY_FOCUS, label_width, label};
 
 pub const CMD_CHECK_BOX_CLICK: u16 = 100;
 
@@ -117,21 +117,32 @@ impl<State: ?Sized> Widget<State> for CheckBoxWidget {
                 false
             },
             Event::Key(Key::Char(' ')) => {
-                let data = window.data_mut::<CheckBox>(tree);
-                data.is_on = !data.is_on;
-                let cmd = data.cmd;
-                window.invalidate_render(tree);
-                window.raise(tree, Event::Cmd(cmd), state);
-                true
+                if window.is_enabled(tree) {
+                    let data = window.data_mut::<CheckBox>(tree);
+                    data.is_on = !data.is_on;
+                    let cmd = data.cmd;
+                    window.invalidate_render(tree);
+                    window.raise(tree, Event::Cmd(cmd), state);
+                    true
+                } else {
+                    false
+                }
             },
             Event::PostProcessKey(Key::Alt(c)) | Event::PostProcessKey(Key::Char(c)) => {
-                let data = window.data_mut::<CheckBox>(tree);
-                let label = data.text
-                    .split('~').nth(1).unwrap_or("")
-                    .chars().next().and_then(|x| x.to_lowercase().next());
-                if Some(c) == label {
-                    window.set_focused_primary(tree, true);
-                    true
+                if window.is_enabled(tree) {
+                    let data = window.data_mut::<CheckBox>(tree);
+                    let label = label(&data.text);
+                    if Some(c) == label {
+                        window.set_focused_primary(tree, true);
+                        let data = window.data_mut::<CheckBox>(tree);
+                        data.is_on = !data.is_on;
+                        let cmd = data.cmd;
+                        window.invalidate_render(tree);
+                        window.raise(tree, Event::Cmd(cmd), state);
+                        true
+                    } else {
+                        false
+                    }
                 } else {
                     false
                 }

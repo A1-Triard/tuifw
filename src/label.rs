@@ -3,7 +3,7 @@ use alloc::boxed::Box;
 use alloc::string::String;
 use either::Left;
 use tuifw_screen_base::{Point, Rect, Vector, Key};
-use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, Timer, label_width};
+use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, Timer, label_width, label};
 
 pub const CMD_LABEL_CLICK: u16 = 110;
 
@@ -95,9 +95,7 @@ impl<State: ?Sized> Widget<State> for LabelWidget {
         _state: &mut State,
     ) -> bool {
         let data = window.data::<Label>(tree);
-        let label = data.text
-            .split('~').nth(1).unwrap_or("")
-            .chars().next().and_then(|x| x.to_lowercase().next());
+        let label = label(&data.text);
         let Some(label) = label else { return false; };
         if event == Event::PostProcessKey(Key::Alt(label)) || event == Event::PostProcessKey(Key::Char(label)) {
             if window.is_enabled(tree) {

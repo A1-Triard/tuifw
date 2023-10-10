@@ -344,51 +344,63 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                 false
             },
             Event::Key(Key::Char(c)) => {
-                let data = window.data_mut::<InputLine>(tree);
-                if data.text.try_reserve(c.len_utf8()).is_ok() {
-                    data.text.insert(data.cursor, c);
-                    data.calc_view_end(data.view.start);
-                    data.cursor_right();
-                    InputLine::update_is_valid(tree, window, Some(state));
+                if window.is_enabled(tree) {
                     let data = window.data_mut::<InputLine>(tree);
-                    if data.is_valid && !data.editing {
-                        data.editing = true;
+                    if data.text.try_reserve(c.len_utf8()).is_ok() {
+                        data.text.insert(data.cursor, c);
+                        data.calc_view_end(data.view.start);
+                        data.cursor_right();
                         InputLine::update_is_valid(tree, window, Some(state));
+                        let data = window.data_mut::<InputLine>(tree);
+                        if data.is_valid && !data.editing {
+                            data.editing = true;
+                            InputLine::update_is_valid(tree, window, Some(state));
+                        }
+                        window.invalidate_render(tree);
                     }
-                    window.invalidate_render(tree);
+                    true
+                } else {
+                    false
                 }
-                true
             },
             Event::Key(Key::Backspace) => {
-                let data = window.data_mut::<InputLine>(tree);
-                if !data.text.is_empty() {
-                    data.cursor_left();
-                    let c = data.text.remove(data.cursor);
-                    data.calc_view_start(data.view.end - c.len_utf8());
-                    InputLine::update_is_valid(tree, window, Some(state));
+                if window.is_enabled(tree) {
                     let data = window.data_mut::<InputLine>(tree);
-                    if data.is_valid && !data.editing {
-                        data.editing = true;
+                    if !data.text.is_empty() {
+                        data.cursor_left();
+                        let c = data.text.remove(data.cursor);
+                        data.calc_view_start(data.view.end - c.len_utf8());
                         InputLine::update_is_valid(tree, window, Some(state));
+                        let data = window.data_mut::<InputLine>(tree);
+                        if data.is_valid && !data.editing {
+                            data.editing = true;
+                            InputLine::update_is_valid(tree, window, Some(state));
+                        }
+                        window.invalidate_render(tree);
                     }
-                    window.invalidate_render(tree);
+                    true
+                } else {
+                    false
                 }
-                true
             },
             Event::Key(Key::Delete) => {
-                let data = window.data_mut::<InputLine>(tree);
-                if data.cursor != data.text.len() {
-                    let c = data.text.remove(data.cursor);
-                    data.calc_view_start(data.view.end - c.len_utf8());
-                    InputLine::update_is_valid(tree, window, Some(state));
+                if window.is_enabled(tree) {
                     let data = window.data_mut::<InputLine>(tree);
-                    if data.is_valid && !data.editing {
-                        data.editing = true;
+                    if data.cursor != data.text.len() {
+                        let c = data.text.remove(data.cursor);
+                        data.calc_view_start(data.view.end - c.len_utf8());
                         InputLine::update_is_valid(tree, window, Some(state));
+                        let data = window.data_mut::<InputLine>(tree);
+                        if data.is_valid && !data.editing {
+                            data.editing = true;
+                            InputLine::update_is_valid(tree, window, Some(state));
+                        }
+                        window.invalidate_render(tree);
                     }
-                    window.invalidate_render(tree);
+                    true
+                } else {
+                    false
                 }
-                true
             },
             Event::Key(Key::Left) => {
                 let data = window.data_mut::<InputLine>(tree);

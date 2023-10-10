@@ -241,7 +241,9 @@ pub fn label(text: &str) -> Option<char> {
             hotkey = !hotkey;
         }
         let actual_text = if !first && !last && text.is_empty() { "~" } else { text };
-        if hotkey { return Some(actual_text.chars().next().unwrap()); }
+        if hotkey && !actual_text.is_empty() {
+            return Some(actual_text.chars().next().unwrap().to_lowercase().next().unwrap());
+        }
         if !first && text.is_empty() {
             hotkey = !hotkey;
         }
