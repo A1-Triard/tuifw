@@ -16,7 +16,10 @@ impl StaticText {
     }
 
     fn init_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
-        window.palette_mut(tree, |palette| palette.set(0, Left(12)));
+        window.palette_mut(tree, |palette| {
+            palette.set(0, Left(12));
+            palette.set(1, Left(13));
+        });
     }
 
     widget!(StaticTextWidget; init_palette);
@@ -40,9 +43,10 @@ impl<State: ?Sized> Widget<State> for StaticTextWidget {
         rp: &mut RenderPort,
         _state: &mut State,
     ) {
-        let color = window.color(tree, 0);
+        let is_enabled = window.actual_is_enabled(tree);
+        let color = window.color(tree, if is_enabled { 0 } else { 1 });
         let data = window.data::<StaticText>(tree);
-        rp.out(Point { x: 0, y: 0 }, color.0, color.1, &data.text);
+        rp.text(Point { x: 0, y: 0 }, color, &data.text);
     }
 
     fn measure(

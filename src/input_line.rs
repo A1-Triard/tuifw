@@ -9,7 +9,7 @@ use tuifw_screen_base::{Thickness};
 use tuifw_window::{Event, RenderPort, Timer, Widget, WidgetData, Window, WindowTree};
 use tuifw_window::{CMD_GOT_PRIMARY_FOCUS, CMD_LOST_PRIMARY_FOCUS, CMD_LOST_ATTENTION};
 
-pub const CMD_IS_VALID_CHANGED: u16 = 110;
+pub const CMD_INPUT_LINE_IS_VALID_CHANGED: u16 = 110;
 
 pub trait Validator {
     fn is_numeric(&self) -> bool;
@@ -97,8 +97,11 @@ impl InputLine {
 
     fn init_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
         window.palette_mut(tree, |palette| {
-            palette.set(0, Left(14));
-            palette.set(1, Left(15));
+            palette.set(0, Left(12));
+            palette.set(1, Left(13));
+            palette.set(2, Left(15));
+            palette.set(3, Left(16));
+            palette.set(4, Left(17));
         });
     }
 
@@ -128,11 +131,11 @@ impl InputLine {
         if is_valid != data.is_valid {
             data.is_valid = is_valid;
             if let Some(state) = state {
-                window.raise(tree, Event::Cmd(CMD_IS_VALID_CHANGED), state);
+                window.raise(tree, Event::Cmd(CMD_INPUT_LINE_IS_VALID_CHANGED), state);
             } else {
                 let is_valid_timer = Timer::new(tree, 0, Box::new(move |tree, state| {
                     window.data_mut::<InputLine>(tree).is_valid_timer = None;
-                    window.raise(tree, Event::Cmd(CMD_IS_VALID_CHANGED), state);
+                    window.raise(tree, Event::Cmd(CMD_INPUT_LINE_IS_VALID_CHANGED), state);
                 }));
                 let data = window.data_mut::<InputLine>(tree);
                 if let Some(timer) = data.is_valid_timer.replace(is_valid_timer) {
@@ -243,22 +246,30 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
         _state: &mut State,
     ) {
         let focused = window.is_focused(tree);
+        let is_enabled = window.actual_is_enabled(tree);
         let bounds = window.inner_bounds(tree);
         let data = window.data::<InputLine>(tree);
-        let color = if !data.is_valid { 1 } else { 0 };
+        let color = if !is_enabled {
+            1
+        } else {
+            if focused {
+                if !data.is_valid { 4 } else { 3 }
+            } else {
+                if !data.is_valid { 2 } else { 0 }
+            }
+        };
         let color = window.color(tree, color);
         rp.fill_bg(color.1);
-        rp.out(
+        rp.text(
             Point { x: data.view_padding.wrapping_add(1), y: 0 },
-            color.0,
-            color.1,
+            color,
             &data.text[data.view.clone()]
         );
         if data.view.start > 0 {
-            rp.out(Point { x: 0, y: 0 }, color.0, color.1, "◄");
+            rp.text(Point { x: 0, y: 0 }, color, "◄");
         }
         if data.view.end < data.text.len() {
-            rp.out(bounds.tr_inner(), color.0, color.1, "►");
+            rp.text(bounds.tr_inner(), color, "►");
         }
         if focused {
             let cursor_x = text_width(&data.text[data.view.start .. data.cursor]);

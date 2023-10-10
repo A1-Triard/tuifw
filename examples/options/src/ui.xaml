@@ -1,6 +1,6 @@
 <Background xmlns='https://a1-triard.github.io/tuifw/2023/xaml'>
   <Frame HAlign="Center" VAlign="Center" TextAlign="Center" Text="Options">
-    <StackPanel Margin="3,1,3,1" HAlign="Center">
+    <StackPanel Margin="1,0,1,0" HAlign="Center">
       <StackPanel Margin="0,0,0,1">
         <CheckBox
           Text="Option ~1~"
@@ -13,7 +13,7 @@
           FocusTabTag="3" FocusDownTag="3" FocusUpTag="1"
         />
         <Frame Text="Radio Buttons">
-          <StackPanel>
+          <StackPanel Margin="1,0,1,0">
             <RadioButton
               Text="~R~adio Button 1" IsOn="True"
               Tag="3"

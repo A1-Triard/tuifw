@@ -1,6 +1,6 @@
-use crate::{prop_string_measure, prop_string_render, prop_value, prop_value_render, widget};
+use crate::{prop_string_measure, prop_value, widget};
 use alloc::boxed::Box;
-use alloc::string::{String, ToString};
+use alloc::string::String;
 use either::Left;
 use tuifw_screen_base::{Key, Point, Rect, Vector, text_width};
 use tuifw_window::{Event, RenderPort, Timer, Widget, WidgetData, Window, WindowTree};
@@ -10,13 +10,10 @@ use tuifw_window::{CMD_GOT_SECONDARY_FOCUS, CMD_LOST_SECONDARY_FOCUS};
 pub const CMD_BUTTON_CLICK: u16 = 100;
 
 pub struct Button {
-    border_left: String,
-    border_right: String,
     text: String,
     click_timer: Option<Timer>,
     release_timer: Option<Timer>,
     cmd: u16,
-    is_enabled: bool,
 }
 
 impl<State: ?Sized> WidgetData<State> for Button {
@@ -33,20 +30,17 @@ impl<State: ?Sized> WidgetData<State> for Button {
 impl Button {
     pub fn new() -> Self {
         Button {
-            border_left: "[".to_string(),
-            border_right: "]".to_string(),
             text: String::new(),
             release_timer: None,
             click_timer: None,
             cmd: CMD_BUTTON_CLICK,
-            is_enabled: true,
         }
     }
 
     fn init_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
         window.palette_mut(tree, |palette| {
-            palette.set(0, Left(16));
-            palette.set(1, Left(17));
+            palette.set(0, Left(12));
+            palette.set(1, Left(13));
             palette.set(2, Left(18));
             palette.set(3, Left(19));
         });
@@ -54,10 +48,7 @@ impl Button {
 
     widget!(ButtonWidget; init_palette);
     prop_string_measure!(text);
-    prop_string_render!(border_left);
-    prop_string_render!(border_right);
     prop_value!(cmd: u16);
-    prop_value_render!(is_enabled: bool);
 }
 
 impl Default for Button {
@@ -79,23 +70,14 @@ impl<State: ?Sized> Widget<State> for ButtonWidget {
     ) {
         let bounds = window.inner_bounds(tree);
         let focused = window.is_focused(tree);
+        let is_enabled = window.actual_is_enabled(tree);
         let data = window.data::<Button>(tree);
         let pressed = data.release_timer.is_some();
-        let color = if !data.is_enabled { 3 } else if pressed { 2 } else if focused { 1 } else { 0 };
+        let color = if !is_enabled { 1 } else if pressed { 3 } else if focused { 2 } else { 0 };
         let color = window.color(tree, color);
-        rp.out(Point { x: 1, y: 0 }, color.0, color.1, &data.text);
-        rp.out(
-            Point { x: 0, y: 0 },
-            color.0,
-            color.1,
-            if pressed { " " } else { &data.border_left }
-        );
-        rp.out(
-            Point { x: bounds.r_inner(), y: 0 },
-            color.0,
-            color.1,
-            if pressed { " " } else { &data.border_right }
-        );
+        rp.text(Point { x: 1, y: 0 }, color, &data.text);
+        rp.text(Point { x: 0, y: 0 }, color, if pressed { " " } else { "[" });
+        rp.text(Point { x: bounds.r_inner(), y: 0 }, color, if pressed { " " } else { "]" });
     }
 
     fn measure(
@@ -137,12 +119,11 @@ impl<State: ?Sized> Widget<State> for ButtonWidget {
                 false
             },
             Event::Key(Key::Enter) => {
-                let data = window.data_mut::<Button>(tree);
-                if data.is_enabled {
+                if window.actual_is_enabled(tree) {
                     let click_timer = Timer::new(tree, 0, Box::new(move |tree, state| {
                         let data = window.data_mut::<Button>(tree);
                         data.click_timer = None;
-                        if data.is_enabled {
+                        if window.is_enabled(tree) {
                             let release_timer = Timer::new(tree, 100, Box::new(move |tree, _state| {
                                 let data = window.data_mut::<Button>(tree);
                                 data.release_timer = None;

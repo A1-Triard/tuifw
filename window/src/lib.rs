@@ -26,11 +26,12 @@ use downcast_rs::{Downcast, impl_downcast};
 use dyn_clone::{DynClone, clone_trait_object};
 use educe::Educe;
 use either::{Either, Left, Right};
+use iter_identify_first_last::IteratorIdentifyFirstLastExt;
 use macro_attr_2018::macro_attr;
 use timer_no_std::{MonoClock, MonoTime};
 use tuifw_screen_base::{Bg, Error, Fg, Key, Point, Rect, Screen, Vector};
 use tuifw_screen_base::Event as screen_Event;
-use tuifw_screen_base::{HAlign, VAlign, Thickness, Range1d};
+use tuifw_screen_base::{HAlign, VAlign, Thickness, Range1d, text_width};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum Event {
@@ -110,7 +111,7 @@ pub struct RenderPort {
 }
 
 impl RenderPort {
-    pub fn out(&mut self, p: Point, fg: Fg, bg: Bg, text: &str) {
+    pub fn text(&mut self, p: Point, color: (Fg, Bg), text: &str) {
         let screen_size = self.screen.size();
         if p.y as u16 >= self.size.y as u16 || self.size.x == 0 { return; }
         let p = p.offset(self.offset);
@@ -137,7 +138,7 @@ impl RenderPort {
 
         for chunk in &chunks {
             if chunk.start >= chunk.end { continue; }
-            let out = self.screen.out(p, fg, bg, text, chunk.clone(), row.clone());
+            let out = self.screen.out(p, color.0, color.1, text, chunk.clone(), row.clone());
             if out.start >= out.end { continue; }
             let row = self.screen.line_invalidated_range_mut(p.y);
             row.start = min(row.start, out.start);
@@ -167,39 +168,85 @@ impl RenderPort {
         }
     }
 
-    pub fn fill_bg(&mut self, bg: Bg) {
-        self.fill(|rp, p| rp.out(p, Fg::LightGray, bg, " "));
+    pub fn label(&mut self, mut p: Point, color: (Fg, Bg), color_hotkey: (Fg, Bg), text: &str) {
+        let mut hotkey = false;
+        for (first, last, text) in text.split('~').identify_first_last() {
+            if !first && !text.is_empty() {
+                hotkey = !hotkey;
+            }
+            let actual_text = if !first && !last && text.is_empty() { "~" } else { text };
+            self.text(p, if hotkey { color_hotkey } else { color }, actual_text);
+            p = p.offset(Vector { x: text_width(actual_text), y: 0 });
+            if !first && text.is_empty() {
+                hotkey = !hotkey;
+            }
+        }
     }
 
-    pub fn h_line(&mut self, start: Point, len: i16, double: bool, fg: Fg, bg: Bg) {
+    pub fn fill_bg(&mut self, bg: Bg) {
+        self.fill(|rp, p| rp.text(p, (Fg::LightGray, bg), " "));
+    }
+
+    pub fn h_line(&mut self, start: Point, len: i16, double: bool, color: (Fg, Bg)) {
         let s = if double { "═" } else { "─" };
         for x in Range1d::new(start.x, start.x.wrapping_add(len)) {
-            self.out(Point { x, y: start.y }, fg, bg, s);
+            self.text(Point { x, y: start.y }, color, s);
         }
     }
 
-    pub fn v_line(&mut self, start: Point, len: i16, double: bool, fg: Fg, bg: Bg) {
+    pub fn v_line(&mut self, start: Point, len: i16, double: bool, color: (Fg, Bg)) {
         let s = if double { "║" } else { "│" };
         for y in Range1d::new(start.y, start.y.wrapping_add(len)) {
-            self.out(Point { x: start.x, y }, fg, bg, s);
+            self.text(Point { x: start.x, y }, color, s);
         }
     }
 
-    pub fn tl_edge(&mut self, p: Point, double: bool, fg: Fg, bg: Bg) {
-        self.out(p, fg, bg, if double { "╔" } else { "┌" });
+    pub fn tl_edge(&mut self, p: Point, double: bool, color: (Fg, Bg)) {
+        self.text(p, color, if double { "╔" } else { "┌" });
     }
 
-    pub fn tr_edge(&mut self, p: Point, double: bool, fg: Fg, bg: Bg) {
-        self.out(p, fg, bg, if double { "╗" } else { "┐" });
+    pub fn tr_edge(&mut self, p: Point, double: bool, color: (Fg, Bg)) {
+        self.text(p, color, if double { "╗" } else { "┐" });
     }
 
-    pub fn bl_edge(&mut self, p: Point, double: bool, fg: Fg, bg: Bg) {
-        self.out(p, fg, bg, if double { "╚" } else { "└" });
+    pub fn bl_edge(&mut self, p: Point, double: bool, color: (Fg, Bg)) {
+        self.text(p, color, if double { "╚" } else { "└" });
     }
 
-    pub fn br_edge(&mut self, p: Point, double: bool, fg: Fg, bg: Bg) {
-        self.out(p, fg, bg, if double { "╝" } else { "┘" });
+    pub fn br_edge(&mut self, p: Point, double: bool, color: (Fg, Bg)) {
+        self.text(p, color, if double { "╝" } else { "┘" });
     }
+}
+
+pub fn label_width(text: &str) -> i16 {
+    let mut width = 0i16;
+    let mut hotkey = false;
+    for (first, last, text) in text.split('~').identify_first_last() {
+        if !first && !text.is_empty() {
+            hotkey = !hotkey;
+        }
+        let actual_text = if !first && !last && text.is_empty() { "~" } else { text };
+        width = width.wrapping_add(text_width(actual_text));
+        if !first && text.is_empty() {
+            hotkey = !hotkey;
+        }
+    }
+    width
+}
+
+pub fn label(text: &str) -> Option<char> {
+    let mut hotkey = false;
+    for (first, last, text) in text.split('~').identify_first_last() {
+        if !first && !text.is_empty() {
+            hotkey = !hotkey;
+        }
+        let actual_text = if !first && !last && text.is_empty() { "~" } else { text };
+        if hotkey { return Some(actual_text.chars().next().unwrap()); }
+        if !first && text.is_empty() {
+            hotkey = !hotkey;
+        }
+    }
+    None
 }
 
 pub trait Widget<State: ?Sized>: DynClone {
@@ -334,6 +381,7 @@ macro_attr! {
         tag: u16,
         pre_process: Option<Id<PrePostProcess<State>>>,
         post_process: Option<Id<PrePostProcess<State>>>,
+        is_enabled: bool,
     }
 }
 
@@ -410,6 +458,7 @@ impl<State: ?Sized> Window<State> {
                 tag: 0,
                 pre_process: None,
                 post_process: None,
+                is_enabled: true,
             }, Window(window))
         });
         window.attach(tree, parent, prev);
@@ -575,13 +624,24 @@ impl<State: ?Sized> Window<State> {
         res
     }
 
-    pub fn actual_focus_tab(self, tree: &WindowTree<State>) -> Self {
+    fn focus_tab_priv(self, tree: &WindowTree<State>) -> Self {
         let node = &tree.arena[self.0];
         if node.focus_tab_tag == 0 {
             node.focus_tab
         } else {
             tree.window_by_tag(node.focus_tab_tag).unwrap()
         }
+    }
+
+    pub fn actual_focus_tab(self, tree: &WindowTree<State>) -> Self {
+        let mut focus = self.focus_tab_priv(tree);
+        let mut limit = 128u8;
+        while !focus.actual_is_enabled(tree) {
+            focus = focus.focus_tab_priv(tree);
+            limit -= 1;
+            if limit == 0 { return self; }
+        }
+        focus
     }
 
     pub fn focus_tab(self, tree: &WindowTree<State>) -> Self {
@@ -600,13 +660,24 @@ impl<State: ?Sized> Window<State> {
         tree.arena[self.0].focus_tab_tag = value;
     }
 
-    pub fn actual_focus_right(self, tree: &WindowTree<State>) -> Self {
+    fn focus_right_priv(self, tree: &WindowTree<State>) -> Self {
         let node = &tree.arena[self.0];
         if node.focus_right_tag == 0 {
             node.focus_right
         } else {
             tree.window_by_tag(node.focus_right_tag).unwrap()
         }
+    }
+
+    pub fn actual_focus_right(self, tree: &WindowTree<State>) -> Self {
+        let mut focus = self.focus_right_priv(tree);
+        let mut limit = 128u8;
+        while !focus.actual_is_enabled(tree) {
+            focus = focus.focus_right_priv(tree);
+            limit -= 1;
+            if limit == 0 { return self; }
+        }
+        focus
     }
 
     pub fn focus_right(self, tree: &WindowTree<State>) -> Self {
@@ -625,13 +696,24 @@ impl<State: ?Sized> Window<State> {
         tree.arena[self.0].focus_right_tag = value;
     }
 
-    pub fn actual_focus_left(self, tree: &WindowTree<State>) -> Self {
+    pub fn focus_left_priv(self, tree: &WindowTree<State>) -> Self {
         let node = &tree.arena[self.0];
         if node.focus_left_tag == 0 {
             node.focus_left
         } else {
             tree.window_by_tag(node.focus_left_tag).unwrap()
         }
+    }
+
+    pub fn actual_focus_left(self, tree: &WindowTree<State>) -> Self {
+        let mut focus = self.focus_left_priv(tree);
+        let mut limit = 128u8;
+        while !focus.actual_is_enabled(tree) {
+            focus = focus.focus_left_priv(tree);
+            limit -= 1;
+            if limit == 0 { return self; }
+        }
+        focus
     }
 
     pub fn focus_left(self, tree: &WindowTree<State>) -> Self {
@@ -650,13 +732,24 @@ impl<State: ?Sized> Window<State> {
         tree.arena[self.0].focus_left_tag = value;
     }
 
-    pub fn actual_focus_up(self, tree: &WindowTree<State>) -> Self {
+    fn focus_up_priv(self, tree: &WindowTree<State>) -> Self {
         let node = &tree.arena[self.0];
         if node.focus_up_tag == 0 {
             node.focus_up
         } else {
             tree.window_by_tag(node.focus_up_tag).unwrap()
         }
+    }
+
+    pub fn actual_focus_up(self, tree: &WindowTree<State>) -> Self {
+        let mut focus = self.focus_up_priv(tree);
+        let mut limit = 128u8;
+        while !focus.actual_is_enabled(tree) {
+            focus = focus.focus_up_priv(tree);
+            limit -= 1;
+            if limit == 0 { return self; }
+        }
+        focus
     }
 
     pub fn focus_up(self, tree: &WindowTree<State>) -> Self {
@@ -675,13 +768,24 @@ impl<State: ?Sized> Window<State> {
         tree.arena[self.0].focus_up_tag = value;
     }
 
-    pub fn actual_focus_down(self, tree: &WindowTree<State>) -> Self {
+    fn focus_down_priv(self, tree: &WindowTree<State>) -> Self {
         let node = &tree.arena[self.0];
         if node.focus_down_tag == 0 {
             node.focus_down
         } else {
             tree.window_by_tag(node.focus_down_tag).unwrap()
         }
+    }
+
+    pub fn actual_focus_down(self, tree: &WindowTree<State>) -> Self {
+        let mut focus = self.focus_down_priv(tree);
+        let mut limit = 128u8;
+        while !focus.actual_is_enabled(tree) {
+            focus = focus.focus_down_priv(tree);
+            limit -= 1;
+            if limit == 0 { return self; }
+        }
+        focus
     }
 
     pub fn focus_down(self, tree: &WindowTree<State>) -> Self {
@@ -754,6 +858,28 @@ impl<State: ?Sized> Window<State> {
                 Right(c) => break c,
             }
         }
+    }
+
+    pub fn is_enabled(self, tree: &WindowTree<State>) -> bool {
+        tree.arena[self.0].is_enabled
+    }
+
+    pub fn set_is_enabled(self, tree: &mut WindowTree<State>, value: bool) {
+        tree.arena[self.0].is_enabled = value;
+        self.invalidate_render(tree);
+    }
+
+    pub fn actual_is_enabled(self, tree: &WindowTree<State>) -> bool {
+        let mut window = self;
+        loop {
+            if !window.is_enabled(tree) { return false; }
+            if let Some(parent) = window.parent(tree) {
+                window = parent;
+            } else {
+                break;
+            }
+        }
+        true
     }
 
     pub fn parent(
@@ -1099,25 +1225,25 @@ const FPS: u16 = 40;
 fn root_palette() -> Palette {
     let mut p = Palette::new();
     p.set(11, Right((Fg::LightGray, Bg::None))); // background
-    p.set(12, Right((Fg::LightGray, Bg::None))); // static text
-    p.set(13, Right((Fg::White, Bg::None))); // label
-    p.set(14, Right((Fg::LightGray, Bg::Blue))); // input line normal
-    p.set(15, Right((Fg::LightGray, Bg::Red))); // input line invalid
-    p.set(16, Right((Fg::Cyan, Bg::None))); // button normal
-    p.set(17, Right((Fg::Black, Bg::Cyan))); // button focused
-    p.set(18, Right((Fg::Cyan, Bg::None))); // button pressed
-    p.set(19, Right((Fg::LightGray, Bg::None))); // button disabled
+    p.set(12, Right((Fg::LightGray, Bg::None))); // text
+    p.set(13, Right((Fg::DarkGray, Bg::None))); // disabled
+    p.set(14, Right((Fg::White, Bg::None))); // hotkey
+    p.set(15, Right((Fg::Red, Bg::None))); // invalid
+    p.set(16, Right((Fg::Black, Bg::Cyan))); // input line focused
+    p.set(17, Right((Fg::Black, Bg::Red))); // input line focused invalid
+    p.set(18, Right((Fg::Black, Bg::Cyan))); // button focused
+    p.set(19, Right((Fg::Cyan, Bg::None))); // button pressed
 
-    p.set(20, Right((Fg::LightGray, Bg::Black))); // frame
-    p.set(21, Right((Fg::LightGray, Bg::Black))); // background in frame
-    p.set(22, Right((Fg::LightGray, Bg::Black))); // static text in frame
-    p.set(23, Right((Fg::White, Bg::Black))); // label in frame
-    p.set(24, Right((Fg::LightGray, Bg::Blue))); // input line normal in frame
-    p.set(25, Right((Fg::LightGray, Bg::Red))); // input line invalid in frame
-    p.set(26, Right((Fg::Cyan, Bg::Black))); // button normal in frame
-    p.set(27, Right((Fg::Black, Bg::Cyan))); // button focused in frame
-    p.set(28, Right((Fg::Cyan, Bg::Black))); // button pressed in frame
-    p.set(29, Right((Fg::LightGray, Bg::Black))); // button disabled in frame
+    p.set(30, Right((Fg::LightGray, Bg::Black))); // frame
+    p.set(31, Right((Fg::LightGray, Bg::Black))); // background in frame
+    p.set(32, Right((Fg::LightGray, Bg::Black))); // text in frame
+    p.set(33, Right((Fg::DarkGray, Bg::Black))); // disabled in frame
+    p.set(34, Right((Fg::White, Bg::Black))); // hotkey in frame
+    p.set(35, Right((Fg::Red, Bg::Black))); // invalid in frame
+    p.set(36, Right((Fg::Black, Bg::Cyan))); // input line focused in frame
+    p.set(37, Right((Fg::Black, Bg::Red))); // input line focused invalid in frame
+    p.set(38, Right((Fg::Black, Bg::Cyan))); // button focused in frame
+    p.set(39, Right((Fg::Cyan, Bg::Black))); // button pressed in frame
 
     p
 }
@@ -1231,6 +1357,7 @@ impl<'clock, State: ?Sized> WindowTree<'clock, State> {
             tag: 0,
             pre_process: None,
             post_process: None,
+            is_enabled: true,
         }, Window(window)));
         let mut tree = WindowTree {
             screen: Some(screen),

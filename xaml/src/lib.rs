@@ -62,6 +62,7 @@ pub fn reg_widgets(xaml: &mut Xaml) {
     let widget_max_width = xaml.reg_prop(widget, "MaxWidth", XamlType::Literal(int_16));
     let widget_min_height = xaml.reg_prop(widget, "MinHeight", XamlType::Literal(int_16));
     let widget_max_height = xaml.reg_prop(widget, "MaxHeight", XamlType::Literal(int_16));
+    let widget_is_enabled = xaml.reg_prop(widget, "IsEnabled", XamlType::Literal(boolean));
 
     let background = xaml.reg_struct(xmlns!("Background"), Some(widget));
     let background_show_pattern = xaml.reg_prop(background, "ShowPattern", XamlType::Literal(boolean));
@@ -79,8 +80,6 @@ pub fn reg_widgets(xaml: &mut Xaml) {
 
     let button = xaml.reg_struct(xmlns!("Button"), Some(widget));
     let button_text = xaml.reg_prop(button, "Text", XamlType::Literal(string));
-    let button_border_left = xaml.reg_prop(button, "BorderLeft", XamlType::Literal(string));
-    let button_border_right = xaml.reg_prop(button, "BorderRight", XamlType::Literal(string));
 
     let input_line = xaml.reg_struct(xmlns!("InputLine"), Some(widget));
     let input_line_text = xaml.reg_prop(input_line, "Text", XamlType::Literal(string));
@@ -204,6 +203,9 @@ pub fn reg_widgets(xaml: &mut Xaml) {
     " }, obj, value))));
 
     xaml.set_prop_set(widget_children, Box::new(|_obj, _value| String::new()));
+    xaml.set_prop_set(widget_is_enabled, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_is_enabled(&mut tree, {});
+    " }, obj, value))));
     xaml.set_prop_set(widget_tag, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_tag(&mut tree, {});
     " }, obj, value))));
@@ -390,12 +392,6 @@ pub fn reg_widgets(xaml: &mut Xaml) {
     })));
     xaml.set_prop_set(button_text, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         Button::set_text(&mut tree, {}, {});
-    " }, obj, value))));
-    xaml.set_prop_set(button_border_left, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        Button::set_border_left(&mut tree, {}, {});
-    " }, obj, value))));
-    xaml.set_prop_set(button_border_right, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        Button::set_border_right(&mut tree, {}, {});
     " }, obj, value))));
 
     xaml.set_struct_new(input_line, Some(Box::new(|obj, parent| {

@@ -46,10 +46,9 @@ impl<State: ?Sized> Widget<State> for BackgroundWidget {
     ) {
         let color = window.color(tree, 0);
         let data = window.data::<Background>(tree);
-        rp.fill(|rp, p| rp.out(
+        rp.fill(|rp, p| rp.text(
             p,
-            color.0,
-            color.1,
+            color,
             if !data.show_pattern {
                 " "
             } else if p.x % 2 == 0 {

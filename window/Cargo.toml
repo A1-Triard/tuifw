@@ -18,6 +18,7 @@ downcast-rs = { version = "1.2.0", default-features = false }
 dyn-clone = "1.0.14"
 educe = "0.4.23"
 either = { version = "1.9.0", default-features = false }
+iter-identify_first_last = "0.2.0"
 macro-attr-2018 = "3.0.0"
 timer-no-std = "0.5.0"
 tuifw-screen-base = { path = "../screen-base", version = "0.23.0" }

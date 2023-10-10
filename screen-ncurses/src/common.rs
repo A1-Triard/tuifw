@@ -38,12 +38,12 @@ fn bg_index(c: Bg) -> i16 {
 fn fg_index(c: Fg) -> i16 {
     match c {
         Fg::Black | Fg::DarkGray => COLOR_BLACK,
-        Fg::Red | Fg::LightRed => COLOR_RED,
-        Fg::Green | Fg::LightGreen => COLOR_GREEN,
+        Fg::Red | Fg::BrightRed => COLOR_RED,
+        Fg::Green | Fg::BrightGreen => COLOR_GREEN,
         Fg::Brown | Fg::Yellow => COLOR_YELLOW,
-        Fg::Blue | Fg::LightBlue => COLOR_BLUE,
-        Fg::Magenta | Fg::LightMagenta => COLOR_MAGENTA,
-        Fg::Cyan | Fg::LightCyan => COLOR_CYAN,
+        Fg::Blue | Fg::BrightBlue => COLOR_BLUE,
+        Fg::Magenta | Fg::BrightMagenta => COLOR_MAGENTA,
+        Fg::Cyan | Fg::BrightCyan => COLOR_CYAN,
         Fg::LightGray | Fg::White => COLOR_WHITE,
     }
 }
@@ -53,8 +53,8 @@ fn fg_attr(c: Fg) -> chtype {
         Fg::Black | Fg::Red | Fg::Green | Fg::Brown |
         Fg::Blue | Fg::Magenta | Fg::Cyan | Fg::LightGray =>
             A_NORMAL,
-        Fg::DarkGray | Fg::LightRed | Fg::LightGreen | Fg::Yellow |
-        Fg::LightBlue | Fg::LightMagenta | Fg::LightCyan | Fg::White =>
+        Fg::DarkGray | Fg::BrightRed | Fg::BrightGreen | Fg::Yellow |
+        Fg::BrightBlue | Fg::BrightMagenta | Fg::BrightCyan | Fg::White =>
             A_BOLD,
     }
 }

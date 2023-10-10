@@ -19,16 +19,16 @@ impl Frame {
 
     fn init_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
         window.palette_mut(tree, |palette| {
-            palette.set(0, Left(20));
-            palette.set(11, Left(21));
-            palette.set(12, Left(22));
-            palette.set(13, Left(23));
-            palette.set(14, Left(24));
-            palette.set(15, Left(25));
-            palette.set(16, Left(26));
-            palette.set(17, Left(27));
-            palette.set(18, Left(28));
-            palette.set(19, Left(29));
+            palette.set(0, Left(30));
+            palette.set(11, Left(31));
+            palette.set(12, Left(32));
+            palette.set(13, Left(33));
+            palette.set(14, Left(34));
+            palette.set(15, Left(35));
+            palette.set(16, Left(36));
+            palette.set(17, Left(37));
+            palette.set(18, Left(38));
+            palette.set(19, Left(39));
         });
     }
 
@@ -59,14 +59,14 @@ impl<State: ?Sized> Widget<State> for FrameWidget {
         let bounds = window.inner_bounds(tree);
         let data = window.data::<Frame>(tree);
         rp.fill_bg(color.1);
-        rp.h_line(bounds.tl, bounds.w(), data.double, color.0, color.1);
-        rp.h_line(bounds.bl_inner(), bounds.w(), data.double, color.0, color.1);
-        rp.v_line(bounds.tl, bounds.h(), data.double, color.0, color.1);
-        rp.v_line(bounds.tr_inner(), bounds.h(), data.double, color.0, color.1);
-        rp.tl_edge(bounds.tl, data.double, color.0, color.1);
-        rp.tr_edge(bounds.tr_inner(), data.double, color.0, color.1);
-        rp.br_edge(bounds.br_inner(), data.double, color.0, color.1);
-        rp.bl_edge(bounds.bl_inner(), data.double, color.0, color.1);
+        rp.h_line(bounds.tl, bounds.w(), data.double, color);
+        rp.h_line(bounds.bl_inner(), bounds.w(), data.double, color);
+        rp.v_line(bounds.tl, bounds.h(), data.double, color);
+        rp.v_line(bounds.tr_inner(), bounds.h(), data.double, color);
+        rp.tl_edge(bounds.tl, data.double, color);
+        rp.tr_edge(bounds.tr_inner(), data.double, color);
+        rp.br_edge(bounds.br_inner(), data.double, color);
+        rp.bl_edge(bounds.bl_inner(), data.double, color);
         if !data.text.is_empty() {
             let text_area_bounds = Thickness::new(2, 0, 2, 0).shrink_rect(bounds.t_line());
             let text_width = text_width(&data.text);
@@ -78,14 +78,14 @@ impl<State: ?Sized> Widget<State> for FrameWidget {
                     VAlign::Top
                 );
                 let text_bounds = margin.shrink_rect(text_area_bounds);
-                rp.out(text_bounds.tl.offset(Vector { x: -1, y: 0 }), color.0, color.1, " ");
-                rp.out(text_bounds.tl, color.0, color.1, &data.text);
-                rp.out(text_bounds.tr(), color.0, color.1, " ");
+                rp.text(text_bounds.tl.offset(Vector { x: -1, y: 0 }), color, " ");
+                rp.text(text_bounds.tl, color, &data.text);
+                rp.text(text_bounds.tr(), color, " ");
             } else {
-                rp.out(text_area_bounds.tl.offset(Vector { x: -1, y: 0 }), color.0, color.1, " ");
-                rp.out(text_area_bounds.tl, color.0, color.1, &data.text);
-                rp.out(text_area_bounds.tr(), color.0, color.1, "►");
-                rp.tr_edge(bounds.tr_inner(), data.double, color.0, color.1);
+                rp.text(text_area_bounds.tl.offset(Vector { x: -1, y: 0 }), color, " ");
+                rp.text(text_area_bounds.tl, color, &data.text);
+                rp.text(text_area_bounds.tr(), color, "►");
+                rp.tr_edge(bounds.tr_inner(), data.double, color);
             }
         }
     }

@@ -53,15 +53,6 @@ pub fn is_text_fit_in(w: i16, s: &str) -> bool {
 
 macro_attr! {
     #[derive(Eq, PartialEq, Debug, Hash, Clone, Copy, Ord, PartialOrd)]
-    #[derive(EnumDisplay!, EnumFromStr!)]
-    pub enum Orient {
-        Hor,
-        Vert
-    }
-}
-
-macro_attr! {
-    #[derive(Eq, PartialEq, Debug, Hash, Clone, Copy, Ord, PartialOrd)]
     #[derive(EnumDisplay!, EnumFromStr!, IterVariants!(BgVariants))]
     pub enum Bg {
         None,
@@ -89,12 +80,12 @@ macro_attr! {
         Cyan,
         LightGray,
         DarkGray,
-        LightRed,
-        LightGreen,
+        BrightRed,
+        BrightGreen,
         Yellow,
-        LightBlue,
-        LightMagenta,
-        LightCyan,
+        BrightBlue,
+        BrightMagenta,
+        BrightCyan,
         White
     }
 }
