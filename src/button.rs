@@ -75,6 +75,7 @@ impl<State: ?Sized> Widget<State> for ButtonWidget {
         let pressed = data.release_timer.is_some();
         let color = if !is_enabled { 1 } else if pressed { 3 } else if focused { 2 } else { 0 };
         let color = window.color(tree, color);
+        rp.fill_bg(color.1);
         rp.text(Point { x: 1, y: 0 }, color, &data.text);
         rp.text(Point { x: 0, y: 0 }, color, if pressed { " " } else { "[" });
         rp.text(Point { x: bounds.r_inner(), y: 0 }, color, if pressed { " " } else { "]" });
