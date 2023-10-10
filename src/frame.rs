@@ -29,6 +29,7 @@ impl Frame {
             palette.set(17, Left(37));
             palette.set(18, Left(38));
             palette.set(19, Left(39));
+            palette.set(20, Left(40));
         });
     }
 

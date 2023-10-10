@@ -31,7 +31,7 @@
 	  </InputLine>
         </StackPanel>
       </DockPanel>
-      <Button HAlign="Center" Text="Calculate" Tag="5" FocusedSecondary="True" />
+      <Button HAlign="Center" Text="~C~alculate" Tag="5" FocusedSecondary="True" />
       <DockPanel Margin="0,1,0,0">
         <StaticText Dock="Left" Text="S =" />
         <Background Width="13" Margin="1,0,0,0">

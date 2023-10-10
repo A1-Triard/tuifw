@@ -28,8 +28,8 @@
         </Frame>
       </StackPanel>
       <StackPanel Vertical="False" HAlign="Center">
-        <Button Text="OK" Tag="10" FocusRightTag="11" FocusLeftTag="11" FocusedSecondary="True" />
-        <Button Text="Cancel" Margin="3,0,0,0" Tag="11" FocusRightTag="10" FocusLeftTag="10" />
+        <Button Text="~O~K" Tag="10" FocusRightTag="11" FocusLeftTag="11" FocusedSecondary="True" />
+        <Button Text="~C~ancel" Margin="3,0,0,0" Tag="11" FocusRightTag="10" FocusLeftTag="10" />
       </StackPanel>
     </StackPanel>
   </Frame>

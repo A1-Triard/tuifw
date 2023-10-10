@@ -125,7 +125,7 @@ impl<State: ?Sized> Widget<State> for CheckBoxWidget {
                 false
             },
             Event::Key(Key::Char(' ')) => {
-                if window.is_enabled(tree) {
+                if window.actual_is_enabled(tree) {
                     CheckBox::click(tree, window, state);
                     true
                 } else {
@@ -133,7 +133,7 @@ impl<State: ?Sized> Widget<State> for CheckBoxWidget {
                 }
             },
             Event::PostProcessKey(Key::Alt(c)) | Event::PostProcessKey(Key::Char(c)) => {
-                if window.is_enabled(tree) {
+                if window.actual_is_enabled(tree) {
                     let data = window.data_mut::<CheckBox>(tree);
                     let label = label(&data.text);
                     if Some(c) == label {

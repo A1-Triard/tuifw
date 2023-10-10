@@ -2,8 +2,8 @@ use crate::{prop_string_measure, prop_value, widget};
 use alloc::boxed::Box;
 use alloc::string::String;
 use either::Left;
-use tuifw_screen_base::{Key, Point, Rect, Vector, text_width};
-use tuifw_window::{Event, RenderPort, Timer, Widget, WidgetData, Window, WindowTree};
+use tuifw_screen_base::{Key, Point, Rect, Vector};
+use tuifw_window::{Event, RenderPort, Timer, Widget, WidgetData, Window, WindowTree, label_width, label};
 use tuifw_window::{CMD_GOT_PRIMARY_FOCUS, CMD_LOST_PRIMARY_FOCUS};
 use tuifw_window::{CMD_GOT_SECONDARY_FOCUS, CMD_LOST_SECONDARY_FOCUS};
 
@@ -41,8 +41,10 @@ impl Button {
         window.palette_mut(tree, |palette| {
             palette.set(0, Left(12));
             palette.set(1, Left(13));
-            palette.set(2, Left(18));
-            palette.set(3, Left(19));
+            palette.set(2, Left(14));
+            palette.set(3, Left(18));
+            palette.set(4, Left(19));
+            palette.set(5, Left(20));
         });
     }
 
@@ -54,7 +56,7 @@ impl Button {
         let click_timer = Timer::new(tree, 0, Box::new(move |tree, state| {
             let data = window.data_mut::<Button>(tree);
             data.click_timer = None;
-            if window.is_enabled(tree) {
+            if window.actual_is_enabled(tree) {
                 let release_timer = Timer::new(tree, 100, Box::new(move |tree, _state| {
                     let data = window.data_mut::<Button>(tree);
                     data.release_timer = None;
@@ -98,10 +100,12 @@ impl<State: ?Sized> Widget<State> for ButtonWidget {
         let is_enabled = window.actual_is_enabled(tree);
         let data = window.data::<Button>(tree);
         let pressed = data.release_timer.is_some();
-        let color = if !is_enabled { 1 } else if pressed { 3 } else if focused { 2 } else { 0 };
+        let color = if !is_enabled { 1 } else if pressed { 5 } else if focused { 3 } else { 0 };
         let color = window.color(tree, color);
+        let color_hotkey = if !is_enabled { 1 } else if pressed { 5 } else if focused { 4 } else { 2 };
+        let color_hotkey = window.color(tree, color_hotkey);
         rp.fill_bg(color.1);
-        rp.text(Point { x: 1, y: 0 }, color, &data.text);
+        rp.label(Point { x: 1, y: 0 }, color, color_hotkey, &data.text);
         rp.text(Point { x: 0, y: 0 }, color, if pressed { " " } else { "[" });
         rp.text(Point { x: bounds.r_inner(), y: 0 }, color, if pressed { " " } else { "]" });
     }
@@ -115,7 +119,7 @@ impl<State: ?Sized> Widget<State> for ButtonWidget {
         _state: &mut State,
     ) -> Vector {
         let data = window.data::<Button>(tree);
-        Vector { x: text_width(&data.text).wrapping_add(2), y: 1 }
+        Vector { x: label_width(&data.text).wrapping_add(2), y: 1 }
     }
 
     fn arrange(
@@ -152,7 +156,23 @@ impl<State: ?Sized> Widget<State> for ButtonWidget {
                     false
                 }
             },
+            Event::PostProcessKey(Key::Alt(c)) | Event::PostProcessKey(Key::Char(c)) => {
+                if window.actual_is_enabled(tree) {
+                    let data = window.data_mut::<Button>(tree);
+                    let label = label(&data.text);
+                    if Some(c) == label {
+                        Button::click(tree, window);
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            },
             _ => false
         }
     }
+
+    fn post_process(&self) -> bool { true }
 }

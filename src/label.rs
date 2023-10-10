@@ -98,11 +98,11 @@ impl<State: ?Sized> Widget<State> for LabelWidget {
         let label = label(&data.text);
         let Some(label) = label else { return false; };
         if event == Event::PostProcessKey(Key::Alt(label)) || event == Event::PostProcessKey(Key::Char(label)) {
-            if window.is_enabled(tree) {
+            if window.actual_is_enabled(tree) {
                 let click_timer = Timer::new(tree, 0, Box::new(move |tree, state| {
                     let data = window.data_mut::<Label>(tree);
                     data.click_timer = None;
-                    if window.is_enabled(tree) {
+                    if window.actual_is_enabled(tree) {
                         let data = window.data_mut::<Label>(tree);
                         let cmd = data.cmd;
                         window.raise(tree, Event::Cmd(cmd), state);

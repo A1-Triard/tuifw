@@ -1231,10 +1231,11 @@ fn root_palette() -> Palette {
     p.set(13, Right((Fg::DarkGray, Bg::None))); // disabled
     p.set(14, Right((Fg::White, Bg::None))); // hotkey
     p.set(15, Right((Fg::Red, Bg::None))); // invalid
-    p.set(16, Right((Fg::Black, Bg::Cyan))); // input line focused
-    p.set(17, Right((Fg::Black, Bg::Red))); // input line focused invalid
-    p.set(18, Right((Fg::Black, Bg::Cyan))); // button focused
-    p.set(19, Right((Fg::Cyan, Bg::None))); // button pressed
+    p.set(16, Right((Fg::LightGray, Bg::Blue))); // input line focused
+    p.set(17, Right((Fg::LightGray, Bg::Red))); // input line focused invalid
+    p.set(18, Right((Fg::LightGray, Bg::Blue))); // button focused
+    p.set(19, Right((Fg::White, Bg::Blue))); // button hotkey
+    p.set(20, Right((Fg::Blue, Bg::None))); // button pressed
 
     p.set(30, Right((Fg::LightGray, Bg::Black))); // frame
     p.set(31, Right((Fg::LightGray, Bg::Black))); // background in frame
@@ -1242,10 +1243,11 @@ fn root_palette() -> Palette {
     p.set(33, Right((Fg::DarkGray, Bg::Black))); // disabled in frame
     p.set(34, Right((Fg::White, Bg::Black))); // hotkey in frame
     p.set(35, Right((Fg::Red, Bg::Black))); // invalid in frame
-    p.set(36, Right((Fg::Black, Bg::Cyan))); // input line focused in frame
-    p.set(37, Right((Fg::Black, Bg::Red))); // input line focused invalid in frame
-    p.set(38, Right((Fg::Black, Bg::Cyan))); // button focused in frame
-    p.set(39, Right((Fg::Cyan, Bg::Black))); // button pressed in frame
+    p.set(36, Right((Fg::LightGray, Bg::Blue))); // input line focused in frame
+    p.set(37, Right((Fg::LightGray, Bg::Red))); // input line focused invalid in frame
+    p.set(38, Right((Fg::LightGray, Bg::Blue))); // button focused in frame
+    p.set(39, Right((Fg::White, Bg::Blue))); // button hotkey in frame
+    p.set(40, Right((Fg::Blue, Bg::Black))); // button pressed in frame
 
     p
 }

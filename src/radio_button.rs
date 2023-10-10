@@ -141,14 +141,14 @@ impl<State: ?Sized> Widget<State> for RadioButtonWidget {
                 false
             },
             Event::Key(Key::Char(' ')) => {
-                if window.is_enabled(tree) {
+                if window.actual_is_enabled(tree) {
                     RadioButton::click(tree, window, state)
                 } else {
                     false
                 }
             },
             Event::PostProcessKey(Key::Alt(c)) | Event::PostProcessKey(Key::Char(c)) => {
-                if window.is_enabled(tree) {
+                if window.actual_is_enabled(tree) {
                     let data = window.data_mut::<RadioButton>(tree);
                     let label = label(&data.text);
                     if Some(c) == label {
