@@ -1,0 +1,40 @@
+<Background xmlns='https://a1-triard.github.io/tuifw/2023/xaml'>
+  <Frame HAlign="Center" VAlign="Center" TextAlign="Center" Text="Tic-Tac-Toe">
+    <StackPanel Margin="3,1,3,1">
+      <StackPanel Vertical="False">
+        <Button Text=" " Tag="7"
+	  FocusTabTag="8" FocusRightTag="8" FocusLeftTag="9" FocusUpTag="1" FocusDownTag="4"
+	  FocusedPrimary="True"
+	/>
+        <Button Text=" " Tag="8"
+	  FocusTabTag="9" FocusRightTag="9" FocusLeftTag="7" FocusUpTag="2" FocusDownTag="5"
+	/>
+        <Button Text=" " Tag="9"
+	  FocusTabTag="4" FocusRightTag="7" FocusLeftTag="8" FocusUpTag="3" FocusDownTag="6"
+	/>
+      </StackPanel>
+      <StackPanel Vertical="False">
+        <Button Text=" " Tag="4"
+	  FocusTabTag="5" FocusRightTag="5" FocusLeftTag="6" FocusUpTag="7" FocusDownTag="1"
+	/>
+        <Button Text=" " Tag="5"
+	  FocusTabTag="6" FocusRightTag="6" FocusLeftTag="4" FocusUpTag="8" FocusDownTag="2"
+	/>
+        <Button Text=" " Tag="6"
+	  FocusTabTag="1" FocusRightTag="4" FocusLeftTag="5" FocusUpTag="9" FocusDownTag="3"
+	/>
+      </StackPanel>
+      <StackPanel Vertical="False">
+        <Button Text=" " Tag="1"
+	  FocusTabTag="2" FocusRightTag="2" FocusLeftTag="3" FocusUpTag="4" FocusDownTag="7"
+	/>
+        <Button Text=" " Tag="2"
+	  FocusTabTag="3" FocusRightTag="3" FocusLeftTag="1" FocusUpTag="5" FocusDownTag="8"
+	/>
+        <Button Text=" " Tag="3"
+	  FocusTabTag="7" FocusRightTag="1" FocusLeftTag="2" FocusUpTag="6" FocusDownTag="9"
+	/>
+      </StackPanel>
+    </StackPanel>
+  </Frame>
+</Background>
