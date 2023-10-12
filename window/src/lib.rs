@@ -251,6 +251,13 @@ pub fn label(text: &str) -> Option<char> {
     None
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub enum Visibility {
+    Visible,
+    Hidden,
+    Collapsed
+}
+
 pub trait Widget<State: ?Sized>: DynClone {
     fn render(
         &self,
@@ -384,6 +391,7 @@ macro_attr! {
         pre_process: Option<Id<PrePostProcess<State>>>,
         post_process: Option<Id<PrePostProcess<State>>>,
         is_enabled: bool,
+        visibility: Visibility,
     }
 }
 
@@ -461,6 +469,7 @@ impl<State: ?Sized> Window<State> {
                 pre_process: None,
                 post_process: None,
                 is_enabled: true,
+                visibility: Visibility::Visible,
             }, Window(window))
         });
         window.attach(tree, parent, prev);
@@ -505,6 +514,10 @@ impl<State: ?Sized> Window<State> {
         state: &mut State
     ) {
         let node = &mut tree.arena[self.0];
+        if node.visibility == Visibility::Collapsed {
+            node.desired_size = Vector::null();
+            return;
+        }
         let min_size = Vector {
             x: node.width.unwrap_or(node.min_width),
             y: node.height.unwrap_or(node.min_height)
@@ -527,6 +540,12 @@ impl<State: ?Sized> Window<State> {
 
     pub fn arrange(self, tree: &mut WindowTree<State>, final_bounds: Rect, state: &mut State) {
         let node = &mut tree.arena[self.0];
+        if node.visibility == Visibility::Collapsed {
+            let bounds = Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() };
+            node.render_bounds = bounds;
+            self.move_xy_raw(tree, bounds);
+            return;
+        }
         let min_size = Vector {
             x: node.width.unwrap_or(node.min_width),
             y: node.height.unwrap_or(node.min_height)
@@ -882,6 +901,24 @@ impl<State: ?Sized> Window<State> {
             }
         }
         true
+    }
+
+    pub fn visibility(self, tree: &WindowTree<State>) -> Visibility {
+        tree.arena[self.0].visibility
+    }
+
+    pub fn set_visibility(self, tree: &mut WindowTree<State>, value: Visibility) {
+        if self == tree.root { return; }
+        let old_value = replace(&mut tree.arena[self.0].visibility, value);
+        match (old_value, value) {
+            (Visibility::Visible, Visibility::Collapsed) => self.parent(tree).unwrap().invalidate_measure(tree),
+            (Visibility::Visible, Visibility::Hidden) => self.invalidate_render(tree),
+            (Visibility::Collapsed, Visibility::Visible) => self.parent(tree).unwrap().invalidate_measure(tree),
+            (Visibility::Collapsed, Visibility::Hidden) => self.parent(tree).unwrap().invalidate_measure(tree),
+            (Visibility::Hidden, Visibility::Visible) => self.invalidate_render(tree),
+            (Visibility::Hidden, Visibility::Collapsed) => self.parent(tree).unwrap().invalidate_measure(tree),
+            _ => { },
+        }
     }
 
     pub fn parent(
@@ -1362,6 +1399,7 @@ impl<'clock, State: ?Sized> WindowTree<'clock, State> {
             pre_process: None,
             post_process: None,
             is_enabled: true,
+            visibility: Visibility::Visible,
         }, Window(window)));
         let mut tree = WindowTree {
             screen: Some(screen),
@@ -1424,6 +1462,9 @@ impl<'clock, State: ?Sized> WindowTree<'clock, State> {
     }
 
     fn render_window(&mut self, window: Window<State>, offset: Vector, render_state: &mut State) {
+        if window.visibility(self) != Visibility::Visible {
+            return;
+        }
         let bounds = self.arena[window.0].window_bounds.offset(offset);
         let screen = self.screen();
         if !rect_invalidated(screen, bounds) { return; }

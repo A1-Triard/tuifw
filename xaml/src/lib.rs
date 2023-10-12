@@ -31,6 +31,7 @@ pub fn reg_widgets(xaml: &mut Xaml) {
     let h_align = xaml.reg_literal(xmlns!("HAlign"));
     let v_align = xaml.reg_literal(xmlns!("VAlign"));
     let dock = xaml.reg_literal(xmlns!("Dock"));
+    let visibility = xaml.reg_literal(xmlns!("Visibility"));
 
     let validator = xaml.reg_struct(xmlns!("Validator"), None);
 
@@ -63,6 +64,7 @@ pub fn reg_widgets(xaml: &mut Xaml) {
     let widget_min_height = xaml.reg_prop(widget, "MinHeight", XamlType::Literal(int_16));
     let widget_max_height = xaml.reg_prop(widget, "MaxHeight", XamlType::Literal(int_16));
     let widget_is_enabled = xaml.reg_prop(widget, "IsEnabled", XamlType::Literal(boolean));
+    let widget_visibility = xaml.reg_prop(widget, "Visibility", XamlType::Literal(visibility));
 
     let background = xaml.reg_struct(xmlns!("Background"), Some(widget));
     let background_show_pattern = xaml.reg_prop(background, "ShowPattern", XamlType::Literal(boolean));
@@ -150,6 +152,12 @@ pub fn reg_widgets(xaml: &mut Xaml) {
         "Bottom" => Some("Dock::Bottom".to_string()),
         _ => None,
     }));
+    xaml.set_literal_new(visibility, Box::new(|x| match x {
+        "Visible" => Some("Visibility::Visible".to_string()),
+        "Hidden" => Some("Visibility::Hidden".to_string()),
+        "Collapsed" => Some("Visibility::Collapsed".to_string()),
+        _ => None,
+    }));
 
     xaml.set_preamble(indoc! { "
         extern crate alloc;
@@ -205,6 +213,9 @@ pub fn reg_widgets(xaml: &mut Xaml) {
     xaml.set_prop_set(widget_children, Box::new(|_obj, _value| String::new()));
     xaml.set_prop_set(widget_is_enabled, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_is_enabled(&mut tree, {});
+    " }, obj, value))));
+    xaml.set_prop_set(widget_visibility, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_visibility(&mut tree, {});
     " }, obj, value))));
     xaml.set_prop_set(widget_tag, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_tag(&mut tree, {});
