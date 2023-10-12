@@ -293,7 +293,7 @@ pub trait Widget<State: ?Sized>: DynClone {
         state: &mut State,
     ) -> bool;
 
-    fn focusable(&self, _primary_focus: bool) -> bool { false }
+    fn secondary_focusable(&self) -> bool { false }
 
     fn pre_process(&self) -> bool { false }
 
@@ -1621,8 +1621,6 @@ impl<'clock, State: ?Sized> WindowTree<'clock, State> {
     ) -> bool {
         let old_focused = self.primary_focused;
         if window == old_focused { return false; }
-        let focusable = window.map_or(true, |x| self.arena[x.0].widget.focusable(true));
-        if !focusable { return false; }
         window.map(|x| x.raise(self, Event::Cmd(CMD_GOT_PRIMARY_FOCUS), state));
 
         if let Some(mut window) = self.primary_focused {
@@ -1658,7 +1656,7 @@ impl<'clock, State: ?Sized> WindowTree<'clock, State> {
     ) -> bool {
         let old_focused = self.secondary_focused;
         if window == old_focused { return false; }
-        let focusable = window.map_or(true, |x| self.arena[x.0].widget.focusable(false));
+        let focusable = window.map_or(true, |x| self.arena[x.0].widget.secondary_focusable());
         if !focusable { return false; }
         window.map(|x| x.raise(self, Event::Cmd(CMD_GOT_SECONDARY_FOCUS), state));
         self.secondary_focused = window;

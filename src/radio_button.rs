@@ -125,8 +125,6 @@ impl<State: ?Sized> Widget<State> for RadioButtonWidget {
         }
     }
 
-    fn focusable(&self, primary_focus: bool) -> bool { primary_focus }
-
     fn update(
         &self,
         tree: &mut WindowTree<State>,

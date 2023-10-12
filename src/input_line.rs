@@ -302,8 +302,6 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
         Vector { x: final_inner_bounds.w(), y: 1 }
     }
 
-    fn focusable(&self, primary_focus: bool) -> bool { primary_focus }
-
     fn update(
         &self,
         tree: &mut WindowTree<State>,

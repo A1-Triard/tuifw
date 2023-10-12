@@ -109,8 +109,6 @@ impl<State: ?Sized> Widget<State> for CheckBoxWidget {
         }
     }
 
-    fn focusable(&self, primary_focus: bool) -> bool { primary_focus }
-
     fn update(
         &self,
         tree: &mut WindowTree<State>,

@@ -132,7 +132,7 @@ impl<State: ?Sized> Widget<State> for ButtonWidget {
         final_inner_bounds.size
     }
 
-    fn focusable(&self, _primary_focus: bool) -> bool { true }
+    fn secondary_focusable(&self) -> bool { true }
 
     fn update(
         &self,
