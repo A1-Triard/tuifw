@@ -3,6 +3,7 @@ use alloc::string::{String, ToString};
 use either::Left;
 use tuifw_screen_base::{Rect, Vector};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree};
+use tuifw_window::COLOR_BACKGROUND;
 
 pub struct Background {
     pattern_even: String,
@@ -18,7 +19,7 @@ impl Background {
     }
 
     fn init_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
-        window.palette_mut(tree, |palette| palette.set(0, Left(11)));
+        window.palette_mut(tree, |palette| palette.set(0, Left(COLOR_BACKGROUND)));
     }
 
     widget!(BackgroundWidget; init_palette);

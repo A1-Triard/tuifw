@@ -3,6 +3,7 @@ use alloc::string::String;
 use either::Left;
 use tuifw_screen_base::{Rect, Vector, Thickness, text_width, HAlign, VAlign};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree};
+use tuifw_window::{COLOR_FRAME, COLORS, COLOR_IN_FRAME};
 
 pub struct Frame {
     double: bool,
@@ -19,17 +20,10 @@ impl Frame {
 
     fn init_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
         window.palette_mut(tree, |palette| {
-            palette.set(0, Left(30));
-            palette.set(11, Left(31));
-            palette.set(12, Left(32));
-            palette.set(13, Left(33));
-            palette.set(14, Left(34));
-            palette.set(15, Left(35));
-            palette.set(16, Left(36));
-            palette.set(17, Left(37));
-            palette.set(18, Left(38));
-            palette.set(19, Left(39));
-            palette.set(20, Left(40));
+            palette.set(0, Left(COLOR_FRAME));
+            for c in COLORS {
+                palette.set(c, Left(c + COLOR_IN_FRAME));
+            }
         });
     }
 

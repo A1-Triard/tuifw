@@ -4,6 +4,7 @@ use either::Left;
 use tuifw_screen_base::{Key, Point, Rect, Vector};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree};
 use tuifw_window::{CMD_GOT_PRIMARY_FOCUS, CMD_LOST_PRIMARY_FOCUS, label_width, label};
+use tuifw_window::{COLOR_TEXT, COLOR_HOTKEY, COLOR_DISABLED};
 
 pub const CMD_CHECK_BOX_CLICK: u16 = 100;
 
@@ -26,9 +27,9 @@ impl CheckBox {
 
     fn init_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
         window.palette_mut(tree, |palette| {
-            palette.set(0, Left(12));
-            palette.set(1, Left(13));
-            palette.set(2, Left(14));
+            palette.set(0, Left(COLOR_TEXT));
+            palette.set(1, Left(COLOR_HOTKEY));
+            palette.set(2, Left(COLOR_DISABLED));
         });
     }
 
@@ -66,8 +67,8 @@ impl<State: ?Sized> Widget<State> for CheckBoxWidget {
         let focused = window.is_focused(tree);
         let is_enabled = window.actual_is_enabled(tree);
         let data = window.data::<CheckBox>(tree);
-        let color = window.color(tree, if is_enabled { 0 } else { 1 });
-        let color_hotkey = window.color(tree, if is_enabled { 2 } else { 1 });
+        let color = window.color(tree, if is_enabled { 0 } else { 2 });
+        let color_hotkey = window.color(tree, if is_enabled { 1 } else { 2 });
         rp.text(Point { x: 1, y: 0 }, color, if data.is_on { "x" } else { " " });
         rp.text(Point { x: 0, y: 0 }, color, "[");
         rp.text(Point { x: 2, y: 0 }, color, "]");

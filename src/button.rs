@@ -6,6 +6,8 @@ use tuifw_screen_base::{Key, Point, Rect, Vector};
 use tuifw_window::{Event, RenderPort, Timer, Widget, WidgetData, Window, WindowTree, label_width, label};
 use tuifw_window::{CMD_GOT_PRIMARY_FOCUS, CMD_LOST_PRIMARY_FOCUS};
 use tuifw_window::{CMD_GOT_SECONDARY_FOCUS, CMD_LOST_SECONDARY_FOCUS};
+use tuifw_window::{COLOR_TEXT, COLOR_HOTKEY, COLOR_DISABLED, COLOR_BUTTON_FOCUSED};
+use tuifw_window::{COLOR_BUTTON_FOCUSED_HOTKEY, COLOR_BUTTON_FOCUSED_DISABLED, COLOR_BUTTON_PRESSED};
 
 pub const CMD_BUTTON_CLICK: u16 = 100;
 
@@ -39,12 +41,13 @@ impl Button {
 
     fn init_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
         window.palette_mut(tree, |palette| {
-            palette.set(0, Left(12));
-            palette.set(1, Left(13));
-            palette.set(2, Left(14));
-            palette.set(3, Left(18));
-            palette.set(4, Left(19));
-            palette.set(5, Left(20));
+            palette.set(0, Left(COLOR_TEXT));
+            palette.set(1, Left(COLOR_HOTKEY));
+            palette.set(2, Left(COLOR_DISABLED));
+            palette.set(3, Left(COLOR_BUTTON_FOCUSED));
+            palette.set(4, Left(COLOR_BUTTON_FOCUSED_HOTKEY));
+            palette.set(5, Left(COLOR_BUTTON_FOCUSED_DISABLED));
+            palette.set(6, Left(COLOR_BUTTON_PRESSED));
         });
     }
 
@@ -100,9 +103,14 @@ impl<State: ?Sized> Widget<State> for ButtonWidget {
         let is_enabled = window.actual_is_enabled(tree);
         let data = window.data::<Button>(tree);
         let pressed = data.release_timer.is_some();
-        let color = if !is_enabled { 1 } else if pressed { 5 } else if focused { 3 } else { 0 };
+        let (color, color_hotkey) = if pressed {
+            (6, 6)
+        } else if focused {
+            if !is_enabled { (5, 5) } else { (3, 4) }
+        } else {
+            if !is_enabled { (2, 2) } else { (0, 1) }
+        };
         let color = window.color(tree, color);
-        let color_hotkey = if !is_enabled { 1 } else if pressed { 5 } else if focused { 4 } else { 2 };
         let color_hotkey = window.color(tree, color_hotkey);
         rp.fill_bg(color.1);
         rp.label(Point { x: 1, y: 0 }, color, color_hotkey, &data.text);

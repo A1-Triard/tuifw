@@ -3,6 +3,7 @@ use alloc::string::String;
 use either::Left;
 use tuifw_screen_base::{Point, Rect, Vector, text_width};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree};
+use tuifw_window::{COLOR_TEXT, COLOR_DISABLED};
 
 pub struct StaticText {
     text: String,
@@ -17,8 +18,8 @@ impl StaticText {
 
     fn init_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
         window.palette_mut(tree, |palette| {
-            palette.set(0, Left(12));
-            palette.set(1, Left(13));
+            palette.set(0, Left(COLOR_TEXT));
+            palette.set(1, Left(COLOR_DISABLED));
         });
     }
 

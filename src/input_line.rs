@@ -8,6 +8,9 @@ use tuifw_screen_base::{Key, Point, Rect, Vector, char_width, text_width};
 use tuifw_screen_base::{Thickness};
 use tuifw_window::{Event, RenderPort, Timer, Widget, WidgetData, Window, WindowTree};
 use tuifw_window::{CMD_GOT_PRIMARY_FOCUS, CMD_LOST_PRIMARY_FOCUS, CMD_LOST_ATTENTION};
+use tuifw_window::{COLOR_TEXT, COLOR_DISABLED, COLOR_INPUT_LINE_INVALID};
+use tuifw_window::{COLOR_INPUT_LINE_FOCUSED, COLOR_INPUT_LINE_FOCUSED_DISABLED};
+use tuifw_window::{COLOR_INPUT_LINE_FOCUSED_INVALID};
 
 pub const CMD_INPUT_LINE_IS_VALID_CHANGED: u16 = 110;
 
@@ -97,11 +100,12 @@ impl InputLine {
 
     fn init_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
         window.palette_mut(tree, |palette| {
-            palette.set(0, Left(12));
-            palette.set(1, Left(13));
-            palette.set(2, Left(15));
-            palette.set(3, Left(16));
-            palette.set(4, Left(17));
+            palette.set(0, Left(COLOR_TEXT));
+            palette.set(1, Left(COLOR_INPUT_LINE_INVALID));
+            palette.set(2, Left(COLOR_DISABLED));
+            palette.set(3, Left(COLOR_INPUT_LINE_FOCUSED));
+            palette.set(4, Left(COLOR_INPUT_LINE_FOCUSED_INVALID));
+            palette.set(5, Left(COLOR_INPUT_LINE_FOCUSED_DISABLED));
         });
     }
 
@@ -250,12 +254,12 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
         let bounds = window.inner_bounds(tree);
         let data = window.data::<InputLine>(tree);
         let color = if !is_enabled {
-            1
+            if focused { 5 } else { 2 }
         } else {
             if focused {
                 if !data.is_valid { 4 } else { 3 }
             } else {
-                if !data.is_valid { 2 } else { 0 }
+                if !data.is_valid { 1 } else { 0 }
             }
         };
         let color = window.color(tree, color);
@@ -342,7 +346,7 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                 false
             },
             Event::Key(Key::Char(c)) => {
-                if window.is_enabled(tree) {
+                if window.actual_is_enabled(tree) {
                     let data = window.data_mut::<InputLine>(tree);
                     if data.text.try_reserve(c.len_utf8()).is_ok() {
                         data.text.insert(data.cursor, c);
@@ -362,7 +366,7 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                 }
             },
             Event::Key(Key::Backspace) => {
-                if window.is_enabled(tree) {
+                if window.actual_is_enabled(tree) {
                     let data = window.data_mut::<InputLine>(tree);
                     if !data.text.is_empty() {
                         data.cursor_left();
@@ -382,7 +386,7 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
                 }
             },
             Event::Key(Key::Delete) => {
-                if window.is_enabled(tree) {
+                if window.actual_is_enabled(tree) {
                     let data = window.data_mut::<InputLine>(tree);
                     if data.cursor != data.text.len() {
                         let c = data.text.remove(data.cursor);

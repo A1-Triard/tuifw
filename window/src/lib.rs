@@ -22,6 +22,7 @@ use alloc::vec::Vec;
 use components_arena::{Arena, Component, ComponentId, Id, NewtypeComponentId, RawId};
 use core::cmp::{max, min};
 use core::mem::replace;
+use core::ops::RangeInclusive;
 use downcast_rs::{Downcast, impl_downcast};
 use dyn_clone::{DynClone, clone_trait_object};
 use educe::Educe;
@@ -645,24 +646,13 @@ impl<State: ?Sized> Window<State> {
         res
     }
 
-    fn focus_tab_priv(self, tree: &WindowTree<State>) -> Self {
+    pub fn actual_focus_tab(self, tree: &WindowTree<State>) -> Self {
         let node = &tree.arena[self.0];
         if node.focus_tab_tag == 0 {
             node.focus_tab
         } else {
             tree.window_by_tag(node.focus_tab_tag).unwrap()
         }
-    }
-
-    pub fn actual_focus_tab(self, tree: &WindowTree<State>) -> Self {
-        let mut focus = self.focus_tab_priv(tree);
-        let mut limit = 128u8;
-        while !focus.actual_is_enabled(tree) {
-            focus = focus.focus_tab_priv(tree);
-            limit -= 1;
-            if limit == 0 { return self; }
-        }
-        focus
     }
 
     pub fn focus_tab(self, tree: &WindowTree<State>) -> Self {
@@ -681,24 +671,13 @@ impl<State: ?Sized> Window<State> {
         tree.arena[self.0].focus_tab_tag = value;
     }
 
-    fn focus_right_priv(self, tree: &WindowTree<State>) -> Self {
+    pub fn actual_focus_right(self, tree: &WindowTree<State>) -> Self {
         let node = &tree.arena[self.0];
         if node.focus_right_tag == 0 {
             node.focus_right
         } else {
             tree.window_by_tag(node.focus_right_tag).unwrap()
         }
-    }
-
-    pub fn actual_focus_right(self, tree: &WindowTree<State>) -> Self {
-        let mut focus = self.focus_right_priv(tree);
-        let mut limit = 128u8;
-        while !focus.actual_is_enabled(tree) {
-            focus = focus.focus_right_priv(tree);
-            limit -= 1;
-            if limit == 0 { return self; }
-        }
-        focus
     }
 
     pub fn focus_right(self, tree: &WindowTree<State>) -> Self {
@@ -717,24 +696,13 @@ impl<State: ?Sized> Window<State> {
         tree.arena[self.0].focus_right_tag = value;
     }
 
-    pub fn focus_left_priv(self, tree: &WindowTree<State>) -> Self {
+    pub fn actual_focus_left(self, tree: &WindowTree<State>) -> Self {
         let node = &tree.arena[self.0];
         if node.focus_left_tag == 0 {
             node.focus_left
         } else {
             tree.window_by_tag(node.focus_left_tag).unwrap()
         }
-    }
-
-    pub fn actual_focus_left(self, tree: &WindowTree<State>) -> Self {
-        let mut focus = self.focus_left_priv(tree);
-        let mut limit = 128u8;
-        while !focus.actual_is_enabled(tree) {
-            focus = focus.focus_left_priv(tree);
-            limit -= 1;
-            if limit == 0 { return self; }
-        }
-        focus
     }
 
     pub fn focus_left(self, tree: &WindowTree<State>) -> Self {
@@ -753,24 +721,13 @@ impl<State: ?Sized> Window<State> {
         tree.arena[self.0].focus_left_tag = value;
     }
 
-    fn focus_up_priv(self, tree: &WindowTree<State>) -> Self {
+    pub fn actual_focus_up(self, tree: &WindowTree<State>) -> Self {
         let node = &tree.arena[self.0];
         if node.focus_up_tag == 0 {
             node.focus_up
         } else {
             tree.window_by_tag(node.focus_up_tag).unwrap()
         }
-    }
-
-    pub fn actual_focus_up(self, tree: &WindowTree<State>) -> Self {
-        let mut focus = self.focus_up_priv(tree);
-        let mut limit = 128u8;
-        while !focus.actual_is_enabled(tree) {
-            focus = focus.focus_up_priv(tree);
-            limit -= 1;
-            if limit == 0 { return self; }
-        }
-        focus
     }
 
     pub fn focus_up(self, tree: &WindowTree<State>) -> Self {
@@ -789,24 +746,13 @@ impl<State: ?Sized> Window<State> {
         tree.arena[self.0].focus_up_tag = value;
     }
 
-    fn focus_down_priv(self, tree: &WindowTree<State>) -> Self {
+    pub fn actual_focus_down(self, tree: &WindowTree<State>) -> Self {
         let node = &tree.arena[self.0];
         if node.focus_down_tag == 0 {
             node.focus_down
         } else {
             tree.window_by_tag(node.focus_down_tag).unwrap()
         }
-    }
-
-    pub fn actual_focus_down(self, tree: &WindowTree<State>) -> Self {
-        let mut focus = self.focus_down_priv(tree);
-        let mut limit = 128u8;
-        while !focus.actual_is_enabled(tree) {
-            focus = focus.focus_down_priv(tree);
-            limit -= 1;
-            if limit == 0 { return self; }
-        }
-        focus
     }
 
     pub fn focus_down(self, tree: &WindowTree<State>) -> Self {
@@ -1261,30 +1207,54 @@ impl<State: ?Sized> Window<State> {
 
 const FPS: u16 = 40;
 
+pub const COLOR_BACKGROUND: u8 = 10;
+pub const COLOR_TEXT: u8 = 11;
+pub const COLOR_DISABLED: u8 = 12;
+pub const COLOR_HOTKEY: u8 = 13;
+pub const COLOR_INPUT_LINE_INVALID: u8 = 14;
+pub const COLOR_INPUT_LINE_FOCUSED: u8 = 15;
+pub const COLOR_INPUT_LINE_FOCUSED_INVALID: u8 = 16;
+pub const COLOR_INPUT_LINE_FOCUSED_DISABLED: u8 = 17;
+pub const COLOR_BUTTON_FOCUSED: u8 = 18;
+pub const COLOR_BUTTON_FOCUSED_HOTKEY: u8 = 19;
+pub const COLOR_BUTTON_FOCUSED_DISABLED: u8 = 20;
+pub const COLOR_BUTTON_PRESSED: u8 = 21;
+pub const COLOR_FRAME: u8 = 22;
+
+pub const COLORS: RangeInclusive<u8> = 10 ..= 22;
+
+pub const COLOR_IN_FRAME: u8 = 20;
+
 fn root_palette() -> Palette {
     let mut p = Palette::new();
-    p.set(11, Right((Fg::LightGray, Bg::None))); // background
-    p.set(12, Right((Fg::LightGray, Bg::None))); // text
-    p.set(13, Right((Fg::DarkGray, Bg::None))); // disabled
-    p.set(14, Right((Fg::White, Bg::None))); // hotkey
-    p.set(15, Right((Fg::Red, Bg::None))); // invalid
-    p.set(16, Right((Fg::LightGray, Bg::Blue))); // input line focused
-    p.set(17, Right((Fg::LightGray, Bg::Red))); // input line focused invalid
-    p.set(18, Right((Fg::LightGray, Bg::Blue))); // button focused
-    p.set(19, Right((Fg::White, Bg::Blue))); // button hotkey
-    p.set(20, Right((Fg::Blue, Bg::None))); // button pressed
 
-    p.set(30, Right((Fg::LightGray, Bg::Black))); // frame
-    p.set(31, Right((Fg::LightGray, Bg::Black))); // background in frame
-    p.set(32, Right((Fg::LightGray, Bg::Black))); // text in frame
-    p.set(33, Right((Fg::DarkGray, Bg::Black))); // disabled in frame
-    p.set(34, Right((Fg::White, Bg::Black))); // hotkey in frame
-    p.set(35, Right((Fg::Red, Bg::Black))); // invalid in frame
-    p.set(36, Right((Fg::LightGray, Bg::Blue))); // input line focused in frame
-    p.set(37, Right((Fg::LightGray, Bg::Red))); // input line focused invalid in frame
-    p.set(38, Right((Fg::LightGray, Bg::Blue))); // button focused in frame
-    p.set(39, Right((Fg::White, Bg::Blue))); // button hotkey in frame
-    p.set(40, Right((Fg::Blue, Bg::Black))); // button pressed in frame
+    p.set(COLOR_BACKGROUND, Right((Fg::LightGray, Bg::None)));
+    p.set(COLOR_TEXT, Right((Fg::LightGray, Bg::None)));
+    p.set(COLOR_DISABLED, Right((Fg::DarkGray, Bg::None)));
+    p.set(COLOR_HOTKEY, Right((Fg::White, Bg::None)));
+    p.set(COLOR_INPUT_LINE_INVALID, Right((Fg::Red, Bg::None)));
+    p.set(COLOR_INPUT_LINE_FOCUSED, Right((Fg::LightGray, Bg::Blue)));
+    p.set(COLOR_INPUT_LINE_FOCUSED_DISABLED, Right((Fg::DarkGray, Bg::Blue)));
+    p.set(COLOR_INPUT_LINE_FOCUSED_INVALID, Right((Fg::LightGray, Bg::Red)));
+    p.set(COLOR_BUTTON_FOCUSED, Right((Fg::LightGray, Bg::Blue)));
+    p.set(COLOR_BUTTON_FOCUSED_HOTKEY, Right((Fg::White, Bg::Blue)));
+    p.set(COLOR_BUTTON_FOCUSED_DISABLED, Right((Fg::DarkGray, Bg::Blue)));
+    p.set(COLOR_BUTTON_PRESSED, Right((Fg::Blue, Bg::None)));
+    p.set(COLOR_FRAME, Right((Fg::LightGray, Bg::Black)));
+
+    p.set(COLOR_IN_FRAME + COLOR_BACKGROUND, Right((Fg::LightGray, Bg::Black)));
+    p.set(COLOR_IN_FRAME + COLOR_TEXT, Right((Fg::LightGray, Bg::Black)));
+    p.set(COLOR_IN_FRAME + COLOR_DISABLED, Right((Fg::DarkGray, Bg::Black)));
+    p.set(COLOR_IN_FRAME + COLOR_HOTKEY, Right((Fg::White, Bg::Black)));
+    p.set(COLOR_IN_FRAME + COLOR_INPUT_LINE_INVALID, Right((Fg::Red, Bg::Black)));
+    p.set(COLOR_IN_FRAME + COLOR_INPUT_LINE_FOCUSED, Right((Fg::LightGray, Bg::Blue)));
+    p.set(COLOR_IN_FRAME + COLOR_INPUT_LINE_FOCUSED_DISABLED, Right((Fg::DarkGray, Bg::Blue)));
+    p.set(COLOR_IN_FRAME + COLOR_INPUT_LINE_FOCUSED_INVALID, Right((Fg::LightGray, Bg::Red)));
+    p.set(COLOR_IN_FRAME + COLOR_BUTTON_FOCUSED, Right((Fg::LightGray, Bg::Blue)));
+    p.set(COLOR_IN_FRAME + COLOR_BUTTON_FOCUSED_HOTKEY, Right((Fg::White, Bg::Blue)));
+    p.set(COLOR_IN_FRAME + COLOR_BUTTON_FOCUSED_DISABLED, Right((Fg::DarkGray, Bg::Blue)));
+    p.set(COLOR_IN_FRAME + COLOR_BUTTON_PRESSED, Right((Fg::Blue, Bg::Black)));
+    p.set(COLOR_IN_FRAME + COLOR_FRAME, Right((Fg::LightGray, Bg::Black)));
 
     p
 }

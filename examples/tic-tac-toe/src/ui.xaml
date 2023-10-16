@@ -36,5 +36,8 @@
 	/>
       </StackPanel>
     </StackPanel>
+    <Background HAlign="Center" VAlign="Center" Visibility="Hidden" Tag="10">
+      <StaticText Margin="1" Tag="11" />
+    </Background>
   </Frame>
 </Background>
