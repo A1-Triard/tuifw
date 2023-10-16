@@ -108,7 +108,9 @@ impl<State: ?Sized> Widget<State> for LabelWidget {
                         let cmd = data.cmd;
                         window.raise(tree, Event::Cmd(cmd), state);
                         let focus = window.actual_focus_tab(tree);
-                        focus.set_focused_primary(tree, true);
+                        if focus != window {
+                            focus.set_focused_primary(tree, true);
+                        }
                     }
                 }));
                 let data = window.data_mut::<Label>(tree);
