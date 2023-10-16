@@ -25,15 +25,15 @@ macro_attr! {
         parent: Option<Id<XamlStruct>>,
         #[allow(dead_code)]
         name: String,
-        prop_names: HashMap<String, Id<XamlProp>>,
-        content_prop: Option<Id<XamlProp>>,
-        new: Option<Box<dyn Fn(&str, Option<(&str, Id<XamlProp>, Option<&str>)>) -> String>>,
+        property_names: HashMap<String, Id<XamlProperty>>,
+        content_property: Option<Id<XamlProperty>>,
+        new: Option<Box<dyn Fn(&str, Option<(&str, Id<XamlProperty>, Option<&str>)>) -> String>>,
     }
 }
 
 macro_attr! {
     #[derive(Component!)]
-    pub struct XamlProp {
+    pub struct XamlProperty {
         owner: Id<XamlStruct>,
         #[allow(dead_code)]
         name: String,
@@ -59,7 +59,7 @@ pub struct Xaml {
     structs: Arena<XamlStruct>,
     literals: Arena<XamlLiteral>,
     type_names: HashMap<String, XamlType>,
-    props: Arena<XamlProp>,
+    properties: Arena<XamlProperty>,
 }
 
 impl Default for Xaml {
@@ -75,7 +75,7 @@ impl Xaml {
             structs: Arena::new(),
             literals: Arena::new(),
             type_names: HashMap::new(),
-            props: Arena::new(),
+            properties: Arena::new(),
             preamble: String::new(),
             header: String::new(),
             footer: String::new(),
@@ -90,8 +90,8 @@ impl Xaml {
         let name = name.into().into_owned();
         let ty = XamlStruct {
             name: name.clone(),
-            prop_names: HashMap::new(),
-            content_prop: None,
+            property_names: HashMap::new(),
+            content_property: None,
             parent,
             new: None,
         };
@@ -111,44 +111,44 @@ impl Xaml {
         id
     }
 
-    pub fn reg_prop<'a>(
+    pub fn reg_property<'a>(
         &mut self,
         owner: Id<XamlStruct>,
         name: impl Into<Cow<'a, str>>,
         ty: XamlType,
-    ) -> Id<XamlProp> {
+    ) -> Id<XamlProperty> {
         let name = name.into().into_owned();
-        let prop = XamlProp { owner, name: name.clone(), ty, set: None };
-        let id = self.props.insert(|id| (prop, id));
-        self.structs[owner].prop_names.insert(name, id);
+        let property = XamlProperty { owner, name: name.clone(), ty, set: None };
+        let id = self.properties.insert(|id| (property, id));
+        self.structs[owner].property_names.insert(name, id);
         id
     }
 
-    pub fn set_preamble<'a>(&mut self, preamble: impl Into<Cow<'a, str>>) {
+    pub fn preamble<'a>(&mut self, preamble: impl Into<Cow<'a, str>>) {
         self.preamble = preamble.into().into_owned();
     }
 
-    pub fn set_header<'a>(&mut self, header: impl Into<Cow<'a, str>>) {
+    pub fn header<'a>(&mut self, header: impl Into<Cow<'a, str>>) {
         self.header = header.into().into_owned();
     }
 
-    pub fn set_footer<'a>(&mut self, footer: impl Into<Cow<'a, str>>) {
+    pub fn footer<'a>(&mut self, footer: impl Into<Cow<'a, str>>) {
         self.footer = footer.into().into_owned();
     }
 
-    pub fn set_res(&mut self, res: Box<dyn Fn(&str) -> String>) {
+    pub fn result(&mut self, res: Box<dyn Fn(&str) -> String>) {
         self.res = Some(res);
     }
 
-    pub fn set_struct_new(
+    pub fn struct_new(
         &mut self,
         ty: Id<XamlStruct>,
-        new: Option<Box<dyn Fn(&str, Option<(&str, Id<XamlProp>, Option<&str>)>) -> String>>,
+        new: Option<Box<dyn Fn(&str, Option<(&str, Id<XamlProperty>, Option<&str>)>) -> String>>,
     ) {
         self.structs[ty].new = new;
     }
 
-    pub fn set_literal_new(
+    pub fn literal_new(
         &mut self,
         ty: Id<XamlLiteral>,
         new: Box<dyn Fn(&str) -> Option<String>>,
@@ -156,29 +156,29 @@ impl Xaml {
         self.literals[ty].new = Some(new);
     }
 
-    pub fn set_prop_set(
+    pub fn property_set(
         &mut self,
-        prop: Id<XamlProp>,
+        property: Id<XamlProperty>,
         set: Box<dyn Fn(&str, &str) -> String>,
     ) {
-        self.props[prop].set = Some(set);
+        self.properties[property].set = Some(set);
     }
 
-    pub fn reset_content_prop(&mut self, ty: Id<XamlStruct>) {
-        self.structs[ty].content_prop = None;
+    pub fn reset_content_property(&mut self, ty: Id<XamlStruct>) {
+        self.structs[ty].content_property = None;
     }
 
-    pub fn set_as_content_prop(&mut self, prop: Id<XamlProp>) {
-        let owner = self.props[prop].owner;
-        self.structs[owner].content_prop = Some(prop);
+    pub fn content_property(&mut self, property: Id<XamlProperty>) {
+        let owner = self.properties[property].owner;
+        self.structs[owner].content_property = Some(property);
     }
 
-    fn find_prop(&self, mut owner: Id<XamlStruct>, name: impl AsRef<str>) -> Option<Id<XamlProp>> {
+    fn find_property(&self, mut owner: Id<XamlStruct>, name: impl AsRef<str>) -> Option<Id<XamlProperty>> {
         let name = name.as_ref();
         loop {
             let owner_data = &self.structs[owner];
-            if let Some(&prop) = owner_data.prop_names.get(name) {
-                return Some(prop);
+            if let Some(&property) = owner_data.property_names.get(name) {
+                return Some(property);
             }
             if let Some(parent) = owner_data.parent {
                 owner = parent;
@@ -189,11 +189,11 @@ impl Xaml {
         None
     }
 
-    fn find_content_prop(&self, mut owner: Id<XamlStruct>) -> Option<Id<XamlProp>> {
+    fn find_content_property(&self, mut owner: Id<XamlStruct>) -> Option<Id<XamlProperty>> {
         loop {
             let owner_data = &self.structs[owner];
-            if let Some(prop) = owner_data.content_prop {
-                return Some(prop);
+            if let Some(property) = owner_data.content_property {
+                return Some(property);
             }
             if let Some(parent) = owner_data.parent {
                 owner = parent;
@@ -276,7 +276,7 @@ impl<'a, R: Read, W: Write> XamlProcessor<'a, R, W> {
 
     fn process_element(
         &mut self,
-        parent_prop: Option<(&str, Id<XamlProp>, Option<&str>)>,
+        parent_property: Option<(&str, Id<XamlProperty>, Option<&str>)>,
     ) -> xml_Result<String> {
         let (name, attributes) = match &self.event {
             XmlEvent::StartElement { name, attributes, .. } => (Self::name(name), attributes.clone()),
@@ -287,7 +287,7 @@ impl<'a, R: Read, W: Write> XamlProcessor<'a, R, W> {
         };
         match ty {
             &XamlType::Literal(ty) => self.process_literal(ty, attributes),
-            &XamlType::Struct(ty) => self.process_struct(ty, attributes, parent_prop),
+            &XamlType::Struct(ty) => self.process_struct(ty, attributes, parent_property),
         }
     }
 
@@ -329,30 +329,30 @@ impl<'a, R: Read, W: Write> XamlProcessor<'a, R, W> {
         &mut self,
         ty: Id<XamlStruct>,
         attributes: Vec<OwnedAttribute>,
-        parent_prop: Option<(&str, Id<XamlProp>, Option<&str>)>,
+        parent_property: Option<(&str, Id<XamlProperty>, Option<&str>)>,
     ) -> xml_Result<String> {
         let obj = self.new_obj_name()?;
         if let Some(new) = self.xaml.structs[ty].new.as_deref() {
-            write!(self.dest, "{}", new(&obj, parent_prop))?;
+            write!(self.dest, "{}", new(&obj, parent_property))?;
         } else {
             return self.error("cannot create abstract type");
         }
         for attr in attributes {
             let attr_name = Self::name(&attr.name);
-            let Some(prop) = self.xaml.find_prop(ty, &attr_name) else {
+            let Some(property) = self.xaml.find_property(ty, &attr_name) else {
                 return self.error(format!("unknown property '{attr_name}'"));
             };
-            let prop = &self.xaml.props[prop];
-            let XamlType::Literal(prop_ty) = prop.ty else {
+            let property = &self.xaml.properties[property];
+            let XamlType::Literal(property_ty) = property.ty else {
                 return self.error(format!("invalid '{attr_name}' property value"));
             };
-            let Some(new) = self.xaml.literals[prop_ty].new.as_ref() else {
+            let Some(new) = self.xaml.literals[property_ty].new.as_ref() else {
                 return self.error("literal creation function is not set");
             };
             let Some(value) = new(&attr.value) else {
                 return self.error(format!("invalid '{attr_name}' property value"));
             };
-            let Some(set) = prop.set.as_ref() else {
+            let Some(set) = property.set.as_ref() else {
                 return self.error("property set function is not set");
             };
             write!(self.dest, "{}", set(&obj, &value))?;
@@ -375,23 +375,23 @@ impl<'a, R: Read, W: Write> XamlProcessor<'a, R, W> {
             _ => unreachable!(),
         };
         let ty_name = &self.xaml.structs[ty].name;
-        let (prop, skip_end_element) = if
+        let (property, skip_end_element) = if
             name.starts_with(ty_name) &&
             name.len() > ty_name.len() &&
             name.len() - ty_name.len() >= 2 &&
             name.as_bytes()[ty_name.len()] == b'.'
         {
             self.next_event()?;
-            let prop_name = &name[ty_name.len() + 1 ..];
-            let Some(prop) = self.xaml.find_prop(ty, prop_name) else {
-                return self.error(format!("unknown property '{prop_name}'"));
+            let property_name = &name[ty_name.len() + 1 ..];
+            let Some(property) = self.xaml.find_property(ty, property_name) else {
+                return self.error(format!("unknown property '{property_name}'"));
             };
             if !attributes.is_empty() {
                 return self.error(format!("unexpected attribute '{}'", Self::name(&attributes[0].name)));
             }
-            (prop, true)
-        } else if let Some(content_prop) = self.xaml.find_content_prop(ty) {
-            (content_prop, false)
+            (property, true)
+        } else if let Some(content_property) = self.xaml.find_content_property(ty) {
+            (content_property, false)
         } else {
             return self.error("type does not have content property");
         };
@@ -400,16 +400,19 @@ impl<'a, R: Read, W: Write> XamlProcessor<'a, R, W> {
             let value = match &self.event {
                 XmlEvent::EndElement { .. } => { break; },
                 XmlEvent::StartElement { .. } =>
-                    self.process_element(Some((&obj, prop, prev_value.as_deref())))?,
+                    self.process_element(Some((&obj, property, prev_value.as_deref())))?,
                 XmlEvent::Characters(_) | XmlEvent::Whitespace(_) => {
-                    let XamlType::Literal(prop_ty) = self.xaml.props[prop].ty else {
-                        return self.error(format!("invalid '{}' property value 2", self.xaml.props[prop].name));
+                    let XamlType::Literal(property_ty) = self.xaml.properties[property].ty else {
+                        return self.error(format!(
+                            "invalid '{}' property value 2",
+                            self.xaml.properties[property].name
+                        ));
                     };
-                    self.process_literal_value(prop_ty)?
+                    self.process_literal_value(property_ty)?
                 },
                 _ => return self.error("unsupported XML feature"),
             };
-            let Some(set) = self.xaml.props[prop].set.as_ref() else {
+            let Some(set) = self.xaml.properties[property].set.as_ref() else {
                 return self.error("property set function is not set");
             };
             write!(self.dest, "{}", set(&obj, &value))?;
@@ -431,8 +434,8 @@ mod tests {
     fn process_literal() {
         let mut xaml = Xaml::new();
         let t = xaml.reg_literal("{https://a1-triard.github.io/tuifw/2023/xaml}Bool");
-        xaml.set_res(Box::new(|x| x.to_string()));
-        xaml.set_literal_new(t, Box::new(|x| match x {
+        xaml.result(Box::new(|x| x.to_string()));
+        xaml.literal_new(t, Box::new(|x| match x {
             "True" => Some("true".to_string()),
             "False" => Some("false".to_string()),
             _ => None,
@@ -448,17 +451,17 @@ mod tests {
         let mut xaml = Xaml::new();
         let b = xaml.reg_literal("{https://a1-triard.github.io/tuifw/2023/xaml}Bool");
         let bg = xaml.reg_struct("{https://a1-triard.github.io/tuifw/2023/xaml}Background", None);
-        let bg_sp = xaml.reg_prop(bg, "ShowPattern", XamlType::Literal(b));
-        xaml.set_res(Box::new(|x| x.to_string()));
-        xaml.set_literal_new(b, Box::new(|x| match x {
+        let bg_sp = xaml.reg_property(bg, "ShowPattern", XamlType::Literal(b));
+        xaml.result(Box::new(|x| x.to_string()));
+        xaml.literal_new(b, Box::new(|x| match x {
             "True" => Some("true".to_string()),
             "False" => Some("false".to_string()),
             _ => None,
         }));
-        xaml.set_struct_new(bg, Some(Box::new(|x, _|
+        xaml.struct_new(bg, Some(Box::new(|x, _|
             format!("let mut {x} = Background::new();\n")
         )));
-        xaml.set_prop_set(bg_sp, Box::new(|o, x|
+        xaml.property_set(bg_sp, Box::new(|o, x|
             format!("Background::set_show_pattern({o}, {x});\n")
         ));
         let source = "
@@ -481,17 +484,17 @@ mod tests {
         let mut xaml = Xaml::new();
         let b = xaml.reg_literal("{https://a1-triard.github.io/tuifw/2023/xaml}Bool");
         let bg = xaml.reg_struct("{https://a1-triard.github.io/tuifw/2023/xaml}Background", None);
-        let bg_sp = xaml.reg_prop(bg, "ShowPattern", XamlType::Literal(b));
-        xaml.set_res(Box::new(|x| x.to_string()));
-        xaml.set_literal_new(b, Box::new(|x| match x {
+        let bg_sp = xaml.reg_property(bg, "ShowPattern", XamlType::Literal(b));
+        xaml.result(Box::new(|x| x.to_string()));
+        xaml.literal_new(b, Box::new(|x| match x {
             "True" => Some("true".to_string()),
             "False" => Some("false".to_string()),
             _ => None,
         }));
-        xaml.set_struct_new(bg, Some(Box::new(|x, _|
+        xaml.struct_new(bg, Some(Box::new(|x, _|
             format!("let mut {x} = Background::new();\n")
         )));
-        xaml.set_prop_set(bg_sp, Box::new(|o, x|
+        xaml.property_set(bg_sp, Box::new(|o, x|
             format!("Background::set_show_pattern({o}, {x});\n")
         ));
         let source = "
@@ -513,17 +516,17 @@ mod tests {
         let mut xaml = Xaml::new();
         let b = xaml.reg_literal("{https://a1-triard.github.io/tuifw/2023/xaml}Bool");
         let bg = xaml.reg_struct("{https://a1-triard.github.io/tuifw/2023/xaml}Background", None);
-        let bg_sp = xaml.reg_prop(bg, "ShowPattern", XamlType::Literal(b));
-        xaml.set_res(Box::new(|x| x.to_string()));
-        xaml.set_literal_new(b, Box::new(|x| match x {
+        let bg_sp = xaml.reg_property(bg, "ShowPattern", XamlType::Literal(b));
+        xaml.result(Box::new(|x| x.to_string()));
+        xaml.literal_new(b, Box::new(|x| match x {
             "True" => Some("true".to_string()),
             "False" => Some("false".to_string()),
             _ => None,
         }));
-        xaml.set_struct_new(bg, Some(Box::new(|x, _|
+        xaml.struct_new(bg, Some(Box::new(|x, _|
             format!("let mut {x} = Background::new();\n")
         )));
-        xaml.set_prop_set(bg_sp, Box::new(|o, x|
+        xaml.property_set(bg_sp, Box::new(|o, x|
             format!("Background::set_show_pattern({o}, {x});\n")
         ));
         let source = "
