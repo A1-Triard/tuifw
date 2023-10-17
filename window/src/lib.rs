@@ -17,6 +17,7 @@
 
 extern crate alloc;
 
+use alloc::borrow::Cow;
 use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -1110,8 +1111,8 @@ impl Window {
         f(&mut tree.arena[self.0].name)
     }
 
-    pub fn set_name(self, tree: &mut WindowTree, value: String) {
-        self.name_mut(tree, |name| replace(name, value));
+    pub fn set_name<'a>(self, tree: &mut WindowTree, value: impl Into<Cow<'a, str>>) {
+        self.name_mut(tree, |name| replace(name, value.into().into_owned()));
     }
 
     fn detach(

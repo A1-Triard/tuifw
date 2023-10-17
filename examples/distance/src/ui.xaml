@@ -9,33 +9,33 @@
           <Label Text="~N~ =" Margin="0,1,0,0" FocusTabTag="4" />
         </StackPanel>
         <StackPanel Width="13" Margin="1,0,0,0">
-          <InputLine Text="0" Tag="1" FocusTabTag="2" FocusDownTag="2" FocusUpTag="4" FocusedPrimary="True">
+          <InputLine Text="0" Tag="1" Name="a" FocusTabTag="2" FocusDownTag="2" FocusUpTag="4" FocusedPrimary="True">
 	    <InputLine.Validator>
 	      <FloatValidator />
 	    </InputLine.Validator>
 	  </InputLine>
-          <InputLine Text="0" Margin="0,1,0,0" Tag="2" FocusTabTag="3" FocusDownTag="3" FocusUpTag="1">
+          <InputLine Text="0" Margin="0,1,0,0" Tag="2" Name="v" FocusTabTag="3" FocusDownTag="3" FocusUpTag="1">
 	    <InputLine.Validator>
 	      <FloatValidator />
 	    </InputLine.Validator>
 	  </InputLine>
-          <InputLine Text="0" Margin="0,1,0,0" Tag="3" FocusTabTag="4" FocusDownTag="4" FocusUpTag="2">
+          <InputLine Text="0" Margin="0,1,0,0" Tag="3" Name="t" FocusTabTag="4" FocusDownTag="4" FocusUpTag="2">
 	    <InputLine.Validator>
 	      <FloatValidator />
 	    </InputLine.Validator>
 	  </InputLine>
-          <InputLine Text="1" Margin="0,1,0,0" Tag="4" FocusTabTag="1" FocusDownTag="1" FocusUpTag="3">
+          <InputLine Text="1" Margin="0,1,0,0" Tag="4" Name="n" FocusTabTag="1" FocusDownTag="1" FocusUpTag="3">
 	    <InputLine.Validator>
 	      <IntValidator Min="1" />
 	    </InputLine.Validator>
 	  </InputLine>
         </StackPanel>
       </DockPanel>
-      <Button HAlign="Center" Text="~C~alculate" Tag="5" FocusedSecondary="True" />
+      <Button HAlign="Center" Text="~C~alculate" Name="calc" FocusedSecondary="True" />
       <DockPanel Margin="0,1,0,0">
         <StaticText Dock="Left" Text="S =" />
         <Background Width="13" Margin="1,0,0,0">
-          <StaticText HAlign="Right" Tag="6" />
+          <StaticText HAlign="Right" Name="s" />
         </Background>
       </DockPanel>
     </StackPanel>

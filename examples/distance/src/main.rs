@@ -120,16 +120,17 @@ impl EventHandler for RootEventHandler {
 fn start() -> Result<(), Error> {
     let clock = unsafe { MonoClock::new() };
     let screen = unsafe { tuifw_screen::init(None, None) }?;
-    let tree = &mut ui::build_tree(screen, &clock)?;
+    let (tree, names) = &mut ui::build_tree(screen, &clock)?;
     let root = tree.root();
     root.set_event_handler(tree, Some(Box::new(RootEventHandler)));
-    let a = tree.window_by_tag(1).unwrap();
-    let v = tree.window_by_tag(2).unwrap();
-    let t = tree.window_by_tag(3).unwrap();
-    let n = tree.window_by_tag(4).unwrap();
-    let calc = tree.window_by_tag(5).unwrap();
-    let s = tree.window_by_tag(6).unwrap();
-    let state = &mut State { a, v, t, n, s, calc };
-    Button::set_cmd(tree, calc, CMD_CALC);
+    let state = &mut State {
+        a: names.a,
+        v: names.v,
+        t: names.t,
+        n: names.n,
+        s: names.s,
+        calc: names.calc,
+    };
+    Button::set_cmd(tree, names.calc, CMD_CALC);
     tree.run(state)
 }

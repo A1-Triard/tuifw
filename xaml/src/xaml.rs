@@ -56,7 +56,8 @@ pub struct Xaml {
     preamble: String,
     header: String,
     footer: String,
-    res: Option<Box<dyn Fn(&str) -> String>>,
+    postamble: Option<Box<dyn Fn(&HashMap<String, String>) -> String>>,
+    result: Option<Box<dyn Fn(&str, &HashMap<String, String>) -> String>>,
     structs: Arena<XamlStruct>,
     literals: Arena<XamlLiteral>,
     type_names: HashMap<String, XamlType>,
@@ -72,12 +73,13 @@ impl Default for Xaml {
 impl Xaml {
     pub fn new() -> Self {
         Xaml {
-            res: None,
+            result: None,
             structs: Arena::new(),
             literals: Arena::new(),
             type_names: HashMap::new(),
             properties: Arena::new(),
             preamble: String::new(),
+            postamble: None,
             header: String::new(),
             footer: String::new(),
         }
@@ -138,8 +140,12 @@ impl Xaml {
         self.footer = footer.into().into_owned();
     }
 
-    pub fn result(&mut self, res: Box<dyn Fn(&str) -> String>) {
-        self.res = Some(res);
+    pub fn result(&mut self, result: Box<dyn Fn(&str, &HashMap<String, String>) -> String>) {
+        self.result = Some(result);
+    }
+
+    pub fn postamble(&mut self, postamble: Box<dyn Fn(&HashMap<String, String>) -> String>) {
+        self.postamble = Some(postamble);
     }
 
     pub fn struct_new(
@@ -244,6 +250,9 @@ impl Xaml {
         let mut processor = XamlProcessor { xaml: self, source, dest, event, obj_n: 0, names: HashMap::new() };
         processor.process()?;
         write!(processor.dest, "{}", self.footer)?;
+        if let Some(postamble) = self.postamble.as_ref() {
+            write!(processor.dest, "{}", postamble(&processor.names))?;
+        }
         Ok(())
     }
 }
@@ -294,10 +303,10 @@ impl<'a, R: Read, W: Write> XamlProcessor<'a, R, W> {
             XmlEvent::EndDocument { .. } => { },
             _ => return self.error("miltiple root records"),
         }
-        let Some(res) = self.xaml.res.as_ref() else {
+        let Some(result) = self.xaml.result.as_ref() else {
             return self.error("XAML result processing function is not set");
         };
-        write!(self.dest, "{}", res(&value))?;
+        write!(self.dest, "{}", result(&value, &self.names))?;
         Ok(())
     }
 
@@ -323,13 +332,13 @@ impl<'a, R: Read, W: Write> XamlProcessor<'a, R, W> {
             return self.error(format!("unexpected attribute '{}'", Self::name(&attributes[0].name)));
         }
         self.next_event()?;
-        let res = self.process_literal_value(ty)?;
+        let res = self.process_literal_value(ty)?.0;
         assert!(matches!(&self.event, XmlEvent::EndElement { .. }));
         self.next_event()?;
         Ok(res)
     }
 
-    fn process_literal_value(&mut self, ty: Id<XamlLiteral>) -> xml_Result<String> {
+    fn process_literal_value(&mut self, ty: Id<XamlLiteral>) -> xml_Result<(String, String)> {
         let value = match self.event.clone() {
             XmlEvent::Characters(s) => {
                 self.next_event()?;
@@ -345,8 +354,8 @@ impl<'a, R: Read, W: Write> XamlProcessor<'a, R, W> {
         let Some(new) = self.xaml.literals[ty].new.as_ref() else {
             return self.error("literal creation function is not set");
         };
-        if let Some(value) = new(&value) {
-            Ok(value)
+        if let Some(processed_value) = new(&value) {
+            Ok((processed_value, value))
         } else {
             self.error(format!("invalid literal '{value}'"))
         }
@@ -385,7 +394,10 @@ impl<'a, R: Read, W: Write> XamlProcessor<'a, R, W> {
             };
             write!(self.dest, "{}", set(&obj, &value))?;
             if is_name_property {
-                self.names.insert(value, obj.clone());
+                if attr.value.is_empty() {
+                    return self.error("name property value should be a non-empty string");
+                }
+                self.names.insert(attr.value, obj.clone());
             }
         }
         self.next_event()?;
@@ -428,10 +440,10 @@ impl<'a, R: Read, W: Write> XamlProcessor<'a, R, W> {
         };
         let mut prev_value = None;
         loop {
-            let value = match &self.event {
+            let (value, raw_value) = match &self.event {
                 XmlEvent::EndElement { .. } => { break; },
                 XmlEvent::StartElement { .. } =>
-                    self.process_element(Some((&obj, property, prev_value.as_deref())))?,
+                    (self.process_element(Some((&obj, property, prev_value.as_deref())))?, String::new()),
                 XmlEvent::Characters(_) | XmlEvent::Whitespace(_) => {
                     let XamlType::Literal(property_ty) = self.xaml.properties[property].ty else {
                         return self.error(format!(
@@ -449,7 +461,10 @@ impl<'a, R: Read, W: Write> XamlProcessor<'a, R, W> {
             write!(self.dest, "{}", set(&obj, &value))?;
             let is_name_property = Some(property) == self.xaml.find_name_property(ty);
             if is_name_property {
-                self.names.insert(value.clone(), obj.clone());
+                if raw_value.is_empty() {
+                    return self.error("name property value should be a non-empty string");
+                }
+                self.names.insert(raw_value, obj.clone());
             }
             prev_value = Some(value);
         }

@@ -175,14 +175,33 @@ pub fn reg_widgets(xaml: &mut Xaml) {
         pub fn build_tree(
             screen: Box<dyn Screen>,
             clock: &MonoClock
-        ) -> Result<WindowTree, Error> {
+        ) -> Result<(WindowTree, Names), Error> {
     " });
+    xaml.result(Box::new(|_, names| {
+        let mut s = "    let names = Names {\n".to_string();
+        for (name, obj) in names {
+            s.push_str("        ");
+            s.push_str(name);
+            s.push_str(": ");
+            s.push_str(obj);
+            s.push_str(",\n");
+        }
+        s.push_str("    };\n    Ok((tree, names))\n");
+        s
+    }));
     xaml.footer(indoc! {"
         }
     " });
-    xaml.result(Box::new(|_| indent_all_by(4, indoc! { "
-        Ok(tree)
-    " })));
+    xaml.postamble(Box::new(|names| {
+        let mut s = "\npub struct Names {\n".to_string();
+        for (name, _obj) in names {
+            s.push_str("    #[allow(dead_code)]\n    pub ");
+            s.push_str(name);
+            s.push_str(": Window,\n");
+        }
+        s.push_str("}\n");
+        s
+    }));
 
     xaml.struct_new(int_validator, Some(Box::new(|obj, _parent| {
         indent_all_by(4, format!(indoc! { "
