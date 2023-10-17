@@ -137,7 +137,6 @@ impl Widget for CheckBoxWidget {
                     let label = label(&data.text);
                     if Some(c) == label {
                         window.set_focused_primary(tree, true);
-                        CheckBox::click(tree, window, app);
                         true
                     } else {
                         false

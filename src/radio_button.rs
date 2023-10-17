@@ -152,7 +152,6 @@ impl Widget for RadioButtonWidget {
                     let label = label(&data.text);
                     if Some(c) == label {
                         window.set_focused_primary(tree, true);
-                        RadioButton::click(tree, window, app);
                         true
                     } else {
                         false
