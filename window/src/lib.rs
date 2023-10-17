@@ -1363,10 +1363,14 @@ impl<'clock> WindowTree<'clock> {
                     break;
                 }
             }
-            let ms = time.split_ms_u16(self.clock).unwrap_or(u16::MAX);
-            self.update(false, app)?;
-            assert!(FPS != 0 && u16::MAX / FPS > 8);
-            self.clock.sleep_ms_u16((1000 / FPS).saturating_sub(ms));
+            if self.timers.items().is_empty() {
+                self.update(true, app)?;
+            } else {
+                let ms = time.split_ms_u16(self.clock).unwrap_or(u16::MAX);
+                self.update(false, app)?;
+                assert!(FPS != 0 && u16::MAX / FPS > 8);
+                self.clock.sleep_ms_u16((1000 / FPS).saturating_sub(ms));
+            }
         }
         Ok(())
     }
@@ -1383,13 +1387,13 @@ impl<'clock> WindowTree<'clock> {
                 self.cursor = None;
             }
         }
-        self.render_window(self.root, Vector::null(), app);
         if let Some(next_primary_focused) = self.next_primary_focused.take() {
             self.focus_primary(next_primary_focused, app);
         }
         if let Some(next_secondary_focused) = self.next_secondary_focused.take() {
             self.focus_secondary(next_secondary_focused, app);
         }
+        self.render_window(self.root, Vector::null(), app);
         let screen = self.screen.as_mut().expect("WindowTree is in invalid state");
         if let Some(screen_Event::Key(n, key)) = screen.update(self.cursor, wait)? {
             for _ in 0 .. n.get() {
