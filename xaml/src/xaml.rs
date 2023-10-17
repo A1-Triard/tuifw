@@ -238,17 +238,29 @@ impl Xaml {
     }
 
     pub fn process_file(&self, source: impl AsRef<Path>, dest: impl AsRef<Path>) -> xml_Result<()> {
-        let source = File::open(source.as_ref())?;
-        let dest = File::create(dest.as_ref())?;
-        self.process(source, dest)
-    }
-
-    pub fn process(&self, source: impl Read, mut dest: impl Write) -> xml_Result<()> {
-        let mut source = EventReader::new(source);
-        let event = source.next()?;
+        let mut dest = File::create(dest.as_ref())?;
         write!(dest, "{}", self.preamble)?;
         write!(dest, "{}", self.header)?;
-        let mut processor = XamlProcessor { xaml: self, source, dest, event, obj_n: 0, names: HashMap::new() };
+        let source_file = File::open(source.as_ref())?;
+        let mut events = EventReader::new(source_file);
+        let event = events.next()?;
+        let mut processor = XamlProcessor {
+            xaml: self,
+            source: events,
+            dest,
+            event,
+            obj_n: 0,
+            names: HashMap::new(),
+            first_pass: true,
+        };
+        processor.process()?;
+        let source_file = File::open(source.as_ref())?;
+        let mut events = EventReader::new(source_file);
+        let event = events.next()?;
+        processor.source = events;
+        processor.event = event;
+        processor.obj_n = 0;
+        processor.first_pass = false;
         processor.process()?;
         write!(processor.dest, "{}", self.footer)?;
         if let Some(postamble) = self.postamble.as_ref() {
@@ -265,6 +277,7 @@ struct XamlProcessor<'a, R: Read, W: Write> {
     event: XmlEvent,
     obj_n: u16,
     names: HashMap<String, String>,
+    first_pass: bool,
 }
 
 impl<'a, R: Read, W: Write> XamlProcessor<'a, R, W> {
@@ -304,10 +317,12 @@ impl<'a, R: Read, W: Write> XamlProcessor<'a, R, W> {
             XmlEvent::EndDocument { .. } => { },
             _ => return self.error("miltiple root records"),
         }
-        let Some(result) = self.xaml.result.as_ref() else {
-            return self.error("XAML result processing function is not set");
-        };
-        write!(self.dest, "{}", result(&value, &self.names))?;
+        if !self.first_pass {
+            let Some(result) = self.xaml.result.as_ref() else {
+                return self.error("XAML result processing function is not set");
+            };
+            write!(self.dest, "{}", result(&value, &self.names))?;
+        }
         Ok(())
     }
 
@@ -367,7 +382,7 @@ impl<'a, R: Read, W: Write> XamlProcessor<'a, R, W> {
                 self.error(format!("invalid literal '{value}'"))
             }
         } else {
-            Ok((self.names[&value].clone(), value))
+            Ok((String::new(), value))
         }
     }
 
@@ -378,10 +393,12 @@ impl<'a, R: Read, W: Write> XamlProcessor<'a, R, W> {
         parent_property: Option<(&str, Id<XamlProperty>, Option<&str>)>,
     ) -> xml_Result<String> {
         let obj = self.new_obj_name()?;
-        if let Some(new) = self.xaml.structs[ty].new.as_deref() {
-            write!(self.dest, "{}", new(&obj, parent_property))?;
-        } else {
-            return self.error("cannot create abstract type");
+        if self.first_pass {
+            if let Some(new) = self.xaml.structs[ty].new.as_deref() {
+                write!(self.dest, "{}", new(&obj, parent_property))?;
+            } else {
+                return self.error("cannot create abstract type");
+            }
         }
         for attr in attributes {
             let attr_name = Self::name(&attr.name);
@@ -390,23 +407,25 @@ impl<'a, R: Read, W: Write> XamlProcessor<'a, R, W> {
             };
             let is_name_property = Some(property) == self.xaml.find_name_property(ty);
             let property = &self.xaml.properties[property];
-            let value = match property.ty {
-                XamlType::Struct(_) => return self.error(format!("invalid '{attr_name}' property value")),
-                XamlType::Literal(property_ty) => {
-                    let Some(new) = self.xaml.literals[property_ty].new.as_ref() else {
-                        return self.error("literal creation function is not set");
-                    };
-                    let Some(value) = new(&attr.value) else {
-                        return self.error(format!("invalid '{attr_name}' property value"));
-                    };
-                    value
-                },
-                XamlType::Ref => self.names[&attr.value].clone(),
-            };
-            let Some(set) = property.set.as_ref() else {
-                return self.error("property set function is not set");
-            };
-            write!(self.dest, "{}", set(&obj, &value))?;
+            if !self.first_pass {
+                let value = match property.ty {
+                    XamlType::Struct(_) => return self.error(format!("invalid '{attr_name}' property value")),
+                    XamlType::Literal(property_ty) => {
+                        let Some(new) = self.xaml.literals[property_ty].new.as_ref() else {
+                            return self.error("literal creation function is not set");
+                        };
+                        let Some(value) = new(&attr.value) else {
+                            return self.error(format!("invalid '{attr_name}' property value"));
+                        };
+                        value
+                    },
+                    XamlType::Ref => self.names[&attr.value].clone(),
+                };
+                let Some(set) = property.set.as_ref() else {
+                    return self.error("property set function is not set");
+                };
+                write!(self.dest, "{}", set(&obj, &value))?;
+            }
             if is_name_property {
                 if attr.value.is_empty() {
                     return self.error("name property value should be a non-empty string");
@@ -469,10 +488,12 @@ impl<'a, R: Read, W: Write> XamlProcessor<'a, R, W> {
                 },
                 _ => return self.error("unsupported XML feature"),
             };
-            let Some(set) = self.xaml.properties[property].set.as_ref() else {
-                return self.error("property set function is not set");
-            };
-            write!(self.dest, "{}", set(&obj, &value))?;
+            if !self.first_pass {
+                let Some(set) = self.xaml.properties[property].set.as_ref() else {
+                    return self.error("property set function is not set");
+                };
+                write!(self.dest, "{}", set(&obj, &value))?;
+            }
             let is_name_property = Some(property) == self.xaml.find_name_property(ty);
             if is_name_property {
                 if raw_value.is_empty() {

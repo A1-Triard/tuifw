@@ -9,7 +9,7 @@
           <Label Text="~N~ =" Margin="0,1,0,0" FocusTabTag="4" />
         </StackPanel>
         <StackPanel Width="13" Margin="1,0,0,0">
-          <InputLine Text="0" Tag="1" Name="a" FocusTabTag="2" FocusDownTag="2" FocusUpTag="4" FocusedPrimary="True">
+          <InputLine Text="0" Tag="1" Name="a" FocusTab="v" FocusDownTag="2" FocusUpTag="4" FocusedPrimary="True">
 	    <InputLine.Validator>
 	      <FloatValidator />
 	    </InputLine.Validator>
