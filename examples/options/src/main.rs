@@ -58,21 +58,23 @@ mod ui {
 use alloc::boxed::Box;
 use timer_no_std::MonoClock;
 use tuifw_screen::{Error, Key};
-use tuifw_window::{Event, EventHandler, Window, WindowTree};
+use tuifw_window::{Event, EventHandler, Window, WindowTree, State};
 
-type State = ();
+struct App { }
+
+impl State for App { }
 
 #[derive(Clone)]
 struct RootEventHandler;
 
-impl EventHandler<State> for RootEventHandler {
+impl EventHandler for RootEventHandler {
     fn invoke(
         &self,
-        tree: &mut WindowTree<State>,
-        _window: Window<State>,
+        tree: &mut WindowTree,
+        _window: Window,
         event: Event,
-        _event_source: Window<State>,
-        _state: &mut State
+        _event_source: Window,
+        _state: &mut dyn State
     ) -> bool {
         match event {
             Event::Key(Key::Escape) => {
@@ -90,6 +92,6 @@ fn start() -> Result<(), Error> {
     let tree = &mut ui::build_tree(screen, &clock)?;
     let root = tree.root();
     root.set_event_handler(tree, Some(Box::new(RootEventHandler)));
-    let state = &mut ();
+    let state = &mut App { };
     tree.run(state)
 }

@@ -2,7 +2,7 @@ use crate::widget;
 use alloc::boxed::Box;
 use core::mem::replace;
 use tuifw_screen_base::{Rect, Vector, Thickness, Point};
-use tuifw_window::{Event, Layout, RenderPort, Widget, WidgetData, Window, WindowTree};
+use tuifw_window::{Event, Layout, RenderPort, Widget, WidgetData, Window, WindowTree, State};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum Dock { Left, Top, Right, Bottom }
@@ -15,7 +15,7 @@ impl Layout for DockLayout { }
 
 pub struct DockPanel { }
 
-impl<State: ?Sized> WidgetData<State> for DockPanel { }
+impl WidgetData for DockPanel { }
 
 impl DockPanel {
     pub fn new() -> Self {
@@ -24,11 +24,11 @@ impl DockPanel {
 
     widget!(DockPanelWidget);
 
-    pub fn dock<State: ?Sized>(tree: &WindowTree<State>, window: Window<State>) -> Option<Dock> {
+    pub fn dock(tree: &WindowTree, window: Window) -> Option<Dock> {
         window.layout::<DockLayout>(tree).and_then(|x| x.dock)
     }
 
-    pub fn set_dock<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>, value: Option<Dock>) {
+    pub fn set_dock(tree: &mut WindowTree, window: Window, value: Option<Dock>) {
         window.layout_mut(tree, |layout| replace(layout, Some(Box::new(DockLayout { dock: value }))));
     }
 }
@@ -42,22 +42,22 @@ impl Default for DockPanel {
 #[derive(Clone, Default)]
 pub struct DockPanelWidget;
 
-impl<State: ?Sized> Widget<State> for DockPanelWidget {
+impl Widget for DockPanelWidget {
     fn render(
         &self,
-        _tree: &WindowTree<State>,
-        _window: Window<State>,
+        _tree: &WindowTree,
+        _window: Window,
         _rp: &mut RenderPort,
-        _state: &mut State,
+        _state: &mut dyn State,
     ) { }
 
     fn measure(
         &self,
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
+        tree: &mut WindowTree,
+        window: Window,
         mut available_width: Option<i16>,
         mut available_height: Option<i16>,
-        state: &mut State,
+        state: &mut dyn State,
     ) -> Vector {
         if let Some(first_child) = window.first_child(tree) {
             let mut size = Vector::null();
@@ -133,10 +133,10 @@ impl<State: ?Sized> Widget<State> for DockPanelWidget {
 
     fn arrange(
         &self,
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
+        tree: &mut WindowTree,
+        window: Window,
         final_inner_bounds: Rect,
-        state: &mut State,
+        state: &mut dyn State,
     ) -> Vector {
         if let Some(first_child) = window.first_child(tree) {
             let mut size = Vector::null();
@@ -226,11 +226,11 @@ impl<State: ?Sized> Widget<State> for DockPanelWidget {
 
     fn update(
         &self,
-        _tree: &mut WindowTree<State>,
-        _window: Window<State>,
+        _tree: &mut WindowTree,
+        _window: Window,
         _event: Event,
-        _event_source: Window<State>,
-        _state: &mut State,
+        _event_source: Window,
+        _state: &mut dyn State,
     ) -> bool {
         false
     }

@@ -170,10 +170,10 @@ pub fn reg_widgets(xaml: &mut Xaml) {
 
     " });
     xaml.header(indoc! { "
-        pub fn build_tree<State: ?Sized + 'static>(
+        pub fn build_tree(
             screen: Box<dyn Screen>,
             clock: &MonoClock
-        ) -> Result<WindowTree<State>, Error> {
+        ) -> Result<WindowTree, Error> {
     " });
     xaml.footer(indoc! {"
         }

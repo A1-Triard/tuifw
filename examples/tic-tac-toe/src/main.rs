@@ -61,13 +61,15 @@ use rand::{Rng, SeedableRng};
 use rand::rngs::SmallRng;
 use timer_no_std::MonoClock;
 use tuifw_screen::{Error, Key};
-use tuifw_window::{Event, EventHandler, Window, WindowTree, Visibility};
+use tuifw_window::{Event, EventHandler, Window, WindowTree, Visibility, State};
 use tuifw::{Button, CMD_BUTTON_CLICK, StaticText};
 
-struct State {
-    squares: [Window<State>; 9],
+struct App {
+    squares: [Window; 9],
     rng: SmallRng,
 }
+
+impl State for App { }
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 enum Winner {
@@ -102,8 +104,8 @@ impl Symbol {
     }
 }
 
-impl State {
-    fn ai_move(&mut self, tree: &mut WindowTree<State>) {
+impl App {
+    fn ai_move(&mut self, tree: &mut WindowTree) {
         let enabled_squares = self.squares.iter().cloned().filter(|x| x.is_enabled(tree)).collect::<Vec<_>>();
         if !enabled_squares.is_empty() {
             let ai_move = self.rng.gen_range(0 .. enabled_squares.len());
@@ -116,7 +118,7 @@ impl State {
         }
     }
 
-    fn winner(&self, tree: & WindowTree<State>) -> Option<Winner> {
+    fn winner(&self, tree: &WindowTree) -> Option<Winner> {
         let s7 = Symbol::from_str(Button::text(tree, self.squares[0]));
         let s8 = Symbol::from_str(Button::text(tree, self.squares[1]));
         let s9 = Symbol::from_str(Button::text(tree, self.squares[2]));
@@ -145,7 +147,7 @@ impl State {
         }
     }
 
-    fn show_winner(&mut self, tree: &mut WindowTree<State>) -> bool {
+    fn show_winner(&mut self, tree: &mut WindowTree) -> bool {
         if let Some(winner) = self.winner(tree) {
             let result = match winner {
                 Winner::Player => "You won!",
@@ -165,15 +167,16 @@ impl State {
 #[derive(Clone)]
 struct RootEventHandler;
 
-impl EventHandler<State> for RootEventHandler {
+impl EventHandler for RootEventHandler {
     fn invoke(
         &self,
-        tree: &mut WindowTree<State>,
-        _window: Window<State>,
+        tree: &mut WindowTree,
+        _window: Window,
         event: Event,
-        event_source: Window<State>,
-        state: &mut State
+        event_source: Window,
+        state: &mut dyn State
     ) -> bool {
+        let state = state.downcast_mut::<App>().unwrap();
         match event {
             Event::Key(Key::Escape) => {
                 tree.quit();
@@ -199,7 +202,7 @@ fn start() -> Result<(), Error> {
     let tree = &mut ui::build_tree(screen, &clock)?;
     let root = tree.root();
     root.set_event_handler(tree, Some(Box::new(RootEventHandler)));
-    let state = &mut State {
+    let state = &mut App {
         squares: [
             tree.window_by_tag(7).unwrap(),
             tree.window_by_tag(8).unwrap(),

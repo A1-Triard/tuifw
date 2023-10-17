@@ -2,7 +2,7 @@ use crate::{prop_string_measure, prop_value, prop_value_render, widget};
 use alloc::string::String;
 use either::Left;
 use tuifw_screen_base::{Key, Point, Rect, Vector};
-use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree};
+use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, State};
 use tuifw_window::{CMD_GOT_PRIMARY_FOCUS, CMD_LOST_PRIMARY_FOCUS, label_width, label};
 use tuifw_window::{COLOR_TEXT, COLOR_HOTKEY, COLOR_DISABLED};
 
@@ -14,7 +14,7 @@ pub struct CheckBox {
     text: String,
 }
 
-impl<State: ?Sized> WidgetData<State> for CheckBox { }
+impl WidgetData for CheckBox { }
 
 impl CheckBox {
     pub fn new() -> Self {
@@ -25,7 +25,7 @@ impl CheckBox {
         }
     }
 
-    fn init_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
+    fn init_palette(tree: &mut WindowTree, window: Window) {
         window.palette_mut(tree, |palette| {
             palette.set(0, Left(COLOR_TEXT));
             palette.set(1, Left(COLOR_HOTKEY));
@@ -38,7 +38,7 @@ impl CheckBox {
     prop_value!(cmd: u16);
     prop_string_measure!(text);
 
-    fn click<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>, state: &mut State) {
+    fn click(tree: &mut WindowTree, window: Window, state: &mut dyn State) {
         let data = window.data_mut::<CheckBox>(tree);
         data.is_on = !data.is_on;
         let cmd = data.cmd;
@@ -56,13 +56,13 @@ impl Default for CheckBox {
 #[derive(Clone, Default)]
 pub struct CheckBoxWidget;
 
-impl<State: ?Sized> Widget<State> for CheckBoxWidget {
+impl Widget for CheckBoxWidget {
     fn render(
         &self,
-        tree: &WindowTree<State>,
-        window: Window<State>,
+        tree: &WindowTree,
+        window: Window,
         rp: &mut RenderPort,
-        _state: &mut State,
+        _state: &mut dyn State,
     ) {
         let focused = window.is_focused(tree);
         let is_enabled = window.actual_is_enabled(tree);
@@ -81,11 +81,11 @@ impl<State: ?Sized> Widget<State> for CheckBoxWidget {
 
     fn measure(
         &self,
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
+        tree: &mut WindowTree,
+        window: Window,
         _available_width: Option<i16>,
         _available_height: Option<i16>,
-        _state: &mut State,
+        _state: &mut dyn State,
     ) -> Vector {
         let data = window.data::<CheckBox>(tree);
         if data.text.is_empty() {
@@ -97,10 +97,10 @@ impl<State: ?Sized> Widget<State> for CheckBoxWidget {
 
     fn arrange(
         &self,
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
+        tree: &mut WindowTree,
+        window: Window,
         _final_inner_bounds: Rect,
-        _state: &mut State,
+        _state: &mut dyn State,
     ) -> Vector {
         let data = window.data::<CheckBox>(tree);
         if data.text.is_empty() {
@@ -112,11 +112,11 @@ impl<State: ?Sized> Widget<State> for CheckBoxWidget {
 
     fn update(
         &self,
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
+        tree: &mut WindowTree,
+        window: Window,
         event: Event,
-        _event_source: Window<State>,
-        state: &mut State,
+        _event_source: Window,
+        state: &mut dyn State,
     ) -> bool {
         match event {
             Event::Cmd(CMD_GOT_PRIMARY_FOCUS) | Event::Cmd(CMD_LOST_PRIMARY_FOCUS) => {

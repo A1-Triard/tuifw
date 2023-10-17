@@ -16,7 +16,6 @@ repository = "https://github.com/A1-Triard/tuifw"
 components-arena = "4.1.0"
 downcast-rs = { version = "1.2.0", default-features = false }
 dyn-clone = "1.0.14"
-educe = "0.4.23"
 either = { version = "1.9.0", default-features = false }
 iter-identify_first_last = "0.2.0"
 macro-attr-2018 = "3.0.0"

@@ -4,7 +4,7 @@ use alloc::string::String;
 use either::Left;
 use tuifw_screen_base::{Point, Rect, Vector, Key};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, Timer, label_width, label};
-use tuifw_window::{COLOR_TEXT, COLOR_HOTKEY, COLOR_DISABLED};
+use tuifw_window::{COLOR_TEXT, COLOR_HOTKEY, COLOR_DISABLED, State};
 
 pub const CMD_LABEL_CLICK: u16 = 110;
 
@@ -14,8 +14,8 @@ pub struct Label {
     cmd: u16,
 }
 
-impl<State: ?Sized> WidgetData<State> for Label {
-    fn drop_widget_data(&mut self, tree: &mut WindowTree<State>, _state: &mut State) {
+impl WidgetData for Label {
+    fn drop_widget_data(&mut self, tree: &mut WindowTree, _state: &mut dyn State) {
         if let Some(click_timer) = self.click_timer.take() {
             click_timer.drop_timer(tree);
         }
@@ -27,7 +27,7 @@ impl Label {
         Label { text: String::new(), click_timer: None, cmd: CMD_LABEL_CLICK }
     }
 
-    fn init_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
+    fn init_palette(tree: &mut WindowTree, window: Window) {
         window.palette_mut(tree, |palette| {
             palette.set(0, Left(COLOR_TEXT));
             palette.set(1, Left(COLOR_HOTKEY));
@@ -49,13 +49,13 @@ impl Default for Label {
 #[derive(Clone, Default)]
 pub struct LabelWidget;
 
-impl<State: ?Sized> Widget<State> for LabelWidget {
+impl Widget for LabelWidget {
     fn render(
         &self,
-        tree: &WindowTree<State>,
-        window: Window<State>,
+        tree: &WindowTree,
+        window: Window,
         rp: &mut RenderPort,
-        _state: &mut State,
+        _state: &mut dyn State,
     ) {
         let is_enabled = window.actual_is_enabled(tree);
         let data = window.data::<Label>(tree);
@@ -66,11 +66,11 @@ impl<State: ?Sized> Widget<State> for LabelWidget {
 
     fn measure(
         &self,
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
+        tree: &mut WindowTree,
+        window: Window,
         _available_width: Option<i16>,
         _available_height: Option<i16>,
-        _state: &mut State,
+        _state: &mut dyn State,
     ) -> Vector {
         let data = window.data::<Label>(tree);
         Vector { x: label_width(&data.text), y: 1 }
@@ -78,10 +78,10 @@ impl<State: ?Sized> Widget<State> for LabelWidget {
 
     fn arrange(
         &self,
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
+        tree: &mut WindowTree,
+        window: Window,
         _final_inner_bounds: Rect,
-        _state: &mut State,
+        _state: &mut dyn State,
     ) -> Vector {
         let data = window.data::<Label>(tree);
         Vector { x: label_width(&data.text), y: 1 }
@@ -89,11 +89,11 @@ impl<State: ?Sized> Widget<State> for LabelWidget {
 
     fn update(
         &self,
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
+        tree: &mut WindowTree,
+        window: Window,
         event: Event,
-        _event_source: Window<State>,
-        _state: &mut State,
+        _event_source: Window,
+        _state: &mut dyn State,
     ) -> bool {
         let data = window.data::<Label>(tree);
         let label = label(&data.text);

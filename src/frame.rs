@@ -2,7 +2,7 @@ use crate::{prop_string_render, prop_value_render, widget};
 use alloc::string::String;
 use either::Left;
 use tuifw_screen_base::{Rect, Vector, Thickness, text_width, HAlign, VAlign};
-use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree};
+use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, State};
 use tuifw_window::{COLOR_FRAME, COLORS, COLOR_IN_FRAME};
 
 pub struct Frame {
@@ -11,14 +11,14 @@ pub struct Frame {
     text_align: HAlign,
 }
 
-impl<State: ?Sized> WidgetData<State> for Frame { }
+impl WidgetData for Frame { }
 
 impl Frame {
     pub fn new() -> Self {
         Frame { double: false, text: String::new(), text_align: HAlign::Left }
     }
 
-    fn init_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
+    fn init_palette(tree: &mut WindowTree, window: Window) {
         window.palette_mut(tree, |palette| {
             palette.set(0, Left(COLOR_FRAME));
             for c in COLORS {
@@ -42,13 +42,13 @@ impl Default for Frame {
 #[derive(Clone, Default)]
 pub struct FrameWidget;
 
-impl<State: ?Sized> Widget<State> for FrameWidget {
+impl Widget for FrameWidget {
     fn render(
         &self,
-        tree: &WindowTree<State>,
-        window: Window<State>,
+        tree: &WindowTree,
+        window: Window,
         rp: &mut RenderPort,
-        _state: &mut State,
+        _state: &mut dyn State,
     ) {
         let color = window.color(tree, 0);
         let bounds = window.inner_bounds(tree);
@@ -87,11 +87,11 @@ impl<State: ?Sized> Widget<State> for FrameWidget {
 
     fn measure(
         &self,
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
+        tree: &mut WindowTree,
+        window: Window,
         available_width: Option<i16>,
         available_height: Option<i16>,
-        state: &mut State,
+        state: &mut dyn State,
     ) -> Vector {
         let available_size = Vector { x: available_width.unwrap_or(0), y: available_height.unwrap_or(0) };
         let children_size = Thickness::all(1).shrink_rect_size(available_size);
@@ -112,10 +112,10 @@ impl<State: ?Sized> Widget<State> for FrameWidget {
 
     fn arrange(
         &self,
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
+        tree: &mut WindowTree,
+        window: Window,
         final_inner_bounds: Rect,
-        state: &mut State,
+        state: &mut dyn State,
     ) -> Vector {
         let children_bounds = Thickness::all(1).shrink_rect(final_inner_bounds);
         if let Some(first_child) = window.first_child(tree) {
@@ -131,11 +131,11 @@ impl<State: ?Sized> Widget<State> for FrameWidget {
 
     fn update(
         &self,
-        _tree: &mut WindowTree<State>,
-        _window: Window<State>,
+        _tree: &mut WindowTree,
+        _window: Window,
         _event: Event,
-        _event_source: Window<State>,
-        _state: &mut State,
+        _event_source: Window,
+        _state: &mut dyn State,
     ) -> bool {
         false
     }

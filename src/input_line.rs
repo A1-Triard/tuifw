@@ -6,7 +6,7 @@ use core::str::FromStr;
 use either::Left;
 use tuifw_screen_base::{Key, Point, Rect, Vector, char_width, text_width};
 use tuifw_screen_base::{Thickness};
-use tuifw_window::{Event, RenderPort, Timer, Widget, WidgetData, Window, WindowTree};
+use tuifw_window::{Event, RenderPort, Timer, Widget, WidgetData, Window, WindowTree, State};
 use tuifw_window::{CMD_GOT_PRIMARY_FOCUS, CMD_LOST_PRIMARY_FOCUS, CMD_LOST_ATTENTION};
 use tuifw_window::{COLOR_TEXT, COLOR_DISABLED, COLOR_INPUT_LINE_INVALID};
 use tuifw_window::{COLOR_INPUT_LINE_FOCUSED, COLOR_INPUT_LINE_FOCUSED_DISABLED};
@@ -75,8 +75,8 @@ pub struct InputLine {
     is_valid_timer: Option<Timer>,
 }
 
-impl<State: ?Sized> WidgetData<State> for InputLine {
-    fn drop_widget_data(&mut self, tree: &mut WindowTree<State>, _state: &mut State) {
+impl WidgetData for InputLine {
+    fn drop_widget_data(&mut self, tree: &mut WindowTree, _state: &mut dyn State) {
         if let Some(timer) = self.is_valid_timer.take() {
             timer.drop_timer(tree);
         }
@@ -98,7 +98,7 @@ impl InputLine {
         }
     }
 
-    fn init_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
+    fn init_palette(tree: &mut WindowTree, window: Window) {
         window.palette_mut(tree, |palette| {
             palette.set(0, Left(COLOR_TEXT));
             palette.set(1, Left(COLOR_INPUT_LINE_INVALID));
@@ -113,7 +113,7 @@ impl InputLine {
     prop_string_render!(text; on_text_changed);
     prop_obj_render!(validator: Option<Box<dyn Validator>>);
 
-    pub fn is_valid<State: ?Sized>(tree: &WindowTree<State>, window: Window<State>) -> bool {
+    pub fn is_valid(tree: &WindowTree, window: Window) -> bool {
         window.data::<InputLine>(tree).is_valid
     }
 
@@ -121,14 +121,14 @@ impl InputLine {
         self.validator.as_deref().map_or(false, |x| x.is_numeric())
     }
 
-    pub fn is_numeric<State: ?Sized>(tree: &WindowTree<State>, window: Window<State>) -> bool {
+    pub fn is_numeric(tree: &WindowTree, window: Window) -> bool {
         window.data::<InputLine>(tree).is_numeric_raw()
     }
 
-    fn update_is_valid<State: ?Sized>(
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
-        state: Option<&mut State>
+    fn update_is_valid(
+        tree: &mut WindowTree,
+        window: Window,
+        state: Option<&mut dyn State>
     ) {
         let data = window.data_mut::<InputLine>(tree);
         let is_valid = data.validator.as_deref().map_or(true, |x| x.is_valid(data.editing, &data.text));
@@ -219,7 +219,7 @@ impl InputLine {
         }
     }
 
-    fn on_text_changed<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
+    fn on_text_changed(tree: &mut WindowTree, window: Window) {
         let focused = window.is_focused(tree);
         let data = &mut window.data_mut::<InputLine>(tree);
         data.reset_view(focused);
@@ -241,13 +241,13 @@ impl Default for InputLine {
 #[derive(Clone, Default)]
 pub struct InputLineWidget;
 
-impl<State: ?Sized> Widget<State> for InputLineWidget {
+impl Widget for InputLineWidget {
     fn render(
         &self,
-        tree: &WindowTree<State>,
-        window: Window<State>,
+        tree: &WindowTree,
+        window: Window,
         rp: &mut RenderPort,
-        _state: &mut State,
+        _state: &mut dyn State,
     ) {
         let focused = window.is_focused(tree);
         let is_enabled = window.actual_is_enabled(tree);
@@ -283,21 +283,21 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
 
     fn measure(
         &self,
-        _tree: &mut WindowTree<State>,
-        _window: Window<State>,
+        _tree: &mut WindowTree,
+        _window: Window,
         available_width: Option<i16>,
         _available_height: Option<i16>,
-        _state: &mut State,
+        _state: &mut dyn State,
     ) -> Vector {
         Vector { x: available_width.unwrap_or(1), y: 1 }
     }
 
     fn arrange(
         &self,
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
+        tree: &mut WindowTree,
+        window: Window,
         final_inner_bounds: Rect,
-        _state: &mut State,
+        _state: &mut dyn State,
     ) -> Vector {
         let focused = window.is_focused(tree);
         let data = window.data_mut::<InputLine>(tree);
@@ -308,11 +308,11 @@ impl<State: ?Sized> Widget<State> for InputLineWidget {
 
     fn update(
         &self,
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
+        tree: &mut WindowTree,
+        window: Window,
         event: Event,
-        _event_source: Window<State>,
-        state: &mut State,
+        _event_source: Window,
+        state: &mut dyn State,
     ) -> bool {
         match event {
             Event::Cmd(CMD_GOT_PRIMARY_FOCUS) => {

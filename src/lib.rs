@@ -70,12 +70,12 @@ macro_rules! widget {
     (
         $W:ident
     ) => {
-        pub fn window<State: ?Sized>(
+        pub fn window(
             self,
-            tree: &mut $crate::tuifw_window_WindowTree<State>,
-            parent: $crate::tuifw_window_Window<State>,
-            prev: Option<$crate::tuifw_window_Window<State>>
-        ) -> Result<$crate::tuifw_window_Window<State>, $crate::tuifw_screen_base_Error> {
+            tree: &mut $crate::tuifw_window_WindowTree,
+            parent: $crate::tuifw_window_Window,
+            prev: Option<$crate::tuifw_window_Window>
+        ) -> Result<$crate::tuifw_window_Window, $crate::tuifw_screen_base_Error> {
             $crate::tuifw_window_Window::new(
                 tree,
                 $crate::alloc_boxed_Box::new($W),
@@ -85,11 +85,11 @@ macro_rules! widget {
             )
         }
 
-        pub fn window_tree<State: ?Sized>(
+        pub fn window_tree(
             self,
             screen: $crate::alloc_boxed_Box<dyn $crate::tuifw_screen_base_Screen>,
             clock: &$crate::timer_no_std_MonoClock,
-        ) -> Result<$crate::tuifw_window_WindowTree<State>, $crate::tuifw_screen_base_Error> {
+        ) -> Result<$crate::tuifw_window_WindowTree, $crate::tuifw_screen_base_Error> {
             $crate::tuifw_window_WindowTree::new(
                 screen,
                 clock,
@@ -101,12 +101,12 @@ macro_rules! widget {
     (
         $W:ident; $init:ident
     ) => {
-        pub fn window<State: ?Sized>(
+        pub fn window(
             self,
-            tree: &mut $crate::tuifw_window_WindowTree<State>,
-            parent: $crate::tuifw_window_Window<State>,
-            prev: Option<$crate::tuifw_window_Window<State>>
-        ) -> Result<$crate::tuifw_window_Window<State>, $crate::tuifw_screen_base_Error> {
+            tree: &mut $crate::tuifw_window_WindowTree,
+            parent: $crate::tuifw_window_Window,
+            prev: Option<$crate::tuifw_window_Window>
+        ) -> Result<$crate::tuifw_window_Window, $crate::tuifw_screen_base_Error> {
             let w = $crate::tuifw_window_Window::new(
                 tree,
                 $crate::alloc_boxed_Box::new($W),
@@ -118,11 +118,11 @@ macro_rules! widget {
             Ok(w)
         }
 
-        pub fn window_tree<State: ?Sized>(
+        pub fn window_tree(
             self,
             screen: $crate::alloc_boxed_Box<dyn $crate::tuifw_screen_base_Screen>,
             clock: &$crate::timer_no_std_MonoClock,
-        ) -> Result<$crate::tuifw_window_WindowTree<State>, $crate::tuifw_screen_base_Error> {
+        ) -> Result<$crate::tuifw_window_WindowTree, $crate::tuifw_screen_base_Error> {
             let mut tree = $crate::tuifw_window_WindowTree::new(
                 screen,
                 clock,
@@ -142,16 +142,16 @@ macro_rules! prop_value {
         $name:ident : $ty:ty $(; $on_changed:ident)? $(| $assert:ident)?
     ) => {
         $crate::paste_paste! {
-            pub fn $name<State: ?Sized>(
-                tree: &$crate::tuifw_window_WindowTree<State>,
-                window: $crate::tuifw_window_Window<State>
+            pub fn $name(
+                tree: &$crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window
             ) -> $ty {
                 window.data::<Self>(tree).$name
             }
 
-            pub fn [< set_ $name >] <State: ?Sized>(
-                tree: &mut $crate::tuifw_window_WindowTree<State>,
-                window: $crate::tuifw_window_Window<State>,
+            pub fn [< set_ $name >] (
+                tree: &mut $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window,
                 value: $ty
             ) {
                 let data = window.data_mut::<Self>(tree);
@@ -169,16 +169,16 @@ macro_rules! prop_value_measure {
         $name:ident : $ty:ty $(; $on_changed:ident)? $(| $assert:ident)?
     ) => {
         $crate::paste_paste! {
-            pub fn $name<State: ?Sized>(
-                tree: &$crate::tuifw_window_WindowTree<State>,
-                window: $crate::tuifw_window_Window<State>
+            pub fn $name(
+                tree: &$crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window
             ) -> $ty {
                 window.data::<Self>(tree).$name
             }
 
-            pub fn [< set_ $name >] <State: ?Sized>(
-                tree: &mut $crate::tuifw_window_WindowTree<State>,
-                window: $crate::tuifw_window_Window<State>,
+            pub fn [< set_ $name >] (
+                tree: &mut $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window,
                 value: $ty
             ) {
                 let data = window.data_mut::<Self>(tree);
@@ -196,16 +196,16 @@ macro_rules! prop_value_render {
         $name:ident : $ty:ty $(; $on_changed:ident)? $(| $assert:ident)?
     ) => {
         $crate::paste_paste! {
-            pub fn $name<State: ?Sized>(
-                tree: &$crate::tuifw_window_WindowTree<State>,
-                window: $crate::tuifw_window_Window<State>
+            pub fn $name(
+                tree: &$crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window
             ) -> $ty {
                 window.data::<Self>(tree).$name
             }
 
-            pub fn [< set_ $name >] <State: ?Sized>(
-                tree: &mut $crate::tuifw_window_WindowTree<State>,
-                window: $crate::tuifw_window_Window<State>,
+            pub fn [< set_ $name >] (
+                tree: &mut $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window,
                 value: $ty
             ) {
                 let data = window.data_mut::<Self>(tree);
@@ -224,16 +224,16 @@ macro_rules! prop_string {
         $name:ident $(; $on_changed:ident)?
     ) => {
         $crate::paste_paste! {
-            pub fn $name<'a, State: ?Sized>(
-                tree: &'a $crate::tuifw_window_WindowTree<State>,
-                window: $crate::tuifw_window_Window<State>
+            pub fn $name<'a>(
+                tree: &'a $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window
             ) -> &'a $crate::alloc_string_String {
                 &window.data::<Self>(tree).$name
             }
 
-            pub fn [< $name _mut >] <State: ?Sized, T>(
-                tree: &mut $crate::tuifw_window_WindowTree<State>,
-                window: $crate::tuifw_window_Window<State>,
+            pub fn [< $name _mut >] <T>(
+                tree: &mut $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window,
                 f: impl FnOnce(&mut $crate::alloc_string_String) -> T
             ) -> T {
                 let value = &mut window.data_mut::<Self>(tree).$name;
@@ -242,9 +242,9 @@ macro_rules! prop_string {
                 res
             }
 
-            pub fn [< set_ $name >] <'a, State: ?Sized>(
-                tree: &mut $crate::tuifw_window_WindowTree<State>,
-                window: $crate::tuifw_window_Window<State>,
+            pub fn [< set_ $name >] <'a>(
+                tree: &mut $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window,
                 value: impl Into<$crate::alloc_borrow_Cow<'a, str>>
             ) {
                 Self:: [< $name _mut >] (
@@ -263,16 +263,16 @@ macro_rules! prop_string_measure {
         $name:ident $(; $on_changed:ident)?
     ) => {
         $crate::paste_paste! {
-            pub fn $name<'a, State: ?Sized>(
-                tree: &'a $crate::tuifw_window_WindowTree<State>,
-                window: $crate::tuifw_window_Window<State>
+            pub fn $name<'a>(
+                tree: &'a $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window
             ) -> &'a $crate::alloc_string_String {
                 &window.data::<Self>(tree).$name
             }
 
-            pub fn [< $name _mut >] <State: ?Sized, T>(
-                tree: &mut $crate::tuifw_window_WindowTree<State>,
-                window: $crate::tuifw_window_Window<State>,
+            pub fn [< $name _mut >] <T>(
+                tree: &mut $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window,
                 f: impl FnOnce(&mut $crate::alloc_string_String) -> T
             ) -> T {
                 let value = &mut window.data_mut::<Self>(tree).$name;
@@ -282,9 +282,9 @@ macro_rules! prop_string_measure {
                 res
             }
 
-            pub fn [< set_ $name >] <'a, State: ?Sized>(
-                tree: &mut $crate::tuifw_window_WindowTree<State>,
-                window: $crate::tuifw_window_Window<State>,
+            pub fn [< set_ $name >] <'a>(
+                tree: &mut $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window,
                 value: impl Into<$crate::alloc_borrow_Cow<'a, str>>
             ) {
                 Self:: [< $name _mut >] (
@@ -303,16 +303,16 @@ macro_rules! prop_string_render {
         $name:ident $(; $on_changed:ident)?
     ) => {
         $crate::paste_paste! {
-            pub fn $name<'a, State: ?Sized>(
-                tree: &'a $crate::tuifw_window_WindowTree<State>,
-                window: $crate::tuifw_window_Window<State>
+            pub fn $name<'a>(
+                tree: &'a $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window
             ) -> &'a $crate::alloc_string_String {
                 &window.data::<Self>(tree).$name
             }
 
-            pub fn [< $name _mut >] <State: ?Sized, T>(
-                tree: &mut $crate::tuifw_window_WindowTree<State>,
-                window: $crate::tuifw_window_Window<State>,
+            pub fn [< $name _mut >] <T>(
+                tree: &mut $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window,
                 f: impl FnOnce(&mut $crate::alloc_string_String) -> T
             ) -> T {
                 let value = &mut window.data_mut::<Self>(tree).$name;
@@ -322,9 +322,9 @@ macro_rules! prop_string_render {
                 res
             }
 
-            pub fn [< set_ $name >] <'a, State: ?Sized>(
-                tree: &mut $crate::tuifw_window_WindowTree<State>,
-                window: $crate::tuifw_window_Window<State>,
+            pub fn [< set_ $name >] <'a>(
+                tree: &mut $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window,
                 value: impl Into<$crate::alloc_borrow_Cow<'a, str>>
             ) {
                 Self:: [< $name _mut >] (
@@ -343,16 +343,16 @@ macro_rules! prop_obj_render {
         $name:ident : $ty:ty $(; $on_changed:ident)?
     ) => {
         $crate::paste_paste! {
-            pub fn $name<'a, State: ?Sized>(
-                tree: &'a $crate::tuifw_window_WindowTree<State>,
-                window: $crate::tuifw_window_Window<State>
+            pub fn $name<'a>(
+                tree: &'a $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window
             ) -> &'a $ty {
                 &window.data::<Self>(tree).$name
             }
 
-            pub fn [< $name _mut >] <State: ?Sized, T>(
-                tree: &mut $crate::tuifw_window_WindowTree<State>,
-                window: $crate::tuifw_window_Window<State>,
+            pub fn [< $name _mut >] <T>(
+                tree: &mut $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window,
                 f: impl FnOnce(&mut $ty) -> T
             ) -> T {
                 let value = &mut window.data_mut::<Self>(tree).$name;
@@ -362,9 +362,9 @@ macro_rules! prop_obj_render {
                 res
             }
 
-            pub fn [< set_ $name >] <State: ?Sized>(
-                tree: &mut $crate::tuifw_window_WindowTree<State>,
-                window: $crate::tuifw_window_Window<State>,
+            pub fn [< set_ $name >] (
+                tree: &mut $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window,
                 value: $ty
             ) {
                 Self:: [< $name _mut >] (

@@ -1,12 +1,12 @@
 use crate::{prop_value_measure, widget};
 use tuifw_screen_base::{Rect, Vector};
-use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree};
+use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, State};
 
 pub struct StackPanel {
     vertical: bool,
 }
 
-impl<State: ?Sized> WidgetData<State> for StackPanel { }
+impl WidgetData for StackPanel { }
 
 impl StackPanel {
     pub fn new() -> Self {
@@ -26,22 +26,22 @@ impl Default for StackPanel {
 #[derive(Clone, Default)]
 pub struct StackPanelWidget;
 
-impl<State: ?Sized> Widget<State> for StackPanelWidget {
+impl Widget for StackPanelWidget {
     fn render(
         &self,
-        _tree: &WindowTree<State>,
-        _window: Window<State>,
+        _tree: &WindowTree,
+        _window: Window,
         _rp: &mut RenderPort,
-        _state: &mut State,
+        _state: &mut dyn State,
     ) { }
 
     fn measure(
         &self,
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
+        tree: &mut WindowTree,
+        window: Window,
         available_width: Option<i16>,
         available_height: Option<i16>,
-        state: &mut State,
+        state: &mut dyn State,
     ) -> Vector {
         let vertical = window.data::<StackPanel>(tree).vertical;
         if vertical {
@@ -75,10 +75,10 @@ impl<State: ?Sized> Widget<State> for StackPanelWidget {
 
     fn arrange(
         &self,
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
+        tree: &mut WindowTree,
+        window: Window,
         final_inner_bounds: Rect,
-        state: &mut State,
+        state: &mut dyn State,
     ) -> Vector {
         let vertical = window.data::<StackPanel>(tree).vertical;
         if vertical {
@@ -118,11 +118,11 @@ impl<State: ?Sized> Widget<State> for StackPanelWidget {
 
     fn update(
         &self,
-        _tree: &mut WindowTree<State>,
-        _window: Window<State>,
+        _tree: &mut WindowTree,
+        _window: Window,
         _event: Event,
-        _event_source: Window<State>,
-        _state: &mut State,
+        _event_source: Window,
+        _state: &mut dyn State,
     ) -> bool {
         false
     }

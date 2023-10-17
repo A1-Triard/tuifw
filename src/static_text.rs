@@ -2,21 +2,21 @@ use crate::{prop_string_measure, widget};
 use alloc::string::String;
 use either::Left;
 use tuifw_screen_base::{Point, Rect, Vector, text_width};
-use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree};
+use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, State};
 use tuifw_window::{COLOR_TEXT, COLOR_DISABLED};
 
 pub struct StaticText {
     text: String,
 }
 
-impl<State: ?Sized> WidgetData<State> for StaticText { }
+impl WidgetData for StaticText { }
 
 impl StaticText {
     pub fn new() -> Self {
         StaticText { text: String::new() }
     }
 
-    fn init_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
+    fn init_palette(tree: &mut WindowTree, window: Window) {
         window.palette_mut(tree, |palette| {
             palette.set(0, Left(COLOR_TEXT));
             palette.set(1, Left(COLOR_DISABLED));
@@ -36,13 +36,13 @@ impl Default for StaticText {
 #[derive(Clone, Default)]
 pub struct StaticTextWidget;
 
-impl<State: ?Sized> Widget<State> for StaticTextWidget {
+impl Widget for StaticTextWidget {
     fn render(
         &self,
-        tree: &WindowTree<State>,
-        window: Window<State>,
+        tree: &WindowTree,
+        window: Window,
         rp: &mut RenderPort,
-        _state: &mut State,
+        _state: &mut dyn State,
     ) {
         let is_enabled = window.actual_is_enabled(tree);
         let color = window.color(tree, if is_enabled { 0 } else { 1 });
@@ -52,11 +52,11 @@ impl<State: ?Sized> Widget<State> for StaticTextWidget {
 
     fn measure(
         &self,
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
+        tree: &mut WindowTree,
+        window: Window,
         _available_width: Option<i16>,
         _available_height: Option<i16>,
-        _state: &mut State,
+        _state: &mut dyn State,
     ) -> Vector {
         let data = window.data::<StaticText>(tree);
         Vector { x: text_width(&data.text), y: 1 }
@@ -64,10 +64,10 @@ impl<State: ?Sized> Widget<State> for StaticTextWidget {
 
     fn arrange(
         &self,
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
+        tree: &mut WindowTree,
+        window: Window,
         _final_inner_bounds: Rect,
-        _state: &mut State,
+        _state: &mut dyn State,
     ) -> Vector {
         let data = window.data::<StaticText>(tree);
         Vector { x: text_width(&data.text), y: 1 }
@@ -75,11 +75,11 @@ impl<State: ?Sized> Widget<State> for StaticTextWidget {
 
     fn update(
         &self,
-        _tree: &mut WindowTree<State>,
-        _window: Window<State>,
+        _tree: &mut WindowTree,
+        _window: Window,
         _event: Event,
-        _event_source: Window<State>,
-        _state: &mut State,
+        _event_source: Window,
+        _state: &mut dyn State,
     ) -> bool {
         false
     }

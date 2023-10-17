@@ -4,7 +4,7 @@ use alloc::string::String;
 use either::Left;
 use tuifw_screen_base::{Key, Point, Rect, Vector};
 use tuifw_window::{Event, RenderPort, Timer, Widget, WidgetData, Window, WindowTree, label_width, label};
-use tuifw_window::{CMD_GOT_PRIMARY_FOCUS, CMD_LOST_PRIMARY_FOCUS};
+use tuifw_window::{CMD_GOT_PRIMARY_FOCUS, CMD_LOST_PRIMARY_FOCUS, State};
 use tuifw_window::{CMD_GOT_SECONDARY_FOCUS, CMD_LOST_SECONDARY_FOCUS};
 use tuifw_window::{COLOR_TEXT, COLOR_HOTKEY, COLOR_DISABLED, COLOR_BUTTON_FOCUSED};
 use tuifw_window::{COLOR_BUTTON_FOCUSED_HOTKEY, COLOR_BUTTON_FOCUSED_DISABLED, COLOR_BUTTON_PRESSED};
@@ -18,8 +18,8 @@ pub struct Button {
     cmd: u16,
 }
 
-impl<State: ?Sized> WidgetData<State> for Button {
-    fn drop_widget_data(&mut self, tree: &mut WindowTree<State>, _state: &mut State) {
+impl WidgetData for Button {
+    fn drop_widget_data(&mut self, tree: &mut WindowTree, _state: &mut dyn State) {
         if let Some(release_timer) = self.release_timer.take() {
             release_timer.drop_timer(tree);
         }
@@ -39,7 +39,7 @@ impl Button {
         }
     }
 
-    fn init_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
+    fn init_palette(tree: &mut WindowTree, window: Window) {
         window.palette_mut(tree, |palette| {
             palette.set(0, Left(COLOR_TEXT));
             palette.set(1, Left(COLOR_HOTKEY));
@@ -55,7 +55,7 @@ impl Button {
     prop_string_measure!(text);
     prop_value!(cmd: u16);
 
-    fn click<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
+    fn click(tree: &mut WindowTree, window: Window) {
         let click_timer = Timer::new(tree, 0, Box::new(move |tree, state| {
             let data = window.data_mut::<Button>(tree);
             data.click_timer = None;
@@ -90,13 +90,13 @@ impl Default for Button {
 #[derive(Clone, Default)]
 pub struct ButtonWidget;
 
-impl<State: ?Sized> Widget<State> for ButtonWidget {
+impl Widget for ButtonWidget {
     fn render(
         &self,
-        tree: &WindowTree<State>,
-        window: Window<State>,
+        tree: &WindowTree,
+        window: Window,
         rp: &mut RenderPort,
-        _state: &mut State,
+        _state: &mut dyn State,
     ) {
         let bounds = window.inner_bounds(tree);
         let focused = window.is_focused(tree);
@@ -120,11 +120,11 @@ impl<State: ?Sized> Widget<State> for ButtonWidget {
 
     fn measure(
         &self,
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
+        tree: &mut WindowTree,
+        window: Window,
         _available_width: Option<i16>,
         _available_height: Option<i16>,
-        _state: &mut State,
+        _state: &mut dyn State,
     ) -> Vector {
         let data = window.data::<Button>(tree);
         Vector { x: label_width(&data.text).wrapping_add(2), y: 1 }
@@ -132,10 +132,10 @@ impl<State: ?Sized> Widget<State> for ButtonWidget {
 
     fn arrange(
         &self,
-        _tree: &mut WindowTree<State>,
-        _window: Window<State>,
+        _tree: &mut WindowTree,
+        _window: Window,
         final_inner_bounds: Rect,
-        _state: &mut State,
+        _state: &mut dyn State,
     ) -> Vector {
         final_inner_bounds.size
     }
@@ -144,11 +144,11 @@ impl<State: ?Sized> Widget<State> for ButtonWidget {
 
     fn update(
         &self,
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
+        tree: &mut WindowTree,
+        window: Window,
         event: Event,
-        _event_source: Window<State>,
-        _state: &mut State,
+        _event_source: Window,
+        _state: &mut dyn State,
     ) -> bool {
         match event {
             Event::Cmd(CMD_GOT_PRIMARY_FOCUS) | Event::Cmd(CMD_LOST_PRIMARY_FOCUS) |

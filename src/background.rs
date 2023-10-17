@@ -2,7 +2,7 @@ use crate::{prop_string_render, prop_value_render, widget};
 use alloc::string::{String, ToString};
 use either::Left;
 use tuifw_screen_base::{Rect, Vector};
-use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree};
+use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, State};
 use tuifw_window::COLOR_BACKGROUND;
 
 pub struct Background {
@@ -11,14 +11,14 @@ pub struct Background {
     show_pattern: bool,
 }
 
-impl<State: ?Sized> WidgetData<State> for Background { }
+impl WidgetData for Background { }
 
 impl Background {
     pub fn new() -> Self {
         Background { pattern_even: "░".to_string(), pattern_odd: "░".to_string(), show_pattern: false }
     }
 
-    fn init_palette<State: ?Sized>(tree: &mut WindowTree<State>, window: Window<State>) {
+    fn init_palette(tree: &mut WindowTree, window: Window) {
         window.palette_mut(tree, |palette| palette.set(0, Left(COLOR_BACKGROUND)));
     }
 
@@ -37,13 +37,13 @@ impl Default for Background {
 #[derive(Clone, Default)]
 pub struct BackgroundWidget;
 
-impl<State: ?Sized> Widget<State> for BackgroundWidget {
+impl Widget for BackgroundWidget {
     fn render(
         &self,
-        tree: &WindowTree<State>,
-        window: Window<State>,
+        tree: &WindowTree,
+        window: Window,
         rp: &mut RenderPort,
-        _state: &mut State,
+        _state: &mut dyn State,
     ) {
         let color = window.color(tree, 0);
         let data = window.data::<Background>(tree);
@@ -62,11 +62,11 @@ impl<State: ?Sized> Widget<State> for BackgroundWidget {
 
     fn measure(
         &self,
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
+        tree: &mut WindowTree,
+        window: Window,
         available_width: Option<i16>,
         available_height: Option<i16>,
-        state: &mut State,
+        state: &mut dyn State,
     ) -> Vector {
         let mut size = Vector::null();
         if let Some(first_child) = window.first_child(tree) {
@@ -83,10 +83,10 @@ impl<State: ?Sized> Widget<State> for BackgroundWidget {
 
     fn arrange(
         &self,
-        tree: &mut WindowTree<State>,
-        window: Window<State>,
+        tree: &mut WindowTree,
+        window: Window,
         final_inner_bounds: Rect,
-        state: &mut State,
+        state: &mut dyn State,
     ) -> Vector {
         if let Some(first_child) = window.first_child(tree) {
             let mut child = first_child;
@@ -101,11 +101,11 @@ impl<State: ?Sized> Widget<State> for BackgroundWidget {
 
     fn update(
         &self,
-        _tree: &mut WindowTree<State>,
-        _window: Window<State>,
+        _tree: &mut WindowTree,
+        _window: Window,
         _event: Event,
-        _event_source: Window<State>,
-        _state: &mut State,
+        _event_source: Window,
+        _state: &mut dyn State,
     ) -> bool {
         false
     }
