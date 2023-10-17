@@ -18,6 +18,7 @@
 extern crate alloc;
 
 use alloc::boxed::Box;
+use alloc::string::String;
 use alloc::vec::Vec;
 use components_arena::{Arena, Component, Id, NewtypeComponentId};
 use core::cmp::{max, min};
@@ -392,6 +393,7 @@ macro_attr! {
         focus_down_tag: u16,
         contains_primary_focus: bool,
         tag: u16,
+        name: String,
         pre_process: Option<Id<PrePostProcess>>,
         post_process: Option<Id<PrePostProcess>>,
         is_enabled: bool,
@@ -469,6 +471,7 @@ impl Window {
                 focus_down_tag: 0,
                 contains_primary_focus: false,
                 tag: 0,
+                name: String::new(),
                 pre_process: None,
                 post_process: None,
                 is_enabled: true,
@@ -1099,6 +1102,18 @@ impl Window {
         }
     }
 
+    pub fn name<'a>(self, tree: &'a WindowTree) -> &'a String {
+        &tree.arena[self.0].name
+    }
+
+    pub fn name_mut<T>(self, tree: &mut WindowTree, f: impl FnOnce(&mut String) -> T) -> T {
+        f(&mut tree.arena[self.0].name)
+    }
+
+    pub fn set_name(self, tree: &mut WindowTree, value: String) {
+        self.name_mut(tree, |name| replace(name, value));
+    }
+
     fn detach(
         self,
         tree: &mut WindowTree
@@ -1367,6 +1382,7 @@ impl<'clock> WindowTree<'clock> {
             focus_down_tag: 0,
             contains_primary_focus: true,
             tag: 0,
+            name: String::new(),
             pre_process: None,
             post_process: None,
             is_enabled: true,

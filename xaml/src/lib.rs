@@ -47,6 +47,8 @@ pub fn reg_widgets(xaml: &mut Xaml) {
     let widget_children = xaml.reg_property(widget, "Children", XamlType::Struct(widget));
     xaml.content_property(widget_children);
     let widget_tag = xaml.reg_property(widget, "Tag", XamlType::Literal(uint_16));
+    let widget_name = xaml.reg_property(widget, "Name", XamlType::Literal(string));
+    xaml.name_property(widget_name);
     let widget_focus_tab_tag = xaml.reg_property(widget, "FocusTabTag", XamlType::Literal(uint_16));
     let widget_focus_right_tag = xaml.reg_property(widget, "FocusRightTag", XamlType::Literal(uint_16));
     let widget_focus_left_tag = xaml.reg_property(widget, "FocusLeftTag", XamlType::Literal(uint_16));
@@ -219,6 +221,9 @@ pub fn reg_widgets(xaml: &mut Xaml) {
     " }, obj, value))));
     xaml.property_set(widget_tag, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_tag(&mut tree, {});
+    " }, obj, value))));
+    xaml.property_set(widget_name, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_name(&mut tree, {});
     " }, obj, value))));
     xaml.property_set(widget_focus_tab_tag, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_focus_tab_tag(&mut tree, {});

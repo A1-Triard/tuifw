@@ -27,6 +27,7 @@ macro_attr! {
         name: String,
         property_names: HashMap<String, Id<XamlProperty>>,
         content_property: Option<Id<XamlProperty>>,
+        name_property: Option<Id<XamlProperty>>,
         new: Option<Box<dyn Fn(&str, Option<(&str, Id<XamlProperty>, Option<&str>)>) -> String>>,
     }
 }
@@ -92,6 +93,7 @@ impl Xaml {
             name: name.clone(),
             property_names: HashMap::new(),
             content_property: None,
+            name_property: None,
             parent,
             new: None,
         };
@@ -173,6 +175,15 @@ impl Xaml {
         self.structs[owner].content_property = Some(property);
     }
 
+    pub fn reset_name_property(&mut self, ty: Id<XamlStruct>) {
+        self.structs[ty].name_property = None;
+    }
+
+    pub fn name_property(&mut self, property: Id<XamlProperty>) {
+        let owner = self.properties[property].owner;
+        self.structs[owner].name_property = Some(property);
+    }
+
     fn find_property(&self, mut owner: Id<XamlStruct>, name: impl AsRef<str>) -> Option<Id<XamlProperty>> {
         let name = name.as_ref();
         loop {
@@ -204,6 +215,21 @@ impl Xaml {
         None
     }
 
+    fn find_name_property(&self, mut owner: Id<XamlStruct>) -> Option<Id<XamlProperty>> {
+        loop {
+            let owner_data = &self.structs[owner];
+            if let Some(property) = owner_data.name_property {
+                return Some(property);
+            }
+            if let Some(parent) = owner_data.parent {
+                owner = parent;
+            } else {
+                break;
+            }
+        }
+        None
+    }
+
     pub fn process_file(&self, source: impl AsRef<Path>, dest: impl AsRef<Path>) -> xml_Result<()> {
         let source = File::open(source.as_ref())?;
         let dest = File::create(dest.as_ref())?;
@@ -215,7 +241,7 @@ impl Xaml {
         let event = source.next()?;
         write!(dest, "{}", self.preamble)?;
         write!(dest, "{}", self.header)?;
-        let mut processor = XamlProcessor { xaml: self, source, dest, event, obj_n: 0 };
+        let mut processor = XamlProcessor { xaml: self, source, dest, event, obj_n: 0, names: HashMap::new() };
         processor.process()?;
         write!(processor.dest, "{}", self.footer)?;
         Ok(())
@@ -228,6 +254,7 @@ struct XamlProcessor<'a, R: Read, W: Write> {
     dest: W,
     event: XmlEvent,
     obj_n: u16,
+    names: HashMap<String, String>,
 }
 
 impl<'a, R: Read, W: Write> XamlProcessor<'a, R, W> {
@@ -342,6 +369,7 @@ impl<'a, R: Read, W: Write> XamlProcessor<'a, R, W> {
             let Some(property) = self.xaml.find_property(ty, &attr_name) else {
                 return self.error(format!("unknown property '{attr_name}'"));
             };
+            let is_name_property = Some(property) == self.xaml.find_name_property(ty);
             let property = &self.xaml.properties[property];
             let XamlType::Literal(property_ty) = property.ty else {
                 return self.error(format!("invalid '{attr_name}' property value"));
@@ -356,6 +384,9 @@ impl<'a, R: Read, W: Write> XamlProcessor<'a, R, W> {
                 return self.error("property set function is not set");
             };
             write!(self.dest, "{}", set(&obj, &value))?;
+            if is_name_property {
+                self.names.insert(value, obj.clone());
+            }
         }
         self.next_event()?;
         loop {
@@ -416,6 +447,10 @@ impl<'a, R: Read, W: Write> XamlProcessor<'a, R, W> {
                 return self.error("property set function is not set");
             };
             write!(self.dest, "{}", set(&obj, &value))?;
+            let is_name_property = Some(property) == self.xaml.find_name_property(ty);
+            if is_name_property {
+                self.names.insert(value.clone(), obj.clone());
+            }
             prev_value = Some(value);
         }
         if skip_end_element {
