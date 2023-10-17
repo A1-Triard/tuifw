@@ -4,7 +4,7 @@ use alloc::string::String;
 use either::Left;
 use tuifw_screen_base::{Point, Rect, Vector, Key};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, Timer, label_width, label};
-use tuifw_window::{COLOR_TEXT, COLOR_HOTKEY, COLOR_DISABLED, State};
+use tuifw_window::{COLOR_TEXT, COLOR_HOTKEY, COLOR_DISABLED, App};
 
 pub const CMD_LABEL_CLICK: u16 = 110;
 
@@ -15,7 +15,7 @@ pub struct Label {
 }
 
 impl WidgetData for Label {
-    fn drop_widget_data(&mut self, tree: &mut WindowTree, _state: &mut dyn State) {
+    fn drop_widget_data(&mut self, tree: &mut WindowTree, _app: &mut dyn App) {
         if let Some(click_timer) = self.click_timer.take() {
             click_timer.drop_timer(tree);
         }
@@ -55,7 +55,7 @@ impl Widget for LabelWidget {
         tree: &WindowTree,
         window: Window,
         rp: &mut RenderPort,
-        _state: &mut dyn State,
+        _app: &mut dyn App,
     ) {
         let is_enabled = window.actual_is_enabled(tree);
         let data = window.data::<Label>(tree);
@@ -70,7 +70,7 @@ impl Widget for LabelWidget {
         window: Window,
         _available_width: Option<i16>,
         _available_height: Option<i16>,
-        _state: &mut dyn State,
+        _app: &mut dyn App,
     ) -> Vector {
         let data = window.data::<Label>(tree);
         Vector { x: label_width(&data.text), y: 1 }
@@ -81,7 +81,7 @@ impl Widget for LabelWidget {
         tree: &mut WindowTree,
         window: Window,
         _final_inner_bounds: Rect,
-        _state: &mut dyn State,
+        _app: &mut dyn App,
     ) -> Vector {
         let data = window.data::<Label>(tree);
         Vector { x: label_width(&data.text), y: 1 }
@@ -93,20 +93,20 @@ impl Widget for LabelWidget {
         window: Window,
         event: Event,
         _event_source: Window,
-        _state: &mut dyn State,
+        _app: &mut dyn App,
     ) -> bool {
         let data = window.data::<Label>(tree);
         let label = label(&data.text);
         let Some(label) = label else { return false; };
         if event == Event::PostProcessKey(Key::Alt(label)) || event == Event::PostProcessKey(Key::Char(label)) {
             if window.actual_is_enabled(tree) {
-                let click_timer = Timer::new(tree, 0, Box::new(move |tree, state| {
+                let click_timer = Timer::new(tree, 0, Box::new(move |tree, app| {
                     let data = window.data_mut::<Label>(tree);
                     data.click_timer = None;
                     if window.actual_is_enabled(tree) {
                         let data = window.data_mut::<Label>(tree);
                         let cmd = data.cmd;
-                        window.raise(tree, Event::Cmd(cmd), state);
+                        window.raise(tree, Event::Cmd(cmd), app);
                         let focus = window.actual_focus_tab(tree);
                         if focus != window {
                             focus.set_focused_primary(tree, true);

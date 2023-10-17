@@ -264,7 +264,7 @@ pub trait Widget: DynClone {
         tree: &WindowTree,
         window: Window,
         rp: &mut RenderPort,
-        state: &mut dyn State,
+        app: &mut dyn App,
     );
 
     fn measure(
@@ -273,7 +273,7 @@ pub trait Widget: DynClone {
         window: Window,
         available_width: Option<i16>,
         available_height: Option<i16>,
-        state: &mut dyn State,
+        app: &mut dyn App,
     ) -> Vector;
 
     fn arrange(
@@ -281,7 +281,7 @@ pub trait Widget: DynClone {
         tree: &mut WindowTree,
         window: Window,
         final_inner_bounds: Rect,
-        state: &mut dyn State,
+        app: &mut dyn App,
     ) -> Vector;
 
     fn update(
@@ -290,7 +290,7 @@ pub trait Widget: DynClone {
         window: Window,
         event: Event,
         event_source: Window,
-        state: &mut dyn State,
+        app: &mut dyn App,
     ) -> bool;
 
     fn secondary_focusable(&self) -> bool { false }
@@ -303,7 +303,7 @@ pub trait Widget: DynClone {
 clone_trait_object!(Widget);
 
 pub trait WidgetData: Downcast {
-    fn drop_widget_data(&mut self, _tree: &mut WindowTree, _state: &mut dyn State) { }
+    fn drop_widget_data(&mut self, _tree: &mut WindowTree, _app: &mut dyn App) { }
 }
 
 impl_downcast!(WidgetData);
@@ -312,9 +312,9 @@ pub trait Layout: Downcast { }
 
 impl_downcast!(Layout);
 
-pub trait State: Downcast { }
+pub trait App: Downcast { }
 
-impl_downcast!(State);
+impl_downcast!(App);
 
 pub struct Palette(Vec<Either<u8, (Fg, Bg)>>);
 
@@ -348,7 +348,7 @@ pub trait EventHandler: DynClone {
         window: Window,
         event: Event,
         event_source: Window,
-        state: &mut dyn State,
+        app: &mut dyn App,
     ) -> bool;
 }
 
@@ -514,7 +514,7 @@ impl Window {
         tree: &mut WindowTree,
         available_width: Option<i16>,
         available_height: Option<i16>,
-        state: &mut dyn State
+        app: &mut dyn App
     ) {
         let node = &mut tree.arena[self.0];
         if node.visibility == Visibility::Collapsed {
@@ -535,13 +535,13 @@ impl Window {
         if node.measure_size == Some(measure_size) { return; }
         node.measure_size = Some(measure_size);
         let widget = node.widget.clone();
-        let measured_size = widget.measure(tree, self, measure_size.0, measure_size.1, state);
+        let measured_size = widget.measure(tree, self, measure_size.0, measure_size.1, app);
         let node = &mut tree.arena[self.0];
         node.desired_size = node.margin.expand_rect_size(measured_size.min(max_size).max(min_size));
         self.invalidate_arrange(tree);
     }
 
-    pub fn arrange(self, tree: &mut WindowTree, final_bounds: Rect, state: &mut dyn State) {
+    pub fn arrange(self, tree: &mut WindowTree, final_bounds: Rect, app: &mut dyn App) {
         let node = &mut tree.arena[self.0];
         if node.visibility == Visibility::Collapsed {
             let bounds = Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() };
@@ -570,7 +570,7 @@ impl Window {
             tree,
             self,
             Rect { tl: Point { x: 0, y: 0 }, size: arrange_size },
-            state
+            app
         );
         let node = &mut tree.arena[self.0];
         let arranged_size = arranged_size.min(max_size).max(min_size);
@@ -901,9 +901,9 @@ impl Window {
         self,
         tree: &mut WindowTree,
         event: Event,
-        state: &mut dyn State
+        app: &mut dyn App
     ) -> bool {
-        self.raise_priv(tree, event, false, state)
+        self.raise_priv(tree, event, false, app)
     }
 
     fn raise_priv(
@@ -911,12 +911,12 @@ impl Window {
         tree: &mut WindowTree,
         event: Event,
         secondary: bool,
-        state: &mut dyn State
+        app: &mut dyn App
     ) -> bool {
         let mut handled = false;
-        self.raise_raw(tree, event.preview(), self, secondary, &mut handled, state);
+        self.raise_raw(tree, event.preview(), self, secondary, &mut handled, app);
         if !handled {
-            self.raise_raw(tree, event, self, secondary, &mut handled, state);
+            self.raise_raw(tree, event, self, secondary, &mut handled, app);
         }
         handled
     }
@@ -928,21 +928,21 @@ impl Window {
         event_source: Window,
         secondary: bool,
         handled: &mut bool,
-        state: &mut dyn State
+        app: &mut dyn App
     ) {
         if secondary && tree.arena[self.0].contains_primary_focus { return; }
         let parent = self.parent(tree);
         if !*handled && event.is_preview() {
             if let Some(parent) = parent {
-                parent.raise_raw(tree, event, event_source, secondary, handled, state);
+                parent.raise_raw(tree, event, event_source, secondary, handled, app);
             }
         }
         if !*handled {
-            *handled = self.raise_core(tree, event, event_source, state);
+            *handled = self.raise_core(tree, event, event_source, app);
         }
         if !*handled && !event.is_preview() {
             if let Some(parent) = parent {
-                parent.raise_raw(tree, event, event_source, secondary, handled, state);
+                parent.raise_raw(tree, event, event_source, secondary, handled, app);
             }
         }
     }
@@ -952,15 +952,15 @@ impl Window {
         tree: &mut WindowTree,
         event: Event,
         event_source: Window,
-        state: &mut dyn State
+        app: &mut dyn App
     ) -> bool {
         let node = &tree.arena[self.0];
         let widget = node.widget.clone();
         let event_handler = node.event_handler.clone();
-        let mut handled = widget.update(tree, self, event, event_source, state);
+        let mut handled = widget.update(tree, self, event, event_source, app);
         if !handled {
             if let Some(event_handler) = event_handler {
-                handled = event_handler.invoke(tree, self, event, event_source, state);
+                handled = event_handler.invoke(tree, self, event, event_source, app);
             }
         }
         handled
@@ -1145,7 +1145,7 @@ impl Window {
     pub fn drop_window(
         self,
         tree: &mut WindowTree,
-        state: &mut dyn State,
+        app: &mut dyn App,
     ) {
         let parent = self.detach(tree);
         let mut node = tree.arena.remove(self.0);
@@ -1155,24 +1155,24 @@ impl Window {
         if let Some(post_process) = node.post_process {
             tree.post_process.remove(post_process);
         }
-        node.data.drop_widget_data(tree, state);
+        node.data.drop_widget_data(tree, app);
         let screen_bounds = node.window_bounds.offset(offset_from_root(parent, tree));
         invalidate_rect(tree.screen(), screen_bounds);
-        Self::drop_node_tree(node.first_child, tree, state);
+        Self::drop_node_tree(node.first_child, tree, app);
     }
 
     fn drop_node_tree(
         first_child: Option<Window>,
         tree: &mut WindowTree,
-        state: &mut dyn State,
+        app: &mut dyn App,
     ) {
         if let Some(first_child) = first_child {
             let mut child = first_child;
             loop {
                 let mut child_node = tree.arena.remove(child.0);
-                child_node.data.drop_widget_data(tree, state);
+                child_node.data.drop_widget_data(tree, app);
                 child = child_node.next;
-                Self::drop_node_tree(child_node.first_child, tree, state);
+                Self::drop_node_tree(child_node.first_child, tree, app);
                 if child == first_child { break; }
             }
         }
@@ -1266,7 +1266,7 @@ macro_attr! {
     struct TimerData {
         start: MonoTime,
         span_ms: u16,
-        alarm: Box<dyn FnOnce(&mut WindowTree, &mut dyn State)>,
+        alarm: Box<dyn FnOnce(&mut WindowTree, &mut dyn App)>,
     }
 }
 
@@ -1280,7 +1280,7 @@ impl Timer {
     pub fn new(
         tree: &mut WindowTree,
         span_ms: u16,
-        alarm: Box<dyn FnOnce(&mut WindowTree, &mut dyn State)>
+        alarm: Box<dyn FnOnce(&mut WindowTree, &mut dyn App)>
     ) -> Self {
         let start = tree.clock.time();
         tree.timers.insert(move |id| (TimerData {
@@ -1432,7 +1432,7 @@ impl<'clock> WindowTree<'clock> {
         self.screen.as_mut().expect("WindowTree is in invalid state").as_mut()
     }
 
-    fn render_window(&mut self, window: Window, offset: Vector, render_state: &mut dyn State) {
+    fn render_window(&mut self, window: Window, offset: Vector, app: &mut dyn App) {
         if window.visibility(self) != Visibility::Visible {
             return;
         }
@@ -1448,20 +1448,20 @@ impl<'clock> WindowTree<'clock> {
             size: bounds.size,
         };
         let widget = self.arena[window.0].widget.clone();
-        widget.render(self, window, &mut port, render_state);
+        widget.render(self, window, &mut port, app);
         self.screen.replace(port.screen);
         self.cursor = port.cursor;
         if let Some(first_child) = self.arena[window.0].first_child {
             let mut child = first_child;
             loop {
-                self.render_window(child, offset, render_state);
+                self.render_window(child, offset, app);
                 child = self.arena[child.0].next;
                 if child == first_child { break; }
             }
         }
     }
 
-    pub fn run(&mut self, state: &mut dyn State) -> Result<(), Error> {
+    pub fn run(&mut self, app: &mut dyn App) -> Result<(), Error> {
         let mut time = self.clock.time();
         while !self.quit {
             let timers_time = self.clock.time();
@@ -1472,37 +1472,37 @@ impl<'clock> WindowTree<'clock> {
                 ;
                 if let Some(timer) = timer {
                     let alarm = self.timers.remove(timer).alarm;
-                    alarm(self, state);
+                    alarm(self, app);
                 } else {
                     break;
                 }
             }
             let ms = time.split_ms_u16(self.clock).unwrap_or(u16::MAX);
-            self.update(false, state)?;
+            self.update(false, app)?;
             assert!(FPS != 0 && u16::MAX / FPS > 8);
             self.clock.sleep_ms_u16((1000 / FPS).saturating_sub(ms));
         }
         Ok(())
     }
 
-    fn update(&mut self, wait: bool, state: &mut dyn State) -> Result<(), Error> {
+    fn update(&mut self, wait: bool, app: &mut dyn App) -> Result<(), Error> {
         let root = self.root;
         let screen = self.screen.as_mut().expect("WindowTree is in invalid state");
         let screen_size = screen.size();
-        root.measure(self, Some(screen_size.x), Some(screen_size.y), state);
-        root.arrange(self, Rect { tl: Point { x: 0, y: 0 }, size: screen_size }, state);
+        root.measure(self, Some(screen_size.x), Some(screen_size.y), app);
+        root.arrange(self, Rect { tl: Point { x: 0, y: 0 }, size: screen_size }, app);
         if let Some(cursor) = self.cursor {
             let screen = self.screen();
             if rect_invalidated(screen, Rect { tl: cursor, size: Vector { x: 1, y: 1 } }) {
                 self.cursor = None;
             }
         }
-        self.render_window(self.root, Vector::null(), state);
+        self.render_window(self.root, Vector::null(), app);
         if let Some(next_primary_focused) = self.next_primary_focused.take() {
-            self.focus_primary(next_primary_focused, state);
+            self.focus_primary(next_primary_focused, app);
         }
         if let Some(next_secondary_focused) = self.next_secondary_focused.take() {
-            self.focus_secondary(next_secondary_focused, state);
+            self.focus_secondary(next_secondary_focused, app);
         }
         let screen = self.screen.as_mut().expect("WindowTree is in invalid state");
         if let Some(screen_Event::Key(n, key)) = screen.update(self.cursor, wait)? {
@@ -1511,73 +1511,73 @@ impl<'clock> WindowTree<'clock> {
                     Key::Tab => {
                         if let Some(primary_focused) = self.primary_focused {
                             let focus = primary_focused.actual_focus_tab(self);
-                            if self.focus_primary(Some(focus), state) { continue; }
+                            if self.focus_primary(Some(focus), app) { continue; }
                         }
                     },
                     Key::Left => {
                         if let Some(primary_focused) = self.primary_focused {
                             let focus = primary_focused.actual_focus_left(self);
-                            if self.focus_primary(Some(focus), state) { continue; }
+                            if self.focus_primary(Some(focus), app) { continue; }
                         }
                         if let Some(secondary_focused) = self.secondary_focused {
                             let focus = secondary_focused.actual_focus_left(self);
-                            if self.focus_secondary(Some(focus), state) { continue; }
+                            if self.focus_secondary(Some(focus), app) { continue; }
                         }
                     },
                     Key::Right => {
                         if let Some(primary_focused) = self.primary_focused {
                             let focus = primary_focused.actual_focus_right(self);
-                            if self.focus_primary(Some(focus), state) { continue; }
+                            if self.focus_primary(Some(focus), app) { continue; }
                         }
                         if let Some(secondary_focused) = self.secondary_focused {
                             let focus = secondary_focused.actual_focus_right(self);
-                            if self.focus_secondary(Some(focus), state) { continue; }
+                            if self.focus_secondary(Some(focus), app) { continue; }
                         }
                     },
                     Key::Up => {
                         if let Some(primary_focused) = self.primary_focused {
                             let focus = primary_focused.actual_focus_up(self);
-                            if self.focus_primary(Some(focus), state) { continue; }
+                            if self.focus_primary(Some(focus), app) { continue; }
                         }
                         if let Some(secondary_focused) = self.secondary_focused {
                             let focus = secondary_focused.actual_focus_up(self);
-                            if self.focus_secondary(Some(focus), state) { continue; }
+                            if self.focus_secondary(Some(focus), app) { continue; }
                         }
                     },
                     Key::Down => {
                         if let Some(primary_focused) = self.primary_focused {
                             let focus = primary_focused.actual_focus_down(self);
-                            if self.focus_primary(Some(focus), state) { continue; }
+                            if self.focus_primary(Some(focus), app) { continue; }
                         }
                         if let Some(secondary_focused) = self.secondary_focused {
                             let focus = secondary_focused.actual_focus_down(self);
-                            if self.focus_secondary(Some(focus), state) { continue; }
+                            if self.focus_secondary(Some(focus), app) { continue; }
                         }
                     },
                     _ => { },
                 }
                 let mut handled = false;
                 for pre_process in self.pre_process.items().clone().values() {
-                    handled = pre_process.0.raise_core(self, Event::PreProcessKey(key), pre_process.0, state);
+                    handled = pre_process.0.raise_core(self, Event::PreProcessKey(key), pre_process.0, app);
                     if handled { break; }
                 }
                 if handled { continue; }
                 handled = self.primary_focused.map_or(false, |x|
-                    x.raise_priv(self, Event::Key(key), false, state)
+                    x.raise_priv(self, Event::Key(key), false, app)
                 );
                 if handled { continue; }
                 handled = self.secondary_focused.map_or(false, |x|
-                    x.raise_priv(self, Event::Key(key), true, state)
+                    x.raise_priv(self, Event::Key(key), true, app)
                 );
                 if handled {
                     self.primary_focused.map(|x|
-                        x.raise_priv(self, Event::Cmd(CMD_LOST_ATTENTION), false, state)
+                        x.raise_priv(self, Event::Cmd(CMD_LOST_ATTENTION), false, app)
                     );
                     continue;
                 }
                 for post_process in self.post_process.items().clone().values() {
                     handled =
-                        post_process.0.raise_core(self, Event::PostProcessKey(key), post_process.0, state);
+                        post_process.0.raise_core(self, Event::PostProcessKey(key), post_process.0, app);
                     if handled { break; }
                 }
             }
@@ -1588,11 +1588,11 @@ impl<'clock> WindowTree<'clock> {
     fn focus_primary(
         &mut self,
         window: Option<Window>,
-        state: &mut dyn State
+        app: &mut dyn App
     ) -> bool {
         let old_focused = self.primary_focused;
         if window == old_focused { return false; }
-        window.map(|x| x.raise(self, Event::Cmd(CMD_GOT_PRIMARY_FOCUS), state));
+        window.map(|x| x.raise(self, Event::Cmd(CMD_GOT_PRIMARY_FOCUS), app));
 
         if let Some(mut window) = self.primary_focused {
             loop {
@@ -1616,22 +1616,22 @@ impl<'clock> WindowTree<'clock> {
             }
         }
 
-        old_focused.map(|x| x.raise(self, Event::Cmd(CMD_LOST_PRIMARY_FOCUS), state));
+        old_focused.map(|x| x.raise(self, Event::Cmd(CMD_LOST_PRIMARY_FOCUS), app));
         true
     }
 
     fn focus_secondary(
         &mut self,
         window: Option<Window>,
-        state: &mut dyn State
+        app: &mut dyn App
     ) -> bool {
         let old_focused = self.secondary_focused;
         if window == old_focused { return false; }
         let focusable = window.map_or(true, |x| self.arena[x.0].widget.secondary_focusable());
         if !focusable { return false; }
-        window.map(|x| x.raise(self, Event::Cmd(CMD_GOT_SECONDARY_FOCUS), state));
+        window.map(|x| x.raise(self, Event::Cmd(CMD_GOT_SECONDARY_FOCUS), app));
         self.secondary_focused = window;
-        old_focused.map(|x| x.raise(self, Event::Cmd(CMD_LOST_SECONDARY_FOCUS), state));
+        old_focused.map(|x| x.raise(self, Event::Cmd(CMD_LOST_SECONDARY_FOCUS), app));
         true
     }
 }

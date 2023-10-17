@@ -2,7 +2,7 @@ use crate::{prop_string_measure, widget};
 use alloc::string::String;
 use either::Left;
 use tuifw_screen_base::{Point, Rect, Vector, text_width};
-use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, State};
+use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App};
 use tuifw_window::{COLOR_TEXT, COLOR_DISABLED};
 
 pub struct StaticText {
@@ -42,7 +42,7 @@ impl Widget for StaticTextWidget {
         tree: &WindowTree,
         window: Window,
         rp: &mut RenderPort,
-        _state: &mut dyn State,
+        _app: &mut dyn App,
     ) {
         let is_enabled = window.actual_is_enabled(tree);
         let color = window.color(tree, if is_enabled { 0 } else { 1 });
@@ -56,7 +56,7 @@ impl Widget for StaticTextWidget {
         window: Window,
         _available_width: Option<i16>,
         _available_height: Option<i16>,
-        _state: &mut dyn State,
+        _app: &mut dyn App,
     ) -> Vector {
         let data = window.data::<StaticText>(tree);
         Vector { x: text_width(&data.text), y: 1 }
@@ -67,7 +67,7 @@ impl Widget for StaticTextWidget {
         tree: &mut WindowTree,
         window: Window,
         _final_inner_bounds: Rect,
-        _state: &mut dyn State,
+        _app: &mut dyn App,
     ) -> Vector {
         let data = window.data::<StaticText>(tree);
         Vector { x: text_width(&data.text), y: 1 }
@@ -79,7 +79,7 @@ impl Widget for StaticTextWidget {
         _window: Window,
         _event: Event,
         _event_source: Window,
-        _state: &mut dyn State,
+        _app: &mut dyn App,
     ) -> bool {
         false
     }

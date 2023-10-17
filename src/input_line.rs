@@ -6,7 +6,7 @@ use core::str::FromStr;
 use either::Left;
 use tuifw_screen_base::{Key, Point, Rect, Vector, char_width, text_width};
 use tuifw_screen_base::{Thickness};
-use tuifw_window::{Event, RenderPort, Timer, Widget, WidgetData, Window, WindowTree, State};
+use tuifw_window::{Event, RenderPort, Timer, Widget, WidgetData, Window, WindowTree, App};
 use tuifw_window::{CMD_GOT_PRIMARY_FOCUS, CMD_LOST_PRIMARY_FOCUS, CMD_LOST_ATTENTION};
 use tuifw_window::{COLOR_TEXT, COLOR_DISABLED, COLOR_INPUT_LINE_INVALID};
 use tuifw_window::{COLOR_INPUT_LINE_FOCUSED, COLOR_INPUT_LINE_FOCUSED_DISABLED};
@@ -76,7 +76,7 @@ pub struct InputLine {
 }
 
 impl WidgetData for InputLine {
-    fn drop_widget_data(&mut self, tree: &mut WindowTree, _state: &mut dyn State) {
+    fn drop_widget_data(&mut self, tree: &mut WindowTree, _app: &mut dyn App) {
         if let Some(timer) = self.is_valid_timer.take() {
             timer.drop_timer(tree);
         }
@@ -128,18 +128,18 @@ impl InputLine {
     fn update_is_valid(
         tree: &mut WindowTree,
         window: Window,
-        state: Option<&mut dyn State>
+        app: Option<&mut dyn App>
     ) {
         let data = window.data_mut::<InputLine>(tree);
         let is_valid = data.validator.as_deref().map_or(true, |x| x.is_valid(data.editing, &data.text));
         if is_valid != data.is_valid {
             data.is_valid = is_valid;
-            if let Some(state) = state {
-                window.raise(tree, Event::Cmd(CMD_INPUT_LINE_IS_VALID_CHANGED), state);
+            if let Some(app) = app {
+                window.raise(tree, Event::Cmd(CMD_INPUT_LINE_IS_VALID_CHANGED), app);
             } else {
-                let is_valid_timer = Timer::new(tree, 0, Box::new(move |tree, state| {
+                let is_valid_timer = Timer::new(tree, 0, Box::new(move |tree, app| {
                     window.data_mut::<InputLine>(tree).is_valid_timer = None;
-                    window.raise(tree, Event::Cmd(CMD_INPUT_LINE_IS_VALID_CHANGED), state);
+                    window.raise(tree, Event::Cmd(CMD_INPUT_LINE_IS_VALID_CHANGED), app);
                 }));
                 let data = window.data_mut::<InputLine>(tree);
                 if let Some(timer) = data.is_valid_timer.replace(is_valid_timer) {
@@ -247,7 +247,7 @@ impl Widget for InputLineWidget {
         tree: &WindowTree,
         window: Window,
         rp: &mut RenderPort,
-        _state: &mut dyn State,
+        _app: &mut dyn App,
     ) {
         let focused = window.is_focused(tree);
         let is_enabled = window.actual_is_enabled(tree);
@@ -287,7 +287,7 @@ impl Widget for InputLineWidget {
         _window: Window,
         available_width: Option<i16>,
         _available_height: Option<i16>,
-        _state: &mut dyn State,
+        _app: &mut dyn App,
     ) -> Vector {
         Vector { x: available_width.unwrap_or(1), y: 1 }
     }
@@ -297,7 +297,7 @@ impl Widget for InputLineWidget {
         tree: &mut WindowTree,
         window: Window,
         final_inner_bounds: Rect,
-        _state: &mut dyn State,
+        _app: &mut dyn App,
     ) -> Vector {
         let focused = window.is_focused(tree);
         let data = window.data_mut::<InputLine>(tree);
@@ -312,7 +312,7 @@ impl Widget for InputLineWidget {
         window: Window,
         event: Event,
         _event_source: Window,
-        state: &mut dyn State,
+        app: &mut dyn App,
     ) -> bool {
         match event {
             Event::Cmd(CMD_GOT_PRIMARY_FOCUS) => {
@@ -320,7 +320,7 @@ impl Widget for InputLineWidget {
                 data.reset_view(true);
                 if data.is_valid {
                     data.editing = true;
-                    InputLine::update_is_valid(tree, window, Some(state));
+                    InputLine::update_is_valid(tree, window, Some(app));
                 }
                 window.invalidate_render(tree);
                 false
@@ -329,18 +329,18 @@ impl Widget for InputLineWidget {
                 let data = window.data_mut::<InputLine>(tree);
                 data.reset_view(false);
                 data.editing = false;
-                InputLine::update_is_valid(tree, window, Some(state));
+                InputLine::update_is_valid(tree, window, Some(app));
                 window.invalidate_render(tree);
                 false
             },
             Event::Cmd(CMD_LOST_ATTENTION) => {
                 let data = window.data_mut::<InputLine>(tree);
                 data.editing = false;
-                InputLine::update_is_valid(tree, window, Some(state));
+                InputLine::update_is_valid(tree, window, Some(app));
                 let data = window.data_mut::<InputLine>(tree);
                 if data.is_valid {
                     data.editing = true;
-                    InputLine::update_is_valid(tree, window, Some(state));
+                    InputLine::update_is_valid(tree, window, Some(app));
                 }
                 window.invalidate_render(tree);
                 false
@@ -352,11 +352,11 @@ impl Widget for InputLineWidget {
                         data.text.insert(data.cursor, c);
                         data.calc_view_end(data.view.start);
                         data.cursor_right();
-                        InputLine::update_is_valid(tree, window, Some(state));
+                        InputLine::update_is_valid(tree, window, Some(app));
                         let data = window.data_mut::<InputLine>(tree);
                         if data.is_valid && !data.editing {
                             data.editing = true;
-                            InputLine::update_is_valid(tree, window, Some(state));
+                            InputLine::update_is_valid(tree, window, Some(app));
                         }
                         window.invalidate_render(tree);
                     }
@@ -372,11 +372,11 @@ impl Widget for InputLineWidget {
                         data.cursor_left();
                         let c = data.text.remove(data.cursor);
                         data.calc_view_start(data.view.end - c.len_utf8());
-                        InputLine::update_is_valid(tree, window, Some(state));
+                        InputLine::update_is_valid(tree, window, Some(app));
                         let data = window.data_mut::<InputLine>(tree);
                         if data.is_valid && !data.editing {
                             data.editing = true;
-                            InputLine::update_is_valid(tree, window, Some(state));
+                            InputLine::update_is_valid(tree, window, Some(app));
                         }
                         window.invalidate_render(tree);
                     }
@@ -391,11 +391,11 @@ impl Widget for InputLineWidget {
                     if data.cursor != data.text.len() {
                         let c = data.text.remove(data.cursor);
                         data.calc_view_start(data.view.end - c.len_utf8());
-                        InputLine::update_is_valid(tree, window, Some(state));
+                        InputLine::update_is_valid(tree, window, Some(app));
                         let data = window.data_mut::<InputLine>(tree);
                         if data.is_valid && !data.editing {
                             data.editing = true;
-                            InputLine::update_is_valid(tree, window, Some(state));
+                            InputLine::update_is_valid(tree, window, Some(app));
                         }
                         window.invalidate_render(tree);
                     }

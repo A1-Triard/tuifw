@@ -2,7 +2,7 @@ use crate::widget;
 use alloc::boxed::Box;
 use core::mem::replace;
 use tuifw_screen_base::{Rect, Vector, Thickness, Point};
-use tuifw_window::{Event, Layout, RenderPort, Widget, WidgetData, Window, WindowTree, State};
+use tuifw_window::{Event, Layout, RenderPort, Widget, WidgetData, Window, WindowTree, App};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum Dock { Left, Top, Right, Bottom }
@@ -48,7 +48,7 @@ impl Widget for DockPanelWidget {
         _tree: &WindowTree,
         _window: Window,
         _rp: &mut RenderPort,
-        _state: &mut dyn State,
+        _app: &mut dyn App,
     ) { }
 
     fn measure(
@@ -57,7 +57,7 @@ impl Widget for DockPanelWidget {
         window: Window,
         mut available_width: Option<i16>,
         mut available_height: Option<i16>,
-        state: &mut dyn State,
+        app: &mut dyn App,
     ) -> Vector {
         if let Some(first_child) = window.first_child(tree) {
             let mut size = Vector::null();
@@ -68,7 +68,7 @@ impl Widget for DockPanelWidget {
                 match dock {
                     None => { },
                     Some(Dock::Left) => {
-                        child.measure(tree, None, available_height, state);
+                        child.measure(tree, None, available_height, app);
                         if let Some(available_width) = available_width.as_mut() {
                             *available_width =
                                 (*available_width as u16).saturating_sub(child.desired_size(tree).x as u16) as i16;
@@ -79,7 +79,7 @@ impl Widget for DockPanelWidget {
                         size = docked_child.shrink_rect_size(size);
                     },
                     Some(Dock::Top) => {
-                        child.measure(tree, available_width, None, state);
+                        child.measure(tree, available_width, None, app);
                         if let Some(available_height) = available_height.as_mut() {
                             *available_height =
                                 (*available_height as u16).saturating_sub(child.desired_size(tree).y as u16) as i16;
@@ -90,7 +90,7 @@ impl Widget for DockPanelWidget {
                         size = docked_child.shrink_rect_size(size);
                     },
                     Some(Dock::Right) => {
-                        child.measure(tree, None, available_height, state);
+                        child.measure(tree, None, available_height, app);
                         if let Some(available_width) = available_width.as_mut() {
                             *available_width =
                                 (*available_width as u16).saturating_sub(child.desired_size(tree).x as u16) as i16;
@@ -101,7 +101,7 @@ impl Widget for DockPanelWidget {
                         size = docked_child.shrink_rect_size(size);
                     },
                     Some(Dock::Bottom) => {
-                        child.measure(tree, available_width, None, state);
+                        child.measure(tree, available_width, None, app);
                         if let Some(available_height) = available_height.as_mut() {
                             *available_height =
                                 (*available_height as u16).saturating_sub(child.desired_size(tree).y as u16) as i16;
@@ -119,7 +119,7 @@ impl Widget for DockPanelWidget {
             loop {
                 let dock = DockPanel::dock(tree, child);
                 if dock.is_none() {
-                    child.measure(tree, available_width, available_height, state);
+                    child.measure(tree, available_width, available_height, app);
                     size = size.max(child.desired_size(tree));
                 }
                 child = child.next(tree);
@@ -136,7 +136,7 @@ impl Widget for DockPanelWidget {
         tree: &mut WindowTree,
         window: Window,
         final_inner_bounds: Rect,
-        state: &mut dyn State,
+        app: &mut dyn App,
     ) -> Vector {
         if let Some(first_child) = window.first_child(tree) {
             let mut size = Vector::null();
@@ -151,7 +151,7 @@ impl Widget for DockPanelWidget {
                         child.arrange(
                             tree,
                             Rect { tl: bounds.tl, size: Vector { x: child.desired_size(tree).x, y: bounds.h() } },
-                            state
+                            app
                         );
                         size = size.max(Vector { x: 0, y: child.desired_size(tree).y });
                         let docked_child = Thickness::new(i32::from(child.desired_size(tree).x), 0, 0, 0);
@@ -162,7 +162,7 @@ impl Widget for DockPanelWidget {
                         child.arrange(
                             tree,
                             Rect { tl: bounds.tl, size: Vector { x: bounds.w(), y: child.desired_size(tree).y } },
-                            state
+                            app
                         );
                         size = size.max(Vector { x: child.desired_size(tree).x, y: 0 });
                         let docked_child = Thickness::new(0, i32::from(child.desired_size(tree).y), 0, 0);
@@ -179,7 +179,7 @@ impl Widget for DockPanelWidget {
                                 },
                                 bounds.br()
                             ),
-                            state
+                            app
                         );
                         size = size.max(Vector { x: 0, y: child.desired_size(tree).y });
                         let docked_child = Thickness::new(0, 0, i32::from(child.desired_size(tree).x), 0);
@@ -196,7 +196,7 @@ impl Widget for DockPanelWidget {
                                 },
                                 bounds.br()
                             ),
-                            state
+                            app
                         );
                         size = size.max(Vector { x: child.desired_size(tree).x, y: 0 });
                         let docked_child = Thickness::new(0, 0, 0, i32::from(child.desired_size(tree).y));
@@ -212,7 +212,7 @@ impl Widget for DockPanelWidget {
             loop {
                 let dock = DockPanel::dock(tree, child);
                 if dock.is_none() {
-                    child.arrange(tree, bounds, state);
+                    child.arrange(tree, bounds, app);
                     size = size.max(child.render_bounds(tree).size);
                 }
                 child = child.next(tree);
@@ -230,7 +230,7 @@ impl Widget for DockPanelWidget {
         _window: Window,
         _event: Event,
         _event_source: Window,
-        _state: &mut dyn State,
+        _app: &mut dyn App,
     ) -> bool {
         false
     }

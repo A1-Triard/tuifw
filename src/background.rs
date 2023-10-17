@@ -2,7 +2,7 @@ use crate::{prop_string_render, prop_value_render, widget};
 use alloc::string::{String, ToString};
 use either::Left;
 use tuifw_screen_base::{Rect, Vector};
-use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, State};
+use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App};
 use tuifw_window::COLOR_BACKGROUND;
 
 pub struct Background {
@@ -43,7 +43,7 @@ impl Widget for BackgroundWidget {
         tree: &WindowTree,
         window: Window,
         rp: &mut RenderPort,
-        _state: &mut dyn State,
+        _app: &mut dyn App,
     ) {
         let color = window.color(tree, 0);
         let data = window.data::<Background>(tree);
@@ -66,13 +66,13 @@ impl Widget for BackgroundWidget {
         window: Window,
         available_width: Option<i16>,
         available_height: Option<i16>,
-        state: &mut dyn State,
+        app: &mut dyn App,
     ) -> Vector {
         let mut size = Vector::null();
         if let Some(first_child) = window.first_child(tree) {
             let mut child = first_child;
             loop {
-                child.measure(tree, available_width, available_height, state);
+                child.measure(tree, available_width, available_height, app);
                 size = size.max(child.desired_size(tree));
                 child = child.next(tree);
                 if child == first_child { break; }
@@ -86,12 +86,12 @@ impl Widget for BackgroundWidget {
         tree: &mut WindowTree,
         window: Window,
         final_inner_bounds: Rect,
-        state: &mut dyn State,
+        app: &mut dyn App,
     ) -> Vector {
         if let Some(first_child) = window.first_child(tree) {
             let mut child = first_child;
             loop {
-                child.arrange(tree, final_inner_bounds, state);
+                child.arrange(tree, final_inner_bounds, app);
                 child = child.next(tree);
                 if child == first_child { break; }
             }
@@ -105,7 +105,7 @@ impl Widget for BackgroundWidget {
         _window: Window,
         _event: Event,
         _event_source: Window,
-        _state: &mut dyn State,
+        _app: &mut dyn App,
     ) -> bool {
         false
     }

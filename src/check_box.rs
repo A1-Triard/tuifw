@@ -2,7 +2,7 @@ use crate::{prop_string_measure, prop_value, prop_value_render, widget};
 use alloc::string::String;
 use either::Left;
 use tuifw_screen_base::{Key, Point, Rect, Vector};
-use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, State};
+use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App};
 use tuifw_window::{CMD_GOT_PRIMARY_FOCUS, CMD_LOST_PRIMARY_FOCUS, label_width, label};
 use tuifw_window::{COLOR_TEXT, COLOR_HOTKEY, COLOR_DISABLED};
 
@@ -38,12 +38,12 @@ impl CheckBox {
     prop_value!(cmd: u16);
     prop_string_measure!(text);
 
-    fn click(tree: &mut WindowTree, window: Window, state: &mut dyn State) {
+    fn click(tree: &mut WindowTree, window: Window, app: &mut dyn App) {
         let data = window.data_mut::<CheckBox>(tree);
         data.is_on = !data.is_on;
         let cmd = data.cmd;
         window.invalidate_render(tree);
-        window.raise(tree, Event::Cmd(cmd), state);
+        window.raise(tree, Event::Cmd(cmd), app);
     }
 }
 
@@ -62,7 +62,7 @@ impl Widget for CheckBoxWidget {
         tree: &WindowTree,
         window: Window,
         rp: &mut RenderPort,
-        _state: &mut dyn State,
+        _app: &mut dyn App,
     ) {
         let focused = window.is_focused(tree);
         let is_enabled = window.actual_is_enabled(tree);
@@ -85,7 +85,7 @@ impl Widget for CheckBoxWidget {
         window: Window,
         _available_width: Option<i16>,
         _available_height: Option<i16>,
-        _state: &mut dyn State,
+        _app: &mut dyn App,
     ) -> Vector {
         let data = window.data::<CheckBox>(tree);
         if data.text.is_empty() {
@@ -100,7 +100,7 @@ impl Widget for CheckBoxWidget {
         tree: &mut WindowTree,
         window: Window,
         _final_inner_bounds: Rect,
-        _state: &mut dyn State,
+        _app: &mut dyn App,
     ) -> Vector {
         let data = window.data::<CheckBox>(tree);
         if data.text.is_empty() {
@@ -116,7 +116,7 @@ impl Widget for CheckBoxWidget {
         window: Window,
         event: Event,
         _event_source: Window,
-        state: &mut dyn State,
+        app: &mut dyn App,
     ) -> bool {
         match event {
             Event::Cmd(CMD_GOT_PRIMARY_FOCUS) | Event::Cmd(CMD_LOST_PRIMARY_FOCUS) => {
@@ -125,7 +125,7 @@ impl Widget for CheckBoxWidget {
             },
             Event::Key(Key::Char(' ')) => {
                 if window.actual_is_enabled(tree) {
-                    CheckBox::click(tree, window, state);
+                    CheckBox::click(tree, window, app);
                     true
                 } else {
                     false
@@ -137,7 +137,7 @@ impl Widget for CheckBoxWidget {
                     let label = label(&data.text);
                     if Some(c) == label {
                         window.set_focused_primary(tree, true);
-                        CheckBox::click(tree, window, state);
+                        CheckBox::click(tree, window, app);
                         true
                     } else {
                         false

@@ -61,12 +61,12 @@ use core::mem::replace;
 use core::str::FromStr;
 use timer_no_std::MonoClock;
 use tuifw_screen::{Error, Key};
-use tuifw_window::{Event, EventHandler, Window, WindowTree, State};
+use tuifw_window::{Event, EventHandler, Window, WindowTree, App};
 use tuifw::{Button, InputLine, StaticText, CMD_INPUT_LINE_IS_VALID_CHANGED};
 
 const CMD_CALC: u16 = 1000;
 
-struct App {
+struct State {
     a: Window,
     v: Window,
     t: Window,
@@ -75,7 +75,7 @@ struct App {
     calc: Window,
 }
 
-impl State for App { }
+impl App for State { }
 
 #[derive(Clone)]
 struct RootEventHandler;
@@ -87,9 +87,9 @@ impl EventHandler for RootEventHandler {
         _window: Window,
         event: Event,
         _event_source: Window,
-        state: &mut dyn State
+        state: &mut dyn App
     ) -> bool {
-        let state = state.downcast_mut::<App>().unwrap();
+        let state = state.downcast_mut::<State>().unwrap();
         match event {
             Event::Key(Key::Escape) => {
                 tree.quit();
@@ -129,7 +129,7 @@ fn start() -> Result<(), Error> {
     let n = tree.window_by_tag(4).unwrap();
     let calc = tree.window_by_tag(5).unwrap();
     let s = tree.window_by_tag(6).unwrap();
-    let state = &mut App { a, v, t, n, s, calc };
+    let state = &mut State { a, v, t, n, s, calc };
     Button::set_cmd(tree, calc, CMD_CALC);
     tree.run(state)
 }

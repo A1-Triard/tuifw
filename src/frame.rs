@@ -2,7 +2,7 @@ use crate::{prop_string_render, prop_value_render, widget};
 use alloc::string::String;
 use either::Left;
 use tuifw_screen_base::{Rect, Vector, Thickness, text_width, HAlign, VAlign};
-use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, State};
+use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App};
 use tuifw_window::{COLOR_FRAME, COLORS, COLOR_IN_FRAME};
 
 pub struct Frame {
@@ -48,7 +48,7 @@ impl Widget for FrameWidget {
         tree: &WindowTree,
         window: Window,
         rp: &mut RenderPort,
-        _state: &mut dyn State,
+        _app: &mut dyn App,
     ) {
         let color = window.color(tree, 0);
         let bounds = window.inner_bounds(tree);
@@ -91,7 +91,7 @@ impl Widget for FrameWidget {
         window: Window,
         available_width: Option<i16>,
         available_height: Option<i16>,
-        state: &mut dyn State,
+        app: &mut dyn App,
     ) -> Vector {
         let available_size = Vector { x: available_width.unwrap_or(0), y: available_height.unwrap_or(0) };
         let children_size = Thickness::all(1).shrink_rect_size(available_size);
@@ -101,7 +101,7 @@ impl Widget for FrameWidget {
         if let Some(first_child) = window.first_child(tree) {
             let mut child = first_child;
             loop {
-                child.measure(tree, children_width, children_height, state);
+                child.measure(tree, children_width, children_height, app);
                 size = size.max(child.desired_size(tree));
                 child = child.next(tree);
                 if child == first_child { break; }
@@ -115,13 +115,13 @@ impl Widget for FrameWidget {
         tree: &mut WindowTree,
         window: Window,
         final_inner_bounds: Rect,
-        state: &mut dyn State,
+        app: &mut dyn App,
     ) -> Vector {
         let children_bounds = Thickness::all(1).shrink_rect(final_inner_bounds);
         if let Some(first_child) = window.first_child(tree) {
             let mut child = first_child;
             loop {
-                child.arrange(tree, children_bounds, state);
+                child.arrange(tree, children_bounds, app);
                 child = child.next(tree);
                 if child == first_child { break; }
             }
@@ -135,7 +135,7 @@ impl Widget for FrameWidget {
         _window: Window,
         _event: Event,
         _event_source: Window,
-        _state: &mut dyn State,
+        _app: &mut dyn App,
     ) -> bool {
         false
     }

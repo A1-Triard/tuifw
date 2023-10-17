@@ -2,7 +2,7 @@ use crate::{prop_string_measure, prop_value, prop_value_render, widget};
 use alloc::string::String;
 use either::Left;
 use tuifw_screen_base::{Key, Point, Rect, Vector};
-use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, State};
+use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App};
 use tuifw_window::{CMD_GOT_PRIMARY_FOCUS, CMD_LOST_PRIMARY_FOCUS, label_width, label};
 use tuifw_window::{COLOR_TEXT, COLOR_HOTKEY, COLOR_DISABLED};
 
@@ -41,7 +41,7 @@ impl RadioButton {
     prop_value!(cmd: u16);
     prop_string_measure!(text);
 
-    fn click(tree: &mut WindowTree, window: Window, state: &mut dyn State) -> bool {
+    fn click(tree: &mut WindowTree, window: Window, app: &mut dyn App) -> bool {
         let data = window.data_mut::<RadioButton>(tree);
         if !data.is_on || data.allow_turn_off {
             data.is_on = !data.is_on;
@@ -55,7 +55,7 @@ impl RadioButton {
                 }
             }
             window.invalidate_render(tree);
-            window.raise(tree, Event::Cmd(cmd), state);
+            window.raise(tree, Event::Cmd(cmd), app);
             true
         } else {
             false
@@ -78,7 +78,7 @@ impl Widget for RadioButtonWidget {
         tree: &WindowTree,
         window: Window,
         rp: &mut RenderPort,
-        _state: &mut dyn State,
+        _app: &mut dyn App,
     ) {
         let is_enabled = window.actual_is_enabled(tree);
         let focused = window.is_focused(tree);
@@ -101,7 +101,7 @@ impl Widget for RadioButtonWidget {
         window: Window,
         _available_width: Option<i16>,
         _available_height: Option<i16>,
-        _state: &mut dyn State,
+        _app: &mut dyn App,
     ) -> Vector {
         let data = window.data::<RadioButton>(tree);
         if data.text.is_empty() {
@@ -116,7 +116,7 @@ impl Widget for RadioButtonWidget {
         tree: &mut WindowTree,
         window: Window,
         _final_inner_bounds: Rect,
-        _state: &mut dyn State,
+        _app: &mut dyn App,
     ) -> Vector {
         let data = window.data::<RadioButton>(tree);
         if data.text.is_empty() {
@@ -132,7 +132,7 @@ impl Widget for RadioButtonWidget {
         window: Window,
         event: Event,
         _event_source: Window,
-        state: &mut dyn State,
+        app: &mut dyn App,
     ) -> bool {
         match event {
             Event::Cmd(CMD_GOT_PRIMARY_FOCUS) | Event::Cmd(CMD_LOST_PRIMARY_FOCUS) => {
@@ -141,7 +141,7 @@ impl Widget for RadioButtonWidget {
             },
             Event::Key(Key::Char(' ')) => {
                 if window.actual_is_enabled(tree) {
-                    RadioButton::click(tree, window, state)
+                    RadioButton::click(tree, window, app)
                 } else {
                     false
                 }
@@ -152,7 +152,7 @@ impl Widget for RadioButtonWidget {
                     let label = label(&data.text);
                     if Some(c) == label {
                         window.set_focused_primary(tree, true);
-                        RadioButton::click(tree, window, state);
+                        RadioButton::click(tree, window, app);
                         true
                     } else {
                         false
