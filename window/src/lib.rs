@@ -1350,6 +1350,7 @@ impl<'clock> WindowTree<'clock> {
     pub fn run(&mut self, app: &mut dyn App) -> Result<(), Error> {
         let mut time = self.clock.time();
         while !self.quit {
+            let no_timers = self.timers.items().is_empty();
             let timers_time = self.clock.time();
             loop {
                 let timer = self.timers.items().iter()
@@ -1363,7 +1364,7 @@ impl<'clock> WindowTree<'clock> {
                     break;
                 }
             }
-            if self.timers.items().is_empty() {
+            if no_timers {
                 self.update(true, app)?;
             } else {
                 let ms = time.split_ms_u16(self.clock).unwrap_or(u16::MAX);

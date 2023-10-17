@@ -2,7 +2,7 @@
 
 #![windows_subsystem = "windows"]
 
-//#![deny(warnings)]
+#![deny(warnings)]
 
 #![no_std]
 
@@ -60,9 +60,12 @@ use alloc::vec::Vec;
 use rand::{Rng, SeedableRng};
 use rand::rngs::SmallRng;
 use timer_no_std::MonoClock;
-use tuifw_screen::{Error, Key};
+use tuifw_screen::Error;
 use tuifw_window::{Event, EventHandler, Window, WindowTree, Visibility, App};
-use tuifw::{Button, CMD_BUTTON_CLICK, StaticText};
+use tuifw::{Button, CMD_BUTTON_CLICK, StaticText, Label};
+
+const CMD_NEW_GAME: u16 = 1000;
+const CMD_EXIT: u16 = 1001;
 
 struct State {
     squares: [Window; 9],
@@ -107,6 +110,15 @@ impl Symbol {
 }
 
 impl State {
+    fn new_game(&mut self, tree: &mut WindowTree) {
+        self.res.set_visibility(tree, Visibility::Hidden);
+        for &square in &self.squares {
+            square.set_is_enabled(tree, true);
+            Button::set_text(tree, square, " ");
+        }
+        self.ai_move(tree);
+    }
+
     fn ai_move(&mut self, tree: &mut WindowTree) {
         let enabled_squares = self.squares.iter().cloned().filter(|x| x.is_enabled(tree)).collect::<Vec<_>>();
         if !enabled_squares.is_empty() {
@@ -114,9 +126,7 @@ impl State {
             let ai_move = enabled_squares[ai_move];
             Button::set_text(tree, ai_move, "x");
             ai_move.set_is_enabled(tree, false);
-            if let Some(enabled_square) = self.squares.iter().find(|x| x.is_enabled(tree)) {
-                enabled_square.set_focused_primary(tree, true);
-            }
+            ai_move.set_focused_primary(tree, true);
         }
     }
 
@@ -179,8 +189,12 @@ impl EventHandler for RootEventHandler {
     ) -> bool {
         let state = state.downcast_mut::<State>().unwrap();
         match event {
-            Event::Key(Key::Escape) => {
+            Event::Cmd(CMD_EXIT) => {
                 tree.quit();
+                true
+            },
+            Event::Cmd(CMD_NEW_GAME) => {
+                state.new_game(tree);
                 true
             },
             Event::Cmd(CMD_BUTTON_CLICK) => {
@@ -219,6 +233,8 @@ fn start() -> Result<(), Error> {
         res_text: names.res_text,
         rng: SmallRng::from_entropy(),
     };
+    Label::set_cmd(&mut tree, names.new_game, CMD_NEW_GAME);
+    Label::set_cmd(&mut tree, names.exit, CMD_EXIT);
     state.ai_move(&mut tree);
     tree.run(state)
 }

@@ -1,7 +1,7 @@
 <Background xmlns='https://a1-triard.github.io/tuifw/2023/xaml'>
   <Frame HAlign="Center" VAlign="Center" TextAlign="Center" Text="Tic-Tac-Toe">
-    <StackPanel Margin="3,1,3,1">
-      <StackPanel Vertical="False">
+    <StackPanel Margin="2,1,2,1">
+      <StackPanel Vertical="False" HAlign="Center">
         <Button Text=" " Name="tl"
 	  FocusTab="t" FocusRight="t" FocusLeft="tr" FocusUp="bl" FocusDown="l"
 	  FocusedPrimary="True"
@@ -13,7 +13,7 @@
 	  FocusTab="l" FocusRight="tl" FocusLeft="t" FocusUp="br" FocusDown="r"
 	/>
       </StackPanel>
-      <StackPanel Vertical="False">
+      <StackPanel Vertical="False" HAlign="Center">
         <Button Text=" " Name="l"
 	  FocusTab="c" FocusRight="c" FocusLeft="r" FocusUp="tl" FocusDown="bl"
 	/>
@@ -24,7 +24,7 @@
 	  FocusTab="bl" FocusRight="l" FocusLeft="c" FocusUp="tr" FocusDown="br"
 	/>
       </StackPanel>
-      <StackPanel Vertical="False">
+      <StackPanel Vertical="False" HAlign="Center">
         <Button Text=" " Name="bl"
 	  FocusTab="b" FocusRight="b" FocusLeft="br" FocusUp="l" FocusDown="tl"
 	/>
@@ -35,9 +35,13 @@
 	  FocusTab="tl" FocusRight="bl" FocusLeft="b" FocusUp="r" FocusDown="tr"
 	/>
       </StackPanel>
+      <StackPanel Vertical="False" Margin="1,1,2,0">
+        <Label Text="~N~ew game" Name="new_game" />
+        <Label Text="E~x~it" Margin="2,0,0,0" Name="exit" />
+      </StackPanel>
     </StackPanel>
-    <Background HAlign="Center" VAlign="Center" Visibility="Hidden" Name="res">
-      <StaticText Margin="1" Name="res_text" />
+    <Background Height="3" Margin="3,1,3,0" Visibility="Hidden" Name="res">
+      <StaticText HAlign="Center" VAlign="Center" Name="res_text" />
     </Background>
   </Frame>
 </Background>
