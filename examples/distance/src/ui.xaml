@@ -24,7 +24,7 @@
 	      <FloatValidator />
 	    </InputLine.Validator>
 	  </InputLine>
-          <InputLine Text="1" Margin="0,1,0,0" Tag="4" Name="n" FocusTabTag="1" FocusDownTag="1" FocusUpTag="3">
+          <InputLine Text="1" Margin="0,1,0,0" Tag="4" Name="n" FocusTab="a" FocusDownTag="1" FocusUpTag="3">
 	    <InputLine.Validator>
 	      <IntValidator Min="1" />
 	    </InputLine.Validator>

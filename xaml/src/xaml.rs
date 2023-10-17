@@ -17,6 +17,7 @@ use xml::reader::Result as xml_Result;
 pub enum XamlType {
     Struct(Id<XamlStruct>),
     Literal(Id<XamlLiteral>),
+    Ref,
 }
 
 macro_attr! {
@@ -322,12 +323,17 @@ impl<'a, R: Read, W: Write> XamlProcessor<'a, R, W> {
             return self.error(format!("unknown type '{}'", name));
         };
         match ty {
-            &XamlType::Literal(ty) => self.process_literal(ty, attributes),
+            XamlType::Ref => self.process_literal(None, attributes),
+            &XamlType::Literal(ty) => self.process_literal(Some(ty), attributes),
             &XamlType::Struct(ty) => self.process_struct(ty, attributes, parent_property),
         }
     }
 
-    fn process_literal(&mut self, ty: Id<XamlLiteral>, attributes: Vec<OwnedAttribute>) -> xml_Result<String> {
+    fn process_literal(
+        &mut self,
+        ty: Option<Id<XamlLiteral>>,
+        attributes: Vec<OwnedAttribute>
+    ) -> xml_Result<String> {
         if !attributes.is_empty() {
             return self.error(format!("unexpected attribute '{}'", Self::name(&attributes[0].name)));
         }
@@ -338,7 +344,7 @@ impl<'a, R: Read, W: Write> XamlProcessor<'a, R, W> {
         Ok(res)
     }
 
-    fn process_literal_value(&mut self, ty: Id<XamlLiteral>) -> xml_Result<(String, String)> {
+    fn process_literal_value(&mut self, ty: Option<Id<XamlLiteral>>) -> xml_Result<(String, String)> {
         let value = match self.event.clone() {
             XmlEvent::Characters(s) => {
                 self.next_event()?;
@@ -351,13 +357,17 @@ impl<'a, R: Read, W: Write> XamlProcessor<'a, R, W> {
             XmlEvent::EndElement { .. } => String::new(),
             _ => return self.error("unsupported XML feature"),
         };
-        let Some(new) = self.xaml.literals[ty].new.as_ref() else {
-            return self.error("literal creation function is not set");
-        };
-        if let Some(processed_value) = new(&value) {
-            Ok((processed_value, value))
+        if let Some(ty) = ty {
+            let Some(new) = self.xaml.literals[ty].new.as_ref() else {
+                return self.error("literal creation function is not set");
+            };
+            if let Some(processed_value) = new(&value) {
+                Ok((processed_value, value))
+            } else {
+                self.error(format!("invalid literal '{value}'"))
+            }
         } else {
-            self.error(format!("invalid literal '{value}'"))
+            Ok((self.names[&value].clone(), value))
         }
     }
 
@@ -380,14 +390,18 @@ impl<'a, R: Read, W: Write> XamlProcessor<'a, R, W> {
             };
             let is_name_property = Some(property) == self.xaml.find_name_property(ty);
             let property = &self.xaml.properties[property];
-            let XamlType::Literal(property_ty) = property.ty else {
-                return self.error(format!("invalid '{attr_name}' property value"));
-            };
-            let Some(new) = self.xaml.literals[property_ty].new.as_ref() else {
-                return self.error("literal creation function is not set");
-            };
-            let Some(value) = new(&attr.value) else {
-                return self.error(format!("invalid '{attr_name}' property value"));
+            let value = match property.ty {
+                XamlType::Struct(_) => return self.error(format!("invalid '{attr_name}' property value")),
+                XamlType::Literal(property_ty) => {
+                    let Some(new) = self.xaml.literals[property_ty].new.as_ref() else {
+                        return self.error("literal creation function is not set");
+                    };
+                    let Some(value) = new(&attr.value) else {
+                        return self.error(format!("invalid '{attr_name}' property value"));
+                    };
+                    value
+                },
+                XamlType::Ref => self.names[&attr.value].clone(),
             };
             let Some(set) = property.set.as_ref() else {
                 return self.error("property set function is not set");
@@ -451,7 +465,7 @@ impl<'a, R: Read, W: Write> XamlProcessor<'a, R, W> {
                             self.xaml.properties[property].name
                         ));
                     };
-                    self.process_literal_value(property_ty)?
+                    self.process_literal_value(Some(property_ty))?
                 },
                 _ => return self.error("unsupported XML feature"),
             };
