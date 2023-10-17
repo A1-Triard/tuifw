@@ -66,6 +66,8 @@ use tuifw::{Button, CMD_BUTTON_CLICK, StaticText};
 
 struct State {
     squares: [Window; 9],
+    res: Window,
+    res_text: Window,
     rng: SmallRng,
 }
 
@@ -154,9 +156,8 @@ impl State {
                 Winner::Ai => "AI won!",
                 Winner::Draw => "Draw!",
             };
-            let result_window = tree.window_by_tag(11).unwrap();
-            StaticText::set_text(tree, result_window, result);
-            tree.window_by_tag(10).unwrap().set_visibility(tree, Visibility::Visible);
+            StaticText::set_text(tree, self.res_text, result);
+            self.res.set_visibility(tree, Visibility::Visible);
             true
         } else {
             false
@@ -199,23 +200,25 @@ impl EventHandler for RootEventHandler {
 fn start() -> Result<(), Error> {
     let clock = unsafe { MonoClock::new() };
     let screen = unsafe { tuifw_screen::init(None, None) }?;
-    let tree = &mut ui::build_tree(screen, &clock)?.0;
+    let (mut tree, names) = ui::build_tree(screen, &clock)?;
     let root = tree.root();
-    root.set_event_handler(tree, Some(Box::new(RootEventHandler)));
+    root.set_event_handler(&mut tree, Some(Box::new(RootEventHandler)));
     let state = &mut State {
         squares: [
-            tree.window_by_tag(7).unwrap(),
-            tree.window_by_tag(8).unwrap(),
-            tree.window_by_tag(9).unwrap(),
-            tree.window_by_tag(4).unwrap(),
-            tree.window_by_tag(5).unwrap(),
-            tree.window_by_tag(6).unwrap(),
-            tree.window_by_tag(1).unwrap(),
-            tree.window_by_tag(2).unwrap(),
-            tree.window_by_tag(3).unwrap(),
+            names.tl,
+            names.t,
+            names.tr,
+            names.l,
+            names.c,
+            names.r,
+            names.bl,
+            names.b,
+            names.br,
         ],
+        res: names.res,
+        res_text: names.res_text,
         rng: SmallRng::from_entropy(),
     };
-    state.ai_move(tree);
+    state.ai_move(&mut tree);
     tree.run(state)
 }

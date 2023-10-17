@@ -107,7 +107,7 @@ impl Widget for LabelWidget {
                         let data = window.data_mut::<Label>(tree);
                         let cmd = data.cmd;
                         window.raise(tree, Event::Cmd(cmd), app);
-                        let focus = window.actual_focus_tab(tree);
+                        let focus = window.focus_tab(tree);
                         if focus != window {
                             focus.set_focused_primary(tree, true);
                         }

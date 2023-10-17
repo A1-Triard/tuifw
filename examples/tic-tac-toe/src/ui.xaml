@@ -2,42 +2,42 @@
   <Frame HAlign="Center" VAlign="Center" TextAlign="Center" Text="Tic-Tac-Toe">
     <StackPanel Margin="3,1,3,1">
       <StackPanel Vertical="False">
-        <Button Text=" " Tag="7"
-	  FocusTabTag="8" FocusRightTag="8" FocusLeftTag="9" FocusUpTag="1" FocusDownTag="4"
+        <Button Text=" " Name="tl"
+	  FocusTab="t" FocusRight="t" FocusLeft="tr" FocusUp="bl" FocusDown="l"
 	  FocusedPrimary="True"
 	/>
-        <Button Text=" " Tag="8"
-	  FocusTabTag="9" FocusRightTag="9" FocusLeftTag="7" FocusUpTag="2" FocusDownTag="5"
+        <Button Text=" " Name="t"
+	  FocusTab="tr" FocusRight="tr" FocusLeft="tl" FocusUp="b" FocusDown="c"
 	/>
-        <Button Text=" " Tag="9"
-	  FocusTabTag="4" FocusRightTag="7" FocusLeftTag="8" FocusUpTag="3" FocusDownTag="6"
-	/>
-      </StackPanel>
-      <StackPanel Vertical="False">
-        <Button Text=" " Tag="4"
-	  FocusTabTag="5" FocusRightTag="5" FocusLeftTag="6" FocusUpTag="7" FocusDownTag="1"
-	/>
-        <Button Text=" " Tag="5"
-	  FocusTabTag="6" FocusRightTag="6" FocusLeftTag="4" FocusUpTag="8" FocusDownTag="2"
-	/>
-        <Button Text=" " Tag="6"
-	  FocusTabTag="1" FocusRightTag="4" FocusLeftTag="5" FocusUpTag="9" FocusDownTag="3"
+        <Button Text=" " Name="tr"
+	  FocusTab="l" FocusRight="tl" FocusLeft="t" FocusUp="br" FocusDown="r"
 	/>
       </StackPanel>
       <StackPanel Vertical="False">
-        <Button Text=" " Tag="1"
-	  FocusTabTag="2" FocusRightTag="2" FocusLeftTag="3" FocusUpTag="4" FocusDownTag="7"
+        <Button Text=" " Name="l"
+	  FocusTab="c" FocusRight="c" FocusLeft="r" FocusUp="tl" FocusDown="bl"
 	/>
-        <Button Text=" " Tag="2"
-	  FocusTabTag="3" FocusRightTag="3" FocusLeftTag="1" FocusUpTag="5" FocusDownTag="8"
+        <Button Text=" " Name="c"
+	  FocusTab="r" FocusRight="r" FocusLeft="l" FocusUp="t" FocusDown="b"
 	/>
-        <Button Text=" " Tag="3"
-	  FocusTabTag="7" FocusRightTag="1" FocusLeftTag="2" FocusUpTag="6" FocusDownTag="9"
+        <Button Text=" " Name="r"
+	  FocusTab="bl" FocusRight="l" FocusLeft="c" FocusUp="tr" FocusDown="br"
+	/>
+      </StackPanel>
+      <StackPanel Vertical="False">
+        <Button Text=" " Name="bl"
+	  FocusTab="b" FocusRight="b" FocusLeft="br" FocusUp="l" FocusDown="tl"
+	/>
+        <Button Text=" " Name="b"
+	  FocusTab="br" FocusRight="br" FocusLeft="bl" FocusUp="c" FocusDown="t"
+	/>
+        <Button Text=" " Name="br"
+	  FocusTab="tl" FocusRight="bl" FocusLeft="b" FocusUp="r" FocusDown="tr"
 	/>
       </StackPanel>
     </StackPanel>
-    <Background HAlign="Center" VAlign="Center" Visibility="Hidden" Tag="10">
-      <StaticText Margin="1" Tag="11" />
+    <Background HAlign="Center" VAlign="Center" Visibility="Hidden" Name="res">
+      <StaticText Margin="1" Name="res_text" />
     </Background>
   </Frame>
 </Background>

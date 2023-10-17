@@ -46,15 +46,13 @@ pub fn reg_widgets(xaml: &mut Xaml) {
     let widget = xaml.reg_struct(xmlns!("Widget"), None);
     let widget_children = xaml.reg_property(widget, "Children", XamlType::Struct(widget));
     xaml.content_property(widget_children);
-    let widget_tag = xaml.reg_property(widget, "Tag", XamlType::Literal(uint_16));
     let widget_name = xaml.reg_property(widget, "Name", XamlType::Literal(string));
     xaml.name_property(widget_name);
     let widget_focus_tab = xaml.reg_property(widget, "FocusTab", XamlType::Ref);
-    let widget_focus_tab_tag = xaml.reg_property(widget, "FocusTabTag", XamlType::Literal(uint_16));
-    let widget_focus_right_tag = xaml.reg_property(widget, "FocusRightTag", XamlType::Literal(uint_16));
-    let widget_focus_left_tag = xaml.reg_property(widget, "FocusLeftTag", XamlType::Literal(uint_16));
-    let widget_focus_up_tag = xaml.reg_property(widget, "FocusUpTag", XamlType::Literal(uint_16));
-    let widget_focus_down_tag = xaml.reg_property(widget, "FocusDownTag", XamlType::Literal(uint_16));
+    let widget_focus_right = xaml.reg_property(widget, "FocusRight", XamlType::Ref);
+    let widget_focus_left = xaml.reg_property(widget, "FocusLeft", XamlType::Ref);
+    let widget_focus_up = xaml.reg_property(widget, "FocusUp", XamlType::Ref);
+    let widget_focus_down = xaml.reg_property(widget, "FocusDown", XamlType::Ref);
     let widget_focused_primary = xaml.reg_property(widget, "FocusedPrimary", XamlType::Literal(boolean));
     let widget_focused_secondary = xaml.reg_property(widget, "FocusedSecondary", XamlType::Literal(boolean));
     let widget_h_align = xaml.reg_property(widget, "HAlign", XamlType::Literal(h_align));
@@ -239,29 +237,23 @@ pub fn reg_widgets(xaml: &mut Xaml) {
     xaml.property_set(widget_visibility, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_visibility(&mut tree, {});
     " }, obj, value))));
-    xaml.property_set(widget_tag, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        {}.set_tag(&mut tree, {});
-    " }, obj, value))));
     xaml.property_set(widget_name, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_name(&mut tree, {});
     " }, obj, value))));
     xaml.property_set(widget_focus_tab, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_focus_tab(&mut tree, {});
     " }, obj, value))));
-    xaml.property_set(widget_focus_tab_tag, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        {}.set_focus_tab_tag(&mut tree, {});
+    xaml.property_set(widget_focus_right, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_focus_right(&mut tree, {});
     " }, obj, value))));
-    xaml.property_set(widget_focus_right_tag, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        {}.set_focus_right_tag(&mut tree, {});
+    xaml.property_set(widget_focus_left, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_focus_left(&mut tree, {});
     " }, obj, value))));
-    xaml.property_set(widget_focus_left_tag, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        {}.set_focus_left_tag(&mut tree, {});
+    xaml.property_set(widget_focus_up, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_focus_up(&mut tree, {});
     " }, obj, value))));
-    xaml.property_set(widget_focus_up_tag, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        {}.set_focus_up_tag(&mut tree, {});
-    " }, obj, value))));
-    xaml.property_set(widget_focus_down_tag, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        {}.set_focus_down_tag(&mut tree, {});
+    xaml.property_set(widget_focus_down, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_focus_down(&mut tree, {});
     " }, obj, value))));
     xaml.property_set(widget_focused_primary, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_focused_primary(&mut tree, {});

@@ -4,32 +4,32 @@
       <StackPanel Margin="0,0,0,1">
         <CheckBox
           Text="Option ~1~"
-          Tag="1"
-          FocusTabTag="2" FocusDownTag="2" FocusUpTag="4" FocusedPrimary="True"
+          Name="o_1"
+          FocusTab="o_2" FocusDown="o_2" FocusUp="r_2" FocusedPrimary="True"
         />
         <CheckBox
           Text="Option ~2~" IsOn="True"
-          Tag="2"
-          FocusTabTag="3" FocusDownTag="3" FocusUpTag="1"
+          Name="o_2"
+          FocusTab="r_1" FocusDown="r_1" FocusUp="o_1"
         />
         <Frame Text="Radio Buttons">
           <StackPanel Margin="1,0,1,0">
             <RadioButton
               Text="~R~adio Button 1" IsOn="True"
-              Tag="3"
-              FocusTabTag="4" FocusDownTag="4" FocusUpTag="2"
+              Name="r_1"
+              FocusTab="r_2" FocusDown="r_2" FocusUp="o_2"
             />
             <RadioButton
               Text="R~a~dio Button 2"
-              Tag="4"
-              FocusTabTag="1" FocusDownTag="1" FocusUpTag="3"
+              Name="r_2"
+              FocusTab="o_1" FocusDown="o_1" FocusUp="r_1"
             />
           </StackPanel>
         </Frame>
       </StackPanel>
       <StackPanel Vertical="False" HAlign="Center">
-        <Button Text="~O~K" Tag="10" FocusRightTag="11" FocusLeftTag="11" FocusedSecondary="True" />
-        <Button Text="~C~ancel" Margin="3,0,0,0" Tag="11" FocusRightTag="10" FocusLeftTag="10" />
+        <Button Text="~O~K" Name="ok" FocusRight="cancel" FocusLeft="cancel" FocusedSecondary="True" />
+        <Button Text="~C~ancel" Margin="3,0,0,0" Name="cancel" FocusRight="ok" FocusLeft="ok" />
       </StackPanel>
     </StackPanel>
   </Frame>

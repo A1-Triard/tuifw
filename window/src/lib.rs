@@ -383,17 +383,11 @@ macro_attr! {
         max_height: i16,
         event_handler: Option<Box<dyn EventHandler>>,
         focus_tab: Window,
-        focus_tab_tag: u16,
         focus_right: Window,
-        focus_right_tag: u16,
         focus_left: Window,
-        focus_left_tag: u16,
         focus_up: Window,
-        focus_up_tag: u16,
         focus_down: Window,
-        focus_down_tag: u16,
         contains_primary_focus: bool,
-        tag: u16,
         name: String,
         pre_process: Option<Id<PrePostProcess>>,
         post_process: Option<Id<PrePostProcess>>,
@@ -461,17 +455,11 @@ impl Window {
                 min_height: 0,
                 max_height: -1,
                 focus_tab: Window(window),
-                focus_tab_tag: 0,
                 focus_right: Window(window),
-                focus_right_tag: 0,
                 focus_left: Window(window),
-                focus_left_tag: 0,
                 focus_up: Window(window),
-                focus_up_tag: 0,
                 focus_down: Window(window),
-                focus_down_tag: 0,
                 contains_primary_focus: false,
-                tag: 0,
                 name: String::new(),
                 pre_process: None,
                 post_process: None,
@@ -652,38 +640,12 @@ impl Window {
         res
     }
 
-    pub fn actual_focus_tab(self, tree: &WindowTree) -> Self {
-        let node = &tree.arena[self.0];
-        if node.focus_tab_tag == 0 {
-            node.focus_tab
-        } else {
-            tree.window_by_tag(node.focus_tab_tag).unwrap()
-        }
-    }
-
     pub fn focus_tab(self, tree: &WindowTree) -> Self {
         tree.arena[self.0].focus_tab
     }
 
     pub fn set_focus_tab(self, tree: &mut WindowTree, value: Self) {
         tree.arena[self.0].focus_tab = value;
-    }
-
-    pub fn focus_tab_tag(self, tree: &WindowTree) -> u16 {
-        tree.arena[self.0].focus_tab_tag
-    }
-
-    pub fn set_focus_tab_tag(self, tree: &mut WindowTree, value: u16) {
-        tree.arena[self.0].focus_tab_tag = value;
-    }
-
-    pub fn actual_focus_right(self, tree: &WindowTree) -> Self {
-        let node = &tree.arena[self.0];
-        if node.focus_right_tag == 0 {
-            node.focus_right
-        } else {
-            tree.window_by_tag(node.focus_right_tag).unwrap()
-        }
     }
 
     pub fn focus_right(self, tree: &WindowTree) -> Self {
@@ -694,46 +656,12 @@ impl Window {
         tree.arena[self.0].focus_right = value;
     }
 
-    pub fn focus_right_tag(self, tree: &WindowTree) -> u16 {
-        tree.arena[self.0].focus_right_tag
-    }
-
-    pub fn set_focus_right_tag(self, tree: &mut WindowTree, value: u16) {
-        tree.arena[self.0].focus_right_tag = value;
-    }
-
-    pub fn actual_focus_left(self, tree: &WindowTree) -> Self {
-        let node = &tree.arena[self.0];
-        if node.focus_left_tag == 0 {
-            node.focus_left
-        } else {
-            tree.window_by_tag(node.focus_left_tag).unwrap()
-        }
-    }
-
     pub fn focus_left(self, tree: &WindowTree) -> Self {
         tree.arena[self.0].focus_left
     }
 
     pub fn set_focus_left(self, tree: &mut WindowTree, value: Self) {
         tree.arena[self.0].focus_left = value;
-    }
-
-    pub fn focus_left_tag(self, tree: &WindowTree) -> u16 {
-        tree.arena[self.0].focus_left_tag
-    }
-
-    pub fn set_focus_left_tag(self, tree: &mut WindowTree, value: u16) {
-        tree.arena[self.0].focus_left_tag = value;
-    }
-
-    pub fn actual_focus_up(self, tree: &WindowTree) -> Self {
-        let node = &tree.arena[self.0];
-        if node.focus_up_tag == 0 {
-            node.focus_up
-        } else {
-            tree.window_by_tag(node.focus_up_tag).unwrap()
-        }
     }
 
     pub fn focus_up(self, tree: &WindowTree) -> Self {
@@ -744,37 +672,12 @@ impl Window {
         tree.arena[self.0].focus_up = value;
     }
 
-    pub fn focus_up_tag(self, tree: &WindowTree) -> u16 {
-        tree.arena[self.0].focus_up_tag
-    }
-
-    pub fn set_focus_up_tag(self, tree: &mut WindowTree, value: u16) {
-        tree.arena[self.0].focus_up_tag = value;
-    }
-
-    pub fn actual_focus_down(self, tree: &WindowTree) -> Self {
-        let node = &tree.arena[self.0];
-        if node.focus_down_tag == 0 {
-            node.focus_down
-        } else {
-            tree.window_by_tag(node.focus_down_tag).unwrap()
-        }
-    }
-
     pub fn focus_down(self, tree: &WindowTree) -> Self {
         tree.arena[self.0].focus_down
     }
 
     pub fn set_focus_down(self, tree: &mut WindowTree, value: Self) {
         tree.arena[self.0].focus_down = value;
-    }
-
-    pub fn focus_down_tag(self, tree: &WindowTree) -> u16 {
-        tree.arena[self.0].focus_down_tag
-    }
-
-    pub fn set_focus_down_tag(self, tree: &mut WindowTree, value: u16) {
-        tree.arena[self.0].focus_down_tag = value;
     }
 
     pub fn is_focused(self, tree: &WindowTree) -> bool {
@@ -1085,24 +988,6 @@ impl Window {
         invalidate_rect(tree.screen(), screen_bounds);
     }
 
-    pub fn tag(self, tree: &WindowTree) -> u16 {
-        tree.arena[self.0].tag
-    }
-
-    pub fn set_tag(self, tree: &mut WindowTree, value: u16) {
-        let old_tag = tree.arena[self.0].tag;
-        if old_tag != 0 {
-            tree.tagged[usize::from(old_tag - 1)] = None;
-        }
-        tree.arena[self.0].tag = value;
-        if value != 0 {
-            if usize::from(value) > tree.tagged.len() {
-                tree.tagged.resize(usize::from(value), None);
-            }
-            assert!(tree.tagged[usize::from(value - 1)].replace(self).is_none());
-        }
-    }
-
     pub fn name<'a>(self, tree: &'a WindowTree) -> &'a String {
         &tree.arena[self.0].name
     }
@@ -1329,7 +1214,6 @@ pub struct WindowTree<'clock> {
     quit: bool,
     timers: Arena<TimerData>,
     clock: &'clock MonoClock,
-    tagged: Vec<Option<Window>>,
     palette: Palette,
     pre_process: Arena<PrePostProcess>,
     post_process: Arena<PrePostProcess>,
@@ -1372,17 +1256,11 @@ impl<'clock> WindowTree<'clock> {
             max_height: -1,
             palette: Palette::new(),
             focus_tab: Window(window),
-            focus_tab_tag: 0,
             focus_right: Window(window),
-            focus_right_tag: 0,
             focus_left: Window(window),
-            focus_left_tag: 0,
             focus_up: Window(window),
-            focus_up_tag: 0,
             focus_down: Window(window),
-            focus_down_tag: 0,
             contains_primary_focus: true,
-            tag: 0,
             name: String::new(),
             pre_process: None,
             post_process: None,
@@ -1401,7 +1279,6 @@ impl<'clock> WindowTree<'clock> {
             quit: false,
             clock,
             timers: Arena::new(),
-            tagged: Vec::new(),
             palette: root_palette(),
             pre_process: Arena::new(),
             post_process: Arena::new(),
@@ -1425,14 +1302,6 @@ impl<'clock> WindowTree<'clock> {
         let res = f(&mut self.palette);
         self.root.invalidate_render(self);
         res
-    }
-
-    pub fn window_by_tag(&self, tag: u16) -> Option<Window> {
-        if tag != 0 && usize::from(tag) <= self.tagged.len() {
-            self.tagged[usize::from(tag - 1)]
-        } else {
-            None
-        }
     }
 
     pub fn root(&self) -> Window { self.root }
@@ -1527,47 +1396,47 @@ impl<'clock> WindowTree<'clock> {
                 match key {
                     Key::Tab => {
                         if let Some(primary_focused) = self.primary_focused {
-                            let focus = primary_focused.actual_focus_tab(self);
+                            let focus = primary_focused.focus_tab(self);
                             if self.focus_primary(Some(focus), app) { continue; }
                         }
                     },
                     Key::Left => {
                         if let Some(primary_focused) = self.primary_focused {
-                            let focus = primary_focused.actual_focus_left(self);
+                            let focus = primary_focused.focus_left(self);
                             if self.focus_primary(Some(focus), app) { continue; }
                         }
                         if let Some(secondary_focused) = self.secondary_focused {
-                            let focus = secondary_focused.actual_focus_left(self);
+                            let focus = secondary_focused.focus_left(self);
                             if self.focus_secondary(Some(focus), app) { continue; }
                         }
                     },
                     Key::Right => {
                         if let Some(primary_focused) = self.primary_focused {
-                            let focus = primary_focused.actual_focus_right(self);
+                            let focus = primary_focused.focus_right(self);
                             if self.focus_primary(Some(focus), app) { continue; }
                         }
                         if let Some(secondary_focused) = self.secondary_focused {
-                            let focus = secondary_focused.actual_focus_right(self);
+                            let focus = secondary_focused.focus_right(self);
                             if self.focus_secondary(Some(focus), app) { continue; }
                         }
                     },
                     Key::Up => {
                         if let Some(primary_focused) = self.primary_focused {
-                            let focus = primary_focused.actual_focus_up(self);
+                            let focus = primary_focused.focus_up(self);
                             if self.focus_primary(Some(focus), app) { continue; }
                         }
                         if let Some(secondary_focused) = self.secondary_focused {
-                            let focus = secondary_focused.actual_focus_up(self);
+                            let focus = secondary_focused.focus_up(self);
                             if self.focus_secondary(Some(focus), app) { continue; }
                         }
                     },
                     Key::Down => {
                         if let Some(primary_focused) = self.primary_focused {
-                            let focus = primary_focused.actual_focus_down(self);
+                            let focus = primary_focused.focus_down(self);
                             if self.focus_primary(Some(focus), app) { continue; }
                         }
                         if let Some(secondary_focused) = self.secondary_focused {
-                            let focus = secondary_focused.actual_focus_down(self);
+                            let focus = secondary_focused.focus_down(self);
                             if self.focus_secondary(Some(focus), app) { continue; }
                         }
                     },
