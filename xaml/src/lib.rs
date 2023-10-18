@@ -193,7 +193,7 @@ pub fn reg_widgets(xaml: &mut Xaml) {
     " });
     xaml.postamble(Box::new(|names| {
         let mut s = "\npub struct Names {\n".to_string();
-        for (name, _obj) in names {
+        for name in names.keys() {
             s.push_str("    #[allow(dead_code)]\n    pub ");
             s.push_str(name);
             s.push_str(": Window,\n");
