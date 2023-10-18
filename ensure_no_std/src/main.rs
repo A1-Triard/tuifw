@@ -32,13 +32,12 @@ use core::hint::black_box;
 use timer_no_std::MonoClock;
 use tuifw::Background;
 use tuifw_screen::Vector;
-use tuifw_window::WindowTree;
 
 #[start]
 pub fn main(_argc: isize, _argv: *const *const u8) -> isize {
     let _ = black_box(tuifw_screen::init);
     let clock = unsafe { MonoClock::new() };
     let screen = Box::new(tuifw_screen_test::Screen::new(Vector { x: 80, y: 25 }));
-    let _tree: WindowTree<()> = Background::new().window_tree(screen, &clock).unwrap();
+    let _tree = Background::new().window_tree(screen, &clock).unwrap();
     0
 }
