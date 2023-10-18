@@ -653,7 +653,10 @@ impl Window {
     }
 
     pub fn set_focus_right(self, tree: &mut WindowTree, value: Self) {
-        tree.arena[self.0].focus_right = value;
+        let old_value = replace(&mut tree.arena[self.0].focus_right, value);
+        if old_value != value {
+            value.set_focus_left(tree, self);
+        }
     }
 
     pub fn focus_left(self, tree: &WindowTree) -> Self {
@@ -661,7 +664,10 @@ impl Window {
     }
 
     pub fn set_focus_left(self, tree: &mut WindowTree, value: Self) {
-        tree.arena[self.0].focus_left = value;
+        let old_value = replace(&mut tree.arena[self.0].focus_left, value);
+        if old_value != value {
+            value.set_focus_right(tree, self);
+        }
     }
 
     pub fn focus_up(self, tree: &WindowTree) -> Self {
@@ -669,7 +675,10 @@ impl Window {
     }
 
     pub fn set_focus_up(self, tree: &mut WindowTree, value: Self) {
-        tree.arena[self.0].focus_up = value;
+        let old_value = replace(&mut tree.arena[self.0].focus_up, value);
+        if old_value != value {
+            value.set_focus_down(tree, self);
+        }
     }
 
     pub fn focus_down(self, tree: &WindowTree) -> Self {
@@ -677,7 +686,10 @@ impl Window {
     }
 
     pub fn set_focus_down(self, tree: &mut WindowTree, value: Self) {
-        tree.arena[self.0].focus_down = value;
+        let old_value = replace(&mut tree.arena[self.0].focus_down, value);
+        if old_value != value {
+            value.set_focus_up(tree, self);
+        }
     }
 
     pub fn is_focused(self, tree: &WindowTree) -> bool {

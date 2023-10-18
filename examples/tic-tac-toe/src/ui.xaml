@@ -2,38 +2,19 @@
   <Frame HAlign="Center" VAlign="Center" TextAlign="Center" Text="Tic-Tac-Toe">
     <StackPanel Margin="2,1,2,1">
       <StackPanel Vertical="False" HAlign="Center">
-        <Button Text=" " Name="tl"
-	  FocusTab="t" FocusRight="t" FocusLeft="tr" FocusUp="bl" FocusDown="l"
-	  FocusedPrimary="True"
-	/>
-        <Button Text=" " Name="t"
-	  FocusTab="tr" FocusRight="tr" FocusLeft="tl" FocusUp="b" FocusDown="c"
-	/>
-        <Button Text=" " Name="tr"
-	  FocusTab="l" FocusRight="tl" FocusLeft="t" FocusUp="br" FocusDown="r"
-	/>
+        <Button Text=" " Name="tl" FocusTab="t" FocusRight="t" FocusDown="l" FocusedPrimary="True" />
+        <Button Text=" " Name="t" FocusTab="tr" FocusRight="tr" FocusDown="c" />
+        <Button Text=" " Name="tr" FocusTab="l" FocusRight="tl" FocusDown="r" />
       </StackPanel>
       <StackPanel Vertical="False" HAlign="Center">
-        <Button Text=" " Name="l"
-	  FocusTab="c" FocusRight="c" FocusLeft="r" FocusUp="tl" FocusDown="bl"
-	/>
-        <Button Text=" " Name="c"
-	  FocusTab="r" FocusRight="r" FocusLeft="l" FocusUp="t" FocusDown="b"
-	/>
-        <Button Text=" " Name="r"
-	  FocusTab="bl" FocusRight="l" FocusLeft="c" FocusUp="tr" FocusDown="br"
-	/>
+        <Button Text=" " Name="l" FocusTab="c" FocusRight="c" FocusDown="bl" />
+        <Button Text=" " Name="c" FocusTab="r" FocusRight="r" FocusDown="b" />
+        <Button Text=" " Name="r" FocusTab="bl" FocusRight="l" FocusDown="br" />
       </StackPanel>
       <StackPanel Vertical="False" HAlign="Center">
-        <Button Text=" " Name="bl"
-	  FocusTab="b" FocusRight="b" FocusLeft="br" FocusUp="l" FocusDown="tl"
-	/>
-        <Button Text=" " Name="b"
-	  FocusTab="br" FocusRight="br" FocusLeft="bl" FocusUp="c" FocusDown="t"
-	/>
-        <Button Text=" " Name="br"
-	  FocusTab="tl" FocusRight="bl" FocusLeft="b" FocusUp="r" FocusDown="tr"
-	/>
+        <Button Text=" " Name="bl" FocusTab="b" FocusRight="b" FocusDown="tl" />
+        <Button Text=" " Name="b" FocusTab="br" FocusRight="br" FocusDown="t" />
+        <Button Text=" " Name="br" FocusTab="tl" FocusRight="bl" FocusDown="tr" />
       </StackPanel>
       <StackPanel Vertical="False" Margin="1,1,2,0">
         <Label Text="~N~ew game" Name="new_game" />
