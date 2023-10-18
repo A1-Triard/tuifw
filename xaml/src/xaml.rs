@@ -238,10 +238,17 @@ impl Xaml {
     }
 
     pub fn process_file(&self, source: impl AsRef<Path>, dest: impl AsRef<Path>) -> xml_Result<()> {
-        let mut dest = File::create(dest.as_ref())?;
+        self.process(|| Ok(File::open(source.as_ref())?), File::create(dest.as_ref())?)
+    }
+
+    pub fn process<R: Read, W: Write>(
+        &self,
+        mut source: impl FnMut() -> xml_Result<R>,
+        mut dest: W,
+    ) -> xml_Result<()> {
         write!(dest, "{}", self.preamble)?;
         write!(dest, "{}", self.header)?;
-        let source_file = File::open(source.as_ref())?;
+        let source_file = source()?;
         let mut events = EventReader::new(source_file);
         let event = events.next()?;
         let mut processor = XamlProcessor {
@@ -254,7 +261,7 @@ impl Xaml {
             first_pass: true,
         };
         processor.process()?;
-        let source_file = File::open(source.as_ref())?;
+        let source_file = source()?;
         let mut events = EventReader::new(source_file);
         let event = events.next()?;
         processor.source = events;
@@ -519,7 +526,7 @@ mod tests {
     fn process_literal() {
         let mut xaml = Xaml::new();
         let t = xaml.reg_literal("{https://a1-triard.github.io/tuifw/2023/xaml}Bool");
-        xaml.result(Box::new(|x| x.to_string()));
+        xaml.result(Box::new(|x, _| x.to_string()));
         xaml.literal_new(t, Box::new(|x| match x {
             "True" => Some("true".to_string()),
             "False" => Some("false".to_string()),
@@ -527,7 +534,7 @@ mod tests {
         }));
         let source = "<Bool xmlns='https://a1-triard.github.io/tuifw/2023/xaml'>True</Bool>";
         let mut dest = Vec::new();
-        xaml.process(source.as_bytes(), &mut dest).unwrap();
+        xaml.process(|| Ok(source.as_bytes()), &mut dest).unwrap();
         assert_eq!(&dest[..], b"true");
     }
 
@@ -537,7 +544,7 @@ mod tests {
         let b = xaml.reg_literal("{https://a1-triard.github.io/tuifw/2023/xaml}Bool");
         let bg = xaml.reg_struct("{https://a1-triard.github.io/tuifw/2023/xaml}Background", None);
         let bg_sp = xaml.reg_property(bg, "ShowPattern", XamlType::Literal(b));
-        xaml.result(Box::new(|x| x.to_string()));
+        xaml.result(Box::new(|x, _| x.to_string()));
         xaml.literal_new(b, Box::new(|x| match x {
             "True" => Some("true".to_string()),
             "False" => Some("false".to_string()),
@@ -556,7 +563,7 @@ mod tests {
             />
         ";
         let mut dest = Vec::new();
-        xaml.process(source.as_bytes(), &mut dest).unwrap();
+        xaml.process(|| Ok(source.as_bytes()), &mut dest).unwrap();
         assert_eq!(str::from_utf8(&dest[..]).unwrap(), "\
             let mut obj_1 = Background::new();\n\
             Background::set_show_pattern(obj_1, true);\n\
@@ -570,7 +577,7 @@ mod tests {
         let b = xaml.reg_literal("{https://a1-triard.github.io/tuifw/2023/xaml}Bool");
         let bg = xaml.reg_struct("{https://a1-triard.github.io/tuifw/2023/xaml}Background", None);
         let bg_sp = xaml.reg_property(bg, "ShowPattern", XamlType::Literal(b));
-        xaml.result(Box::new(|x| x.to_string()));
+        xaml.result(Box::new(|x, _| x.to_string()));
         xaml.literal_new(b, Box::new(|x| match x {
             "True" => Some("true".to_string()),
             "False" => Some("false".to_string()),
@@ -588,7 +595,7 @@ mod tests {
             </Background>
         ";
         let mut dest = Vec::new();
-        xaml.process(source.as_bytes(), &mut dest).unwrap();
+        xaml.process(|| Ok(source.as_bytes()), &mut dest).unwrap();
         assert_eq!(str::from_utf8(&dest[..]).unwrap(), "\
             let mut obj_1 = Background::new();\n\
             Background::set_show_pattern(obj_1, true);\n\
@@ -602,7 +609,7 @@ mod tests {
         let b = xaml.reg_literal("{https://a1-triard.github.io/tuifw/2023/xaml}Bool");
         let bg = xaml.reg_struct("{https://a1-triard.github.io/tuifw/2023/xaml}Background", None);
         let bg_sp = xaml.reg_property(bg, "ShowPattern", XamlType::Literal(b));
-        xaml.result(Box::new(|x| x.to_string()));
+        xaml.result(Box::new(|x, _| x.to_string()));
         xaml.literal_new(b, Box::new(|x| match x {
             "True" => Some("true".to_string()),
             "False" => Some("false".to_string()),
@@ -620,7 +627,7 @@ mod tests {
             </Background>
         ";
         let mut dest = Vec::new();
-        xaml.process(source.as_bytes(), &mut dest).unwrap();
+        xaml.process(|| Ok(source.as_bytes()), &mut dest).unwrap();
         assert_eq!(str::from_utf8(&dest[..]).unwrap(), "\
             let mut obj_1 = Background::new();\n\
             Background::set_show_pattern(obj_1, true);\n\
