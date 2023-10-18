@@ -12,6 +12,7 @@ pub struct Label {
     text: String,
     click_timer: Option<Timer>,
     cmd: u16,
+    focus: Option<Window>,
 }
 
 impl WidgetData for Label {
@@ -24,7 +25,7 @@ impl WidgetData for Label {
 
 impl Label {
     pub fn new() -> Self {
-        Label { text: String::new(), click_timer: None, cmd: CMD_LABEL_CLICK }
+        Label { text: String::new(), click_timer: None, cmd: CMD_LABEL_CLICK, focus: None }
     }
 
     fn init_palette(tree: &mut WindowTree, window: Window) {
@@ -38,6 +39,7 @@ impl Label {
     widget!(LabelWidget; init_palette);
     prop_string_measure!(text);
     prop_value!(cmd: u16);
+    prop_value!(focus: Option<Window>);
 }
 
 impl Default for Label {
@@ -106,9 +108,9 @@ impl Widget for LabelWidget {
                     if window.actual_is_enabled(tree) {
                         let data = window.data_mut::<Label>(tree);
                         let cmd = data.cmd;
+                        let focus = data.focus;
                         window.raise(tree, Event::Cmd(cmd), app);
-                        let focus = window.focus_tab(tree);
-                        if focus != window {
+                        if let Some(focus) = focus {
                             focus.set_focused_primary(tree, true);
                         }
                     }

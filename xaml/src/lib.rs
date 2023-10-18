@@ -95,6 +95,7 @@ pub fn reg_widgets(xaml: &mut Xaml) {
 
     let label = xaml.reg_struct(xmlns!("Label"), Some(widget));
     let label_text = xaml.reg_property(label, "Text", XamlType::Literal(string));
+    let label_focus = xaml.reg_property(label, "Focus", XamlType::Ref);
 
     let check_box = xaml.reg_struct(xmlns!("CheckBox"), Some(widget));
     let check_box_text = xaml.reg_property(check_box, "Text", XamlType::Literal(string));
@@ -510,6 +511,9 @@ pub fn reg_widgets(xaml: &mut Xaml) {
     })));
     xaml.property_set(label_text, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         Label::set_text(&mut tree, {}, {});
+    " }, obj, value))));
+    xaml.property_set(label_focus, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        Label::set_focus(&mut tree, {}, Some({}));
     " }, obj, value))));
 
     xaml.struct_new(check_box, Some(Box::new(|obj, parent| {

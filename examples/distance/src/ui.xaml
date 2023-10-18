@@ -3,10 +3,10 @@
     <StackPanel Margin="3,1,3,1" HAlign="Center">
       <DockPanel Margin="0,0,0,1">
         <StackPanel Dock="Left">
-          <Label Text="~A~ =" FocusTab="a" />
-          <Label Text="~V~ =" Margin="0,1,0,0" FocusTab="v" />
-          <Label Text="~T~ =" Margin="0,1,0,0" FocusTab="t" />
-          <Label Text="~N~ =" Margin="0,1,0,0" FocusTab="n" />
+          <Label Text="~A~ =" Focus="a" />
+          <Label Text="~V~ =" Margin="0,1,0,0" Focus="v" />
+          <Label Text="~T~ =" Margin="0,1,0,0" Focus="t" />
+          <Label Text="~N~ =" Margin="0,1,0,0" Focus="n" />
         </StackPanel>
         <StackPanel Width="13" Margin="1,0,0,0">
           <InputLine Text="0" Name="a" FocusTab="v" FocusDown="v" FocusUp="n" FocusedPrimary="True">
