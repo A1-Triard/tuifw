@@ -261,6 +261,8 @@ pub enum Visibility {
 }
 
 pub trait Widget: DynClone {
+    fn new(&self) -> Box<dyn WidgetData>;
+
     fn render(
         &self,
         tree: &WindowTree,
@@ -422,10 +424,10 @@ impl Window {
     pub fn new(
         tree: &mut WindowTree,
         widget: Box<dyn Widget>,
-        data: Box<dyn WidgetData>,
         parent: Self,
         prev: Option<Self>,
     ) -> Result<Self, Error> {
+        let data = widget.new();
         let pre_process = widget.pre_process();
         let post_process = widget.post_process();
         tree.arena.try_reserve().map_err(|_| Error::Oom)?;
@@ -638,6 +640,14 @@ impl Window {
             parent.invalidate_measure(tree);
         }
         res
+    }
+
+    pub fn set_layout(
+        self,
+        tree: &mut WindowTree,
+        value: Option<Box<dyn Layout>>
+    ) {
+        self.layout_mut(tree, |layout| replace(layout, value));
     }
 
     pub fn focus_tab(self, tree: &WindowTree) -> Self {
@@ -1236,8 +1246,8 @@ impl<'clock> WindowTree<'clock> {
         screen: Box<dyn Screen>,
         clock: &'clock MonoClock,
         root_widget: Box<dyn Widget>,
-        root_data: Box<dyn WidgetData>,
     ) -> Result<Self, Error> {
+        let data = root_widget.new();
         let pre_process = root_widget.pre_process();
         let post_process = root_widget.post_process();
         let mut arena = Arena::new();
@@ -1250,7 +1260,7 @@ impl<'clock> WindowTree<'clock> {
             first_child: None,
             event_handler: None,
             widget: root_widget,
-            data: root_data,
+            data,
             layout: None,
             measure_size: Some((Some(screen_size.x), Some(screen_size.y))),
             desired_size: screen_size,

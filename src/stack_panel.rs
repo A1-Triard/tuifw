@@ -1,4 +1,5 @@
 use crate::{prop_value_measure, widget};
+use alloc::boxed::Box;
 use tuifw_screen_base::{Rect, Vector};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App};
 
@@ -9,24 +10,20 @@ pub struct StackPanel {
 impl WidgetData for StackPanel { }
 
 impl StackPanel {
-    pub fn new() -> Self {
-        StackPanel { vertical: true }
-    }
-
     widget!(StackPanelWidget);
     prop_value_measure!(vertical: bool);
-}
-
-impl Default for StackPanel {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 #[derive(Clone, Default)]
 pub struct StackPanelWidget;
 
 impl Widget for StackPanelWidget {
+    fn new(&self) -> Box<dyn WidgetData> {
+        Box::new(StackPanel {
+            vertical: true
+        })
+    }
+
     fn render(
         &self,
         _tree: &WindowTree,

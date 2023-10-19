@@ -1,4 +1,5 @@
 use crate::{prop_string_measure, prop_value, prop_value_render, widget};
+use alloc::boxed::Box;
 use alloc::string::String;
 use either::Left;
 use tuifw_screen_base::{Key, Point, Rect, Vector};
@@ -17,14 +18,6 @@ pub struct CheckBox {
 impl WidgetData for CheckBox { }
 
 impl CheckBox {
-    pub fn new() -> Self {
-        CheckBox {
-            is_on: false,
-            cmd: CMD_CHECK_BOX_CLICK,
-            text: String::new(),
-        }
-    }
-
     fn init_palette(tree: &mut WindowTree, window: Window) {
         window.palette_mut(tree, |palette| {
             palette.set(0, Left(COLOR_TEXT));
@@ -47,16 +40,18 @@ impl CheckBox {
     }
 }
 
-impl Default for CheckBox {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[derive(Clone, Default)]
 pub struct CheckBoxWidget;
 
 impl Widget for CheckBoxWidget {
+    fn new(&self) -> Box<dyn WidgetData> {
+        Box::new(CheckBox {
+            is_on: false,
+            cmd: CMD_CHECK_BOX_CLICK,
+            text: String::new(),
+        })
+    }
+
     fn render(
         &self,
         tree: &WindowTree,

@@ -1,4 +1,5 @@
 use crate::{prop_string_render, prop_value_render, widget};
+use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use either::Left;
 use tuifw_screen_base::{Rect, Vector};
@@ -14,10 +15,6 @@ pub struct Background {
 impl WidgetData for Background { }
 
 impl Background {
-    pub fn new() -> Self {
-        Background { pattern_even: "░".to_string(), pattern_odd: "░".to_string(), show_pattern: false }
-    }
-
     fn init_palette(tree: &mut WindowTree, window: Window) {
         window.palette_mut(tree, |palette| palette.set(0, Left(COLOR_BACKGROUND)));
     }
@@ -28,16 +25,16 @@ impl Background {
     prop_string_render!(pattern_odd);
 }
 
-impl Default for Background {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[derive(Clone, Default)]
 pub struct BackgroundWidget;
 
 impl Widget for BackgroundWidget {
+    fn new(&self) -> Box<dyn WidgetData> {
+        Box::new(Background {
+            pattern_even: "░".to_string(), pattern_odd: "░".to_string(), show_pattern: false
+        })
+    }
+
     fn render(
         &self,
         tree: &WindowTree,

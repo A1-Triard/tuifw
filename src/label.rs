@@ -24,10 +24,6 @@ impl WidgetData for Label {
 }
 
 impl Label {
-    pub fn new() -> Self {
-        Label { text: String::new(), click_timer: None, cmd: CMD_LABEL_CLICK, focus: None }
-    }
-
     fn init_palette(tree: &mut WindowTree, window: Window) {
         window.palette_mut(tree, |palette| {
             palette.set(0, Left(COLOR_TEXT));
@@ -42,16 +38,16 @@ impl Label {
     prop_value!(focus: Option<Window>);
 }
 
-impl Default for Label {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[derive(Clone, Default)]
 pub struct LabelWidget;
 
 impl Widget for LabelWidget {
+    fn new(&self) -> Box<dyn WidgetData> {
+        Box::new(Label {
+            text: String::new(), click_timer: None, cmd: CMD_LABEL_CLICK, focus: None
+        })
+    }
+
     fn render(
         &self,
         tree: &WindowTree,

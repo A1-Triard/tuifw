@@ -1,4 +1,5 @@
 use crate::{prop_string_measure, prop_value, prop_value_render, widget};
+use alloc::boxed::Box;
 use alloc::string::String;
 use either::Left;
 use tuifw_screen_base::{Key, Point, Rect, Vector};
@@ -18,15 +19,6 @@ pub struct RadioButton {
 impl WidgetData for RadioButton { }
 
 impl RadioButton {
-    pub fn new() -> Self {
-        RadioButton {
-            is_on: false,
-            allow_turn_off: false,
-            cmd: CMD_RADIO_BUTTON_CLICK,
-            text: String::new(),
-        }
-    }
-
     fn init_palette(tree: &mut WindowTree, window: Window) {
         window.palette_mut(tree, |palette| {
             palette.set(0, Left(COLOR_TEXT));
@@ -63,16 +55,19 @@ impl RadioButton {
     }
 }
 
-impl Default for RadioButton {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[derive(Clone, Default)]
 pub struct RadioButtonWidget;
 
 impl Widget for RadioButtonWidget {
+    fn new(&self) -> Box<dyn WidgetData> {
+        Box::new(RadioButton {
+            is_on: false,
+            allow_turn_off: false,
+            cmd: CMD_RADIO_BUTTON_CLICK,
+            text: String::new(),
+        })
+    }
+
     fn render(
         &self,
         tree: &WindowTree,

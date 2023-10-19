@@ -1,6 +1,5 @@
 use crate::widget;
 use alloc::boxed::Box;
-use core::mem::replace;
 use tuifw_screen_base::{Rect, Vector, Thickness, Point};
 use tuifw_window::{Event, Layout, RenderPort, Widget, WidgetData, Window, WindowTree, App};
 
@@ -18,10 +17,6 @@ pub struct DockPanel { }
 impl WidgetData for DockPanel { }
 
 impl DockPanel {
-    pub fn new() -> Self {
-        DockPanel { }
-    }
-
     widget!(DockPanelWidget);
 
     pub fn dock(tree: &WindowTree, window: Window) -> Option<Dock> {
@@ -29,13 +24,7 @@ impl DockPanel {
     }
 
     pub fn set_dock(tree: &mut WindowTree, window: Window, value: Option<Dock>) {
-        window.layout_mut(tree, |layout| replace(layout, Some(Box::new(DockLayout { dock: value }))));
-    }
-}
-
-impl Default for DockPanel {
-    fn default() -> Self {
-        Self::new()
+        window.set_layout(tree, Some(Box::new(DockLayout { dock: value })));
     }
 }
 
@@ -43,6 +32,10 @@ impl Default for DockPanel {
 pub struct DockPanelWidget;
 
 impl Widget for DockPanelWidget {
+    fn new(&self) -> Box<dyn WidgetData> {
+        Box::new(DockPanel { })
+    }
+
     fn render(
         &self,
         _tree: &WindowTree,

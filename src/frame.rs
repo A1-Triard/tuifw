@@ -1,4 +1,5 @@
 use crate::{prop_string_render, prop_value_render, widget};
+use alloc::boxed::Box;
 use alloc::string::String;
 use either::Left;
 use tuifw_screen_base::{Rect, Vector, Thickness, text_width, HAlign, VAlign};
@@ -14,10 +15,6 @@ pub struct Frame {
 impl WidgetData for Frame { }
 
 impl Frame {
-    pub fn new() -> Self {
-        Frame { double: false, text: String::new(), text_align: HAlign::Left }
-    }
-
     fn init_palette(tree: &mut WindowTree, window: Window) {
         window.palette_mut(tree, |palette| {
             palette.set(0, Left(COLOR_FRAME));
@@ -33,16 +30,16 @@ impl Frame {
     prop_value_render!(text_align: HAlign);
 }
 
-impl Default for Frame {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[derive(Clone, Default)]
 pub struct FrameWidget;
 
 impl Widget for FrameWidget {
+    fn new(&self) -> Box<dyn WidgetData> {
+        Box::new(Frame {
+            double: false, text: String::new(), text_align: HAlign::Left
+        })
+    }
+
     fn render(
         &self,
         tree: &WindowTree,

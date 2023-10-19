@@ -70,8 +70,7 @@ macro_rules! widget {
     (
         $W:ident
     ) => {
-        pub fn window(
-            self,
+        pub fn new(
             tree: &mut $crate::tuifw_window_WindowTree,
             parent: $crate::tuifw_window_Window,
             prev: Option<$crate::tuifw_window_Window>
@@ -79,14 +78,12 @@ macro_rules! widget {
             $crate::tuifw_window_Window::new(
                 tree,
                 $crate::alloc_boxed_Box::new($W),
-                $crate::alloc_boxed_Box::new(self),
                 parent,
                 prev
             )
         }
 
-        pub fn window_tree(
-            self,
+        pub fn new_tree(
             screen: $crate::alloc_boxed_Box<dyn $crate::tuifw_screen_base_Screen>,
             clock: &$crate::timer_no_std_MonoClock,
         ) -> Result<$crate::tuifw_window_WindowTree, $crate::tuifw_screen_base_Error> {
@@ -94,15 +91,13 @@ macro_rules! widget {
                 screen,
                 clock,
                 $crate::alloc_boxed_Box::new($W),
-                $crate::alloc_boxed_Box::new(self)
             )
         }
     };
     (
         $W:ident; $init:ident
     ) => {
-        pub fn window(
-            self,
+        pub fn new(
             tree: &mut $crate::tuifw_window_WindowTree,
             parent: $crate::tuifw_window_Window,
             prev: Option<$crate::tuifw_window_Window>
@@ -110,7 +105,6 @@ macro_rules! widget {
             let w = $crate::tuifw_window_Window::new(
                 tree,
                 $crate::alloc_boxed_Box::new($W),
-                $crate::alloc_boxed_Box::new(self),
                 parent,
                 prev
             )?;
@@ -118,8 +112,7 @@ macro_rules! widget {
             Ok(w)
         }
 
-        pub fn window_tree(
-            self,
+        pub fn new_tree(
             screen: $crate::alloc_boxed_Box<dyn $crate::tuifw_screen_base_Screen>,
             clock: &$crate::timer_no_std_MonoClock,
         ) -> Result<$crate::tuifw_window_WindowTree, $crate::tuifw_screen_base_Error> {
@@ -127,7 +120,6 @@ macro_rules! widget {
                 screen,
                 clock,
                 $crate::alloc_boxed_Box::new($W),
-                $crate::alloc_boxed_Box::new(self)
             )?;
             let root = tree.root();
             Self::$init(&mut tree, root);

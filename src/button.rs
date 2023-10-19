@@ -30,15 +30,6 @@ impl WidgetData for Button {
 }
 
 impl Button {
-    pub fn new() -> Self {
-        Button {
-            text: String::new(),
-            release_timer: None,
-            click_timer: None,
-            cmd: CMD_BUTTON_CLICK,
-        }
-    }
-
     fn init_palette(tree: &mut WindowTree, window: Window) {
         window.palette_mut(tree, |palette| {
             palette.set(0, Left(COLOR_TEXT));
@@ -81,16 +72,19 @@ impl Button {
     }
 }
 
-impl Default for Button {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[derive(Clone, Default)]
 pub struct ButtonWidget;
 
 impl Widget for ButtonWidget {
+    fn new(&self) -> Box<dyn WidgetData> {
+        Box::new(Button {
+            text: String::new(),
+            release_timer: None,
+            click_timer: None,
+            cmd: CMD_BUTTON_CLICK,
+        })
+    }
+
     fn render(
         &self,
         tree: &WindowTree,

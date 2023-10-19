@@ -295,18 +295,18 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = Background::new().window(&mut tree, {}, Some({}))?;
+                    let {} = Background::new(&mut tree, {}, Some({}))?;
                 " }, obj, parent, prev))
             } else {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = Background::new().window(&mut tree, {}, None)?;
+                    let {} = Background::new(&mut tree, {}, None)?;
                 " }, obj, parent))
             }
         } else {
             indent_all_by(4, format!(indoc! { "
                 #[allow(unused_mut)]
-                let mut tree = Background::new().window_tree(screen, clock)?;
+                let mut tree = Background::new_tree(screen, clock)?;
                 #[allow(unused_variables)]
                 let {} = tree.root();
             " }, obj))
@@ -327,18 +327,18 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = StackPanel::new().window(&mut tree, {}, Some({}))?;
+                    let {} = StackPanel::new(&mut tree, {}, Some({}))?;
                 " }, obj, parent, prev))
             } else {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = StackPanel::new().window(&mut tree, {}, None)?;
+                    let {} = StackPanel::new(&mut tree, {}, None)?;
                 " }, obj, parent))
             }
         } else {
             indent_all_by(4, format!(indoc! { "
                 #[allow(unused_mut)]
-                let mut tree = StackPanel::new().window_tree(screen, clock)?;
+                let mut tree = StackPanel::new_tree(screen, clock)?;
                 #[allow(unused_variables)]
                 let {} = tree.root();
             " }, obj))
@@ -353,18 +353,18 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = DockPanel::new().window(&mut tree, {}, Some({}))?;
+                    let {} = DockPanel::new(&mut tree, {}, Some({}))?;
                 " }, obj, parent, prev))
             } else {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = DockPanel::new().window(&mut tree, {}, None)?;
+                    let {} = DockPanel::new(&mut tree, {}, None)?;
                 " }, obj, parent))
             }
         } else {
             indent_all_by(4, format!(indoc! { "
                 #[allow(unused_mut)]
-                let mut tree = DockPanel::new().window_tree(screen, clock)?;
+                let mut tree = DockPanel::new_tree(screen, clock)?;
                 #[allow(unused_variables)]
                 let {} = tree.root();
             " }, obj))
@@ -379,18 +379,18 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = StaticText::new().window(&mut tree, {}, Some({}))?;
+                    let {} = StaticText::new(&mut tree, {}, Some({}))?;
                 " }, obj, parent, prev))
             } else {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = StaticText::new().window(&mut tree, {}, None)?;
+                    let {} = StaticText::new(&mut tree, {}, None)?;
                 " }, obj, parent))
             }
         } else {
             indent_all_by(4, format!(indoc! { "
                 #[allow(unused_mut)]
-                let mut tree = StaticText::new().window_tree(screen, clock)?;
+                let mut tree = StaticText::new_tree(screen, clock)?;
                 #[allow(unused_variables)]
                 let {} = tree.root();
             " }, obj))
@@ -405,18 +405,18 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = Button::new().window(&mut tree, {}, Some({}))?;
+                    let {} = Button::new(&mut tree, {}, Some({}))?;
                 " }, obj, parent, prev))
             } else {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = Button::new().window(&mut tree, {}, None)?;
+                    let {} = Button::new(&mut tree, {}, None)?;
                 " }, obj, parent))
             }
         } else {
             indent_all_by(4, format!(indoc! { "
                 #[allow(unused_mut)]
-                let mut tree = Button::new().window_tree(screen, clock)?;
+                let mut tree = Button::new_tree(screen, clock)?;
                 #[allow(unused_variables)]
                 let {} = tree.root();
             " }, obj))
@@ -431,18 +431,18 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = InputLine::new().window(&mut tree, {}, Some({}))?;
+                    let {} = InputLine::new(&mut tree, {}, Some({}))?;
                 " }, obj, parent, prev))
             } else {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = InputLine::new().window(&mut tree, {}, None)?;
+                    let {} = InputLine::new(&mut tree, {}, None)?;
                 " }, obj, parent))
             }
         } else {
             indent_all_by(4, format!(indoc! { "
                 #[allow(unused_mut)]
-                let mut tree = InputLine::new().window_tree(screen, clock)?;
+                let mut tree = InputLine::new_tree(screen, clock)?;
                 #[allow(unused_variables)]
                 let {} = tree.root();
             " }, obj))
@@ -460,18 +460,18 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = Frame::new().window(&mut tree, {}, Some({}))?;
+                    let {} = Frame::new(&mut tree, {}, Some({}))?;
                 " }, obj, parent, prev))
             } else {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = Frame::new().window(&mut tree, {}, None)?;
+                    let {} = Frame::new(&mut tree, {}, None)?;
                 " }, obj, parent))
             }
         } else {
             indent_all_by(4, format!(indoc! { "
                 #[allow(unused_mut)]
-                let mut tree = Frame::new().window_tree(screen, clock)?;
+                let mut tree = Frame::new_tree(screen, clock)?;
                 #[allow(unused_variables)]
                 let {} = tree.root();
             " }, obj))
@@ -492,18 +492,18 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = Label::new().window(&mut tree, {}, Some({}))?;
+                    let {} = Label::new(&mut tree, {}, Some({}))?;
                 " }, obj, parent, prev))
             } else {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = Label::new().window(&mut tree, {}, None)?;
+                    let {} = Label::new(&mut tree, {}, None)?;
                 " }, obj, parent))
             }
         } else {
             indent_all_by(4, format!(indoc! { "
                 #[allow(unused_mut)]
-                let mut tree = Label::new().window_tree(screen, clock)?;
+                let mut tree = Label::new_tree(screen, clock)?;
                 #[allow(unused_variables)]
                 let {} = tree.root();
             " }, obj))
@@ -521,18 +521,18 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = CheckBox::new().window(&mut tree, {}, Some({}))?;
+                    let {} = CheckBox::new(&mut tree, {}, Some({}))?;
                 " }, obj, parent, prev))
             } else {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = CheckBox::new().window(&mut tree, {}, None)?;
+                    let {} = CheckBox::new(&mut tree, {}, None)?;
                 " }, obj, parent))
             }
         } else {
             indent_all_by(4, format!(indoc! { "
                 #[allow(unused_mut)]
-                let mut tree = CheckBox::new().window_tree(screen, clock)?;
+                let mut tree = CheckBox::new_tree(screen, clock)?;
                 #[allow(unused_variables)]
                 let {} = tree.root();
             " }, obj))
@@ -550,18 +550,18 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = RadioButton::new().window(&mut tree, {}, Some({}))?;
+                    let {} = RadioButton::new(&mut tree, {}, Some({}))?;
                 " }, obj, parent, prev))
             } else {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = RadioButton::new().window(&mut tree, {}, None)?;
+                    let {} = RadioButton::new(&mut tree, {}, None)?;
                 " }, obj, parent))
             }
         } else {
             indent_all_by(4, format!(indoc! { "
                 #[allow(unused_mut)]
-                let mut tree = RadioButton::new().window_tree(screen, clock)?;
+                let mut tree = RadioButton::new_tree(screen, clock)?;
                 #[allow(unused_variables)]
                 let {} = tree.root();
             " }, obj))

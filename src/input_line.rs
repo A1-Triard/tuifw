@@ -84,20 +84,6 @@ impl WidgetData for InputLine {
 }
 
 impl InputLine {
-    pub fn new() -> Self {
-        InputLine {
-            validator: None,
-            text: String::new(),
-            is_valid: true,
-            editing: false,
-            view_padding: 0,
-            view: 0 .. 0,
-            cursor: 0,
-            width: 0,
-            is_valid_timer: None,
-        }
-    }
-
     fn init_palette(tree: &mut WindowTree, window: Window) {
         window.palette_mut(tree, |palette| {
             palette.set(0, Left(COLOR_TEXT));
@@ -232,16 +218,24 @@ impl InputLine {
     }
 }
 
-impl Default for InputLine {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[derive(Clone, Default)]
 pub struct InputLineWidget;
 
 impl Widget for InputLineWidget {
+    fn new(&self) -> Box<dyn WidgetData> {
+        Box::new(InputLine {
+            validator: None,
+            text: String::new(),
+            is_valid: true,
+            editing: false,
+            view_padding: 0,
+            view: 0 .. 0,
+            cursor: 0,
+            width: 0,
+            is_valid_timer: None,
+        })
+    }
+
     fn render(
         &self,
         tree: &WindowTree,
