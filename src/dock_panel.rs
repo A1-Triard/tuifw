@@ -1,4 +1,4 @@
-use crate::widget2;
+use crate::widget;
 use alloc::boxed::Box;
 use tuifw_screen_base::{Rect, Vector, Thickness, Point};
 use tuifw_window::{Event, Layout, RenderPort, Widget, WidgetData, Window, WindowTree, App};
@@ -12,7 +12,7 @@ struct DockLayout {
 
 impl Layout for DockLayout { }
 
-widget2! {
+widget! {
     #[widget(DockPanelWidget)]
     pub struct DockPanel { }
 }

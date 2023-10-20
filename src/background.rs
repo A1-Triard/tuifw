@@ -1,4 +1,4 @@
-use crate::widget2;
+use crate::widget;
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use either::Left;
@@ -6,7 +6,7 @@ use tuifw_screen_base::{Rect, Vector};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App};
 use tuifw_window::COLOR_BACKGROUND;
 
-widget2! {
+widget! {
     #[widget(BackgroundWidget, init=init_palette)]
     pub struct Background {
         #[property(ref, render)]

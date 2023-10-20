@@ -74,7 +74,7 @@ pub use tuifw_window::Window as tuifw_window_Window;
 pub use tuifw_window::WindowTree as tuifw_window_WindowTree;
 
 #[macro_export]
-macro_rules! widget2 {
+macro_rules! widget {
     (
         #[widget($Widget:ident $(, init=$init:ident)?)]
         $vis:vis struct $name:ident {

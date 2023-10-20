@@ -1,4 +1,4 @@
-use crate::widget2;
+use crate::widget;
 use alloc::boxed::Box;
 use alloc::string::String;
 use core::ops::Range;
@@ -63,7 +63,7 @@ impl Validator for FloatValidator {
     }
 }
 
-widget2! {
+widget! {
     #[widget(InputLineWidget, init=init_palette)]
     pub struct InputLine {
         #[property(obj, render)]

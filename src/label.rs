@@ -1,4 +1,4 @@
-use crate::widget2;
+use crate::widget;
 use alloc::boxed::Box;
 use alloc::string::String;
 use either::Left;
@@ -8,7 +8,7 @@ use tuifw_window::{COLOR_TEXT, COLOR_HOTKEY, COLOR_DISABLED, App};
 
 pub const CMD_LABEL_CLICK: u16 = 110;
 
-widget2! {
+widget! {
     #[widget(LabelWidget, init=init_palette)]
     pub struct Label {
         #[property(ref, measure)]

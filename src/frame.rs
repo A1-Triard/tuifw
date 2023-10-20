@@ -1,4 +1,4 @@
-use crate::widget2;
+use crate::widget;
 use alloc::boxed::Box;
 use alloc::string::String;
 use either::Left;
@@ -6,7 +6,7 @@ use tuifw_screen_base::{Rect, Vector, Thickness, text_width, HAlign, VAlign};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App};
 use tuifw_window::{COLOR_FRAME, COLORS, COLOR_IN_FRAME};
 
-widget2! {
+widget! {
     #[widget(FrameWidget, init=init_palette)]
     pub struct Frame {
         #[property(value, render)]

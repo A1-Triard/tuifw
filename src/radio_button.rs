@@ -1,4 +1,4 @@
-use crate::widget2;
+use crate::widget;
 use alloc::boxed::Box;
 use alloc::string::String;
 use either::Left;
@@ -9,7 +9,7 @@ use tuifw_window::{COLOR_TEXT, COLOR_HOTKEY, COLOR_DISABLED};
 
 pub const CMD_RADIO_BUTTON_CLICK: u16 = 100;
 
-widget2! {
+widget! {
     #[widget(RadioButtonWidget, init=init_palette)]
     pub struct RadioButton {
         #[property(value, render)]

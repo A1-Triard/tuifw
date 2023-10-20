@@ -1,9 +1,9 @@
-use crate::widget2;
+use crate::widget;
 use alloc::boxed::Box;
 use tuifw_screen_base::{Rect, Vector};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App};
 
-widget2! {
+widget! {
     #[widget(StackPanelWidget)]
     pub struct StackPanel {
         #[property(value, measure)]

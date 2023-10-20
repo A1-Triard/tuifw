@@ -1,4 +1,4 @@
-use crate::widget2;
+use crate::widget;
 use alloc::boxed::Box;
 use alloc::string::String;
 use either::Left;
@@ -11,7 +11,7 @@ use tuifw_window::{COLOR_BUTTON_FOCUSED_HOTKEY, COLOR_BUTTON_FOCUSED_DISABLED, C
 
 pub const CMD_BUTTON_CLICK: u16 = 100;
 
-widget2! {
+widget! {
     #[widget(ButtonWidget, init=init_palette)]
     pub struct Button {
         #[property(ref, measure)]
