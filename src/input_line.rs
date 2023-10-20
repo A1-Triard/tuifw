@@ -1,4 +1,4 @@
-use crate::{prop_obj_render, prop_string_render, widget};
+use crate::widget2;
 use alloc::boxed::Box;
 use alloc::string::String;
 use core::ops::Range;
@@ -63,16 +63,21 @@ impl Validator for FloatValidator {
     }
 }
 
-pub struct InputLine {
-    validator: Option<Box<dyn Validator>>,
-    text: String,
-    is_valid: bool,
-    editing: bool,
-    view_padding: i16,
-    view: Range<usize>,
-    cursor: usize,
-    width: i16,
-    is_valid_timer: Option<Timer>,
+widget2! {
+    #[widget(InputLineWidget, init=init_palette)]
+    pub struct InputLine {
+        #[property(obj, render)]
+        validator: Option<Box<dyn Validator>>,
+        #[property(ref, render, changed=on_text_changed)]
+        text: String,
+        is_valid: bool,
+        editing: bool,
+        view_padding: i16,
+        view: Range<usize>,
+        cursor: usize,
+        width: i16,
+        is_valid_timer: Option<Timer>,
+    }
 }
 
 impl WidgetData for InputLine {
@@ -94,10 +99,6 @@ impl InputLine {
             palette.set(5, Left(COLOR_INPUT_LINE_FOCUSED_DISABLED));
         });
     }
-
-    widget!(InputLineWidget; init_palette);
-    prop_string_render!(text; on_text_changed);
-    prop_obj_render!(validator: Option<Box<dyn Validator>>);
 
     pub fn is_valid(tree: &WindowTree, window: Window) -> bool {
         window.data::<InputLine>(tree).is_valid

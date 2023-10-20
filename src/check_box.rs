@@ -10,7 +10,7 @@ use tuifw_window::{COLOR_TEXT, COLOR_HOTKEY, COLOR_DISABLED};
 pub const CMD_CHECK_BOX_CLICK: u16 = 100;
 
 widget2! {
-    #[widget(CheckBoxWidget, init_palette)]
+    #[widget(CheckBoxWidget, init=init_palette)]
     pub struct CheckBox {
         #[property(value, render)]
         is_on: bool,

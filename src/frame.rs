@@ -7,7 +7,7 @@ use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, Ap
 use tuifw_window::{COLOR_FRAME, COLORS, COLOR_IN_FRAME};
 
 widget2! {
-    #[widget(FrameWidget, init_palette)]
+    #[widget(FrameWidget, init=init_palette)]
     pub struct Frame {
         #[property(value, render)]
         double: bool,

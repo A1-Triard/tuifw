@@ -12,7 +12,7 @@ use tuifw_window::{COLOR_BUTTON_FOCUSED_HOTKEY, COLOR_BUTTON_FOCUSED_DISABLED, C
 pub const CMD_BUTTON_CLICK: u16 = 100;
 
 widget2! {
-    #[widget(ButtonWidget, init_palette)]
+    #[widget(ButtonWidget, init=init_palette)]
     pub struct Button {
         #[property(ref, measure)]
         text: String,

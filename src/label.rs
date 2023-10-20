@@ -1,4 +1,4 @@
-use crate::{prop_string_measure, prop_value, widget};
+use crate::widget2;
 use alloc::boxed::Box;
 use alloc::string::String;
 use either::Left;
@@ -8,11 +8,17 @@ use tuifw_window::{COLOR_TEXT, COLOR_HOTKEY, COLOR_DISABLED, App};
 
 pub const CMD_LABEL_CLICK: u16 = 110;
 
-pub struct Label {
-    text: String,
-    click_timer: Option<Timer>,
-    cmd: u16,
-    focus: Option<Window>,
+widget2! {
+    #[widget(LabelWidget, init=init_palette)]
+    pub struct Label {
+        #[property(ref, measure)]
+        text: String,
+        click_timer: Option<Timer>,
+        #[property(value)]
+        cmd: u16,
+        #[property(value)]
+        focus: Option<Window>,
+    }
 }
 
 impl WidgetData for Label {
@@ -31,11 +37,6 @@ impl Label {
             palette.set(2, Left(COLOR_DISABLED));
         });
     }
-
-    widget!(LabelWidget; init_palette);
-    prop_string_measure!(text);
-    prop_value!(cmd: u16);
-    prop_value!(focus: Option<Window>);
 }
 
 #[derive(Clone, Default)]

@@ -1,4 +1,4 @@
-use crate::{prop_string_measure, prop_value, prop_value_render, widget};
+use crate::widget2;
 use alloc::boxed::Box;
 use alloc::string::String;
 use either::Left;
@@ -9,11 +9,18 @@ use tuifw_window::{COLOR_TEXT, COLOR_HOTKEY, COLOR_DISABLED};
 
 pub const CMD_RADIO_BUTTON_CLICK: u16 = 100;
 
-pub struct RadioButton {
-    is_on: bool,
-    allow_turn_off: bool,
-    cmd: u16,
-    text: String,
+widget2! {
+    #[widget(RadioButtonWidget, init=init_palette)]
+    pub struct RadioButton {
+        #[property(value, render)]
+        is_on: bool,
+        #[property(value)]
+        allow_turn_off: bool,
+        #[property(value)]
+        cmd: u16,
+        #[property(ref, measure)]
+        text: String,
+    }
 }
 
 impl WidgetData for RadioButton { }
@@ -26,12 +33,6 @@ impl RadioButton {
             palette.set(2, Left(COLOR_DISABLED));
         });
     }
-
-    widget!(RadioButtonWidget; init_palette);
-    prop_value_render!(is_on: bool);
-    prop_value!(allow_turn_off: bool);
-    prop_value!(cmd: u16);
-    prop_string_measure!(text);
 
     fn click(tree: &mut WindowTree, window: Window, app: &mut dyn App) -> bool {
         let data = window.data_mut::<RadioButton>(tree);

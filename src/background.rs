@@ -7,7 +7,7 @@ use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, Ap
 use tuifw_window::COLOR_BACKGROUND;
 
 widget2! {
-    #[widget(BackgroundWidget, init_palette)]
+    #[widget(BackgroundWidget, init=init_palette)]
     pub struct Background {
         #[property(ref, render)]
         pattern_even: String,
