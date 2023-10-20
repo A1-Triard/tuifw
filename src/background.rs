@@ -18,8 +18,6 @@ widget! {
     }
 }
 
-impl WidgetData for Background { }
-
 impl Background {
     fn init_palette(tree: &mut WindowTree, window: Window) {
         window.palette_mut(tree, |palette| palette.set(0, Left(COLOR_BACKGROUND)));

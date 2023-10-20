@@ -17,8 +17,6 @@ widget! {
     pub struct DockPanel { }
 }
 
-impl WidgetData for DockPanel { }
-
 impl DockPanel {
     pub fn dock(tree: &WindowTree, window: Window) -> Option<Dock> {
         window.layout::<DockLayout>(tree).and_then(|x| x.dock)

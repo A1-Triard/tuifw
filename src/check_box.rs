@@ -21,8 +21,6 @@ widget! {
     }
 }
 
-impl WidgetData for CheckBox { }
-
 impl CheckBox {
     fn init_palette(tree: &mut WindowTree, window: Window) {
         window.palette_mut(tree, |palette| {

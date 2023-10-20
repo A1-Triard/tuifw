@@ -23,8 +23,6 @@ widget! {
     }
 }
 
-impl WidgetData for RadioButton { }
-
 impl RadioButton {
     fn init_palette(tree: &mut WindowTree, window: Window) {
         window.palette_mut(tree, |palette| {

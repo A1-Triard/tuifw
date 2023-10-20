@@ -11,8 +11,6 @@ widget! {
     }
 }
 
-impl WidgetData for StackPanel { }
-
 #[derive(Clone, Default)]
 pub struct StackPanelWidget;
 

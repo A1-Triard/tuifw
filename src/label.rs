@@ -9,7 +9,7 @@ use tuifw_window::{COLOR_TEXT, COLOR_HOTKEY, COLOR_DISABLED, App};
 pub const CMD_LABEL_CLICK: u16 = 110;
 
 widget! {
-    #[widget(LabelWidget, init=init_palette)]
+    #[widget(LabelWidget, init=init_palette, drop=drop_timers)]
     pub struct Label {
         #[property(ref, measure)]
         text: String,
@@ -21,14 +21,6 @@ widget! {
     }
 }
 
-impl WidgetData for Label {
-    fn drop_widget_data(&mut self, tree: &mut WindowTree, _app: &mut dyn App) {
-        if let Some(click_timer) = self.click_timer.take() {
-            click_timer.drop_timer(tree);
-        }
-    }
-}
-
 impl Label {
     fn init_palette(tree: &mut WindowTree, window: Window) {
         window.palette_mut(tree, |palette| {
@@ -36,6 +28,12 @@ impl Label {
             palette.set(1, Left(COLOR_HOTKEY));
             palette.set(2, Left(COLOR_DISABLED));
         });
+    }
+
+    fn drop_timers(&mut self, tree: &mut WindowTree, _app: &mut dyn App) {
+        if let Some(click_timer) = self.click_timer.take() {
+            click_timer.drop_timer(tree);
+        }
     }
 }
 

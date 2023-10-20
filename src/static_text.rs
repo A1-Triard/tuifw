@@ -14,8 +14,6 @@ widget! {
     }
 }
 
-impl WidgetData for StaticText { }
-
 impl StaticText {
     fn init_palette(tree: &mut WindowTree, window: Window) {
         window.palette_mut(tree, |palette| {

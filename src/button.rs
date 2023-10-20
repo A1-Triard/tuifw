@@ -12,7 +12,7 @@ use tuifw_window::{COLOR_BUTTON_FOCUSED_HOTKEY, COLOR_BUTTON_FOCUSED_DISABLED, C
 pub const CMD_BUTTON_CLICK: u16 = 100;
 
 widget! {
-    #[widget(ButtonWidget, init=init_palette)]
+    #[widget(ButtonWidget, init=init_palette, drop=drop_timers)]
     pub struct Button {
         #[property(ref, measure)]
         text: String,
@@ -20,17 +20,6 @@ widget! {
         release_timer: Option<Timer>,
         #[property(value)]
         cmd: u16,
-    }
-}
-
-impl WidgetData for Button {
-    fn drop_widget_data(&mut self, tree: &mut WindowTree, _app: &mut dyn App) {
-        if let Some(release_timer) = self.release_timer.take() {
-            release_timer.drop_timer(tree);
-        }
-        if let Some(click_timer) = self.click_timer.take() {
-            click_timer.drop_timer(tree);
-        }
     }
 }
 
@@ -45,6 +34,15 @@ impl Button {
             palette.set(5, Left(COLOR_BUTTON_FOCUSED_DISABLED));
             palette.set(6, Left(COLOR_BUTTON_PRESSED));
         });
+    }
+
+    fn drop_timers(&mut self, tree: &mut WindowTree, _app: &mut dyn App) {
+        if let Some(release_timer) = self.release_timer.take() {
+            release_timer.drop_timer(tree);
+        }
+        if let Some(click_timer) = self.click_timer.take() {
+            click_timer.drop_timer(tree);
+        }
     }
 
     fn click(tree: &mut WindowTree, window: Window) {

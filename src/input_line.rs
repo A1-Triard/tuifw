@@ -64,7 +64,7 @@ impl Validator for FloatValidator {
 }
 
 widget! {
-    #[widget(InputLineWidget, init=init_palette)]
+    #[widget(InputLineWidget, init=init_palette, drop=drop_timers)]
     pub struct InputLine {
         #[property(obj, render)]
         validator: Option<Box<dyn Validator>>,
@@ -80,14 +80,6 @@ widget! {
     }
 }
 
-impl WidgetData for InputLine {
-    fn drop_widget_data(&mut self, tree: &mut WindowTree, _app: &mut dyn App) {
-        if let Some(timer) = self.is_valid_timer.take() {
-            timer.drop_timer(tree);
-        }
-    }
-}
-
 impl InputLine {
     fn init_palette(tree: &mut WindowTree, window: Window) {
         window.palette_mut(tree, |palette| {
@@ -98,6 +90,12 @@ impl InputLine {
             palette.set(4, Left(COLOR_INPUT_LINE_FOCUSED_INVALID));
             palette.set(5, Left(COLOR_INPUT_LINE_FOCUSED_DISABLED));
         });
+    }
+
+    fn drop_timers(&mut self, tree: &mut WindowTree, _app: &mut dyn App) {
+        if let Some(timer) = self.is_valid_timer.take() {
+            timer.drop_timer(tree);
+        }
     }
 
     pub fn is_valid(tree: &WindowTree, window: Window) -> bool {

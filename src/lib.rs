@@ -69,6 +69,10 @@ pub use tuifw_screen_base::Error as tuifw_screen_base_Error;
 #[doc(hidden)]
 pub use tuifw_screen_base::Screen as tuifw_screen_base_Screen;
 #[doc(hidden)]
+pub use tuifw_window::App as tuifw_window_App;
+#[doc(hidden)]
+pub use tuifw_window::WidgetData as tuifw_window_WidgetData;
+#[doc(hidden)]
 pub use tuifw_window::Window as tuifw_window_Window;
 #[doc(hidden)]
 pub use tuifw_window::WindowTree as tuifw_window_WindowTree;
@@ -76,7 +80,7 @@ pub use tuifw_window::WindowTree as tuifw_window_WindowTree;
 #[macro_export]
 macro_rules! widget {
     (
-        #[widget($Widget:ident $(, init=$init:ident)?)]
+        #[widget($Widget:ident $(, init=$init:ident)? $(, drop=$drop:ident)?)]
         $vis:vis struct $name:ident {
             $($(
                 $(#[property$(($($attrs:tt)*))?])?
@@ -86,6 +90,18 @@ macro_rules! widget {
     ) => {
         $vis struct $name {
             $($($field_name: $field_ty),+)?
+        }
+
+        impl $crate::tuifw_window_WidgetData for $name {
+            fn drop_widget_data(
+                &mut self,
+                #[allow(unused_variables)]
+                tree: &mut $crate::tuifw_window_WindowTree,
+                #[allow(unused_variables)]
+                app: &mut dyn $crate::tuifw_window_App
+            ) {
+                $(self.$drop(tree, app);)?
+            }
         }
 
         impl $name {

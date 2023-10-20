@@ -18,8 +18,6 @@ widget! {
     }
 }
 
-impl WidgetData for Frame { }
-
 impl Frame {
     fn init_palette(tree: &mut WindowTree, window: Window) {
         window.palette_mut(tree, |palette| {
