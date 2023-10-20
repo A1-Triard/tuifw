@@ -49,9 +49,17 @@ pub use alloc::boxed::Box as alloc_boxed_Box;
 #[doc(hidden)]
 pub use alloc::borrow::Cow as alloc_borrow_Cow;
 #[doc(hidden)]
+pub use alloc::borrow::ToOwned as alloc_borrow_ToOwned;
+#[doc(hidden)]
 pub use alloc::string::String as alloc_string_String;
 #[doc(hidden)]
+pub use core::compile_error as core_compile_error;
+#[doc(hidden)]
+pub use core::concat as core_concat;
+#[doc(hidden)]
 pub use core::mem::replace as core_mem_replace;
+#[doc(hidden)]
+pub use core::stringify as core_stringify;
 #[doc(hidden)]
 pub use paste::paste as paste_paste;
 #[doc(hidden)]
@@ -64,6 +72,255 @@ pub use tuifw_screen_base::Screen as tuifw_screen_base_Screen;
 pub use tuifw_window::Window as tuifw_window_Window;
 #[doc(hidden)]
 pub use tuifw_window::WindowTree as tuifw_window_WindowTree;
+
+#[macro_export]
+macro_rules! widget2 {
+    (
+        #[widget($Widget:ident $(, $init:ident)?)]
+        $vis:vis struct $name:ident {
+            $($(
+                $(#[property$(($($attrs:tt)*))?])?
+                $field_name:ident : $field_ty:ty
+            ),+ $(,)?)?
+        }
+    ) => {
+        $vis struct $name {
+            $($($field_name: $field_ty),+)?
+        }
+
+        impl $name {
+            $vis fn new(
+                tree: &mut $crate::tuifw_window_WindowTree,
+                parent: $crate::tuifw_window_Window,
+                prev: Option<$crate::tuifw_window_Window>
+            ) -> Result<$crate::tuifw_window_Window, $crate::tuifw_screen_base_Error> {
+                let w = $crate::tuifw_window_Window::new(
+                    tree,
+                    $crate::alloc_boxed_Box::new($Widget),
+                    parent,
+                    prev
+                )?;
+                $(Self::$init(tree, w);)?
+                Ok(w)
+            }
+
+            $vis fn new_tree(
+                screen: $crate::alloc_boxed_Box<dyn $crate::tuifw_screen_base_Screen>,
+                clock: &$crate::timer_no_std_MonoClock,
+            ) -> Result<$crate::tuifw_window_WindowTree, $crate::tuifw_screen_base_Error> {
+                let mut tree = $crate::tuifw_window_WindowTree::new(
+                    screen,
+                    clock,
+                    $crate::alloc_boxed_Box::new($Widget),
+                )?;
+                let root = tree.root();
+                $(Self::$init(&mut tree, root);)?
+                Ok(tree)
+            }
+
+            $($($crate::widget_impl! {
+                $(#[property($($($attrs)*)?)])?
+                $vis $field_name : $field_ty
+            })+)?
+        }
+    };
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! widget_impl {
+    (
+        $vis:vis $field_name:ident : $field_ty:ty
+    ) => {
+    };
+    (
+        #[property(value, measure)]
+        $vis:vis $name:ident : $ty:ty
+    ) => {
+        $crate::paste_paste! {
+            $vis fn $name(
+                tree: &$crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window
+            ) -> $ty {
+                window.data::<Self>(tree).$name
+            }
+
+            $vis fn [< set_ $name >] (
+                tree: &mut $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window,
+                value: $ty
+            ) {
+                let data = window.data_mut::<Self>(tree);
+                data.$name = value;
+                window.invalidate_measure(tree);
+            }
+        }
+    };
+    (
+        #[property(value, render)]
+        $vis:vis $name:ident : $ty:ty
+    ) => {
+        $crate::paste_paste! {
+            $vis fn $name(
+                tree: &$crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window
+            ) -> $ty {
+                window.data::<Self>(tree).$name
+            }
+
+            $vis fn [< set_ $name >] (
+                tree: &mut $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window,
+                value: $ty
+            ) {
+                let data = window.data_mut::<Self>(tree);
+                data.$name = value;
+                window.invalidate_render(tree);
+            }
+        }
+    };
+    (
+        #[property(value)]
+        $vis:vis $name:ident : $ty:ty
+    ) => {
+        $crate::paste_paste! {
+            $vis fn $name(
+                tree: &$crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window
+            ) -> $ty {
+                window.data::<Self>(tree).$name
+            }
+
+            $vis fn [< set_ $name >] (
+                tree: &mut $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window,
+                value: $ty
+            ) {
+                let data = window.data_mut::<Self>(tree);
+                data.$name = value;
+            }
+        }
+    };
+    (
+        #[property(ref, measure)]
+        $vis:vis $name:ident : $ty:ty
+    ) => {
+        $crate::paste_paste! {
+            $vis fn $name<'a>(
+                tree: &'a $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window
+            ) -> &'a <$ty as $crate::alloc_borrow_ToOwned>::Owned {
+                &window.data::<Self>(tree).$name
+            }
+
+            $vis fn [< $name _mut >] <T>(
+                tree: &mut $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window,
+                f: impl FnOnce(&mut <$ty as $crate::alloc_borrow_ToOwned>::Owned) -> T
+            ) -> T {
+                let value = &mut window.data_mut::<Self>(tree).$name;
+                let res = f(value);
+                window.invalidate_measure(tree);
+                res
+            }
+
+            $vis fn [< set_ $name >] <'a>(
+                tree: &mut $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window,
+                value: impl Into<$crate::alloc_borrow_Cow<'a, $ty>>
+            ) {
+                Self:: [< $name _mut >] (
+                    tree,
+                    window,
+                    |x| $crate::core_mem_replace(x, value.into().into_owned())
+                );
+            }
+        }
+    };
+    (
+        #[property(ref, render)]
+        $vis:vis $name:ident : $ty:ty
+    ) => {
+        $crate::paste_paste! {
+            $vis fn $name<'a>(
+                tree: &'a $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window
+            ) -> &'a <$ty as $crate::alloc_borrow_ToOwned>::Owned {
+                &window.data::<Self>(tree).$name
+            }
+
+            $vis fn [< $name _mut >] <T>(
+                tree: &mut $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window,
+                f: impl FnOnce(&mut <$ty as $crate::alloc_borrow_ToOwned>::Owned) -> T
+            ) -> T {
+                let value = &mut window.data_mut::<Self>(tree).$name;
+                let res = f(value);
+                window.invalidate_render(tree);
+                res
+            }
+
+            $vis fn [< set_ $name >] <'a>(
+                tree: &mut $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window,
+                value: impl Into<$crate::alloc_borrow_Cow<'a, $ty>>
+            ) {
+                Self:: [< $name _mut >] (
+                    tree,
+                    window,
+                    |x| $crate::core_mem_replace(x, value.into().into_owned())
+                );
+            }
+        }
+    };
+    (
+        #[property(ref)]
+        $vis:vis $name:ident : $ty:ty
+    ) => {
+        $crate::paste_paste! {
+            $vis fn $name<'a>(
+                tree: &'a $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window
+            ) -> &'a <$ty as $crate::alloc_borrow_ToOwned>::Owned {
+                &window.data::<Self>(tree).$name
+            }
+
+            $vis fn [< $name _mut >] <T>(
+                tree: &mut $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window,
+                f: impl FnOnce(&mut <$ty as $crate::alloc_borrow_ToOwned>::Owned) -> T
+            ) -> T {
+                let value = &mut window.data_mut::<Self>(tree).$name;
+                let res = f(value);
+                res
+            }
+
+            $vis fn [< set_ $name >] <'a>(
+                tree: &mut $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window,
+                value: impl Into<$crate::alloc_borrow_Cow<'a, $ty>>
+            ) {
+                Self:: [< $name _mut >] (
+                    tree,
+                    window,
+                    |x| $crate::core_mem_replace(x, value.into().into_owned())
+                );
+            }
+        }
+    };
+    (
+        $(#[property($($attrs:tt)*)])?
+        $vis:vis $field_name:ident : $field_ty:ty
+    ) => {
+        $crate::core_compile_error!($crate::core_concat!(
+            "invalid widget property: ",
+            $crate::core_stringify!(
+                $(#[property($($attrs)*)])?
+                $vis $field_name : $field_ty
+            )
+        ));
+    };
+}
 
 #[macro_export]
 macro_rules! widget {

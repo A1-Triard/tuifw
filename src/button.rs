@@ -1,4 +1,4 @@
-use crate::{prop_string_measure, prop_value, widget};
+use crate::widget2;
 use alloc::boxed::Box;
 use alloc::string::String;
 use either::Left;
@@ -11,11 +11,16 @@ use tuifw_window::{COLOR_BUTTON_FOCUSED_HOTKEY, COLOR_BUTTON_FOCUSED_DISABLED, C
 
 pub const CMD_BUTTON_CLICK: u16 = 100;
 
-pub struct Button {
-    text: String,
-    click_timer: Option<Timer>,
-    release_timer: Option<Timer>,
-    cmd: u16,
+widget2! {
+    #[widget(ButtonWidget, init_palette)]
+    pub struct Button {
+        #[property(ref, measure)]
+        text: String,
+        click_timer: Option<Timer>,
+        release_timer: Option<Timer>,
+        #[property(value)]
+        cmd: u16,
+    }
 }
 
 impl WidgetData for Button {
@@ -41,10 +46,6 @@ impl Button {
             palette.set(6, Left(COLOR_BUTTON_PRESSED));
         });
     }
-
-    widget!(ButtonWidget; init_palette);
-    prop_string_measure!(text);
-    prop_value!(cmd: u16);
 
     fn click(tree: &mut WindowTree, window: Window) {
         let click_timer = Timer::new(tree, 0, Box::new(move |tree, app| {
