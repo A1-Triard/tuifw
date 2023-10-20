@@ -1,4 +1,4 @@
-use crate::{prop_string_render, prop_value_render, widget};
+use crate::widget2;
 use alloc::boxed::Box;
 use alloc::string::String;
 use either::Left;
@@ -6,10 +6,16 @@ use tuifw_screen_base::{Rect, Vector, Thickness, text_width, HAlign, VAlign};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App};
 use tuifw_window::{COLOR_FRAME, COLORS, COLOR_IN_FRAME};
 
-pub struct Frame {
-    double: bool,
-    text: String,
-    text_align: HAlign,
+widget2! {
+    #[widget(FrameWidget, init_palette)]
+    pub struct Frame {
+        #[property(value, render)]
+        double: bool,
+        #[property(ref, render)]
+        text: String,
+        #[property(value, render)]
+        text_align: HAlign,
+    }
 }
 
 impl WidgetData for Frame { }
@@ -23,11 +29,6 @@ impl Frame {
             }
         });
     }
-
-    widget!(FrameWidget; init_palette);
-    prop_value_render!(double: bool);
-    prop_string_render!(text);
-    prop_value_render!(text_align: HAlign);
 }
 
 #[derive(Clone, Default)]

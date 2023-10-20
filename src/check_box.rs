@@ -1,4 +1,4 @@
-use crate::{prop_string_measure, prop_value, prop_value_render, widget};
+use crate::widget2;
 use alloc::boxed::Box;
 use alloc::string::String;
 use either::Left;
@@ -9,10 +9,16 @@ use tuifw_window::{COLOR_TEXT, COLOR_HOTKEY, COLOR_DISABLED};
 
 pub const CMD_CHECK_BOX_CLICK: u16 = 100;
 
-pub struct CheckBox {
-    is_on: bool,
-    cmd: u16,
-    text: String,
+widget2! {
+    #[widget(CheckBoxWidget, init_palette)]
+    pub struct CheckBox {
+        #[property(value, render)]
+        is_on: bool,
+        #[property(value)]
+        cmd: u16,
+        #[property(ref, measure)]
+        text: String,
+    }
 }
 
 impl WidgetData for CheckBox { }
@@ -25,11 +31,6 @@ impl CheckBox {
             palette.set(2, Left(COLOR_DISABLED));
         });
     }
-
-    widget!(CheckBoxWidget; init_palette);
-    prop_value_render!(is_on: bool);
-    prop_value!(cmd: u16);
-    prop_string_measure!(text);
 
     fn click(tree: &mut WindowTree, window: Window, app: &mut dyn App) {
         let data = window.data_mut::<CheckBox>(tree);

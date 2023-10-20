@@ -1,4 +1,4 @@
-use crate::widget;
+use crate::widget2;
 use alloc::boxed::Box;
 use tuifw_screen_base::{Rect, Vector, Thickness, Point};
 use tuifw_window::{Event, Layout, RenderPort, Widget, WidgetData, Window, WindowTree, App};
@@ -12,13 +12,14 @@ struct DockLayout {
 
 impl Layout for DockLayout { }
 
-pub struct DockPanel { }
+widget2! {
+    #[widget(DockPanelWidget)]
+    pub struct DockPanel { }
+}
 
 impl WidgetData for DockPanel { }
 
 impl DockPanel {
-    widget!(DockPanelWidget);
-
     pub fn dock(tree: &WindowTree, window: Window) -> Option<Dock> {
         window.layout::<DockLayout>(tree).and_then(|x| x.dock)
     }
