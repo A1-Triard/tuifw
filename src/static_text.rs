@@ -1,4 +1,4 @@
-use crate::{prop_string_measure, widget};
+use crate::widget2;
 use alloc::boxed::Box;
 use alloc::string::String;
 use either::Left;
@@ -6,8 +6,12 @@ use tuifw_screen_base::{Point, Rect, Vector, text_width};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App};
 use tuifw_window::{COLOR_TEXT, COLOR_DISABLED};
 
-pub struct StaticText {
-    text: String,
+widget2! {
+    #[widget(StaticTextWidget, init=init_palette)]
+    pub struct StaticText {
+        #[property(ref, measure)]
+        text: String,
+    }
 }
 
 impl WidgetData for StaticText { }
@@ -19,9 +23,6 @@ impl StaticText {
             palette.set(1, Left(COLOR_DISABLED));
         });
     }
-
-    widget!(StaticTextWidget; init_palette);
-    prop_string_measure!(text);
 }
 
 #[derive(Clone, Default)]

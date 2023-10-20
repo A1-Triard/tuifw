@@ -1,18 +1,17 @@
-use crate::{prop_value_measure, widget};
+use crate::widget2;
 use alloc::boxed::Box;
 use tuifw_screen_base::{Rect, Vector};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App};
 
-pub struct StackPanel {
-    vertical: bool,
+widget2! {
+    #[widget(StackPanelWidget)]
+    pub struct StackPanel {
+        #[property(value, measure)]
+        vertical: bool,
+    }
 }
 
 impl WidgetData for StackPanel { }
-
-impl StackPanel {
-    widget!(StackPanelWidget);
-    prop_value_measure!(vertical: bool);
-}
 
 #[derive(Clone, Default)]
 pub struct StackPanelWidget;
