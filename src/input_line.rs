@@ -29,7 +29,7 @@ impl Validator for IntValidator {
     fn is_numeric(&self) -> bool { true }
 
     fn is_valid(&self, editing: bool, text: &str) -> bool {
-        if editing && text.is_empty() { return true; }
+        if editing && (text.is_empty() || text == "-") { return true; }
         if let Ok(value) = i32::from_str(text) {
             (self.min ..= self.max).contains(&value)
         } else {
@@ -47,7 +47,7 @@ impl Validator for FloatValidator {
     fn is_numeric(&self) -> bool { true }
 
     fn is_valid(&self, editing: bool, text: &str) -> bool {
-        if editing && text.is_empty() { return true; }
+        if editing && (text.is_empty() || text == "-") { return true; }
         let text = if editing && (text.ends_with('e') || text.ends_with('E')) {
             let text = &text[.. text.len() - 1];
             if text.contains(|c| c == 'e' || c == 'E') { return false; }
