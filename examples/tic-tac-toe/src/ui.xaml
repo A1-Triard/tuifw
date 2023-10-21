@@ -1,4 +1,4 @@
-<Background xmlns='https://a1-triard.github.io/tuifw/2023/xaml'>
+<Background xmlns='https://a1-triard.github.io/tuifw/2023/xaml' Name="root">
   <Frame HAlign="Center" VAlign="Center" TextAlign="Center" Text="Tic-Tac-Toe">
     <StackPanel Margin="2,1,2,1">
       <StackPanel Vertical="False" HAlign="Center">

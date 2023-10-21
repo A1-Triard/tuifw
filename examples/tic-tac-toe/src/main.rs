@@ -214,9 +214,9 @@ impl EventHandler for RootEventHandler {
 fn start() -> Result<(), Error> {
     let clock = unsafe { MonoClock::new() };
     let screen = unsafe { tuifw_screen::init(None, None) }?;
-    let (mut tree, names) = ui::build_tree(screen, &clock)?;
-    let root = tree.root();
-    root.set_event_handler(&mut tree, Some(Box::new(RootEventHandler)));
+    let tree = &mut WindowTree::new(screen, &clock)?;
+    let names = ui::build(tree)?;
+    names.root.set_event_handler(tree, Some(Box::new(RootEventHandler)));
     let state = &mut State {
         squares: [
             names.tl,
@@ -233,8 +233,8 @@ fn start() -> Result<(), Error> {
         res_text: names.res_text,
         rng: SmallRng::from_entropy(),
     };
-    Label::set_cmd(&mut tree, names.new_game, CMD_NEW_GAME);
-    Label::set_cmd(&mut tree, names.exit, CMD_EXIT);
-    state.ai_move(&mut tree);
+    Label::set_cmd(tree, names.new_game, CMD_NEW_GAME);
+    Label::set_cmd(tree, names.exit, CMD_EXIT);
+    state.ai_move(tree);
     tree.run(state)
 }

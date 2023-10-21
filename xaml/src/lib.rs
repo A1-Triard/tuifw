@@ -164,6 +164,7 @@ pub fn reg_widgets(xaml: &mut Xaml) {
     xaml.preamble(indoc! { "
         extern crate alloc;
 
+        #[allow(unused_imports)]
         use alloc::boxed::Box;
         use tuifw::*;
         use tuifw_screen::*;
