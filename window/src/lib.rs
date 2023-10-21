@@ -10,6 +10,7 @@
 #![allow(clippy::collapsible_else_if)]
 #![allow(clippy::collapsible_if)]
 #![allow(clippy::non_canonical_partial_ord_impl)]
+#![allow(clippy::option_map_unit_fn)]
 #![allow(clippy::partialeq_to_none)]
 #![allow(clippy::type_complexity)]
 
@@ -261,6 +262,8 @@ pub enum Visibility {
 }
 
 pub trait Widget: DynClone {
+    #[allow(clippy::wrong_self_convention)]
+    #[allow(clippy::new_ret_no_self)]
     fn new(&self) -> Box<dyn WidgetData>;
 
     fn render(

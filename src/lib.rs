@@ -105,6 +105,7 @@ macro_rules! widget {
         }
 
         impl $name {
+            #[allow(clippy::new_ret_no_self)]
             $vis fn new(
                 tree: &mut $crate::tuifw_window_WindowTree,
                 parent: Option<$crate::tuifw_window_Window>,
