@@ -107,7 +107,7 @@ macro_rules! widget {
         impl $name {
             $vis fn new(
                 tree: &mut $crate::tuifw_window_WindowTree,
-                parent: $crate::tuifw_window_Window,
+                parent: Option<$crate::tuifw_window_Window>,
                 prev: Option<$crate::tuifw_window_Window>
             ) -> Result<$crate::tuifw_window_Window, $crate::tuifw_screen_base_Error> {
                 let w = $crate::tuifw_window_Window::new(
@@ -118,22 +118,6 @@ macro_rules! widget {
                 )?;
                 $(Self::$init(tree, w);)?
                 Ok(w)
-            }
-
-            $vis fn new_tree(
-                screen: $crate::alloc_boxed_Box<dyn $crate::tuifw_screen_base_Screen>,
-                clock: &$crate::timer_no_std_MonoClock,
-            ) -> Result<$crate::tuifw_window_WindowTree, $crate::tuifw_screen_base_Error> {
-                #[allow(unused_mut)]
-                let mut tree = $crate::tuifw_window_WindowTree::new(
-                    screen,
-                    clock,
-                    $crate::alloc_boxed_Box::new($Widget),
-                )?;
-                #[allow(unused_variables)]
-                let root = tree.root();
-                $(Self::$init(&mut tree, root);)?
-                Ok(tree)
             }
 
             $($($crate::widget_impl! {

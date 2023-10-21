@@ -165,17 +165,15 @@ pub fn reg_widgets(xaml: &mut Xaml) {
         extern crate alloc;
 
         use alloc::boxed::Box;
-        use timer_no_std::MonoClock;
         use tuifw::*;
         use tuifw_screen::*;
         use tuifw_window::*;
 
     " });
     xaml.header(indoc! { "
-        pub fn build_tree(
-            screen: Box<dyn Screen>,
-            clock: &MonoClock
-        ) -> Result<(WindowTree, Names), Error> {
+        pub fn build(
+            tree: &mut WindowTree,
+        ) -> Result<Names, Error> {
     " });
     xaml.result(Box::new(|_, names| {
         let mut s = "    let names = Names {\n".to_string();
@@ -186,7 +184,7 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             s.push_str(obj);
             s.push_str(",\n");
         }
-        s.push_str("    };\n    Ok((tree, names))\n");
+        s.push_str("    };\n    Ok(names)\n");
         s
     }));
     xaml.footer(indoc! {"
@@ -233,61 +231,61 @@ pub fn reg_widgets(xaml: &mut Xaml) {
 
     xaml.property_set(widget_children, Box::new(|_obj, _value| String::new()));
     xaml.property_set(widget_is_enabled, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        {}.set_is_enabled(&mut tree, {});
+        {}.set_is_enabled(tree, {});
     " }, obj, value))));
     xaml.property_set(widget_visibility, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        {}.set_visibility(&mut tree, {});
+        {}.set_visibility(tree, {});
     " }, obj, value))));
     xaml.property_set(widget_name, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        {}.set_name(&mut tree, {});
+        {}.set_name(tree, {});
     " }, obj, value))));
     xaml.property_set(widget_focus_tab, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        {}.set_focus_tab(&mut tree, {});
+        {}.set_focus_tab(tree, {});
     " }, obj, value))));
     xaml.property_set(widget_focus_right, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        {}.set_focus_right(&mut tree, {});
+        {}.set_focus_right(tree, {});
     " }, obj, value))));
     xaml.property_set(widget_focus_left, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        {}.set_focus_left(&mut tree, {});
+        {}.set_focus_left(tree, {});
     " }, obj, value))));
     xaml.property_set(widget_focus_up, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        {}.set_focus_up(&mut tree, {});
+        {}.set_focus_up(tree, {});
     " }, obj, value))));
     xaml.property_set(widget_focus_down, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        {}.set_focus_down(&mut tree, {});
+        {}.set_focus_down(tree, {});
     " }, obj, value))));
     xaml.property_set(widget_focused_primary, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        {}.set_focused_primary(&mut tree, {});
+        {}.set_focused_primary(tree, {});
     " }, obj, value))));
     xaml.property_set(widget_focused_secondary, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        {}.set_focused_secondary(&mut tree, {});
+        {}.set_focused_secondary(tree, {});
     " }, obj, value))));
     xaml.property_set(widget_h_align, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        {}.set_h_align(&mut tree, Some({}));
+        {}.set_h_align(tree, Some({}));
     " }, obj, value))));
     xaml.property_set(widget_v_align, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        {}.set_v_align(&mut tree, Some({}));
+        {}.set_v_align(tree, Some({}));
     " }, obj, value))));
     xaml.property_set(widget_width, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        {}.set_width(&mut tree, Some({}));
+        {}.set_width(tree, Some({}));
     " }, obj, value))));
     xaml.property_set(widget_height, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        {}.set_height(&mut tree, Some({}));
+        {}.set_height(tree, Some({}));
     " }, obj, value))));
     xaml.property_set(widget_margin, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        {}.set_margin(&mut tree, {});
+        {}.set_margin(tree, {});
     " }, obj, value))));
     xaml.property_set(widget_min_width, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        {}.set_min_width(&mut tree, {});
+        {}.set_min_width(tree, {});
     " }, obj, value))));
     xaml.property_set(widget_min_height, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        {}.set_min_height(&mut tree, {});
+        {}.set_min_height(tree, {});
     " }, obj, value))));
     xaml.property_set(widget_max_width, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        {}.set_max_width(&mut tree, {});
+        {}.set_max_width(tree, {});
     " }, obj, value))));
     xaml.property_set(widget_max_height, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        {}.set_max_height(&mut tree, {});
+        {}.set_max_height(tree, {});
     " }, obj, value))));
 
     xaml.struct_new(background, Some(Box::new(|obj, parent| {
@@ -295,31 +293,29 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = Background::new(&mut tree, {}, Some({}))?;
+                    let {} = Background::new(tree, Some({}), Some({}))?;
                 " }, obj, parent, prev))
             } else {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = Background::new(&mut tree, {}, None)?;
+                    let {} = Background::new(tree, Some({}), None)?;
                 " }, obj, parent))
             }
         } else {
             indent_all_by(4, format!(indoc! { "
-                #[allow(unused_mut)]
-                let mut tree = Background::new_tree(screen, clock)?;
                 #[allow(unused_variables)]
-                let {} = tree.root();
+                let {} = Background::new(tree, None, None)?;
             " }, obj))
         }
     })));
     xaml.property_set(background_show_pattern, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        Background::set_show_pattern(&mut tree, {}, {});
+        Background::set_show_pattern(tree, {}, {});
     " }, obj, value))));
     xaml.property_set(background_pattern_even, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        Background::set_pattern_even(&mut tree, {}, {});
+        Background::set_pattern_even(tree, {}, {});
     " }, obj, value))));
     xaml.property_set(background_pattern_odd, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        Background::set_pattern_odd(&mut tree, {}, {});
+        Background::set_pattern_odd(tree, {}, {});
     " }, obj, value))));
 
     xaml.struct_new(stack_panel, Some(Box::new(|obj, parent| {
@@ -327,25 +323,23 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = StackPanel::new(&mut tree, {}, Some({}))?;
+                    let {} = StackPanel::new(tree, Some({}), Some({}))?;
                 " }, obj, parent, prev))
             } else {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = StackPanel::new(&mut tree, {}, None)?;
+                    let {} = StackPanel::new(tree, Some({}), None)?;
                 " }, obj, parent))
             }
         } else {
             indent_all_by(4, format!(indoc! { "
-                #[allow(unused_mut)]
-                let mut tree = StackPanel::new_tree(screen, clock)?;
                 #[allow(unused_variables)]
-                let {} = tree.root();
+                let {} = StackPanel::new(tree, None, None)?;
             " }, obj))
         }
     })));
     xaml.property_set(stack_panel_vertical, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        StackPanel::set_vertical(&mut tree, {}, {});
+        StackPanel::set_vertical(tree, {}, {});
     " }, obj, value))));
 
     xaml.struct_new(dock_panel, Some(Box::new(|obj, parent| {
@@ -353,25 +347,23 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = DockPanel::new(&mut tree, {}, Some({}))?;
+                    let {} = DockPanel::new(tree, Some({}), Some({}))?;
                 " }, obj, parent, prev))
             } else {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = DockPanel::new(&mut tree, {}, None)?;
+                    let {} = DockPanel::new(tree, Some({}), None)?;
                 " }, obj, parent))
             }
         } else {
             indent_all_by(4, format!(indoc! { "
-                #[allow(unused_mut)]
-                let mut tree = DockPanel::new_tree(screen, clock)?;
                 #[allow(unused_variables)]
-                let {} = tree.root();
+                let {} = DockPanel::new(tree, None, None)?;
             " }, obj))
         }
     })));
     xaml.property_set(widget_dock, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        DockPanel::set_dock(&mut tree, {}, Some({}));
+        DockPanel::set_dock(tree, {}, Some({}));
     " }, obj, value))));
 
     xaml.struct_new(static_text, Some(Box::new(|obj, parent| {
@@ -379,25 +371,23 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = StaticText::new(&mut tree, {}, Some({}))?;
+                    let {} = StaticText::new(tree, Some({}), Some({}))?;
                 " }, obj, parent, prev))
             } else {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = StaticText::new(&mut tree, {}, None)?;
+                    let {} = StaticText::new(tree, Some({}), None)?;
                 " }, obj, parent))
             }
         } else {
             indent_all_by(4, format!(indoc! { "
-                #[allow(unused_mut)]
-                let mut tree = StaticText::new_tree(screen, clock)?;
                 #[allow(unused_variables)]
-                let {} = tree.root();
+                let {} = StaticText::new(tree, None, None)?;
             " }, obj))
         }
     })));
     xaml.property_set(static_text_text, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        StaticText::set_text(&mut tree, {}, {});
+        StaticText::set_text(tree, {}, {});
     " }, obj, value))));
 
     xaml.struct_new(button, Some(Box::new(|obj, parent| {
@@ -405,25 +395,23 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = Button::new(&mut tree, {}, Some({}))?;
+                    let {} = Button::new(tree, Some({}), Some({}))?;
                 " }, obj, parent, prev))
             } else {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = Button::new(&mut tree, {}, None)?;
+                    let {} = Button::new(tree, Some({}), None)?;
                 " }, obj, parent))
             }
         } else {
             indent_all_by(4, format!(indoc! { "
-                #[allow(unused_mut)]
-                let mut tree = Button::new_tree(screen, clock)?;
                 #[allow(unused_variables)]
-                let {} = tree.root();
+                let {} = Button::new(tree, None, None)?;
             " }, obj))
         }
     })));
     xaml.property_set(button_text, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        Button::set_text(&mut tree, {}, {});
+        Button::set_text(tree, {}, {});
     " }, obj, value))));
 
     xaml.struct_new(input_line, Some(Box::new(|obj, parent| {
@@ -431,28 +419,26 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = InputLine::new(&mut tree, {}, Some({}))?;
+                    let {} = InputLine::new(tree, Some({}), Some({}))?;
                 " }, obj, parent, prev))
             } else {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = InputLine::new(&mut tree, {}, None)?;
+                    let {} = InputLine::new(tree, Some({}), None)?;
                 " }, obj, parent))
             }
         } else {
             indent_all_by(4, format!(indoc! { "
-                #[allow(unused_mut)]
-                let mut tree = InputLine::new_tree(screen, clock)?;
                 #[allow(unused_variables)]
-                let {} = tree.root();
+                let {} = InputLine::new(tree, None, None)?;
             " }, obj))
         }
     })));
     xaml.property_set(input_line_text, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        InputLine::set_text(&mut tree, {}, {});
+        InputLine::set_text(tree, {}, {});
     " }, obj, value))));
     xaml.property_set(input_line_validator, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        InputLine::set_validator(&mut tree, {}, Some(Box::new({})));
+        InputLine::set_validator(tree, {}, Some(Box::new({})));
     " }, obj, value))));
 
     xaml.struct_new(frame, Some(Box::new(|obj, parent| {
@@ -460,31 +446,29 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = Frame::new(&mut tree, {}, Some({}))?;
+                    let {} = Frame::new(tree, Some({}), Some({}))?;
                 " }, obj, parent, prev))
             } else {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = Frame::new(&mut tree, {}, None)?;
+                    let {} = Frame::new(tree, Some({}), None)?;
                 " }, obj, parent))
             }
         } else {
             indent_all_by(4, format!(indoc! { "
-                #[allow(unused_mut)]
-                let mut tree = Frame::new_tree(screen, clock)?;
                 #[allow(unused_variables)]
-                let {} = tree.root();
+                let {} = Frame::new(tree, None, None)?;
             " }, obj))
         }
     })));
     xaml.property_set(frame_double, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        Frame::set_double(&mut tree, {}, {});
+        Frame::set_double(tree, {}, {});
     " }, obj, value))));
     xaml.property_set(frame_text, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        Frame::set_text(&mut tree, {}, {});
+        Frame::set_text(tree, {}, {});
     " }, obj, value))));
     xaml.property_set(frame_text_align, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        Frame::set_text_align(&mut tree, {}, {});
+        Frame::set_text_align(tree, {}, {});
     " }, obj, value))));
 
     xaml.struct_new(label, Some(Box::new(|obj, parent| {
@@ -492,28 +476,26 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = Label::new(&mut tree, {}, Some({}))?;
+                    let {} = Label::new(tree, Some({}), Some({}))?;
                 " }, obj, parent, prev))
             } else {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = Label::new(&mut tree, {}, None)?;
+                    let {} = Label::new(tree, Some({}), None)?;
                 " }, obj, parent))
             }
         } else {
             indent_all_by(4, format!(indoc! { "
-                #[allow(unused_mut)]
-                let mut tree = Label::new_tree(screen, clock)?;
                 #[allow(unused_variables)]
-                let {} = tree.root();
+                let {} = Label::new(tree, None, None)?;
             " }, obj))
         }
     })));
     xaml.property_set(label_text, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        Label::set_text(&mut tree, {}, {});
+        Label::set_text(tree, {}, {});
     " }, obj, value))));
     xaml.property_set(label_focus, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        Label::set_focus(&mut tree, {}, Some({}));
+        Label::set_focus(tree, {}, Some({}));
     " }, obj, value))));
 
     xaml.struct_new(check_box, Some(Box::new(|obj, parent| {
@@ -521,28 +503,26 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = CheckBox::new(&mut tree, {}, Some({}))?;
+                    let {} = CheckBox::new(tree, Some({}), Some({}))?;
                 " }, obj, parent, prev))
             } else {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = CheckBox::new(&mut tree, {}, None)?;
+                    let {} = CheckBox::new(tree, Some({}), None)?;
                 " }, obj, parent))
             }
         } else {
             indent_all_by(4, format!(indoc! { "
-                #[allow(unused_mut)]
-                let mut tree = CheckBox::new_tree(screen, clock)?;
                 #[allow(unused_variables)]
-                let {} = tree.root();
+                let {} = CheckBox::new(tree, None, None)?;
             " }, obj))
         }
     })));
     xaml.property_set(check_box_text, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        CheckBox::set_text(&mut tree, {}, {});
+        CheckBox::set_text(tree, {}, {});
     " }, obj, value))));
     xaml.property_set(check_box_is_on, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        CheckBox::set_is_on(&mut tree, {}, {});
+        CheckBox::set_is_on(tree, {}, {});
     " }, obj, value))));
 
     xaml.struct_new(radio_button, Some(Box::new(|obj, parent| {
@@ -550,27 +530,25 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = RadioButton::new(&mut tree, {}, Some({}))?;
+                    let {} = RadioButton::new(tree, Some({}), Some({}))?;
                 " }, obj, parent, prev))
             } else {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = RadioButton::new(&mut tree, {}, None)?;
+                    let {} = RadioButton::new(tree, Some({}), None)?;
                 " }, obj, parent))
             }
         } else {
             indent_all_by(4, format!(indoc! { "
-                #[allow(unused_mut)]
-                let mut tree = RadioButton::new_tree(screen, clock)?;
                 #[allow(unused_variables)]
-                let {} = tree.root();
+                let {} = RadioButton::new(tree, None, None)?;
             " }, obj))
         }
     })));
     xaml.property_set(radio_button_text, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        RadioButton::set_text(&mut tree, {}, {});
+        RadioButton::set_text(tree, {}, {});
     " }, obj, value))));
     xaml.property_set(radio_button_is_on, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        RadioButton::set_is_on(&mut tree, {}, {});
+        RadioButton::set_is_on(tree, {}, {});
     " }, obj, value))));
 }

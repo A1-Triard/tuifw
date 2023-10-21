@@ -399,10 +399,11 @@ macro_attr! {
 }
 
 fn offset_from_root(
-    mut window: Window,
+    window: Option<Window>,
     tree: &WindowTree
 ) -> Vector {
     let mut offset = Vector::null();
+    let Some(mut window) = window else { return offset; };
     loop {
         offset += tree.arena[window.0].window_bounds.tl.offset_from(Point { x: 0, y: 0 });
         if let Some(parent) = tree.arena[window.0].parent {
@@ -424,7 +425,7 @@ impl Window {
     pub fn new(
         tree: &mut WindowTree,
         widget: Box<dyn Widget>,
-        parent: Self,
+        parent: Option<Self>,
         prev: Option<Self>,
     ) -> Result<Self, Error> {
         let data = widget.new();
@@ -433,7 +434,7 @@ impl Window {
         tree.arena.try_reserve().map_err(|_| Error::Oom)?;
         let window = tree.arena.insert(move |window| {
             (WindowNode {
-                parent: Some(parent),
+                parent,
                 prev: Window(window),
                 next: Window(window),
                 first_child: None,
@@ -785,15 +786,20 @@ impl Window {
     }
 
     pub fn set_visibility(self, tree: &mut WindowTree, value: Visibility) {
-        if self == tree.root { return; }
         let old_value = replace(&mut tree.arena[self.0].visibility, value);
         match (old_value, value) {
-            (Visibility::Visible, Visibility::Collapsed) => self.parent(tree).unwrap().invalidate_measure(tree),
-            (Visibility::Visible, Visibility::Hidden) => self.invalidate_render(tree),
-            (Visibility::Collapsed, Visibility::Visible) => self.parent(tree).unwrap().invalidate_measure(tree),
-            (Visibility::Collapsed, Visibility::Hidden) => self.parent(tree).unwrap().invalidate_measure(tree),
-            (Visibility::Hidden, Visibility::Visible) => self.invalidate_render(tree),
-            (Visibility::Hidden, Visibility::Collapsed) => self.parent(tree).unwrap().invalidate_measure(tree),
+            (Visibility::Visible, Visibility::Collapsed) =>
+                self.parent(tree).map(|x| x.invalidate_measure(tree)).unwrap_or(()),
+            (Visibility::Visible, Visibility::Hidden) =>
+                self.invalidate_render(tree),
+            (Visibility::Collapsed, Visibility::Visible) =>
+                self.parent(tree).map(|x| x.invalidate_measure(tree)).unwrap_or(()),
+            (Visibility::Collapsed, Visibility::Hidden) =>
+                self.parent(tree).map(|x| x.invalidate_measure(tree)).unwrap_or(()),
+            (Visibility::Hidden, Visibility::Visible) =>
+                self.invalidate_render(tree),
+            (Visibility::Hidden, Visibility::Collapsed) =>
+                self.parent(tree).map(|x| x.invalidate_measure(tree)).unwrap_or(()),
             _ => { },
         }
     }
@@ -900,7 +906,7 @@ impl Window {
         tree: &mut WindowTree,
         window_bounds: Rect
     ) {
-        let Some(parent) = tree.arena[self.0].parent else { return; };
+        let parent = tree.arena[self.0].parent;
         let screen_bounds = window_bounds.offset(offset_from_root(parent, tree));
         invalidate_rect(tree.screen(), screen_bounds);
         let window_bounds = replace(&mut tree.arena[self.0].window_bounds, window_bounds);
@@ -913,7 +919,6 @@ impl Window {
     }
 
     pub fn set_h_align(self, tree: &mut WindowTree, value: Option<HAlign>) {
-        if self == tree.root { return; }
         tree.arena[self.0].h_align = value;
         self.invalidate_measure(tree);
     }
@@ -923,7 +928,6 @@ impl Window {
     }
 
     pub fn set_v_align(self, tree: &mut WindowTree, value: Option<VAlign>) {
-        if self == tree.root { return; }
         tree.arena[self.0].v_align = value;
         self.invalidate_measure(tree);
     }
@@ -933,7 +937,6 @@ impl Window {
     }
 
     pub fn set_margin(self, tree: &mut WindowTree, value: Thickness) {
-        if self == tree.root { return; }
         tree.arena[self.0].margin = value;
         self.invalidate_measure(tree);
     }
@@ -943,7 +946,6 @@ impl Window {
     }
 
     pub fn set_min_width(self, tree: &mut WindowTree, value: i16) {
-        if self == tree.root { return; }
         tree.arena[self.0].min_width = value;
         self.invalidate_measure(tree);
     }
@@ -953,7 +955,6 @@ impl Window {
     }
 
     pub fn set_min_height(self, tree: &mut WindowTree, value: i16) {
-        if self == tree.root { return; }
         tree.arena[self.0].min_height = value;
         self.invalidate_measure(tree);
     }
@@ -963,7 +964,6 @@ impl Window {
     }
 
     pub fn set_max_width(self, tree: &mut WindowTree, value: i16) {
-        if self == tree.root { return; }
         tree.arena[self.0].max_width = value;
         self.invalidate_measure(tree);
     }
@@ -973,7 +973,6 @@ impl Window {
     }
 
     pub fn set_max_height(self, tree: &mut WindowTree, value: i16) {
-        if self == tree.root { return; }
         tree.arena[self.0].max_height = value;
         self.invalidate_measure(tree);
     }
@@ -983,7 +982,6 @@ impl Window {
     }
 
     pub fn set_width(self, tree: &mut WindowTree, value: Option<i16>) {
-        if self == tree.root { return; }
         tree.arena[self.0].width = value;
         self.invalidate_measure(tree);
     }
@@ -993,7 +991,6 @@ impl Window {
     }
 
     pub fn set_height(self, tree: &mut WindowTree, value: Option<i16>) {
-        if self == tree.root { return; }
         tree.arena[self.0].height = value;
         self.invalidate_measure(tree);
     }
@@ -1025,44 +1022,55 @@ impl Window {
     fn detach(
         self,
         tree: &mut WindowTree
-    ) -> Self {
+    ) -> Option<Self> {
         let node = &mut tree.arena[self.0];
-        let parent = node.parent.take().expect("root can not be detached");
+        let parent = node.parent.take();
         let prev = replace(&mut node.prev, self);
         let next = replace(&mut node.next, self);
         tree.arena[prev.0].next = next;
         tree.arena[next.0].prev = prev;
-        let parent_node = &mut tree.arena[parent.0];
-        if parent_node.first_child.unwrap() == self {
-            parent_node.first_child = if next == self { None } else { Some(next) };
+        if let Some(parent) = parent {
+            let parent_node = &mut tree.arena[parent.0];
+            if parent_node.first_child.unwrap() == self {
+                parent_node.first_child = if next == self { None } else { Some(next) };
+            }
+            parent.invalidate_measure(tree);
+        } else {
+            if tree.first_child.unwrap() == self {
+                tree.first_child = if next == self { None } else { Some(next) };
+            }
         }
-        parent.invalidate_measure(tree);
         parent
     }
 
     fn attach(
         self,
         tree: &mut WindowTree,
-        parent: Self,
+        parent: Option<Self>,
         prev: Option<Self>
     ) {
         let (prev, next) = if let Some(prev) = prev {
-            assert_eq!(tree.arena[prev.0].parent.unwrap(), parent);
+            assert_eq!(tree.arena[prev.0].parent, parent);
             let next = replace(&mut tree.arena[prev.0].next, self);
             tree.arena[next.0].prev = self;
             (prev, next)
-        } else {
+        } else if let Some(parent) = parent {
             let parent_node = &mut tree.arena[parent.0];
             let next = parent_node.first_child.replace(self).unwrap_or(self);
             let prev = replace(&mut tree.arena[next.0].prev, self);
             tree.arena[prev.0].next = self;
             (prev, next)
+        } else {
+            let next = tree.first_child.replace(self).unwrap_or(self);
+            let prev = replace(&mut tree.arena[next.0].prev, self);
+            tree.arena[prev.0].next = self;
+            (prev, next)
         };
         let node = &mut tree.arena[self.0];
-        node.parent = Some(parent);
+        node.parent = parent;
         node.prev = prev;
         node.next = next;
-        parent.invalidate_measure(tree);
+        parent.map(|x| x.invalidate_measure(tree));
     }
 
     pub fn drop_window(
@@ -1108,11 +1116,8 @@ impl Window {
     ) {
         let bounds = tree.arena[self.0].window_bounds;
         let rect = rect.offset(bounds.tl.offset_from(Point { x: 0, y: 0 })).intersect(bounds);
-        let screen_rect = if let Some(parent) = tree.arena[self.0].parent {
-            rect.offset(offset_from_root(parent, tree))
-        } else {
-            rect
-        };
+        let parent = tree.arena[self.0].parent;
+        let screen_rect = rect.offset(offset_from_root(parent, tree));
         invalidate_rect(tree.screen(), screen_rect);
     }
  
@@ -1121,11 +1126,8 @@ impl Window {
         tree: &mut WindowTree
     ) {
         let bounds = tree.arena[self.0].window_bounds;
-        let screen_bounds = if let Some(parent) = tree.arena[self.0].parent {
-            bounds.offset(offset_from_root(parent, tree))
-        } else {
-            bounds
-        };
+        let parent = tree.arena[self.0].parent;
+        let screen_bounds = bounds.offset(offset_from_root(parent, tree));
         invalidate_rect(tree.screen(), screen_bounds);
     }
 }
@@ -1227,7 +1229,7 @@ macro_attr! {
 pub struct WindowTree<'clock> {
     screen: Option<Box<dyn Screen>>,
     arena: Arena<WindowNode>,
-    root: Window,
+    first_child: Option<Window>,
     primary_focused: Option<Window>,
     secondary_focused: Option<Window>,
     next_primary_focused: Option<Option<Window>>,
@@ -1245,54 +1247,11 @@ impl<'clock> WindowTree<'clock> {
     pub fn new(
         screen: Box<dyn Screen>,
         clock: &'clock MonoClock,
-        root_widget: Box<dyn Widget>,
     ) -> Result<Self, Error> {
-        let data = root_widget.new();
-        let pre_process = root_widget.pre_process();
-        let post_process = root_widget.post_process();
-        let mut arena = Arena::new();
-        arena.try_reserve().map_err(|_| Error::Oom)?;
-        let screen_size = screen.size();
-        let root = arena.insert(|window| (WindowNode {
-            parent: None,
-            prev: Window(window),
-            next: Window(window),
-            first_child: None,
-            event_handler: None,
-            widget: root_widget,
-            data,
-            layout: None,
-            measure_size: Some((Some(screen_size.x), Some(screen_size.y))),
-            desired_size: screen_size,
-            arrange_size: Some(screen_size),
-            render_bounds: Rect { tl: Point { x: 0, y: 0 }, size: screen_size },
-            window_bounds: Rect { tl: Point { x: 0, y: 0 }, size: screen_size },
-            h_align: None,
-            v_align: None,
-            margin: Thickness::all(0),
-            width: None,
-            height: None,
-            min_width: 0,
-            min_height: 0,
-            max_width: -1,
-            max_height: -1,
-            palette: Palette::new(),
-            focus_tab: Window(window),
-            focus_right: Window(window),
-            focus_left: Window(window),
-            focus_up: Window(window),
-            focus_down: Window(window),
-            contains_primary_focus: true,
-            name: String::new(),
-            pre_process: None,
-            post_process: None,
-            is_enabled: true,
-            visibility: Visibility::Visible,
-        }, Window(window)));
-        let mut tree = WindowTree {
+        Ok(WindowTree {
             screen: Some(screen),
-            arena,
-            root,
+            arena: Arena::new(),
+            first_child: None,
             primary_focused: None,
             secondary_focused: None,
             next_primary_focused: None,
@@ -1304,16 +1263,7 @@ impl<'clock> WindowTree<'clock> {
             palette: root_palette(),
             pre_process: Arena::new(),
             post_process: Arena::new(),
-        };
-        if pre_process {
-            let id = tree.pre_process.insert(|id| (PrePostProcess(root), id));
-            tree.arena[root.0].pre_process = Some(id);
-        }
-        if post_process {
-            let id = tree.post_process.insert(|id| (PrePostProcess(root), id));
-            tree.arena[root.0].post_process = Some(id);
-        }
-        Ok(tree)
+        })
     }
 
     pub fn palette(&self) -> &Palette {
@@ -1322,11 +1272,18 @@ impl<'clock> WindowTree<'clock> {
 
     pub fn palette_mut<T>(&mut self, f: impl FnOnce(&mut Palette) -> T) -> T {
         let res = f(&mut self.palette);
-        self.root.invalidate_render(self);
+        if let Some(first_child) = self.first_child {
+            let mut child = first_child;
+            loop {
+                child.invalidate_render(self);
+                child = child.next(self);
+                if child == first_child { break; }
+            }
+        }
         res
     }
 
-    pub fn root(&self) -> Window { self.root }
+    pub fn first_child(&self) -> Option<Window> { self.first_child }
 
     pub fn primary_focused(&self) -> Option<Window> { self.primary_focused }
 
@@ -1399,11 +1356,17 @@ impl<'clock> WindowTree<'clock> {
     }
 
     fn update(&mut self, wait: bool, app: &mut dyn App) -> Result<(), Error> {
-        let root = self.root;
         let screen = self.screen.as_mut().expect("WindowTree is in invalid state");
         let screen_size = screen.size();
-        root.measure(self, Some(screen_size.x), Some(screen_size.y), app);
-        root.arrange(self, Rect { tl: Point { x: 0, y: 0 }, size: screen_size }, app);
+        if let Some(first_child) = self.first_child {
+            let mut child = first_child;
+            loop {
+                child.measure(self, Some(screen_size.x), Some(screen_size.y), app);
+                child.arrange(self, Rect { tl: Point { x: 0, y: 0 }, size: screen_size }, app);
+                child = child.next(self);
+                if child == first_child { break; }
+            }
+        }
         if let Some(cursor) = self.cursor {
             let screen = self.screen();
             if rect_invalidated(screen, Rect { tl: cursor, size: Vector { x: 1, y: 1 } }) {
@@ -1416,7 +1379,16 @@ impl<'clock> WindowTree<'clock> {
         if let Some(next_secondary_focused) = self.next_secondary_focused.take() {
             self.focus_secondary(next_secondary_focused, app);
         }
-        self.render_window(self.root, Vector::null(), app);
+        if let Some(first_child) = self.first_child {
+            let mut child = first_child;
+            loop {
+                let bounds = self.arena[child.0].window_bounds;
+                let offset = bounds.tl.offset_from(Point { x: 0, y: 0 });
+                self.render_window(child, offset, app);
+                child = child.next(self);
+                if child == first_child { break; }
+            }
+        }
         let screen = self.screen.as_mut().expect("WindowTree is in invalid state");
         if let Some(screen_Event::Key(n, key)) = screen.update(self.cursor, wait)? {
             for _ in 0 .. n.get() {

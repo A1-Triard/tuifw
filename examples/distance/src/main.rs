@@ -120,9 +120,9 @@ impl EventHandler for RootEventHandler {
 fn start() -> Result<(), Error> {
     let clock = unsafe { MonoClock::new() };
     let screen = unsafe { tuifw_screen::init(None, None) }?;
-    let (tree, names) = &mut ui::build_tree(screen, &clock)?;
-    let root = tree.root();
-    root.set_event_handler(tree, Some(Box::new(RootEventHandler)));
+    let tree = &mut WindowTree::new(screen, &clock)?;
+    let names = ui::build(tree)?;
+    names.root.set_event_handler(tree, Some(Box::new(RootEventHandler)));
     let state = &mut State {
         a: names.a,
         v: names.v,
