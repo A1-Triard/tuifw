@@ -375,6 +375,7 @@ macro_attr! {
         measure_size: Option<(Option<i16>, Option<i16>)>,
         desired_size: Vector,
         arrange_size: Option<Vector>,
+        arranged_size: Vector,
         render_bounds: Rect,
         window_bounds: Rect,
         h_align: Option<HAlign>,
@@ -449,6 +450,7 @@ impl Window {
                 measure_size: None,
                 desired_size: Vector::null(),
                 arrange_size: None,
+                arranged_size: Vector::null(),
                 render_bounds: Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() },
                 window_bounds: Rect { tl: Point { x: 0, y: 0 }, size: Vector::null() },
                 h_align: None,
@@ -561,19 +563,21 @@ impl Window {
             y: if node.v_align.is_none() { final_bounds.h() } else { node.desired_size.y }
         };
         let arrange_size = node.margin.shrink_rect_size(arrange_size).min(max_size).max(min_size);
-        if node.arrange_size == Some(arrange_size) { return; }
-        node.arrange_size = Some(arrange_size);
-        let widget = node.widget.clone();
-        let arranged_size = widget.arrange(
-            tree,
-            self,
-            Rect { tl: Point { x: 0, y: 0 }, size: arrange_size },
-            app
-        );
+        if node.arrange_size != Some(arrange_size) {
+            node.arrange_size = Some(arrange_size);
+            let widget = node.widget.clone();
+            let arranged_size = widget.arrange(
+                tree,
+                self,
+                Rect { tl: Point { x: 0, y: 0 }, size: arrange_size },
+                app
+            );
+            let node = &mut tree.arena[self.0];
+            node.arranged_size = arranged_size.min(max_size).max(min_size);
+        }
         let node = &mut tree.arena[self.0];
-        let arranged_size = arranged_size.min(max_size).max(min_size);
         let arranged_bounds = Thickness::align(
-            arranged_size,
+            node.arranged_size,
             margined_bounds.size,
             node.h_align.unwrap_or(HAlign::Left),
             node.v_align.unwrap_or(VAlign::Top)
@@ -642,7 +646,6 @@ impl Window {
         let res = f(layout);
         if let Some(parent) = self.parent(tree) {
             parent.invalidate_measure(tree);
-            parent.invalidate_arrange(tree);
         }
         res
     }
