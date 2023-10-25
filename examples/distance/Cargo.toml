@@ -25,6 +25,7 @@ rlibc = "1.0.0"
 timer-no-std = "0.5.0"
 tuifw = { path = "../.." }
 tuifw-screen = { path = "../../screen" }
+tuifw-screen-base = { path = "../../screen-base" }
 tuifw-window = { path = "../../window" }
 
 [build-dependencies]

@@ -158,55 +158,49 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             if t < -i32::from(u16::MAX) || t > i32::from(u16::MAX) { return None; }
             if r < -i32::from(u16::MAX) || r > i32::from(u16::MAX) { return None; }
             if b < -i32::from(u16::MAX) || b > i32::from(u16::MAX) { return None; }
-            Some(format!("Thickness::new({l}, {t}, {r}, {b})"))
+            Some(format!("tuifw_screen_base::Thickness::new({l}, {t}, {r}, {b})"))
         } else if parts.len() == 1 {
             let a = i32::from_str(parts[0]).ok()?;
             if a < -i32::from(u16::MAX) || a > i32::from(u16::MAX) { return None; }
-            Some(format!("Thickness::all({a})"))
+            Some(format!("tuifw_screen_base::Thickness::all({a})"))
         } else {
             None
         }
     })));
     h_align.set_ctor(xaml, Some(Box::new(|x| match x {
-        "Left" => Some("HAlign::Left".to_string()),
-        "Center" => Some("HAlign::Center".to_string()),
-        "Right" => Some("HAlign::Right".to_string()),
+        "Left" => Some("tuifw_screen_base::HAlign::Left".to_string()),
+        "Center" => Some("tuifw_screen_base::HAlign::Center".to_string()),
+        "Right" => Some("tuifw_screen_base::HAlign::Right".to_string()),
         _ => None,
     })));
     v_align.set_ctor(xaml, Some(Box::new(|x| match x {
-        "Top" => Some("VAlign::Top".to_string()),
-        "Center" => Some("VAlign::Center".to_string()),
-        "Bottom" => Some("VAlign::Bottom".to_string()),
+        "Top" => Some("tuifw_screen_base::VAlign::Top".to_string()),
+        "Center" => Some("tuifw_screen_base::VAlign::Center".to_string()),
+        "Bottom" => Some("tuifw_screen_base::VAlign::Bottom".to_string()),
         _ => None,
     })));
     dock.set_ctor(xaml, Some(Box::new(|x| match x {
-        "Left" => Some("Dock::Left".to_string()),
-        "Top" => Some("Dock::Top".to_string()),
-        "Right" => Some("Dock::Right".to_string()),
-        "Bottom" => Some("Dock::Bottom".to_string()),
+        "Left" => Some("tuifw::Dock::Left".to_string()),
+        "Top" => Some("tuifw::Dock::Top".to_string()),
+        "Right" => Some("tuifw::Dock::Right".to_string()),
+        "Bottom" => Some("tuifw::Dock::Bottom".to_string()),
         _ => None,
     })));
     visibility.set_ctor(xaml, Some(Box::new(|x| match x {
-        "Visible" => Some("Visibility::Visible".to_string()),
-        "Hidden" => Some("Visibility::Hidden".to_string()),
-        "Collapsed" => Some("Visibility::Collapsed".to_string()),
+        "Visible" => Some("tuifw_window::Visibility::Visible".to_string()),
+        "Hidden" => Some("tuifw_window::Visibility::Hidden".to_string()),
+        "Collapsed" => Some("tuifw_window::Visibility::Collapsed".to_string()),
         _ => None,
     })));
 
     xaml.set_preamble(indoc! { "
         extern crate alloc;
-
-        #[allow(unused_imports)]
-        use alloc::boxed::Box;
-        use tuifw::*;
-        use tuifw_screen::*;
-        use tuifw_window::*;
     " });
     xaml.set_header(indoc! { "
 
         pub fn build(
-            tree: &mut WindowTree,
-        ) -> Result<Names, Error> {
+            tree: &mut tuifw_window::WindowTree,
+        ) -> Result<Names, tuifw_screen_base::Error> {
     " });
     xaml.set_result(Box::new(|_, names| {
         let mut s = "    let names = Names {\n".to_string();
@@ -228,7 +222,7 @@ pub fn reg_widgets(xaml: &mut Xaml) {
         for name in names.keys() {
             s.push_str("    #[allow(dead_code)]\n    pub ");
             s.push_str(name);
-            s.push_str(": Window,\n");
+            s.push_str(": tuifw_window::Window,\n");
         }
         s.push_str("}\n");
         s
@@ -238,7 +232,7 @@ pub fn reg_widgets(xaml: &mut Xaml) {
         indent_all_by(4, format!(indoc! { "
             #[allow(unused_mut)]
             #[allow(unused_variables)]
-            let mut {} = IntValidator {{ min: i32::MIN, max: i32::MAX }};
+            let mut {} = tuifw::IntValidator {{ min: i32::MIN, max: i32::MAX }};
         " }, obj))
     })));
     int_validator_min.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
@@ -252,7 +246,7 @@ pub fn reg_widgets(xaml: &mut Xaml) {
         indent_all_by(4, format!(indoc! { "
             #[allow(unused_mut)]
             #[allow(unused_variables)]
-            let mut {} = FloatValidator {{ min: f64::MIN, max: f64::MAX }};
+            let mut {} = tuifw::FloatValidator {{ min: f64::MIN, max: f64::MAX }};
         " }, obj))
     })));
     float_validator_min.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
@@ -326,29 +320,29 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = Background::new(tree, Some({}), Some({}))?;
+                    let {} = tuifw::Background::new(tree, Some({}), Some({}))?;
                 " }, obj, parent, prev))
             } else {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = Background::new(tree, Some({}), None)?;
+                    let {} = tuifw::Background::new(tree, Some({}), None)?;
                 " }, obj, parent))
             }
         } else {
             indent_all_by(4, format!(indoc! { "
                 #[allow(unused_variables)]
-                let {} = Background::new(tree, None, None)?;
+                let {} = tuifw::Background::new(tree, None, None)?;
             " }, obj))
         }
     })));
     background_show_pattern.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        Background::set_show_pattern(tree, {}, {});
+        tuifw::Background::set_show_pattern(tree, {}, {});
     " }, obj, value))));
     background_pattern_even.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        Background::set_pattern_even(tree, {}, {});
+        tuifw::Background::set_pattern_even(tree, {}, {});
     " }, obj, value))));
     background_pattern_odd.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        Background::set_pattern_odd(tree, {}, {});
+        tuifw::Background::set_pattern_odd(tree, {}, {});
     " }, obj, value))));
 
     stack_panel.set_ctor(xaml, Some(Box::new(|obj, parent, prev| {
@@ -356,23 +350,23 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = StackPanel::new(tree, Some({}), Some({}))?;
+                    let {} = tuifw::StackPanel::new(tree, Some({}), Some({}))?;
                 " }, obj, parent, prev))
             } else {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = StackPanel::new(tree, Some({}), None)?;
+                    let {} = tuifw::StackPanel::new(tree, Some({}), None)?;
                 " }, obj, parent))
             }
         } else {
             indent_all_by(4, format!(indoc! { "
                 #[allow(unused_variables)]
-                let {} = StackPanel::new(tree, None, None)?;
+                let {} = tuifw::StackPanel::new(tree, None, None)?;
             " }, obj))
         }
     })));
     stack_panel_vertical.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        StackPanel::set_vertical(tree, {}, {});
+        tuifw::StackPanel::set_vertical(tree, {}, {});
     " }, obj, value))));
 
     dock_panel.set_ctor(xaml, Some(Box::new(|obj, parent, prev| {
@@ -380,23 +374,23 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = DockPanel::new(tree, Some({}), Some({}))?;
+                    let {} = tuifw::DockPanel::new(tree, Some({}), Some({}))?;
                 " }, obj, parent, prev))
             } else {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = DockPanel::new(tree, Some({}), None)?;
+                    let {} = tuifw::DockPanel::new(tree, Some({}), None)?;
                 " }, obj, parent))
             }
         } else {
             indent_all_by(4, format!(indoc! { "
                 #[allow(unused_variables)]
-                let {} = DockPanel::new(tree, None, None)?;
+                let {} = tuifw::DockPanel::new(tree, None, None)?;
             " }, obj))
         }
     })));
     widget_dock.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        DockPanel::set_dock(tree, {}, Some({}));
+        tuifw::DockPanel::set_dock(tree, {}, Some({}));
     " }, obj, value))));
 
     static_text.set_ctor(xaml, Some(Box::new(|obj, parent, prev| {
@@ -404,23 +398,23 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = StaticText::new(tree, Some({}), Some({}))?;
+                    let {} = tuifw::StaticText::new(tree, Some({}), Some({}))?;
                 " }, obj, parent, prev))
             } else {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = StaticText::new(tree, Some({}), None)?;
+                    let {} = tuifw::StaticText::new(tree, Some({}), None)?;
                 " }, obj, parent))
             }
         } else {
             indent_all_by(4, format!(indoc! { "
                 #[allow(unused_variables)]
-                let {} = StaticText::new(tree, None, None)?;
+                let {} = tuifw::StaticText::new(tree, None, None)?;
             " }, obj))
         }
     })));
     static_text_text.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        StaticText::set_text(tree, {}, {});
+        tuifw::StaticText::set_text(tree, {}, {});
     " }, obj, value))));
 
     button.set_ctor(xaml, Some(Box::new(|obj, parent, prev| {
@@ -428,23 +422,23 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = Button::new(tree, Some({}), Some({}))?;
+                    let {} = tuifw::Button::new(tree, Some({}), Some({}))?;
                 " }, obj, parent, prev))
             } else {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = Button::new(tree, Some({}), None)?;
+                    let {} = tuifw::Button::new(tree, Some({}), None)?;
                 " }, obj, parent))
             }
         } else {
             indent_all_by(4, format!(indoc! { "
                 #[allow(unused_variables)]
-                let {} = Button::new(tree, None, None)?;
+                let {} = tuifw::Button::new(tree, None, None)?;
             " }, obj))
         }
     })));
     button_text.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        Button::set_text(tree, {}, {});
+        tuifw::Button::set_text(tree, {}, {});
     " }, obj, value))));
 
     input_line.set_ctor(xaml, Some(Box::new(|obj, parent, prev| {
@@ -452,26 +446,26 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = InputLine::new(tree, Some({}), Some({}))?;
+                    let {} = tuifw::InputLine::new(tree, Some({}), Some({}))?;
                 " }, obj, parent, prev))
             } else {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = InputLine::new(tree, Some({}), None)?;
+                    let {} = tuifw::InputLine::new(tree, Some({}), None)?;
                 " }, obj, parent))
             }
         } else {
             indent_all_by(4, format!(indoc! { "
                 #[allow(unused_variables)]
-                let {} = InputLine::new(tree, None, None)?;
+                let {} = tuifw::InputLine::new(tree, None, None)?;
             " }, obj))
         }
     })));
     input_line_text.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        InputLine::set_text(tree, {}, {});
+        tuifw::InputLine::set_text(tree, {}, {});
     " }, obj, value))));
     input_line_validator.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        InputLine::set_validator(tree, {}, Some(Box::new({})));
+        tuifw::InputLine::set_validator(tree, {}, Some(alloc::boxed::Box::new({})));
     " }, obj, value))));
 
     frame.set_ctor(xaml, Some(Box::new(|obj, parent, prev| {
@@ -479,29 +473,29 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = Frame::new(tree, Some({}), Some({}))?;
+                    let {} = tuifw::Frame::new(tree, Some({}), Some({}))?;
                 " }, obj, parent, prev))
             } else {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = Frame::new(tree, Some({}), None)?;
+                    let {} = tuifw::Frame::new(tree, Some({}), None)?;
                 " }, obj, parent))
             }
         } else {
             indent_all_by(4, format!(indoc! { "
                 #[allow(unused_variables)]
-                let {} = Frame::new(tree, None, None)?;
+                let {} = tuifw::Frame::new(tree, None, None)?;
             " }, obj))
         }
     })));
     frame_double.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        Frame::set_double(tree, {}, {});
+        tuifw::Frame::set_double(tree, {}, {});
     " }, obj, value))));
     frame_text.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        Frame::set_text(tree, {}, {});
+        tuifw::Frame::set_text(tree, {}, {});
     " }, obj, value))));
     frame_text_align.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        Frame::set_text_align(tree, {}, {});
+        tuifw::Frame::set_text_align(tree, {}, {});
     " }, obj, value))));
 
     label.set_ctor(xaml, Some(Box::new(|obj, parent, prev| {
@@ -509,26 +503,26 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = Label::new(tree, Some({}), Some({}))?;
+                    let {} = tuifw::Label::new(tree, Some({}), Some({}))?;
                 " }, obj, parent, prev))
             } else {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = Label::new(tree, Some({}), None)?;
+                    let {} = tuifw::Label::new(tree, Some({}), None)?;
                 " }, obj, parent))
             }
         } else {
             indent_all_by(4, format!(indoc! { "
                 #[allow(unused_variables)]
-                let {} = Label::new(tree, None, None)?;
+                let {} = tuifw::Label::new(tree, None, None)?;
             " }, obj))
         }
     })));
     label_text.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        Label::set_text(tree, {}, {});
+        tuifw::Label::set_text(tree, {}, {});
     " }, obj, value))));
     label_focus.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        Label::set_focus(tree, {}, Some({}));
+        tuifw::Label::set_focus(tree, {}, Some({}));
     " }, obj, value))));
 
     check_box.set_ctor(xaml, Some(Box::new(|obj, parent, prev| {
@@ -536,26 +530,26 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = CheckBox::new(tree, Some({}), Some({}))?;
+                    let {} = tuifw::CheckBox::new(tree, Some({}), Some({}))?;
                 " }, obj, parent, prev))
             } else {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = CheckBox::new(tree, Some({}), None)?;
+                    let {} = tuifw::CheckBox::new(tree, Some({}), None)?;
                 " }, obj, parent))
             }
         } else {
             indent_all_by(4, format!(indoc! { "
                 #[allow(unused_variables)]
-                let {} = CheckBox::new(tree, None, None)?;
+                let {} = tuifw::CheckBox::new(tree, None, None)?;
             " }, obj))
         }
     })));
     check_box_text.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        CheckBox::set_text(tree, {}, {});
+        tuifw::CheckBox::set_text(tree, {}, {});
     " }, obj, value))));
     check_box_is_on.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        CheckBox::set_is_on(tree, {}, {});
+        tuifw::CheckBox::set_is_on(tree, {}, {});
     " }, obj, value))));
 
     radio_button.set_ctor(xaml, Some(Box::new(|obj, parent, prev| {
@@ -563,25 +557,25 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = RadioButton::new(tree, Some({}), Some({}))?;
+                    let {} = tuifw::RadioButton::new(tree, Some({}), Some({}))?;
                 " }, obj, parent, prev))
             } else {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = RadioButton::new(tree, Some({}), None)?;
+                    let {} = tuifw::RadioButton::new(tree, Some({}), None)?;
                 " }, obj, parent))
             }
         } else {
             indent_all_by(4, format!(indoc! { "
                 #[allow(unused_variables)]
-                let {} = RadioButton::new(tree, None, None)?;
+                let {} = tuifw::RadioButton::new(tree, None, None)?;
             " }, obj))
         }
     })));
     radio_button_text.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        RadioButton::set_text(tree, {}, {});
+        tuifw::RadioButton::set_text(tree, {}, {});
     " }, obj, value))));
     radio_button_is_on.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        RadioButton::set_is_on(tree, {}, {});
+        tuifw::RadioButton::set_is_on(tree, {}, {});
     " }, obj, value))));
 }
