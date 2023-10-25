@@ -1,0 +1,10 @@
+<Background
+  xmlns="https://a1-triard.github.io/tuifw/2023/xaml"
+  xmlns:example="https://a1-triard.github.io/tuifw/2023/xaml/example"
+  Name="root"
+  FocusedPrimary="True"
+>
+  <Canvas>
+    <example:FloatingFrame Name="floating_frame" />
+  </Canvas>
+</Background>

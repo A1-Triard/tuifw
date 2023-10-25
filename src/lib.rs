@@ -20,6 +20,9 @@ pub use stack_panel::*;
 mod dock_panel;
 pub use dock_panel::*;
 
+mod canvas;
+pub use canvas::*;
+
 mod static_text;
 pub use static_text::*;
 

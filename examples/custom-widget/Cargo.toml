@@ -1,0 +1,32 @@
+[package]
+edition = "2021"
+name = "cstmwdgt"
+version = "0.0.0"
+publish = false
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "z"
+panic = "abort"
+strip = true
+
+[workspace]
+
+[dependencies]
+composable-allocators = "0.2.9"
+libc-print = "0.1.22"
+panic-no-std = "0.0.1"
+panicking = { version = "0.4.0", default-features = false, features = ["abort"] }
+rlibc = "1.0.0"
+timer-no-std = "0.5.0"
+tuifw = { path = "../.." }
+tuifw-screen = { path = "../../screen" }
+tuifw-screen-base = { path = "../../screen-base" }
+tuifw-window = { path = "../../window" }
+
+[build-dependencies]
+tuifw-xaml = { path = "../../xaml" }

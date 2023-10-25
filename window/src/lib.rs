@@ -642,6 +642,7 @@ impl Window {
         let res = f(layout);
         if let Some(parent) = self.parent(tree) {
             parent.invalidate_measure(tree);
+            parent.invalidate_arrange(tree);
         }
         res
     }
