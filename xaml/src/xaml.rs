@@ -1,55 +1,246 @@
-use components_arena::{Arena, Component, Id};
+use components_arena::{Arena, Component, Id, NewtypeComponentId};
 use macro_attr_2018::macro_attr;
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::{Read, Write};
-use std::path::Path;
-use xml::EventReader;
-use xml::attribute::OwnedAttribute;
-use xml::common::Position;
-use xml::name::OwnedName;
-use xml::reader::XmlEvent;
-use xml::reader::Error as xml_Error;
-use xml::reader::Result as xml_Result;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum XamlType {
-    Struct(Id<XamlStruct>),
-    Literal(Id<XamlLiteral>),
+    Struct(XamlStruct),
+    Literal(XamlLiteral),
     Ref,
 }
 
 macro_attr! {
-    #[derive(Component!)]
-    pub struct XamlStruct {
-        parent: Option<Id<XamlStruct>>,
-        #[allow(dead_code)]
-        name: String,
-        property_names: HashMap<String, Id<XamlProperty>>,
-        content_property: Option<Id<XamlProperty>>,
-        name_property: Option<Id<XamlProperty>>,
-        new: Option<Box<dyn Fn(&str, Option<(&str, Id<XamlProperty>, Option<&str>)>) -> String>>,
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, NewtypeComponentId!)]
+    pub struct XamlStruct(Id<XamlStructData>);
+}
+
+impl XamlStruct {
+    pub fn parent(self, xaml: &Xaml) -> Option<XamlStruct> {
+        xaml.structs[self.0].parent
+    }
+
+    pub fn name(self, xaml: &Xaml) -> &str {
+        &xaml.structs[self.0].name
+    }
+
+    pub fn self_property(self, xaml: &Xaml, name: &str) -> Option<XamlProperty> {
+        xaml.structs[self.0].property_names.get(name).copied()
+    }
+
+    pub fn property(self, xaml: &Xaml, name: &str) -> Option<XamlProperty> {
+        let mut owner = self;
+        loop {
+            if let Some(property) = owner.self_property(xaml, name) {
+                return Some(property);
+            }
+            if let Some(parent) = owner.parent(xaml) {
+                owner = parent;
+            } else {
+                break;
+            }
+        }
+        None
+    }
+
+    pub fn self_content_property(self, xaml: &Xaml) -> Option<XamlProperty> {
+        xaml.structs[self.0].content_property
+    }
+
+    pub fn self_name_property(self, xaml: &Xaml) -> Option<XamlProperty> {
+        xaml.structs[self.0].name_property
+    }
+
+    pub fn content_property(self, xaml: &Xaml) -> Option<XamlProperty> {
+        let mut owner = self;
+        loop {
+            if let Some(property) = owner.self_content_property(xaml) {
+                return Some(property);
+            }
+            if let Some(parent) = owner.parent(xaml) {
+                owner = parent;
+            } else {
+                break;
+            }
+        }
+        None
+    }
+
+    pub fn name_property(self, xaml: &Xaml) -> Option<XamlProperty> {
+        let mut owner = self;
+        loop {
+            if let Some(property) = owner.self_name_property(xaml) {
+                return Some(property);
+            }
+            if let Some(parent) = owner.parent(xaml) {
+                owner = parent;
+            } else {
+                break;
+            }
+        }
+        None
+    }
+
+    pub fn new<'a>(
+        xaml: &mut Xaml,
+        parent: Option<XamlStruct>,
+        namespace: &str,
+        name: &str,
+    ) -> XamlStruct {
+        let name = format!("{{{namespace}}}{name}");
+        let data = XamlStructData {
+            name: name.clone(),
+            property_names: HashMap::new(),
+            content_property: None,
+            name_property: None,
+            parent,
+            ctor: None,
+        };
+        let id = xaml.structs.insert(|id| (data, XamlStruct(id)));
+        xaml.type_names.insert(name, XamlType::Struct(id));
+        id
+    }
+
+    pub fn instance(
+        self,
+        xaml: &Xaml,
+        name: &str,
+        parent: Option<(&str, XamlProperty)>,
+        prev: Option<&str>
+    ) -> Option<String> {
+        xaml.structs[self.0].ctor.as_ref().map(|x| x(name, parent, prev))
+    }
+
+    pub fn set_ctor(
+        self,
+        xaml: &mut Xaml,
+        ctor: Option<Box<dyn Fn(&str, Option<(&str, XamlProperty)>, Option<&str>) -> String>>,
+    ) {
+        xaml.structs[self.0].ctor = ctor;
     }
 }
 
 macro_attr! {
     #[derive(Component!)]
-    pub struct XamlProperty {
-        owner: Id<XamlStruct>,
-        #[allow(dead_code)]
+    struct XamlStructData {
+        parent: Option<XamlStruct>,
+        name: String,
+        property_names: HashMap<String, XamlProperty>,
+        content_property: Option<XamlProperty>,
+        name_property: Option<XamlProperty>,
+        ctor: Option<Box<dyn Fn(&str, Option<(&str, XamlProperty)>, Option<&str>) -> String>>,
+    }
+}
+
+macro_attr! {
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, NewtypeComponentId!)]
+    pub struct XamlProperty(Id<XamlPropertyData>);
+}
+
+impl XamlProperty {
+    pub fn name(self, xaml: &Xaml) -> &str {
+        &xaml.properties[self.0].name
+    }
+
+    pub fn owner(self, xaml: &Xaml) -> XamlStruct {
+        xaml.properties[self.0].owner
+    }
+
+    pub fn ty(self, xaml: &Xaml) -> XamlType {
+        xaml.properties[self.0].ty
+    }
+
+    pub fn new<'a>(
+        xaml: &mut Xaml,
+        owner: XamlStruct,
+        name: &str,
+        ty: XamlType,
+        is_content_property: bool,
+        is_name_property: bool,
+    ) -> XamlProperty {
+        let name = name.to_string();
+        let property = XamlPropertyData {
+            owner,
+            name: name.clone(),
+            ty,
+            setter: Box::new(|_, _| String::new())
+        };
+        let id = xaml.properties.insert(|id| (property, XamlProperty(id)));
+        let owner_data = &mut xaml.structs[owner.0];
+        owner_data.property_names.insert(name, id);
+        if is_content_property {
+            assert!(owner_data.content_property.replace(id).is_none(), "duplicate content property");
+        }
+        if is_name_property {
+            assert!(owner_data.name_property.replace(id).is_none(), "duplicate name property");
+        }
+        id
+    }
+
+    pub fn set(self, xaml: &Xaml, obj: &str, value: &str) -> String {
+        (xaml.properties[self.0].setter)(obj, value)
+    }
+
+    pub fn set_setter(
+        self,
+        xaml: &mut Xaml,
+        setter: Box<dyn Fn(&str, &str) -> String>,
+    ) {
+        xaml.properties[self.0].setter = setter;
+    }
+}
+
+macro_attr! {
+    #[derive(Component!)]
+    pub struct XamlPropertyData {
+        owner: XamlStruct,
         name: String,
         ty: XamlType,
-        set: Option<Box<dyn Fn(&str, &str) -> String>>,
+        setter: Box<dyn Fn(&str, &str) -> String>,
     }
 }
 
 macro_attr! {
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, NewtypeComponentId!)]
+    pub struct XamlLiteral(Id<XamlLiteralData>);
+}
+
+impl XamlLiteral {
+    pub fn name(self, xaml: &Xaml) -> &str {
+        &xaml.literals[self.0].name
+    }
+
+    pub fn new<'a>(
+        xaml: &mut Xaml,
+        namespace: &str,
+        name: &str,
+    ) -> XamlLiteral {
+        let name = format!("{{{namespace}}}{name}");
+        let ty = XamlLiteralData { name: name.clone(), ctor: None };
+        let id = xaml.literals.insert(|id| (ty, XamlLiteral(id)));
+        xaml.type_names.insert(name, XamlType::Literal(id));
+        id
+    }
+
+    pub fn instance(self, xaml: &Xaml, value: &str) -> Option<String> {
+        xaml.literals[self.0].ctor.as_ref().and_then(|x| x(value))
+    }
+
+    pub fn set_ctor(
+        self,
+        xaml: &mut Xaml,
+        ctor: Option<Box<dyn Fn(&str) -> Option<String>>>,
+    ) {
+        xaml.literals[self.0].ctor = ctor;
+    }
+
+}
+
+macro_attr! {
     #[derive(Component!)]
-    pub struct XamlLiteral {
-        #[allow(dead_code)]
+    pub struct XamlLiteralData {
         name: String,
-        new: Option<Box<dyn Fn(&str) -> Option<String>>>,
+        ctor: Option<Box<dyn Fn(&str) -> Option<String>>>,
     }
 }
 
@@ -57,12 +248,12 @@ pub struct Xaml {
     preamble: String,
     header: String,
     footer: String,
-    postamble: Option<Box<dyn Fn(&HashMap<String, String>) -> String>>,
-    result: Option<Box<dyn Fn(&str, &HashMap<String, String>) -> String>>,
-    structs: Arena<XamlStruct>,
-    literals: Arena<XamlLiteral>,
+    postamble: Box<dyn Fn(&HashMap<String, String>) -> String>,
+    result: Box<dyn Fn(&str, &HashMap<String, String>) -> String>,
+    structs: Arena<XamlStructData>,
+    literals: Arena<XamlLiteralData>,
     type_names: HashMap<String, XamlType>,
-    properties: Arena<XamlProperty>,
+    properties: Arena<XamlPropertyData>,
 }
 
 impl Default for Xaml {
@@ -74,564 +265,64 @@ impl Default for Xaml {
 impl Xaml {
     pub fn new() -> Self {
         Xaml {
-            result: None,
+            result: Box::new(|_, _| String::new()),
             structs: Arena::new(),
             literals: Arena::new(),
             type_names: HashMap::new(),
             properties: Arena::new(),
             preamble: String::new(),
-            postamble: None,
+            postamble: Box::new(|_| String::new()),
             header: String::new(),
             footer: String::new(),
         }
     }
 
-    pub fn reg_struct<'a>(
-        &mut self,
-        name: impl Into<Cow<'a, str>>,
-        parent: Option<Id<XamlStruct>>,
-    ) -> Id<XamlStruct> {
-        let name = name.into().into_owned();
-        let ty = XamlStruct {
-            name: name.clone(),
-            property_names: HashMap::new(),
-            content_property: None,
-            name_property: None,
-            parent,
-            new: None,
-        };
-        let id = self.structs.insert(|id| (ty, id));
-        self.type_names.insert(name, XamlType::Struct(id));
-        id
+    pub fn ty(&self, name: &str) -> Option<XamlType> {
+        self.type_names.get(name).copied()
     }
 
-    pub fn reg_literal<'a>(
-        &mut self,
-        name: impl Into<Cow<'a, str>>,
-    ) -> Id<XamlLiteral> {
-        let name = name.into().into_owned();
-        let ty = XamlLiteral { name: name.clone(), new: None };
-        let id = self.literals.insert(|id| (ty, id));
-        self.type_names.insert(name, XamlType::Literal(id));
-        id
+    pub fn preamble(&self) -> &str {
+        &self.preamble
     }
 
-    pub fn reg_property<'a>(
-        &mut self,
-        owner: Id<XamlStruct>,
-        name: impl Into<Cow<'a, str>>,
-        ty: XamlType,
-    ) -> Id<XamlProperty> {
-        let name = name.into().into_owned();
-        let property = XamlProperty { owner, name: name.clone(), ty, set: None };
-        let id = self.properties.insert(|id| (property, id));
-        self.structs[owner].property_names.insert(name, id);
-        id
+    pub fn header(&self) -> &str {
+        &self.header
     }
 
-    pub fn preamble<'a>(&mut self, preamble: impl Into<Cow<'a, str>>) {
+    pub fn result(&self, obj: &str, names: &HashMap<String, String>) -> String {
+        (self.result)(obj, names)
+    }
+
+    pub fn footer(&self) -> &str {
+        &self.footer
+    }
+
+    pub fn postamble(&self, names: &HashMap<String, String>) -> String {
+        (self.postamble)(names)
+    }
+
+    pub fn set_preamble<'a>(&mut self, preamble: impl Into<Cow<'a, str>>) {
         self.preamble = preamble.into().into_owned();
     }
 
-    pub fn header<'a>(&mut self, header: impl Into<Cow<'a, str>>) {
+    pub fn append_preamble(&mut self, preamble: &str) {
+        self.preamble.push_str(preamble);
+    }
+
+    pub fn set_header<'a>(&mut self, header: impl Into<Cow<'a, str>>) {
         self.header = header.into().into_owned();
     }
 
-    pub fn footer<'a>(&mut self, footer: impl Into<Cow<'a, str>>) {
+    pub fn set_footer<'a>(&mut self, footer: impl Into<Cow<'a, str>>) {
         self.footer = footer.into().into_owned();
     }
 
-    pub fn result(&mut self, result: Box<dyn Fn(&str, &HashMap<String, String>) -> String>) {
-        self.result = Some(result);
+    pub fn set_result(&mut self, result: Box<dyn Fn(&str, &HashMap<String, String>) -> String>) {
+        self.result = result;
     }
 
-    pub fn postamble(&mut self, postamble: Box<dyn Fn(&HashMap<String, String>) -> String>) {
-        self.postamble = Some(postamble);
+    pub fn set_postamble(&mut self, postamble: Box<dyn Fn(&HashMap<String, String>) -> String>) {
+        self.postamble = postamble;
     }
 
-    pub fn struct_new(
-        &mut self,
-        ty: Id<XamlStruct>,
-        new: Option<Box<dyn Fn(&str, Option<(&str, Id<XamlProperty>, Option<&str>)>) -> String>>,
-    ) {
-        self.structs[ty].new = new;
-    }
-
-    pub fn literal_new(
-        &mut self,
-        ty: Id<XamlLiteral>,
-        new: Box<dyn Fn(&str) -> Option<String>>,
-    ) {
-        self.literals[ty].new = Some(new);
-    }
-
-    pub fn property_set(
-        &mut self,
-        property: Id<XamlProperty>,
-        set: Box<dyn Fn(&str, &str) -> String>,
-    ) {
-        self.properties[property].set = Some(set);
-    }
-
-    pub fn reset_content_property(&mut self, ty: Id<XamlStruct>) {
-        self.structs[ty].content_property = None;
-    }
-
-    pub fn content_property(&mut self, property: Id<XamlProperty>) {
-        let owner = self.properties[property].owner;
-        self.structs[owner].content_property = Some(property);
-    }
-
-    pub fn reset_name_property(&mut self, ty: Id<XamlStruct>) {
-        self.structs[ty].name_property = None;
-    }
-
-    pub fn name_property(&mut self, property: Id<XamlProperty>) {
-        let owner = self.properties[property].owner;
-        self.structs[owner].name_property = Some(property);
-    }
-
-    fn find_property(&self, mut owner: Id<XamlStruct>, name: impl AsRef<str>) -> Option<Id<XamlProperty>> {
-        let name = name.as_ref();
-        loop {
-            let owner_data = &self.structs[owner];
-            if let Some(&property) = owner_data.property_names.get(name) {
-                return Some(property);
-            }
-            if let Some(parent) = owner_data.parent {
-                owner = parent;
-            } else {
-                break;
-            }
-        }
-        None
-    }
-
-    fn find_content_property(&self, mut owner: Id<XamlStruct>) -> Option<Id<XamlProperty>> {
-        loop {
-            let owner_data = &self.structs[owner];
-            if let Some(property) = owner_data.content_property {
-                return Some(property);
-            }
-            if let Some(parent) = owner_data.parent {
-                owner = parent;
-            } else {
-                break;
-            }
-        }
-        None
-    }
-
-    fn find_name_property(&self, mut owner: Id<XamlStruct>) -> Option<Id<XamlProperty>> {
-        loop {
-            let owner_data = &self.structs[owner];
-            if let Some(property) = owner_data.name_property {
-                return Some(property);
-            }
-            if let Some(parent) = owner_data.parent {
-                owner = parent;
-            } else {
-                break;
-            }
-        }
-        None
-    }
-
-    pub fn process_file(&self, source: impl AsRef<Path>, dest: impl AsRef<Path>) -> xml_Result<()> {
-        self.process(|| Ok(File::open(source.as_ref())?), File::create(dest.as_ref())?)
-    }
-
-    pub fn process<R: Read, W: Write>(
-        &self,
-        mut source: impl FnMut() -> xml_Result<R>,
-        mut dest: W,
-    ) -> xml_Result<()> {
-        write!(dest, "{}", self.preamble)?;
-        write!(dest, "{}", self.header)?;
-        let source_file = source()?;
-        let mut events = EventReader::new(source_file);
-        let event = events.next()?;
-        let mut processor = XamlProcessor {
-            xaml: self,
-            source: events,
-            dest,
-            event,
-            obj_n: 0,
-            names: HashMap::new(),
-            first_pass: true,
-        };
-        processor.process()?;
-        let source_file = source()?;
-        let mut events = EventReader::new(source_file);
-        let event = events.next()?;
-        processor.source = events;
-        processor.event = event;
-        processor.obj_n = 0;
-        processor.first_pass = false;
-        processor.process()?;
-        write!(processor.dest, "{}", self.footer)?;
-        if let Some(postamble) = self.postamble.as_ref() {
-            write!(processor.dest, "{}", postamble(&processor.names))?;
-        }
-        Ok(())
-    }
-}
-
-struct XamlProcessor<'a, R: Read, W: Write> {
-    xaml: &'a Xaml,
-    source: EventReader<R>,
-    dest: W,
-    event: XmlEvent,
-    obj_n: u16,
-    names: HashMap<String, String>,
-    first_pass: bool,
-}
-
-impl<'a, R: Read, W: Write> XamlProcessor<'a, R, W> {
-    fn next_event(&mut self) -> xml_Result<()> {
-        self.event = self.source.next()?;
-        while matches!(&self.event, XmlEvent::Comment(_)) || matches!(&self.event, XmlEvent::Whitespace(_)) {
-            self.event = self.source.next()?;
-        }
-        Ok(())
-    }
-
-    fn error<T>(&self, e: impl Into<Cow<'static, str>>) -> xml_Result<T> {
-        Err(xml_Error::from((&self.source.position(), e)))
-    }
-
-    fn name(name: &OwnedName) -> String {
-        if let Some(namespace) = name.namespace.as_ref() {
-            format!("{{{namespace}}}{}", name.local_name)
-        } else {
-            name.local_name.clone()
-        }
-    }
-
-    fn new_obj_name(&mut self) -> xml_Result<String> {
-        self.obj_n = self.obj_n.checked_add(1).map_or_else(|| self.error("too many objects"), Ok)?;
-        Ok(format!("obj_{}", self.obj_n))
-    }
-
-    fn process(&mut self) -> xml_Result<()> {
-        match &self.event {
-            XmlEvent::StartDocument { .. } => { },
-            _ => return self.error("invalid XML document"),
-        }
-        self.next_event()?;
-        let value = self.process_element(None)?;
-        match &self.event {
-            XmlEvent::EndDocument { .. } => { },
-            _ => return self.error("miltiple root records"),
-        }
-        if !self.first_pass {
-            let Some(result) = self.xaml.result.as_ref() else {
-                return self.error("XAML result processing function is not set");
-            };
-            write!(self.dest, "{}", result(&value, &self.names))?;
-        }
-        Ok(())
-    }
-
-    fn process_element(
-        &mut self,
-        parent_property: Option<(&str, Id<XamlProperty>, Option<&str>)>,
-    ) -> xml_Result<String> {
-        let (name, attributes) = match &self.event {
-            XmlEvent::StartElement { name, attributes, .. } => (Self::name(name), attributes.clone()),
-            _ => return self.error("element start expected"),
-        };
-        let Some(ty) = self.xaml.type_names.get(&name) else {
-            return self.error(format!("unknown type '{}'", name));
-        };
-        match ty {
-            XamlType::Ref => self.process_literal(None, attributes),
-            &XamlType::Literal(ty) => self.process_literal(Some(ty), attributes),
-            &XamlType::Struct(ty) => self.process_struct(ty, attributes, parent_property),
-        }
-    }
-
-    fn process_literal(
-        &mut self,
-        ty: Option<Id<XamlLiteral>>,
-        attributes: Vec<OwnedAttribute>
-    ) -> xml_Result<String> {
-        if !attributes.is_empty() {
-            return self.error(format!("unexpected attribute '{}'", Self::name(&attributes[0].name)));
-        }
-        self.next_event()?;
-        let res = self.process_literal_value(ty)?.0;
-        assert!(matches!(&self.event, XmlEvent::EndElement { .. }));
-        self.next_event()?;
-        Ok(res)
-    }
-
-    fn process_literal_value(&mut self, ty: Option<Id<XamlLiteral>>) -> xml_Result<(String, String)> {
-        let value = match self.event.clone() {
-            XmlEvent::Characters(s) => {
-                self.next_event()?;
-                s
-            },
-            XmlEvent::Whitespace(s) => {
-                self.next_event()?;
-                s
-            },
-            XmlEvent::EndElement { .. } => String::new(),
-            _ => return self.error("unsupported XML feature"),
-        };
-        if let Some(ty) = ty {
-            let Some(new) = self.xaml.literals[ty].new.as_ref() else {
-                return self.error("literal creation function is not set");
-            };
-            if let Some(processed_value) = new(&value) {
-                Ok((processed_value, value))
-            } else {
-                self.error(format!("invalid literal '{value}'"))
-            }
-        } else {
-            Ok((String::new(), value))
-        }
-    }
-
-    fn process_struct(
-        &mut self,
-        ty: Id<XamlStruct>,
-        attributes: Vec<OwnedAttribute>,
-        parent_property: Option<(&str, Id<XamlProperty>, Option<&str>)>,
-    ) -> xml_Result<String> {
-        let obj = self.new_obj_name()?;
-        if self.first_pass {
-            if let Some(new) = self.xaml.structs[ty].new.as_deref() {
-                write!(self.dest, "{}", new(&obj, parent_property))?;
-            } else {
-                return self.error("cannot create abstract type");
-            }
-        }
-        for attr in attributes {
-            let attr_name = Self::name(&attr.name);
-            let Some(property) = self.xaml.find_property(ty, &attr_name) else {
-                return self.error(format!("unknown property '{attr_name}'"));
-            };
-            let is_name_property = Some(property) == self.xaml.find_name_property(ty);
-            let property = &self.xaml.properties[property];
-            if !self.first_pass {
-                let value = match property.ty {
-                    XamlType::Struct(_) => return self.error(format!("invalid '{attr_name}' property value")),
-                    XamlType::Literal(property_ty) => {
-                        let Some(new) = self.xaml.literals[property_ty].new.as_ref() else {
-                            return self.error("literal creation function is not set");
-                        };
-                        let Some(value) = new(&attr.value) else {
-                            return self.error(format!("invalid '{attr_name}' property value"));
-                        };
-                        value
-                    },
-                    XamlType::Ref => self.names[&attr.value].clone(),
-                };
-                let Some(set) = property.set.as_ref() else {
-                    return self.error("property set function is not set");
-                };
-                write!(self.dest, "{}", set(&obj, &value))?;
-            }
-            if is_name_property {
-                if attr.value.is_empty() {
-                    return self.error("name property value should be a non-empty string");
-                }
-                self.names.insert(attr.value, obj.clone());
-            }
-        }
-        self.next_event()?;
-        loop {
-            match &self.event {
-                XmlEvent::EndElement { .. } => { self.next_event()?; break; },
-                XmlEvent::StartElement { .. } => self.process_property(obj.clone(), ty)?,
-                XmlEvent::Whitespace(_) => { self.next_event()? },
-                _ => return self.error("unsupported XML feature"),
-            }
-        }
-        Ok(obj)
-    }
-
-    fn process_property(&mut self, obj: String, ty: Id<XamlStruct>) -> xml_Result<()> {
-        let (name, attributes) = match &self.event {
-            XmlEvent::StartElement { name, attributes, .. } => (Self::name(name), attributes.clone()),
-            _ => unreachable!(),
-        };
-        let ty_name = &self.xaml.structs[ty].name;
-        let (property, skip_end_element) = if
-            name.starts_with(ty_name) &&
-            name.len() > ty_name.len() &&
-            name.len() - ty_name.len() >= 2 &&
-            name.as_bytes()[ty_name.len()] == b'.'
-        {
-            self.next_event()?;
-            let property_name = &name[ty_name.len() + 1 ..];
-            let Some(property) = self.xaml.find_property(ty, property_name) else {
-                return self.error(format!("unknown property '{property_name}'"));
-            };
-            if !attributes.is_empty() {
-                return self.error(format!("unexpected attribute '{}'", Self::name(&attributes[0].name)));
-            }
-            (property, true)
-        } else if let Some(content_property) = self.xaml.find_content_property(ty) {
-            (content_property, false)
-        } else {
-            return self.error("type does not have content property");
-        };
-        let mut prev_value = None;
-        loop {
-            let (value, raw_value) = match &self.event {
-                XmlEvent::EndElement { .. } => { break; },
-                XmlEvent::StartElement { .. } =>
-                    (self.process_element(Some((&obj, property, prev_value.as_deref())))?, String::new()),
-                XmlEvent::Characters(_) | XmlEvent::Whitespace(_) => {
-                    let XamlType::Literal(property_ty) = self.xaml.properties[property].ty else {
-                        return self.error(format!(
-                            "invalid '{}' property value 2",
-                            self.xaml.properties[property].name
-                        ));
-                    };
-                    self.process_literal_value(Some(property_ty))?
-                },
-                _ => return self.error("unsupported XML feature"),
-            };
-            if !self.first_pass {
-                let Some(set) = self.xaml.properties[property].set.as_ref() else {
-                    return self.error("property set function is not set");
-                };
-                write!(self.dest, "{}", set(&obj, &value))?;
-            }
-            let is_name_property = Some(property) == self.xaml.find_name_property(ty);
-            if is_name_property {
-                if raw_value.is_empty() {
-                    return self.error("name property value should be a non-empty string");
-                }
-                self.names.insert(raw_value, obj.clone());
-            }
-            prev_value = Some(value);
-        }
-        if skip_end_element {
-            self.next_event()?;
-        }
-        Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::str::{self};
-
-    #[test]
-    fn process_literal() {
-        let mut xaml = Xaml::new();
-        let t = xaml.reg_literal("{https://a1-triard.github.io/tuifw/2023/xaml}Bool");
-        xaml.result(Box::new(|x, _| x.to_string()));
-        xaml.literal_new(t, Box::new(|x| match x {
-            "True" => Some("true".to_string()),
-            "False" => Some("false".to_string()),
-            _ => None,
-        }));
-        let source = "<Bool xmlns='https://a1-triard.github.io/tuifw/2023/xaml'>True</Bool>";
-        let mut dest = Vec::new();
-        xaml.process(|| Ok(source.as_bytes()), &mut dest).unwrap();
-        assert_eq!(&dest[..], b"true");
-    }
-
-    #[test]
-    fn process_struct_with_property() {
-        let mut xaml = Xaml::new();
-        let b = xaml.reg_literal("{https://a1-triard.github.io/tuifw/2023/xaml}Bool");
-        let bg = xaml.reg_struct("{https://a1-triard.github.io/tuifw/2023/xaml}Background", None);
-        let bg_sp = xaml.reg_property(bg, "ShowPattern", XamlType::Literal(b));
-        xaml.result(Box::new(|x, _| x.to_string()));
-        xaml.literal_new(b, Box::new(|x| match x {
-            "True" => Some("true".to_string()),
-            "False" => Some("false".to_string()),
-            _ => None,
-        }));
-        xaml.struct_new(bg, Some(Box::new(|x, _|
-            format!("let mut {x} = Background::new();\n")
-        )));
-        xaml.property_set(bg_sp, Box::new(|o, x|
-            format!("Background::set_show_pattern({o}, {x});\n")
-        ));
-        let source = "
-            <Background
-                xmlns='https://a1-triard.github.io/tuifw/2023/xaml'
-                ShowPattern='True'
-            />
-        ";
-        let mut dest = Vec::new();
-        xaml.process(|| Ok(source.as_bytes()), &mut dest).unwrap();
-        assert_eq!(str::from_utf8(&dest[..]).unwrap(), "\
-            let mut obj_1 = Background::new();\n\
-            Background::set_show_pattern(obj_1, true);\n\
-            obj_1\
-        ");
-    }
-
-    #[test]
-    fn process_struct_with_expanded_property() {
-        let mut xaml = Xaml::new();
-        let b = xaml.reg_literal("{https://a1-triard.github.io/tuifw/2023/xaml}Bool");
-        let bg = xaml.reg_struct("{https://a1-triard.github.io/tuifw/2023/xaml}Background", None);
-        let bg_sp = xaml.reg_property(bg, "ShowPattern", XamlType::Literal(b));
-        xaml.result(Box::new(|x, _| x.to_string()));
-        xaml.literal_new(b, Box::new(|x| match x {
-            "True" => Some("true".to_string()),
-            "False" => Some("false".to_string()),
-            _ => None,
-        }));
-        xaml.struct_new(bg, Some(Box::new(|x, _|
-            format!("let mut {x} = Background::new();\n")
-        )));
-        xaml.property_set(bg_sp, Box::new(|o, x|
-            format!("Background::set_show_pattern({o}, {x});\n")
-        ));
-        let source = "
-            <Background xmlns='https://a1-triard.github.io/tuifw/2023/xaml'>
-                <Background.ShowPattern><Bool>True</Bool></Background.ShowPattern>
-            </Background>
-        ";
-        let mut dest = Vec::new();
-        xaml.process(|| Ok(source.as_bytes()), &mut dest).unwrap();
-        assert_eq!(str::from_utf8(&dest[..]).unwrap(), "\
-            let mut obj_1 = Background::new();\n\
-            Background::set_show_pattern(obj_1, true);\n\
-            obj_1\
-        ");
-    }
-
-    #[test]
-    fn process_struct_with_expanded_property_2() {
-        let mut xaml = Xaml::new();
-        let b = xaml.reg_literal("{https://a1-triard.github.io/tuifw/2023/xaml}Bool");
-        let bg = xaml.reg_struct("{https://a1-triard.github.io/tuifw/2023/xaml}Background", None);
-        let bg_sp = xaml.reg_property(bg, "ShowPattern", XamlType::Literal(b));
-        xaml.result(Box::new(|x, _| x.to_string()));
-        xaml.literal_new(b, Box::new(|x| match x {
-            "True" => Some("true".to_string()),
-            "False" => Some("false".to_string()),
-            _ => None,
-        }));
-        xaml.struct_new(bg, Some(Box::new(|x, _|
-            format!("let mut {x} = Background::new();\n")
-        )));
-        xaml.property_set(bg_sp, Box::new(|o, x|
-            format!("Background::set_show_pattern({o}, {x});\n")
-        ));
-        let source = "
-            <Background xmlns='https://a1-triard.github.io/tuifw/2023/xaml'>
-                <Background.ShowPattern>True</Background.ShowPattern>
-            </Background>
-        ";
-        let mut dest = Vec::new();
-        xaml.process(|| Ok(source.as_bytes()), &mut dest).unwrap();
-        assert_eq!(str::from_utf8(&dest[..]).unwrap(), "\
-            let mut obj_1 = Background::new();\n\
-            Background::set_show_pattern(obj_1, true);\n\
-            obj_1\
-        ");
-    }
 }

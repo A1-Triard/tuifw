@@ -7,115 +7,147 @@
 
 pub mod xaml;
 
+pub mod preprocessor;
+
 use indent::indent_all_by;
 use indoc::indoc;
 use std::str::FromStr;
 use xaml::*;
 
-macro_rules! xmlns {
-    (
-        $s:literal
-    ) => {
-        concat!("{https://a1-triard.github.io/tuifw/2023/xaml}", $s)
-    };
-}
+pub const XMLNS: &str = "https://a1-triard.github.io/tuifw/2023/xaml";
 
 pub fn reg_widgets(xaml: &mut Xaml) {
-    let boolean = xaml.reg_literal(xmlns!("Bool"));
-    let string = xaml.reg_literal(xmlns!("String"));
-    let int_16 = xaml.reg_literal(xmlns!("I16"));
-    let uint_16 = xaml.reg_literal(xmlns!("U16"));
-    let int_32 = xaml.reg_literal(xmlns!("I32"));
-    let float_64 = xaml.reg_literal(xmlns!("F64"));
-    let thickness = xaml.reg_literal(xmlns!("Thickness"));
-    let h_align = xaml.reg_literal(xmlns!("HAlign"));
-    let v_align = xaml.reg_literal(xmlns!("VAlign"));
-    let dock = xaml.reg_literal(xmlns!("Dock"));
-    let visibility = xaml.reg_literal(xmlns!("Visibility"));
+    let boolean = XamlLiteral::new(xaml, XMLNS, "Bool");
+    let string = XamlLiteral::new(xaml, XMLNS, "String");
+    let int_16 = XamlLiteral::new(xaml, XMLNS, "I16");
+    let uint_16 = XamlLiteral::new(xaml, XMLNS, "U16");
+    let int_32 = XamlLiteral::new(xaml, XMLNS, "I32");
+    let float_64 = XamlLiteral::new(xaml, XMLNS, "F64");
+    let thickness = XamlLiteral::new(xaml, XMLNS, "Thickness");
+    let h_align = XamlLiteral::new(xaml, XMLNS, "HAlign");
+    let v_align = XamlLiteral::new(xaml, XMLNS, "VAlign");
+    let dock = XamlLiteral::new(xaml, XMLNS, "Dock");
+    let visibility = XamlLiteral::new(xaml, XMLNS, "Visibility");
 
-    let validator = xaml.reg_struct(xmlns!("Validator"), None);
+    let validator = XamlStruct::new(xaml, None, XMLNS, "Validator");
 
-    let int_validator = xaml.reg_struct(xmlns!("IntValidator"), Some(validator));
-    let int_validator_min = xaml.reg_property(int_validator, "Min", XamlType::Literal(int_32));
-    let int_validator_max = xaml.reg_property(int_validator, "Max", XamlType::Literal(int_32));
+    let int_validator = XamlStruct::new(xaml, Some(validator), XMLNS, "IntValidator");
+    let int_validator_min = XamlProperty::new(
+        xaml, int_validator, "Min", XamlType::Literal(int_32), false, false
+    );
+    let int_validator_max = XamlProperty::new(
+        xaml, int_validator, "Max", XamlType::Literal(int_32), false, false
+    );
 
-    let float_validator = xaml.reg_struct(xmlns!("FloatValidator"), Some(validator));
-    let float_validator_min = xaml.reg_property(float_validator, "Min", XamlType::Literal(float_64));
-    let float_validator_max = xaml.reg_property(float_validator, "Max", XamlType::Literal(float_64));
+    let float_validator = XamlStruct::new(xaml, Some(validator), XMLNS, "FloatValidator");
+    let float_validator_min = XamlProperty::new(
+        xaml, float_validator, "Min", XamlType::Literal(float_64), false, false
+    );
+    let float_validator_max = XamlProperty::new(
+        xaml, float_validator, "Max", XamlType::Literal(float_64), false, false
+    );
 
-    let widget = xaml.reg_struct(xmlns!("Widget"), None);
-    let widget_children = xaml.reg_property(widget, "Children", XamlType::Struct(widget));
-    xaml.content_property(widget_children);
-    let widget_name = xaml.reg_property(widget, "Name", XamlType::Literal(string));
-    xaml.name_property(widget_name);
-    let widget_focus_tab = xaml.reg_property(widget, "FocusTab", XamlType::Ref);
-    let widget_focus_right = xaml.reg_property(widget, "FocusRight", XamlType::Ref);
-    let widget_focus_left = xaml.reg_property(widget, "FocusLeft", XamlType::Ref);
-    let widget_focus_up = xaml.reg_property(widget, "FocusUp", XamlType::Ref);
-    let widget_focus_down = xaml.reg_property(widget, "FocusDown", XamlType::Ref);
-    let widget_focused_primary = xaml.reg_property(widget, "FocusedPrimary", XamlType::Literal(boolean));
-    let widget_focused_secondary = xaml.reg_property(widget, "FocusedSecondary", XamlType::Literal(boolean));
-    let widget_h_align = xaml.reg_property(widget, "HAlign", XamlType::Literal(h_align));
-    let widget_v_align = xaml.reg_property(widget, "VAlign", XamlType::Literal(v_align));
-    let widget_width = xaml.reg_property(widget, "Width", XamlType::Literal(int_16));
-    let widget_height = xaml.reg_property(widget, "Height", XamlType::Literal(int_16));
-    let widget_margin = xaml.reg_property(widget, "Margin", XamlType::Literal(thickness));
-    let widget_min_width = xaml.reg_property(widget, "MinWidth", XamlType::Literal(int_16));
-    let widget_max_width = xaml.reg_property(widget, "MaxWidth", XamlType::Literal(int_16));
-    let widget_min_height = xaml.reg_property(widget, "MinHeight", XamlType::Literal(int_16));
-    let widget_max_height = xaml.reg_property(widget, "MaxHeight", XamlType::Literal(int_16));
-    let widget_is_enabled = xaml.reg_property(widget, "IsEnabled", XamlType::Literal(boolean));
-    let widget_visibility = xaml.reg_property(widget, "Visibility", XamlType::Literal(visibility));
+    let widget = XamlStruct::new(xaml, None, XMLNS, "Widget");
+    let widget_children = XamlProperty::new(xaml, widget, "Children", XamlType::Struct(widget), true, false);
+    let widget_name = XamlProperty::new(xaml, widget, "Name", XamlType::Literal(string), false, true);
+    let widget_focus_tab = XamlProperty::new(xaml, widget, "FocusTab", XamlType::Ref, false, false);
+    let widget_focus_right = XamlProperty::new(xaml, widget, "FocusRight", XamlType::Ref, false, false);
+    let widget_focus_left = XamlProperty::new(xaml, widget, "FocusLeft", XamlType::Ref, false, false);
+    let widget_focus_up = XamlProperty::new(xaml, widget, "FocusUp", XamlType::Ref, false, false);
+    let widget_focus_down = XamlProperty::new(xaml, widget, "FocusDown", XamlType::Ref, false, false);
+    let widget_focused_primary = XamlProperty::new(
+        xaml, widget, "FocusedPrimary", XamlType::Literal(boolean), false, false
+    );
+    let widget_focused_secondary = XamlProperty::new(
+        xaml, widget, "FocusedSecondary", XamlType::Literal(boolean), false, false
+    );
+    let widget_h_align = XamlProperty::new(xaml, widget, "HAlign", XamlType::Literal(h_align), false, false);
+    let widget_v_align = XamlProperty::new(xaml, widget, "VAlign", XamlType::Literal(v_align), false, false);
+    let widget_width = XamlProperty::new(xaml, widget, "Width", XamlType::Literal(int_16), false, false);
+    let widget_height = XamlProperty::new(xaml, widget, "Height", XamlType::Literal(int_16), false, false);
+    let widget_margin = XamlProperty::new(xaml, widget, "Margin", XamlType::Literal(thickness), false, false);
+    let widget_min_width = XamlProperty::new(xaml, widget, "MinWidth", XamlType::Literal(int_16), false, false);
+    let widget_max_width = XamlProperty::new(xaml, widget, "MaxWidth", XamlType::Literal(int_16), false, false);
+    let widget_min_height = XamlProperty::new(
+        xaml, widget, "MinHeight", XamlType::Literal(int_16), false, false
+    );
+    let widget_max_height = XamlProperty::new(
+        xaml, widget, "MaxHeight", XamlType::Literal(int_16), false, false
+    );
+    let widget_is_enabled = XamlProperty::new(
+        xaml, widget, "IsEnabled", XamlType::Literal(boolean), false, false
+    );
+    let widget_visibility = XamlProperty::new(
+        xaml, widget, "Visibility", XamlType::Literal(visibility), false, false
+    );
 
-    let background = xaml.reg_struct(xmlns!("Background"), Some(widget));
-    let background_show_pattern = xaml.reg_property(background, "ShowPattern", XamlType::Literal(boolean));
-    let background_pattern_even = xaml.reg_property(background, "PatternEven", XamlType::Literal(string));
-    let background_pattern_odd = xaml.reg_property(background, "PatternOdd", XamlType::Literal(string));
+    let background = XamlStruct::new(xaml, Some(widget), XMLNS, "Background");
+    let background_show_pattern = XamlProperty::new(
+        xaml, background, "ShowPattern", XamlType::Literal(boolean), false, false
+    );
+    let background_pattern_even = XamlProperty::new(
+        xaml, background, "PatternEven", XamlType::Literal(string), false, false
+    );
+    let background_pattern_odd = XamlProperty::new(
+        xaml, background, "PatternOdd", XamlType::Literal(string), false, false
+    );
 
-    let stack_panel = xaml.reg_struct(xmlns!("StackPanel"), Some(widget));
-    let stack_panel_vertical = xaml.reg_property(stack_panel, "Vertical", XamlType::Literal(boolean));
+    let stack_panel = XamlStruct::new(xaml, Some(widget), XMLNS, "StackPanel");
+    let stack_panel_vertical = XamlProperty::new(
+        xaml, stack_panel, "Vertical", XamlType::Literal(boolean), false, false
+    );
 
-    let dock_panel = xaml.reg_struct(xmlns!("DockPanel"), Some(widget));
-    let widget_dock = xaml.reg_property(widget, "Dock", XamlType::Literal(dock));
+    let dock_panel = XamlStruct::new(xaml, Some(widget), XMLNS, "DockPanel");
+    let widget_dock = XamlProperty::new(xaml, widget, "Dock", XamlType::Literal(dock), false, false);
 
-    let static_text = xaml.reg_struct(xmlns!("StaticText"), Some(widget));
-    let static_text_text = xaml.reg_property(static_text, "Text", XamlType::Literal(string));
+    let static_text = XamlStruct::new(xaml, Some(widget), XMLNS, "StaticText");
+    let static_text_text = XamlProperty::new(
+        xaml, static_text, "Text", XamlType::Literal(string), false, false
+    );
 
-    let button = xaml.reg_struct(xmlns!("Button"), Some(widget));
-    let button_text = xaml.reg_property(button, "Text", XamlType::Literal(string));
+    let button = XamlStruct::new(xaml, Some(widget), XMLNS, "Button");
+    let button_text = XamlProperty::new(xaml, button, "Text", XamlType::Literal(string), false, false);
 
-    let input_line = xaml.reg_struct(xmlns!("InputLine"), Some(widget));
-    let input_line_text = xaml.reg_property(input_line, "Text", XamlType::Literal(string));
-    let input_line_validator = xaml.reg_property(input_line, "Validator", XamlType::Struct(validator));
+    let input_line = XamlStruct::new(xaml, Some(widget), XMLNS, "InputLine");
+    let input_line_text = XamlProperty::new(xaml, input_line, "Text", XamlType::Literal(string), false, false);
+    let input_line_validator = XamlProperty::new(
+        xaml, input_line, "Validator", XamlType::Struct(validator), false, false
+    );
 
-    let frame = xaml.reg_struct(xmlns!("Frame"), Some(widget));
-    let frame_double = xaml.reg_property(frame, "Double", XamlType::Literal(boolean));
-    let frame_text = xaml.reg_property(frame, "Text", XamlType::Literal(string));
-    let frame_text_align = xaml.reg_property(frame, "TextAlign", XamlType::Literal(h_align));
+    let frame = XamlStruct::new(xaml, Some(widget), XMLNS, "Frame");
+    let frame_double = XamlProperty::new(xaml, frame, "Double", XamlType::Literal(boolean), false, false);
+    let frame_text = XamlProperty::new(xaml, frame, "Text", XamlType::Literal(string), false, false);
+    let frame_text_align = XamlProperty::new(
+        xaml, frame, "TextAlign", XamlType::Literal(h_align), false, false
+    );
 
-    let label = xaml.reg_struct(xmlns!("Label"), Some(widget));
-    let label_text = xaml.reg_property(label, "Text", XamlType::Literal(string));
-    let label_focus = xaml.reg_property(label, "Focus", XamlType::Ref);
+    let label = XamlStruct::new(xaml, Some(widget), XMLNS, "Label");
+    let label_text = XamlProperty::new(xaml, label, "Text", XamlType::Literal(string), false, false);
+    let label_focus = XamlProperty::new(xaml, label, "Focus", XamlType::Ref, false, false);
 
-    let check_box = xaml.reg_struct(xmlns!("CheckBox"), Some(widget));
-    let check_box_text = xaml.reg_property(check_box, "Text", XamlType::Literal(string));
-    let check_box_is_on = xaml.reg_property(check_box, "IsOn", XamlType::Literal(boolean));
+    let check_box = XamlStruct::new(xaml, Some(widget), XMLNS, "CheckBox");
+    let check_box_text = XamlProperty::new(xaml, check_box, "Text", XamlType::Literal(string), false, false);
+    let check_box_is_on = XamlProperty::new(xaml, check_box, "IsOn", XamlType::Literal(boolean), false, false);
 
-    let radio_button = xaml.reg_struct(xmlns!("RadioButton"), Some(widget));
-    let radio_button_text = xaml.reg_property(radio_button, "Text", XamlType::Literal(string));
-    let radio_button_is_on = xaml.reg_property(radio_button, "IsOn", XamlType::Literal(boolean));
+    let radio_button = XamlStruct::new(xaml, Some(widget), XMLNS, "RadioButton");
+    let radio_button_text = XamlProperty::new(
+        xaml, radio_button, "Text", XamlType::Literal(string), false, false
+    );
+    let radio_button_is_on = XamlProperty::new(
+        xaml, radio_button, "IsOn", XamlType::Literal(boolean), false, false
+    );
 
-    xaml.literal_new(boolean, Box::new(|x| match x {
+    boolean.set_ctor(xaml, Some(Box::new(|x| match x {
         "True" => Some("true".to_string()),
         "False" => Some("false".to_string()),
         _ => None,
-    }));
-    xaml.literal_new(string, Box::new(|x| Some(format!("\"{}\"", x.escape_debug()))));
-    xaml.literal_new(int_16, Box::new(|x| i16::from_str(x).ok().map(|x| x.to_string())));
-    xaml.literal_new(uint_16, Box::new(|x| u16::from_str(x).ok().map(|x| x.to_string())));
-    xaml.literal_new(int_32, Box::new(|x| i32::from_str(x).ok().map(|x| x.to_string())));
-    xaml.literal_new(float_64, Box::new(|x| f64::from_str(x).ok().map(|x| x.to_string())));
-    xaml.literal_new(thickness, Box::new(|x| {
+    })));
+    string.set_ctor(xaml, Some(Box::new(|x| Some(format!("\"{}\"", x.escape_debug())))));
+    int_16.set_ctor(xaml, Some(Box::new(|x| i16::from_str(x).ok().map(|x| x.to_string()))));
+    uint_16.set_ctor(xaml, Some(Box::new(|x| u16::from_str(x).ok().map(|x| x.to_string()))));
+    int_32.set_ctor(xaml, Some(Box::new(|x| i32::from_str(x).ok().map(|x| x.to_string()))));
+    float_64.set_ctor(xaml, Some(Box::new(|x| f64::from_str(x).ok().map(|x| x.to_string()))));
+    thickness.set_ctor(xaml, Some(Box::new(|x| {
         let parts = x.split(',').collect::<Vec<_>>();
         if parts.len() == 4 {
             let l = i32::from_str(parts[0]).ok()?;
@@ -134,34 +166,34 @@ pub fn reg_widgets(xaml: &mut Xaml) {
         } else {
             None
         }
-    }));
-    xaml.literal_new(h_align, Box::new(|x| match x {
+    })));
+    h_align.set_ctor(xaml, Some(Box::new(|x| match x {
         "Left" => Some("HAlign::Left".to_string()),
         "Center" => Some("HAlign::Center".to_string()),
         "Right" => Some("HAlign::Right".to_string()),
         _ => None,
-    }));
-    xaml.literal_new(v_align, Box::new(|x| match x {
+    })));
+    v_align.set_ctor(xaml, Some(Box::new(|x| match x {
         "Top" => Some("VAlign::Top".to_string()),
         "Center" => Some("VAlign::Center".to_string()),
         "Bottom" => Some("VAlign::Bottom".to_string()),
         _ => None,
-    }));
-    xaml.literal_new(dock, Box::new(|x| match x {
+    })));
+    dock.set_ctor(xaml, Some(Box::new(|x| match x {
         "Left" => Some("Dock::Left".to_string()),
         "Top" => Some("Dock::Top".to_string()),
         "Right" => Some("Dock::Right".to_string()),
         "Bottom" => Some("Dock::Bottom".to_string()),
         _ => None,
-    }));
-    xaml.literal_new(visibility, Box::new(|x| match x {
+    })));
+    visibility.set_ctor(xaml, Some(Box::new(|x| match x {
         "Visible" => Some("Visibility::Visible".to_string()),
         "Hidden" => Some("Visibility::Hidden".to_string()),
         "Collapsed" => Some("Visibility::Collapsed".to_string()),
         _ => None,
-    }));
+    })));
 
-    xaml.preamble(indoc! { "
+    xaml.set_preamble(indoc! { "
         extern crate alloc;
 
         #[allow(unused_imports)]
@@ -169,14 +201,14 @@ pub fn reg_widgets(xaml: &mut Xaml) {
         use tuifw::*;
         use tuifw_screen::*;
         use tuifw_window::*;
-
     " });
-    xaml.header(indoc! { "
+    xaml.set_header(indoc! { "
+
         pub fn build(
             tree: &mut WindowTree,
         ) -> Result<Names, Error> {
     " });
-    xaml.result(Box::new(|_, names| {
+    xaml.set_result(Box::new(|_, names| {
         let mut s = "    let names = Names {\n".to_string();
         for (name, obj) in names {
             s.push_str("        ");
@@ -188,10 +220,10 @@ pub fn reg_widgets(xaml: &mut Xaml) {
         s.push_str("    };\n    Ok(names)\n");
         s
     }));
-    xaml.footer(indoc! {"
+    xaml.set_footer(indoc! {"
         }
     " });
-    xaml.postamble(Box::new(|names| {
+    xaml.set_postamble(Box::new(|names| {
         let mut s = "\npub struct Names {\n".to_string();
         for name in names.keys() {
             s.push_str("    #[allow(dead_code)]\n    pub ");
@@ -202,95 +234,95 @@ pub fn reg_widgets(xaml: &mut Xaml) {
         s
     }));
 
-    xaml.struct_new(int_validator, Some(Box::new(|obj, _parent| {
+    int_validator.set_ctor(xaml, Some(Box::new(|obj, _parent, _prev| {
         indent_all_by(4, format!(indoc! { "
             #[allow(unused_mut)]
             #[allow(unused_variables)]
             let mut {} = IntValidator {{ min: i32::MIN, max: i32::MAX }};
         " }, obj))
     })));
-    xaml.property_set(int_validator_min, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    int_validator_min.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.min = {};
     " }, obj, value))));
-    xaml.property_set(int_validator_max, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    int_validator_max.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.max = {};
     " }, obj, value))));
 
-    xaml.struct_new(float_validator, Some(Box::new(|obj, _parent| {
+    float_validator.set_ctor(xaml, Some(Box::new(|obj, _parent, _prev| {
         indent_all_by(4, format!(indoc! { "
             #[allow(unused_mut)]
             #[allow(unused_variables)]
             let mut {} = FloatValidator {{ min: f64::MIN, max: f64::MAX }};
         " }, obj))
     })));
-    xaml.property_set(float_validator_min, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    float_validator_min.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.min = {};
     " }, obj, value))));
-    xaml.property_set(float_validator_max, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    float_validator_max.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.max = {};
     " }, obj, value))));
 
-    xaml.property_set(widget_children, Box::new(|_obj, _value| String::new()));
-    xaml.property_set(widget_is_enabled, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    widget_children.set_setter(xaml, Box::new(|_obj, _value| String::new()));
+    widget_is_enabled.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_is_enabled(tree, {});
     " }, obj, value))));
-    xaml.property_set(widget_visibility, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    widget_visibility.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_visibility(tree, {});
     " }, obj, value))));
-    xaml.property_set(widget_name, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    widget_name.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_name(tree, {});
     " }, obj, value))));
-    xaml.property_set(widget_focus_tab, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    widget_focus_tab.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_focus_tab(tree, {});
     " }, obj, value))));
-    xaml.property_set(widget_focus_right, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    widget_focus_right.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_focus_right(tree, {});
     " }, obj, value))));
-    xaml.property_set(widget_focus_left, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    widget_focus_left.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_focus_left(tree, {});
     " }, obj, value))));
-    xaml.property_set(widget_focus_up, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    widget_focus_up.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_focus_up(tree, {});
     " }, obj, value))));
-    xaml.property_set(widget_focus_down, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    widget_focus_down.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_focus_down(tree, {});
     " }, obj, value))));
-    xaml.property_set(widget_focused_primary, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    widget_focused_primary.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_focused_primary(tree, {});
     " }, obj, value))));
-    xaml.property_set(widget_focused_secondary, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    widget_focused_secondary.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_focused_secondary(tree, {});
     " }, obj, value))));
-    xaml.property_set(widget_h_align, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    widget_h_align.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_h_align(tree, Some({}));
     " }, obj, value))));
-    xaml.property_set(widget_v_align, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    widget_v_align.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_v_align(tree, Some({}));
     " }, obj, value))));
-    xaml.property_set(widget_width, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    widget_width.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_width(tree, Some({}));
     " }, obj, value))));
-    xaml.property_set(widget_height, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    widget_height.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_height(tree, Some({}));
     " }, obj, value))));
-    xaml.property_set(widget_margin, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    widget_margin.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_margin(tree, {});
     " }, obj, value))));
-    xaml.property_set(widget_min_width, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    widget_min_width.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_min_width(tree, {});
     " }, obj, value))));
-    xaml.property_set(widget_min_height, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    widget_min_height.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_min_height(tree, {});
     " }, obj, value))));
-    xaml.property_set(widget_max_width, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    widget_max_width.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_max_width(tree, {});
     " }, obj, value))));
-    xaml.property_set(widget_max_height, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    widget_max_height.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_max_height(tree, {});
     " }, obj, value))));
 
-    xaml.struct_new(background, Some(Box::new(|obj, parent| {
-        if let Some((parent, _parent_property, prev)) = parent {
+    background.set_ctor(xaml, Some(Box::new(|obj, parent, prev| {
+        if let Some((parent, _parent_property)) = parent {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
@@ -309,18 +341,18 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             " }, obj))
         }
     })));
-    xaml.property_set(background_show_pattern, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    background_show_pattern.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         Background::set_show_pattern(tree, {}, {});
     " }, obj, value))));
-    xaml.property_set(background_pattern_even, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    background_pattern_even.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         Background::set_pattern_even(tree, {}, {});
     " }, obj, value))));
-    xaml.property_set(background_pattern_odd, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    background_pattern_odd.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         Background::set_pattern_odd(tree, {}, {});
     " }, obj, value))));
 
-    xaml.struct_new(stack_panel, Some(Box::new(|obj, parent| {
-        if let Some((parent, _parent_property, prev)) = parent {
+    stack_panel.set_ctor(xaml, Some(Box::new(|obj, parent, prev| {
+        if let Some((parent, _parent_property)) = parent {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
@@ -339,12 +371,12 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             " }, obj))
         }
     })));
-    xaml.property_set(stack_panel_vertical, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    stack_panel_vertical.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         StackPanel::set_vertical(tree, {}, {});
     " }, obj, value))));
 
-    xaml.struct_new(dock_panel, Some(Box::new(|obj, parent| {
-        if let Some((parent, _parent_property, prev)) = parent {
+    dock_panel.set_ctor(xaml, Some(Box::new(|obj, parent, prev| {
+        if let Some((parent, _parent_property)) = parent {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
@@ -363,12 +395,12 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             " }, obj))
         }
     })));
-    xaml.property_set(widget_dock, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    widget_dock.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         DockPanel::set_dock(tree, {}, Some({}));
     " }, obj, value))));
 
-    xaml.struct_new(static_text, Some(Box::new(|obj, parent| {
-        if let Some((parent, _parent_property, prev)) = parent {
+    static_text.set_ctor(xaml, Some(Box::new(|obj, parent, prev| {
+        if let Some((parent, _parent_property)) = parent {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
@@ -387,12 +419,12 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             " }, obj))
         }
     })));
-    xaml.property_set(static_text_text, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    static_text_text.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         StaticText::set_text(tree, {}, {});
     " }, obj, value))));
 
-    xaml.struct_new(button, Some(Box::new(|obj, parent| {
-        if let Some((parent, _parent_property, prev)) = parent {
+    button.set_ctor(xaml, Some(Box::new(|obj, parent, prev| {
+        if let Some((parent, _parent_property)) = parent {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
@@ -411,12 +443,12 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             " }, obj))
         }
     })));
-    xaml.property_set(button_text, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    button_text.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         Button::set_text(tree, {}, {});
     " }, obj, value))));
 
-    xaml.struct_new(input_line, Some(Box::new(|obj, parent| {
-        if let Some((parent, _parent_property, prev)) = parent {
+    input_line.set_ctor(xaml, Some(Box::new(|obj, parent, prev| {
+        if let Some((parent, _parent_property)) = parent {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
@@ -435,15 +467,15 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             " }, obj))
         }
     })));
-    xaml.property_set(input_line_text, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    input_line_text.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         InputLine::set_text(tree, {}, {});
     " }, obj, value))));
-    xaml.property_set(input_line_validator, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    input_line_validator.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         InputLine::set_validator(tree, {}, Some(Box::new({})));
     " }, obj, value))));
 
-    xaml.struct_new(frame, Some(Box::new(|obj, parent| {
-        if let Some((parent, _parent_property, prev)) = parent {
+    frame.set_ctor(xaml, Some(Box::new(|obj, parent, prev| {
+        if let Some((parent, _parent_property)) = parent {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
@@ -462,18 +494,18 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             " }, obj))
         }
     })));
-    xaml.property_set(frame_double, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    frame_double.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         Frame::set_double(tree, {}, {});
     " }, obj, value))));
-    xaml.property_set(frame_text, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    frame_text.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         Frame::set_text(tree, {}, {});
     " }, obj, value))));
-    xaml.property_set(frame_text_align, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    frame_text_align.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         Frame::set_text_align(tree, {}, {});
     " }, obj, value))));
 
-    xaml.struct_new(label, Some(Box::new(|obj, parent| {
-        if let Some((parent, _parent_property, prev)) = parent {
+    label.set_ctor(xaml, Some(Box::new(|obj, parent, prev| {
+        if let Some((parent, _parent_property)) = parent {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
@@ -492,15 +524,15 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             " }, obj))
         }
     })));
-    xaml.property_set(label_text, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    label_text.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         Label::set_text(tree, {}, {});
     " }, obj, value))));
-    xaml.property_set(label_focus, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    label_focus.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         Label::set_focus(tree, {}, Some({}));
     " }, obj, value))));
 
-    xaml.struct_new(check_box, Some(Box::new(|obj, parent| {
-        if let Some((parent, _parent_property, prev)) = parent {
+    check_box.set_ctor(xaml, Some(Box::new(|obj, parent, prev| {
+        if let Some((parent, _parent_property)) = parent {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
@@ -519,15 +551,15 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             " }, obj))
         }
     })));
-    xaml.property_set(check_box_text, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    check_box_text.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         CheckBox::set_text(tree, {}, {});
     " }, obj, value))));
-    xaml.property_set(check_box_is_on, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    check_box_is_on.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         CheckBox::set_is_on(tree, {}, {});
     " }, obj, value))));
 
-    xaml.struct_new(radio_button, Some(Box::new(|obj, parent| {
-        if let Some((parent, _parent_property, prev)) = parent {
+    radio_button.set_ctor(xaml, Some(Box::new(|obj, parent, prev| {
+        if let Some((parent, _parent_property)) = parent {
             if let Some(prev) = prev {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
@@ -546,10 +578,10 @@ pub fn reg_widgets(xaml: &mut Xaml) {
             " }, obj))
         }
     })));
-    xaml.property_set(radio_button_text, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    radio_button_text.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         RadioButton::set_text(tree, {}, {});
     " }, obj, value))));
-    xaml.property_set(radio_button_is_on, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+    radio_button_is_on.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         RadioButton::set_is_on(tree, {}, {});
     " }, obj, value))));
 }
