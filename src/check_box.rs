@@ -7,7 +7,7 @@ use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, Ap
 use tuifw_window::{CMD_GOT_PRIMARY_FOCUS, CMD_LOST_PRIMARY_FOCUS, label_width, label};
 use tuifw_window::{COLOR_TEXT, COLOR_HOTKEY, COLOR_DISABLED};
 
-pub const CMD_CHECK_BOX_CLICK: u16 = 100;
+pub const CMD_CHECK_BOX_CLICK: u16 = 110;
 
 widget! {
     #[widget(CheckBoxWidget, init=init_palette)]

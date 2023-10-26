@@ -254,6 +254,12 @@ pub fn label(text: &str) -> Option<char> {
     None
 }
 
+pub trait Data: Downcast + DynClone { }
+
+impl_downcast!(Data);
+
+clone_trait_object!(Data);
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum Visibility {
     Visible,
@@ -367,6 +373,7 @@ macro_attr! {
     #[derive(Component!)]
     struct WindowNode {
         is_template: bool,
+        source: Option<Box<dyn Data>>,
         parent: Option<Window>,
         prev: Window,
         next: Window,
@@ -481,6 +488,7 @@ impl Window {
         let window = tree.arena.insert(move |window| {
             (WindowNode {
                 is_template,
+                source: None,
                 parent,
                 prev: Window(window),
                 next: Window(window),
@@ -528,6 +536,19 @@ impl Window {
             tree.arena[window.0].post_process = Some(id);
         }
         Ok(window)
+    }
+
+    pub fn source<'a>(self, tree: &'a WindowTree) -> &'a Option<Box<dyn Data>> {
+        &tree.arena[self.0].source
+    }
+
+    pub fn source_mut<T>(self, tree: &mut WindowTree, f: impl FnOnce(&mut Option<Box<dyn Data>>) -> T) -> T {
+        let source = &mut tree.arena[self.0].source;
+        f(source)
+    }
+
+    pub fn set_source(self, tree: &mut WindowTree, value: Option<Box<dyn Data>>) {
+        self.source_mut(tree, |source| replace(source, value));
     }
 
     pub fn invalidate_measure(self, tree: &mut WindowTree) {

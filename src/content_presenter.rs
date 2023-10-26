@@ -1,15 +1,10 @@
 use crate::widget;
 use alloc::boxed::Box;
-use downcast_rs::{Downcast, impl_downcast};
-use dyn_clone::{DynClone, clone_trait_object};
 use tuifw_screen_base::{Rect, Vector};
-use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App, Timer};
+use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App, Timer, Data};
 
-pub trait Data: Downcast + DynClone { }
-
-impl_downcast!(Data);
-
-clone_trait_object!(Data);
+pub const CMD_CONTENT_PRESENTER_BIND: u16 = 130;
+pub const CMD_CONTENT_PRESENTER_UNBIND: u16 = 131;
 
 widget! {
     #[widget(ContentPresenterWidget)]
@@ -28,10 +23,14 @@ impl ContentPresenter {
             let data = window.data_mut::<ContentPresenter>(tree);
             data.update_tree_timer = None;
             if let Some(child) = window.first_child(tree) {
+                child.raise(tree, Event::Cmd(CMD_CONTENT_PRESENTER_UNBIND), app);
+                child.set_source(tree, None);
                 child.drop_window(tree, app);
             }
             if let Some(content_template) = ContentPresenter::content_template(tree, window) {
-                let _child = content_template.new_instance(tree, Some(window), None);
+                let child = content_template.new_instance(tree, Some(window), None).unwrap(); // TODO
+                child.set_source(tree, ContentPresenter::content(tree, window).clone());
+                child.raise(tree, Event::Cmd(CMD_CONTENT_PRESENTER_BIND), app);
             }
         }));
         let data = window.data_mut::<ContentPresenter>(tree);
