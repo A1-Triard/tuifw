@@ -16,6 +16,10 @@ impl Widget for FloatingFrameWidget {
         Box::new(FloatingFrame { })
     }
 
+    fn clone_data(&self, tree: &mut WindowTree, source: Window, dest: Window) {
+        FloatingFrame::clone(tree, source, dest);
+    }
+
     fn render(
         &self,
         _tree: &WindowTree,

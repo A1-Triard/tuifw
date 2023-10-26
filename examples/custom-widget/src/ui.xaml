@@ -5,6 +5,8 @@
   FocusedPrimary="True"
 >
   <Canvas>
-    <example:FloatingFrame Name="floating_frame" />
+    <ContentPresenter Name="floating_frame">
+      <example:FloatingFrame />
+    </ContentPresenter>
   </Canvas>
 </Background>

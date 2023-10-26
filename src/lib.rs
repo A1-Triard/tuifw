@@ -47,6 +47,9 @@ pub use check_box::*;
 mod radio_button;
 pub use radio_button::*;
 
+mod content_presenter;
+pub use content_presenter::*;
+
 #[doc(hidden)]
 pub use alloc::boxed::Box as alloc_boxed_Box;
 #[doc(hidden)]
@@ -124,6 +127,17 @@ macro_rules! widget {
                 Ok(w)
             }
 
+            $vis fn new_template(
+                tree: &mut $crate::tuifw_window_WindowTree,
+            ) -> Result<$crate::tuifw_window_Window, $crate::tuifw_screen_base_Error> {
+                let w = $crate::tuifw_window_Window::new_template(
+                    tree,
+                    $crate::alloc_boxed_Box::new($Widget),
+                )?;
+                $(Self::$init(tree, w);)?
+                Ok(w)
+            }
+
             $($($crate::widget_impl! {
                 @property
                 $(#[property($($($attrs)*)?)])?
@@ -181,7 +195,7 @@ macro_rules! widget_impl {
     };
     (
         @property
-        #[property(value, measure $(, changed=$on_changed:ident)?)]
+        #[property(value, measure $(, on_changed=$on_changed:ident)?)]
         $vis:vis $name:ident : $ty:ty
     ) => {
         $crate::paste_paste! {
@@ -206,7 +220,7 @@ macro_rules! widget_impl {
     };
     (
         @property
-        #[property(value, render $(, changed=$on_changed:ident)?)]
+        #[property(value, render $(, on_changed=$on_changed:ident)?)]
         $vis:vis $name:ident : $ty:ty
     ) => {
         $crate::paste_paste! {
@@ -231,7 +245,7 @@ macro_rules! widget_impl {
     };
     (
         @property
-        #[property(value $(, changed=$on_changed:ident)?)]
+        #[property(value $(, on_changed=$on_changed:ident)?)]
         $vis:vis $name:ident : $ty:ty
     ) => {
         $crate::paste_paste! {
@@ -255,7 +269,7 @@ macro_rules! widget_impl {
     };
     (
         @property
-        #[property(ref, measure $(, changed=$on_changed:ident)?)]
+        #[property(ref, measure $(, on_changed=$on_changed:ident)?)]
         $vis:vis $name:ident : $ty:ty
     ) => {
         $crate::paste_paste! {
@@ -293,7 +307,7 @@ macro_rules! widget_impl {
     };
     (
         @property
-        #[property(ref, render $(, changed=$on_changed:ident)?)]
+        #[property(ref, render $(, on_changed=$on_changed:ident)?)]
         $vis:vis $name:ident : $ty:ty
     ) => {
         $crate::paste_paste! {
@@ -331,7 +345,7 @@ macro_rules! widget_impl {
     };
     (
         @property
-        #[property(ref $(, changed=$on_changed:ident)?)]
+        #[property(ref $(, on_changed=$on_changed:ident)?)]
         $vis:vis $name:ident : $ty:ty
     ) => {
         $crate::paste_paste! {
@@ -368,7 +382,7 @@ macro_rules! widget_impl {
     };
     (
         @property
-        #[property(obj, measure $(, changed=$on_changed:ident)?)]
+        #[property(obj, measure $(, on_changed=$on_changed:ident)?)]
         $vis:vis $name:ident : $ty:ty
     ) => {
         $crate::paste_paste! {
@@ -406,7 +420,7 @@ macro_rules! widget_impl {
     };
     (
         @property
-        #[property(obj, render $(, changed=$on_changed:ident)?)]
+        #[property(obj, render $(, on_changed=$on_changed:ident)?)]
         $vis:vis $name:ident : $ty:ty
     ) => {
         $crate::paste_paste! {
@@ -444,7 +458,7 @@ macro_rules! widget_impl {
     };
     (
         @property
-        #[property(obj $(, changed=$on_changed:ident)?)]
+        #[property(obj $(, on_changed=$on_changed:ident)?)]
         $vis:vis $name:ident : $ty:ty
     ) => {
         $crate::paste_paste! {

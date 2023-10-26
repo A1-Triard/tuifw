@@ -29,6 +29,7 @@ exclude = [
 
 [dependencies]
 components-arena = "4.1.0"
+downcast-rs = { version = "1.2.0", default-features = false }
 dyn-clone = "1.0.14"
 either = { version = "1.9.0", default-features = false }
 macro-attr-2018 = "3.0.0"

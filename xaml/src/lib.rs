@@ -16,19 +16,31 @@ use xaml::*;
 
 pub const XMLNS: &str = "https://a1-triard.github.io/tuifw/2023/xaml";
 
-pub fn set_widget_ctor(xaml: &mut Xaml, widget: XamlStruct, widget_name: &'static str) {
+pub fn set_widget_ctor(
+    xaml: &mut Xaml,
+    widget: XamlStruct,
+    widget_name: &'static str,
+    widget_children: XamlProperty,
+) {
     widget.set_ctor(xaml, Some(Box::new(move |obj, parent, prev| {
-        if let Some((parent, _parent_property)) = parent {
-            if let Some(prev) = prev {
-                indent_all_by(4, format!(indoc! { "
-                    #[allow(unused_variables)]
-                    let {} = {}::new(tree, Some({}), Some({}))?;
-                " }, obj, widget_name, parent, prev))
+        if let Some((parent, parent_property)) = parent {
+            if parent_property == widget_children {
+                if let Some(prev) = prev {
+                    indent_all_by(4, format!(indoc! { "
+                        #[allow(unused_variables)]
+                        let {} = {}::new(tree, Some({}), Some({}))?;
+                    " }, obj, widget_name, parent, prev))
+                } else {
+                    indent_all_by(4, format!(indoc! { "
+                        #[allow(unused_variables)]
+                        let {} = {}::new(tree, Some({}), None)?;
+                    " }, obj, widget_name, parent))
+                }
             } else {
                 indent_all_by(4, format!(indoc! { "
                     #[allow(unused_variables)]
-                    let {} = {}::new(tree, Some({}), None)?;
-                " }, obj, widget_name, parent))
+                    let {} = {}::new_template(tree)?;
+                " }, obj, widget_name))
             }
         } else {
             indent_all_by(4, format!(indoc! { "
@@ -125,6 +137,9 @@ pub struct Registered {
     pub radio_button: XamlStruct,
     pub radio_button_text: XamlProperty,
     pub radio_button_is_on: XamlProperty,
+
+    pub content_presenter: XamlStruct,
+    pub content_presenter_content_template: XamlProperty,
 }
 
 pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
@@ -250,6 +265,11 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
     );
     let radio_button_is_on = XamlProperty::new(
         xaml, radio_button, "IsOn", XamlType::Literal(boolean), false, false
+    );
+
+    let content_presenter = XamlStruct::new(xaml, Some(widget), XMLNS, "ContentPresenter");
+    let content_presenter_content_template = XamlProperty::new(
+        xaml, content_presenter, "ContentTemplate", XamlType::Struct(widget), true, false
     );
 
     boolean.set_ctor(xaml, Some(Box::new(|x| match x {
@@ -440,7 +460,7 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
         {}.set_max_height(tree, {});
     " }, obj, value))));
 
-    set_widget_ctor(xaml, background, "tuifw::Background");
+    set_widget_ctor(xaml, background, "tuifw::Background", widget_children);
     background_show_pattern.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         tuifw::Background::set_show_pattern(tree, {}, {});
     " }, obj, value))));
@@ -451,32 +471,32 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
         tuifw::Background::set_pattern_odd(tree, {}, {});
     " }, obj, value))));
 
-    set_widget_ctor(xaml, stack_panel, "tuifw::StackPanel");
+    set_widget_ctor(xaml, stack_panel, "tuifw::StackPanel", widget_children);
     stack_panel_vertical.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         tuifw::StackPanel::set_vertical(tree, {}, {});
     " }, obj, value))));
 
-    set_widget_ctor(xaml, dock_panel, "tuifw::DockPanel");
+    set_widget_ctor(xaml, dock_panel, "tuifw::DockPanel", widget_children);
     widget_dock.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         tuifw::DockPanel::set_dock(tree, {}, Some({}));
     " }, obj, value))));
 
-    set_widget_ctor(xaml, canvas, "tuifw::Canvas");
+    set_widget_ctor(xaml, canvas, "tuifw::Canvas", widget_children);
     widget_tl.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         tuifw::Canvas::set_tl(tree, {}, {});
     " }, obj, value))));
 
-    set_widget_ctor(xaml, static_text, "tuifw::StaticText");
+    set_widget_ctor(xaml, static_text, "tuifw::StaticText", widget_children);
     static_text_text.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         tuifw::StaticText::set_text(tree, {}, {});
     " }, obj, value))));
 
-    set_widget_ctor(xaml, button, "tuifw::Button");
+    set_widget_ctor(xaml, button, "tuifw::Button", widget_children);
     button_text.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         tuifw::Button::set_text(tree, {}, {});
     " }, obj, value))));
 
-    set_widget_ctor(xaml, input_line, "tuifw::InputLine");
+    set_widget_ctor(xaml, input_line, "tuifw::InputLine", widget_children);
     input_line_text.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         tuifw::InputLine::set_text(tree, {}, {});
     " }, obj, value))));
@@ -484,7 +504,7 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
         tuifw::InputLine::set_validator(tree, {}, Some(alloc::boxed::Box::new({})));
     " }, obj, value))));
 
-    set_widget_ctor(xaml, frame, "tuifw::Frame");
+    set_widget_ctor(xaml, frame, "tuifw::Frame", widget_children);
     frame_double.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         tuifw::Frame::set_double(tree, {}, {});
     " }, obj, value))));
@@ -495,7 +515,7 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
         tuifw::Frame::set_text_align(tree, {}, {});
     " }, obj, value))));
 
-    set_widget_ctor(xaml, label, "tuifw::Label");
+    set_widget_ctor(xaml, label, "tuifw::Label", widget_children);
     label_text.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         tuifw::Label::set_text(tree, {}, {});
     " }, obj, value))));
@@ -503,7 +523,7 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
         tuifw::Label::set_focus(tree, {}, Some({}));
     " }, obj, value))));
 
-    set_widget_ctor(xaml, check_box, "tuifw::CheckBox");
+    set_widget_ctor(xaml, check_box, "tuifw::CheckBox", widget_children);
     check_box_text.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         tuifw::CheckBox::set_text(tree, {}, {});
     " }, obj, value))));
@@ -511,13 +531,21 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
         tuifw::CheckBox::set_is_on(tree, {}, {});
     " }, obj, value))));
 
-    set_widget_ctor(xaml, radio_button, "tuifw::RadioButton");
+    set_widget_ctor(xaml, radio_button, "tuifw::RadioButton", widget_children);
     radio_button_text.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         tuifw::RadioButton::set_text(tree, {}, {});
     " }, obj, value))));
     radio_button_is_on.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         tuifw::RadioButton::set_is_on(tree, {}, {});
     " }, obj, value))));
+
+    set_widget_ctor(xaml, content_presenter, "tuifw::ContentPresenter", widget_children);
+    content_presenter_content_template.set_setter(
+        xaml,
+        Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+            tuifw::ContentPresenter::set_content_template(tree, {}, Some({}));
+        " }, obj, value)))
+    );
 
     Registered {
         boolean,
@@ -605,5 +633,8 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
         radio_button,
         radio_button_text,
         radio_button_is_on,
+
+        content_presenter,
+        content_presenter_content_template,
     }
 }

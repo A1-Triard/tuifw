@@ -17,7 +17,9 @@ fn main() {
         "https://a1-triard.github.io/tuifw/2023/xaml/example",
         "FloatingFrame",
     );
-    tuifw_xaml::set_widget_ctor(&mut xaml, floating_frame, "crate::floating_frame::FloatingFrame");
+    tuifw_xaml::set_widget_ctor(
+        &mut xaml, floating_frame, "crate::floating_frame::FloatingFrame", r.widget_children
+    );
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     preprocess_xaml_file(&xaml, "src/ui.xaml", out_dir.join("ui.rs")).unwrap();
 }
