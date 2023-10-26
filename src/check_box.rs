@@ -51,6 +51,10 @@ impl Widget for CheckBoxWidget {
         })
     }
 
+    fn clone(&self, tree: &mut WindowTree, source: Window, dest: Window) {
+        CheckBox::clone(tree, source, dest);
+    }
+
     fn render(
         &self,
         tree: &WindowTree,

@@ -125,9 +125,25 @@ macro_rules! widget {
             }
 
             $($($crate::widget_impl! {
+                @property
                 $(#[property($($($attrs)*)?)])?
                 $vis $field_name : $field_ty
             })+)?
+
+            fn clone(
+                #[allow(unused_variables)]
+                tree: &mut $crate::tuifw_window_WindowTree,
+                #[allow(unused_variables)]
+                source: $crate::tuifw_window_Window,
+                #[allow(unused_variables)]
+                dest: $crate::tuifw_window_Window
+            ) {
+                $($($crate::widget_impl! {
+                    @clone
+                    $(#[property($($($attrs)*)?)])?
+                    $field_name tree source dest : $field_ty
+                })+)?
+            }
         }
     };
 }
@@ -136,10 +152,35 @@ macro_rules! widget {
 #[macro_export]
 macro_rules! widget_impl {
     (
+        @clone
+        $name:ident $tree:ident $source:ident $dest:ident : $ty:ty
+    ) => {
+    };
+    (
+        @clone
+        #[property(value $($x:tt)*)]
+        $name:ident $tree:ident $source:ident $dest:ident : $ty:ty
+    ) => {
+        $crate::paste_paste! {
+            Self:: [< set_ $name >] ($tree, $dest, Self::$name($tree, $source));
+        }
+    };
+    (
+        @clone
+        #[property($($x:tt)*)]
+        $name:ident $tree:ident $source:ident $dest:ident : $ty:ty
+    ) => {
+        $crate::paste_paste! {
+            Self:: [< set_ $name >] ($tree, $dest, <$ty as Clone>::clone(Self::$name($tree, $source)));
+        }
+    };
+    (
+        @property
         $vis:vis $field_name:ident : $field_ty:ty
     ) => {
     };
     (
+        @property
         #[property(value, measure $(, changed=$on_changed:ident)?)]
         $vis:vis $name:ident : $ty:ty
     ) => {
@@ -164,6 +205,7 @@ macro_rules! widget_impl {
         }
     };
     (
+        @property
         #[property(value, render $(, changed=$on_changed:ident)?)]
         $vis:vis $name:ident : $ty:ty
     ) => {
@@ -188,6 +230,7 @@ macro_rules! widget_impl {
         }
     };
     (
+        @property
         #[property(value $(, changed=$on_changed:ident)?)]
         $vis:vis $name:ident : $ty:ty
     ) => {
@@ -211,6 +254,7 @@ macro_rules! widget_impl {
         }
     };
     (
+        @property
         #[property(ref, measure $(, changed=$on_changed:ident)?)]
         $vis:vis $name:ident : $ty:ty
     ) => {
@@ -248,6 +292,7 @@ macro_rules! widget_impl {
         }
     };
     (
+        @property
         #[property(ref, render $(, changed=$on_changed:ident)?)]
         $vis:vis $name:ident : $ty:ty
     ) => {
@@ -285,6 +330,7 @@ macro_rules! widget_impl {
         }
     };
     (
+        @property
         #[property(ref $(, changed=$on_changed:ident)?)]
         $vis:vis $name:ident : $ty:ty
     ) => {
@@ -321,6 +367,7 @@ macro_rules! widget_impl {
         }
     };
     (
+        @property
         #[property(obj, measure $(, changed=$on_changed:ident)?)]
         $vis:vis $name:ident : $ty:ty
     ) => {
@@ -358,6 +405,7 @@ macro_rules! widget_impl {
         }
     };
     (
+        @property
         #[property(obj, render $(, changed=$on_changed:ident)?)]
         $vis:vis $name:ident : $ty:ty
     ) => {
@@ -395,6 +443,7 @@ macro_rules! widget_impl {
         }
     };
     (
+        @property
         #[property(obj $(, changed=$on_changed:ident)?)]
         $vis:vis $name:ident : $ty:ty
     ) => {
@@ -431,6 +480,7 @@ macro_rules! widget_impl {
         }
     };
     (
+        @property
         $(#[property($($attrs:tt)*)])?
         $vis:vis $field_name:ident : $field_ty:ty
     ) => {

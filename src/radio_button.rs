@@ -67,6 +67,10 @@ impl Widget for RadioButtonWidget {
         })
     }
 
+    fn clone(&self, tree: &mut WindowTree, source: Window, dest: Window) {
+        RadioButton::clone(tree, source, dest);
+    }
+
     fn render(
         &self,
         tree: &WindowTree,

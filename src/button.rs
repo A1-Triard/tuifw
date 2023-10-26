@@ -84,6 +84,10 @@ impl Widget for ButtonWidget {
         })
     }
 
+    fn clone(&self, tree: &mut WindowTree, source: Window, dest: Window) {
+        Button::clone(tree, source, dest);
+    }
+
     fn render(
         &self,
         tree: &WindowTree,

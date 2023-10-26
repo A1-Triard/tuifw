@@ -33,6 +33,10 @@ impl Widget for StaticTextWidget {
         })
     }
 
+    fn clone(&self, tree: &mut WindowTree, source: Window, dest: Window) {
+        StaticText::clone(tree, source, dest);
+    }
+
     fn render(
         &self,
         tree: &WindowTree,

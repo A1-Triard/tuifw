@@ -21,6 +21,10 @@ impl Widget for StackPanelWidget {
         })
     }
 
+    fn clone(&self, tree: &mut WindowTree, source: Window, dest: Window) {
+        StackPanel::clone(tree, source, dest);
+    }
+
     fn render(
         &self,
         _tree: &WindowTree,

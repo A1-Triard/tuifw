@@ -266,6 +266,8 @@ pub trait Widget: DynClone {
     #[allow(clippy::new_ret_no_self)]
     fn new(&self) -> Box<dyn WidgetData>;
 
+    fn clone(&self, tree: &mut WindowTree, source: Window, dest: Window);
+
     fn render(
         &self,
         tree: &WindowTree,

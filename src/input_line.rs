@@ -3,6 +3,7 @@ use alloc::boxed::Box;
 use alloc::string::String;
 use core::ops::Range;
 use core::str::FromStr;
+use dyn_clone::{DynClone, clone_trait_object};
 use either::Left;
 use tuifw_screen_base::{Key, Point, Rect, Vector, char_width, text_width};
 use tuifw_screen_base::{Thickness};
@@ -14,12 +15,15 @@ use tuifw_window::{COLOR_INPUT_LINE_FOCUSED_INVALID};
 
 pub const CMD_INPUT_LINE_IS_VALID_CHANGED: u16 = 110;
 
-pub trait Validator {
+pub trait Validator: DynClone {
     fn is_numeric(&self) -> bool;
 
     fn is_valid(&self, editing: bool, text: &str) -> bool;
 }
 
+clone_trait_object!(Validator);
+
+#[derive(Clone)]
 pub struct IntValidator {
     pub min: i32,
     pub max: i32,
@@ -38,6 +42,7 @@ impl Validator for IntValidator {
     }
 }
 
+#[derive(Clone)]
 pub struct FloatValidator {
     pub min: f64,
     pub max: f64,
@@ -233,6 +238,10 @@ impl Widget for InputLineWidget {
             width: 0,
             is_valid_timer: None,
         })
+    }
+
+    fn clone(&self, tree: &mut WindowTree, source: Window, dest: Window) {
+        InputLine::clone(tree, source, dest);
     }
 
     fn render(
