@@ -47,7 +47,7 @@ impl Widget for LabelWidget {
         })
     }
 
-    fn clone(&self, tree: &mut WindowTree, source: Window, dest: Window) {
+    fn clone_data(&self, tree: &mut WindowTree, source: Window, dest: Window) {
         Label::clone(tree, source, dest);
     }
 

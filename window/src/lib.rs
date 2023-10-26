@@ -266,7 +266,7 @@ pub trait Widget: DynClone {
     #[allow(clippy::new_ret_no_self)]
     fn new(&self) -> Box<dyn WidgetData>;
 
-    fn clone(&self, tree: &mut WindowTree, source: Window, dest: Window);
+    fn clone_data(&self, tree: &mut WindowTree, source: Window, dest: Window);
 
     fn render(
         &self,
@@ -366,6 +366,7 @@ clone_trait_object!(EventHandler);
 macro_attr! {
     #[derive(Component!)]
     struct WindowNode {
+        is_template: bool,
         parent: Option<Window>,
         prev: Window,
         next: Window,
@@ -434,12 +435,52 @@ impl Window {
         parent: Option<Self>,
         prev: Option<Self>,
     ) -> Result<Self, Error> {
+        let is_template = if let Some(parent) = parent {
+            tree.arena[parent.0].is_template
+        } else {
+            false
+        };
+        Self::new_raw(tree, widget, parent, prev, is_template)
+    }
+
+    pub fn new_template(
+        tree: &mut WindowTree,
+        widget: Box<dyn Widget>,
+    ) -> Result<Self, Error> {
+        Self::new_raw(tree, widget, None, None, true)
+    }
+
+    pub fn is_template(self, tree: &WindowTree) -> bool {
+        tree.arena[self.0].is_template
+    }
+
+    pub fn new_instance(
+        self,
+        tree: &mut WindowTree,
+        parent: Option<Self>,
+        prev: Option<Self>
+    ) -> Result<Self, Error> {
+        assert!(self.is_template(tree), "cannot instantiate non-template window");
+        let widget = tree.arena[self.0].widget.clone();
+        let window = Self::new(tree, widget.clone(), parent, prev)?;
+        widget.clone_data(tree, self, window);
+        Ok(window)
+    }
+
+    fn new_raw(
+        tree: &mut WindowTree,
+        widget: Box<dyn Widget>,
+        parent: Option<Self>,
+        prev: Option<Self>,
+        is_template: bool,
+    ) -> Result<Self, Error> {
         let data = widget.new();
         let pre_process = widget.pre_process();
         let post_process = widget.post_process();
         tree.arena.try_reserve().map_err(|_| Error::Oom)?;
         let window = tree.arena.insert(move |window| {
             (WindowNode {
+                is_template,
                 parent,
                 prev: Window(window),
                 next: Window(window),

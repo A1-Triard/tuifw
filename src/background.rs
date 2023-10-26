@@ -34,7 +34,7 @@ impl Widget for BackgroundWidget {
         })
     }
 
-    fn clone(&self, tree: &mut WindowTree, source: Window, dest: Window) {
+    fn clone_data(&self, tree: &mut WindowTree, source: Window, dest: Window) {
         Background::clone(tree, source, dest);
     }
 

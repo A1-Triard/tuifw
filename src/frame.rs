@@ -39,7 +39,7 @@ impl Widget for FrameWidget {
         })
     }
 
-    fn clone(&self, tree: &mut WindowTree, source: Window, dest: Window) {
+    fn clone_data(&self, tree: &mut WindowTree, source: Window, dest: Window) {
         Frame::clone(tree, source, dest);
     }
 

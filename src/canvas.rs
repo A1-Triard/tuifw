@@ -32,7 +32,7 @@ impl Widget for CanvasWidget {
         Box::new(Canvas { })
     }
 
-    fn clone(&self, tree: &mut WindowTree, source: Window, dest: Window) {
+    fn clone_data(&self, tree: &mut WindowTree, source: Window, dest: Window) {
         Canvas::clone(tree, source, dest);
     }
 
