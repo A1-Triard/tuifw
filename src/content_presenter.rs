@@ -1,13 +1,15 @@
-use crate::widget;
+use crate::{widget, StaticText};
 use alloc::boxed::Box;
-use tuifw_screen_base::{Rect, Vector};
+use alloc::string::ToString;
+use tuifw_screen_base::{Rect, Vector, Error};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App, Timer, Data};
+use tuifw_window::Visibility;
 
 pub const CMD_CONTENT_PRESENTER_BIND: u16 = 130;
 pub const CMD_CONTENT_PRESENTER_UNBIND: u16 = 131;
 
 widget! {
-    #[widget(ContentPresenterWidget)]
+    #[widget(ContentPresenterWidget, init=init)]
     pub struct ContentPresenter {
         #[property(obj, on_changed=update_tree)]
         content: Option<Box<dyn Data>>,
@@ -18,19 +20,36 @@ widget! {
 }
 
 impl ContentPresenter {
+    fn init(tree: &mut WindowTree, window: Window) -> Result<(), Error> {
+        let error_text = StaticText::new(tree, Some(window), None)?;
+        error_text.set_visibility(tree, Visibility::Collapsed);
+        Ok(())
+    }
+
     fn update_tree(tree: &mut WindowTree, window: Window) {
         let update_tree_timer = Timer::new(tree, 0, Box::new(move |tree, app| {
             let data = window.data_mut::<ContentPresenter>(tree);
             data.update_tree_timer = None;
             if let Some(child) = window.first_child(tree) {
-                child.raise(tree, Event::Cmd(CMD_CONTENT_PRESENTER_UNBIND), app);
-                child.set_source(tree, None);
-                child.drop_window(tree, app);
+                if child.next(tree) != child {
+                    child.raise(tree, Event::Cmd(CMD_CONTENT_PRESENTER_UNBIND), app);
+                    child.set_source(tree, None);
+                    child.drop_window(tree, app);
+                }
             }
             if let Some(content_template) = ContentPresenter::content_template(tree, window) {
-                let child = content_template.new_instance(tree, Some(window), None).unwrap(); // TODO
-                child.set_source(tree, ContentPresenter::content(tree, window).clone());
-                child.raise(tree, Event::Cmd(CMD_CONTENT_PRESENTER_BIND), app);
+                match content_template.new_instance(tree, Some(window), None) {
+                    Ok(child) => {
+                        child.next(tree).set_visibility(tree, Visibility::Collapsed);
+                        child.set_source(tree, ContentPresenter::content(tree, window).clone());
+                        child.raise(tree, Event::Cmd(CMD_CONTENT_PRESENTER_BIND), app);
+                    },
+                    Err(error) => {
+                        let error_text = window.first_child(tree).unwrap();
+                        StaticText::set_text(tree, error_text, error.to_string());
+                        error_text.set_visibility(tree, Visibility::Visible);
+                    }
+                }
             }
         }));
         let data = window.data_mut::<ContentPresenter>(tree);

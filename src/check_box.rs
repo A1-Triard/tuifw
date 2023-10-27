@@ -2,7 +2,7 @@ use crate::widget;
 use alloc::boxed::Box;
 use alloc::string::String;
 use either::Left;
-use tuifw_screen_base::{Key, Point, Rect, Vector};
+use tuifw_screen_base::{Key, Point, Rect, Vector, Error};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App};
 use tuifw_window::{CMD_GOT_PRIMARY_FOCUS, CMD_LOST_PRIMARY_FOCUS, label_width, label};
 use tuifw_window::{COLOR_TEXT, COLOR_HOTKEY, COLOR_DISABLED};
@@ -22,12 +22,13 @@ widget! {
 }
 
 impl CheckBox {
-    fn init_palette(tree: &mut WindowTree, window: Window) {
+    fn init_palette(tree: &mut WindowTree, window: Window) -> Result<(), Error> {
         window.palette_mut(tree, |palette| {
             palette.set(0, Left(COLOR_TEXT));
             palette.set(1, Left(COLOR_HOTKEY));
             palette.set(2, Left(COLOR_DISABLED));
         });
+        Ok(())
     }
 
     fn click(tree: &mut WindowTree, window: Window, app: &mut dyn App) {

@@ -6,7 +6,7 @@ use core::str::FromStr;
 use dyn_clone::{DynClone, clone_trait_object};
 use either::Left;
 use tuifw_screen_base::{Key, Point, Rect, Vector, char_width, text_width};
-use tuifw_screen_base::{Thickness};
+use tuifw_screen_base::{Thickness, Error};
 use tuifw_window::{Event, RenderPort, Timer, Widget, WidgetData, Window, WindowTree, App};
 use tuifw_window::{CMD_GOT_PRIMARY_FOCUS, CMD_LOST_PRIMARY_FOCUS, CMD_LOST_ATTENTION};
 use tuifw_window::{COLOR_TEXT, COLOR_DISABLED, COLOR_INPUT_LINE_INVALID};
@@ -86,7 +86,7 @@ widget! {
 }
 
 impl InputLine {
-    fn init_palette(tree: &mut WindowTree, window: Window) {
+    fn init_palette(tree: &mut WindowTree, window: Window) -> Result<(), Error> {
         window.palette_mut(tree, |palette| {
             palette.set(0, Left(COLOR_TEXT));
             palette.set(1, Left(COLOR_INPUT_LINE_INVALID));
@@ -95,6 +95,7 @@ impl InputLine {
             palette.set(4, Left(COLOR_INPUT_LINE_FOCUSED_INVALID));
             palette.set(5, Left(COLOR_INPUT_LINE_FOCUSED_DISABLED));
         });
+        Ok(())
     }
 
     fn drop_timers(&mut self, tree: &mut WindowTree, _app: &mut dyn App) {

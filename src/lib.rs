@@ -123,7 +123,7 @@ macro_rules! widget {
                     parent,
                     prev
                 )?;
-                $(Self::$init(tree, w);)?
+                $(Self::$init(tree, w)?;)?
                 Ok(w)
             }
 
@@ -134,7 +134,7 @@ macro_rules! widget {
                     tree,
                     $crate::alloc_boxed_Box::new($Widget),
                 )?;
-                $(Self::$init(tree, w);)?
+                $(Self::$init(tree, w)?;)?
                 Ok(w)
             }
 

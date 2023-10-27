@@ -2,7 +2,7 @@ use crate::widget;
 use alloc::boxed::Box;
 use alloc::string::String;
 use either::Left;
-use tuifw_screen_base::{Point, Rect, Vector, text_width};
+use tuifw_screen_base::{Point, Rect, Vector, text_width, Error};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App};
 use tuifw_window::{COLOR_TEXT, COLOR_DISABLED};
 
@@ -15,11 +15,12 @@ widget! {
 }
 
 impl StaticText {
-    fn init_palette(tree: &mut WindowTree, window: Window) {
+    fn init_palette(tree: &mut WindowTree, window: Window) -> Result<(), Error> {
         window.palette_mut(tree, |palette| {
             palette.set(0, Left(COLOR_TEXT));
             palette.set(1, Left(COLOR_DISABLED));
         });
+        Ok(())
     }
 }
 

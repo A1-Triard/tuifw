@@ -2,7 +2,7 @@ use crate::widget;
 use alloc::boxed::Box;
 use alloc::string::String;
 use either::Left;
-use tuifw_screen_base::{Rect, Vector, Thickness, text_width, HAlign, VAlign};
+use tuifw_screen_base::{Rect, Vector, Thickness, text_width, HAlign, VAlign, Error};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App};
 use tuifw_window::{COLOR_FRAME, COLORS, COLOR_IN_FRAME};
 
@@ -19,13 +19,14 @@ widget! {
 }
 
 impl Frame {
-    fn init_palette(tree: &mut WindowTree, window: Window) {
+    fn init_palette(tree: &mut WindowTree, window: Window) -> Result<(), Error> {
         window.palette_mut(tree, |palette| {
             palette.set(0, Left(COLOR_FRAME));
             for c in COLORS {
                 palette.set(c, Left(c + COLOR_IN_FRAME));
             }
         });
+        Ok(())
     }
 }
 
