@@ -1,7 +1,8 @@
 use crate::{widget, StaticText};
 use alloc::boxed::Box;
 use alloc::string::ToString;
-use tuifw_screen_base::{Rect, Vector, Error};
+use either::Right;
+use tuifw_screen_base::{Rect, Vector, Error, Fg, Bg};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App, Timer, Data};
 use tuifw_window::Visibility;
 
@@ -23,6 +24,9 @@ impl ContentPresenter {
     fn init(tree: &mut WindowTree, window: Window) -> Result<(), Error> {
         let error_text = StaticText::new(tree, Some(window), None)?;
         error_text.set_visibility(tree, Visibility::Collapsed);
+        error_text.palette_mut(tree, |palette| {
+            palette.set(0, Right((Fg::BrightRed, Bg::Blue)));
+        });
         Ok(())
     }
 
@@ -30,12 +34,11 @@ impl ContentPresenter {
         let update_tree_timer = Timer::new(tree, 0, Box::new(move |tree, app| {
             let data = window.data_mut::<ContentPresenter>(tree);
             data.update_tree_timer = None;
-            if let Some(child) = window.first_child(tree) {
-                if child.next(tree) != child {
-                    child.raise(tree, Event::Cmd(CMD_CONTENT_PRESENTER_UNBIND), app);
-                    child.set_source(tree, None);
-                    child.drop_window(tree, app);
-                }
+            let child = window.first_child(tree).unwrap();
+            if child.next(tree) != child {
+                child.raise(tree, Event::Cmd(CMD_CONTENT_PRESENTER_UNBIND), app);
+                child.set_source(tree, None);
+                child.drop_window(tree, app);
             }
             if let Some(content_template) = ContentPresenter::content_template(tree, window) {
                 match content_template.new_instance(tree, Some(window), None) {
@@ -50,6 +53,9 @@ impl ContentPresenter {
                         error_text.set_visibility(tree, Visibility::Visible);
                     }
                 }
+            } else {
+                let error_text = window.first_child(tree).unwrap();
+                error_text.set_visibility(tree, Visibility::Collapsed);
             }
         }));
         let data = window.data_mut::<ContentPresenter>(tree);
