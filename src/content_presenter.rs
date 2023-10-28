@@ -12,11 +12,11 @@ pub const CMD_CONTENT_PRESENTER_UNBIND: u16 = 131;
 widget! {
     #[widget(ContentPresenterWidget, init=init)]
     pub struct ContentPresenter {
-        #[property(ref, on_changed=update_tree)]
+        #[property(ref, on_changed=update)]
         content: Option<Box<dyn Data>>,
-        #[property(copy, on_changed=update_tree)]
+        #[property(copy, on_changed=update)]
         content_template: Option<Window>,
-        update_tree_timer: Option<Timer>,
+        update_timer: Option<Timer>,
     }
 }
 
@@ -30,37 +30,49 @@ impl ContentPresenter {
         Ok(())
     }
 
-    fn update_tree(tree: &mut WindowTree, window: Window) {
-        let update_tree_timer = Timer::new(tree, 0, Box::new(move |tree, app| {
+    fn error_text(tree: &WindowTree, window: Window) -> Window {
+        let child = window.first_child(tree).unwrap();
+        child.next(tree)
+    }
+
+    fn content_window(tree: &WindowTree, window: Window) -> Option<Window> {
+        let child = window.first_child(tree).unwrap();
+        if child.next(tree) == child {
+            None
+        } else {
+            Some(child)
+        }
+    }
+
+    fn update(tree: &mut WindowTree, window: Window) {
+        let update_timer = Timer::new(tree, 0, Box::new(move |tree, app| {
             let data = window.data_mut::<ContentPresenter>(tree);
-            data.update_tree_timer = None;
-            let child = window.first_child(tree).unwrap();
-            if child.next(tree) != child {
-                child.raise(tree, Event::Cmd(CMD_CONTENT_PRESENTER_UNBIND), app);
-                child.set_source(tree, None);
-                child.drop_window(tree, app);
+            data.update_timer = None;
+            if let Some(content_window) = Self::content_window(tree, window) {
+                content_window.raise(tree, Event::Cmd(CMD_CONTENT_PRESENTER_UNBIND), app);
+                content_window.set_source(tree, None);
+                content_window.drop_window(tree, app);
             }
             if let Some(content_template) = ContentPresenter::content_template(tree, window) {
                 match content_template.new_instance(tree, Some(window), None) {
-                    Ok(child) => {
-                        child.next(tree).set_visibility(tree, Visibility::Collapsed);
-                        child.set_source(tree, ContentPresenter::content(tree, window).clone());
-                        child.raise(tree, Event::Cmd(CMD_CONTENT_PRESENTER_BIND), app);
+                    Ok(content_window) => {
+                        Self::error_text(tree, window).set_visibility(tree, Visibility::Collapsed);
+                        content_window.set_source(tree, ContentPresenter::content(tree, window).clone());
+                        content_window.raise(tree, Event::Cmd(CMD_CONTENT_PRESENTER_BIND), app);
                     },
                     Err(error) => {
-                        let error_text = window.first_child(tree).unwrap();
+                        let error_text = Self::error_text(tree, window);
                         StaticText::set_text(tree, error_text, error.to_string());
                         error_text.set_visibility(tree, Visibility::Visible);
                     }
                 }
             } else {
-                let error_text = window.first_child(tree).unwrap();
-                error_text.set_visibility(tree, Visibility::Collapsed);
+                Self::error_text(tree, window).set_visibility(tree, Visibility::Collapsed);
             }
         }));
         let data = window.data_mut::<ContentPresenter>(tree);
-        if let Some(old_update_tree_timer) = data.update_tree_timer.replace(update_tree_timer) {
-            old_update_tree_timer.drop_timer(tree);
+        if let Some(old_update_timer) = data.update_timer.replace(update_timer) {
+            old_update_timer.drop_timer(tree);
         }
     }
 }
@@ -71,7 +83,7 @@ pub struct ContentPresenterWidget;
 impl Widget for ContentPresenterWidget {
     fn new(&self) -> Box<dyn WidgetData> {
         Box::new(ContentPresenter {
-            content: None, content_template: None, update_tree_timer: None
+            content: None, content_template: None, update_timer: None
         })
     }
 
