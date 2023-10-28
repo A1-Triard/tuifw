@@ -16,6 +16,7 @@ enum Update {
     Refresh,
     Clear,
     Push(Box<dyn Data>),
+    Insert(usize, Box<dyn Data>),
 }
 
 widget! {
@@ -56,6 +57,12 @@ impl ItemsPresenter {
     pub fn push(tree: &mut WindowTree, window: Window, item: Box<dyn Data>) {
         let data = window.data_mut::<ItemsPresenter>(tree);
         data.update_queue.push_back(Update::Push(item));
+        Self::update(tree, window);
+    }
+
+    pub fn insert(tree: &mut WindowTree, window: Window, index: usize, item: Box<dyn Data>) {
+        let data = window.data_mut::<ItemsPresenter>(tree);
+        data.update_queue.push_back(Update::Insert(index, item));
         Self::update(tree, window);
     }
 
@@ -174,6 +181,24 @@ impl ItemsPresenter {
                 item_window.set_source(tree, Some(item));
                 item_window.raise(tree, Event::Cmd(CMD_ITEMS_PRESENTER_BIND), app);
                 window.data_mut::<ItemsPresenter>(tree).items.push(item_window);
+            },
+            Update::Insert(index, item) => {
+                let panel = Self::panel(tree, window);
+                let prev = index.checked_sub(1).map(|i| window.data::<ItemsPresenter>(tree).items[i]);
+                let item_window = if let Some(item_template) = ItemsPresenter::item_template(tree, window) {
+                    match item_template.new_instance(tree, Some(panel), prev) {
+                        Ok(item_window) => item_window,
+                        Err(error) => return Self::show_error(tree, window, error),
+                    }
+                } else {
+                    match StaticText::new(tree, Some(panel), prev) {
+                        Ok(item_window) => item_window,
+                        Err(error) => return Self::show_error(tree, window, error),
+                    }
+                };
+                item_window.set_source(tree, Some(item));
+                item_window.raise(tree, Event::Cmd(CMD_ITEMS_PRESENTER_BIND), app);
+                window.data_mut::<ItemsPresenter>(tree).items.insert(index, item_window);
             },
         }
     }
