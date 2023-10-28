@@ -16,7 +16,7 @@ widget! {
         click_timer: Option<Timer>,
         #[property(value)]
         cmd: u16,
-        #[property(value)]
+        #[property(window)]
         focus: Option<Window>,
     }
 }
@@ -48,8 +48,14 @@ impl Widget for LabelWidget {
         })
     }
 
-    fn clone_data(&self, tree: &mut WindowTree, source: Window, dest: Window) {
-        Label::clone(tree, source, dest);
+    fn clone_data(
+        &self,
+        tree: &mut WindowTree,
+        source: Window,
+        dest: Window,
+        clone_window: Box<dyn Fn(&WindowTree, Window) -> Window>,
+    ) {
+        Label::clone(tree, source, dest, clone_window);
     }
 
     fn render(

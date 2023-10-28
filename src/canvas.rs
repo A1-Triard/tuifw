@@ -3,6 +3,7 @@ use alloc::boxed::Box;
 use tuifw_screen_base::{Rect, Vector, Point};
 use tuifw_window::{Event, Layout, RenderPort, Widget, WidgetData, Window, WindowTree, App};
 
+#[derive(Clone)]
 struct CanvasLayout {
     tl: Point,
 }
@@ -32,8 +33,14 @@ impl Widget for CanvasWidget {
         Box::new(Canvas { })
     }
 
-    fn clone_data(&self, tree: &mut WindowTree, source: Window, dest: Window) {
-        Canvas::clone(tree, source, dest);
+    fn clone_data(
+        &self,
+        tree: &mut WindowTree,
+        source: Window,
+        dest: Window,
+        clone_window: Box<dyn Fn(&WindowTree, Window) -> Window>,
+    ) {
+        Canvas::clone(tree, source, dest, clone_window);
     }
 
     fn render(

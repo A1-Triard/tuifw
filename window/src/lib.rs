@@ -272,7 +272,13 @@ pub trait Widget: DynClone {
     #[allow(clippy::new_ret_no_self)]
     fn new(&self) -> Box<dyn WidgetData>;
 
-    fn clone_data(&self, tree: &mut WindowTree, source: Window, dest: Window);
+    fn clone_data(
+        &self,
+        tree: &mut WindowTree,
+        source: Window,
+        dest: Window,
+        clone_window: Box<dyn Fn(&WindowTree, Window) -> Window>,
+    );
 
     fn render(
         &self,
@@ -323,14 +329,17 @@ pub trait WidgetData: Downcast {
 
 impl_downcast!(WidgetData);
 
-pub trait Layout: Downcast { }
+pub trait Layout: Downcast + DynClone { }
 
 impl_downcast!(Layout);
+
+clone_trait_object!(Layout);
 
 pub trait App: Downcast { }
 
 impl_downcast!(App);
 
+#[derive(Clone)]
 pub struct Palette(Vec<Either<u8, (Fg, Bg)>>);
 
 impl Palette {
@@ -409,6 +418,7 @@ macro_attr! {
         post_process: Option<Id<PrePostProcess>>,
         is_enabled: bool,
         visibility: Visibility,
+        cloning: Option<Window>,
     }
 }
 
@@ -468,10 +478,78 @@ impl Window {
         prev: Option<Self>
     ) -> Result<Self, Error> {
         assert!(self.is_template(tree), "cannot instantiate non-template window");
-        let widget = tree.arena[self.0].widget.clone();
-        let window = Self::new(tree, widget.clone(), parent, prev)?;
-        widget.clone_data(tree, self, window);
+        let window = self.begin_cloning(tree, parent, prev)?;
+        self.do_cloning(tree);
+        self.end_cloning(tree);
         Ok(window)
+    }
+
+    fn begin_cloning(
+        self,
+        tree: &mut WindowTree,
+        parent: Option<Self>,
+        prev: Option<Self>,
+    ) -> Result<Window, Error> {
+        let widget = tree.arena[self.0].widget.clone();
+        let clone = Self::new(tree, widget, parent, prev)?;
+        assert!(tree.arena[self.0].cloning.replace(clone).is_none());
+        if let Some(first_child) = self.first_child(tree) {
+            let mut child = first_child;
+            let mut prev = None;
+            loop {
+                prev = Some(child.begin_cloning(tree, Some(clone), prev)?);
+                child = child.next(tree);
+                if child == first_child { break; }
+            }
+        }
+        Ok(clone)
+    }
+
+    fn do_cloning(self, tree: &mut WindowTree) {
+        let clone = tree.arena[self.0].cloning.unwrap();
+        clone.set_palette(tree, self.palette(tree).clone());
+        clone.set_visibility(tree, self.visibility(tree));
+        clone.set_layout(tree, self.layout_raw(tree).clone());
+        clone.set_is_enabled(tree, self.is_enabled(tree).clone());
+        clone.set_h_align(tree, self.h_align(tree).clone());
+        clone.set_v_align(tree, self.v_align(tree).clone());
+        clone.set_margin(tree, self.margin(tree).clone());
+        clone.set_min_width(tree, self.min_width(tree).clone());
+        clone.set_min_height(tree, self.min_height(tree).clone());
+        clone.set_max_width(tree, self.max_width(tree).clone());
+        clone.set_max_height(tree, self.max_height(tree).clone());
+        clone.set_width(tree, self.width(tree).clone());
+        clone.set_height(tree, self.height(tree).clone());
+        let clone_window: Box<dyn Fn(&WindowTree, Window) -> Window> =
+            Box::new(|tree: &WindowTree, window: Window| tree.arena[window.0].cloning.unwrap_or(window))
+        ;
+        clone.set_focus_tab(tree, clone_window(tree, self.focus_tab(tree)));
+        clone.set_focus_right(tree, clone_window(tree, self.focus_right(tree)));
+        clone.set_focus_left(tree, clone_window(tree, self.focus_left(tree)));
+        clone.set_focus_up(tree, clone_window(tree, self.focus_up(tree)));
+        clone.set_focus_down(tree, clone_window(tree, self.focus_down(tree)));
+        let widget = tree.arena[self.0].widget.clone();
+        widget.clone_data(tree, self, clone, clone_window);
+        if let Some(first_child) = self.first_child(tree) {
+            let mut child = first_child;
+            loop {
+                child.do_cloning(tree);
+                child = child.next(tree);
+                if child == first_child { break; }
+            }
+        }
+    }
+
+    fn end_cloning(self, tree: &mut WindowTree) {
+        assert!(tree.arena[self.0].cloning.take().is_some());
+        if let Some(first_child) = self.first_child(tree) {
+            let mut child = first_child;
+            loop {
+                child.end_cloning(tree);
+                child = child.next(tree);
+                if child == first_child { break; }
+            }
+        }
     }
 
     fn new_raw(
@@ -482,8 +560,8 @@ impl Window {
         is_template: bool,
     ) -> Result<Self, Error> {
         let data = widget.new();
-        let pre_process = widget.pre_process();
-        let post_process = widget.post_process();
+        let pre_process = if is_template { false } else { widget.pre_process() };
+        let post_process = if is_template { false } else { widget.post_process() };
         tree.arena.try_reserve().map_err(|_| Error::Oom)?;
         let window = tree.arena.insert(move |window| {
             (WindowNode {
@@ -524,6 +602,7 @@ impl Window {
                 post_process: None,
                 is_enabled: true,
                 visibility: Visibility::Visible,
+                cloning: None,
             }, Window(window))
         });
         window.attach(tree, parent, prev);
@@ -694,6 +773,13 @@ impl Window {
         tree.arena[self.0].data.downcast_mut::<T>().expect("wrong type")
     }
 
+    pub fn layout_raw<'a>(
+        self,
+        tree: &'a WindowTree<'_>
+    ) -> &'a Option<Box<dyn Layout>> {
+        &tree.arena[self.0].layout
+    }
+
     pub fn layout<'a, T: Layout + 'static>(
         self,
         tree: &'a WindowTree<'_>
@@ -779,6 +865,7 @@ impl Window {
     }
 
     pub fn set_focused_primary(self, tree: &mut WindowTree, value: bool) {
+        assert!(!self.is_template(tree), "cannot focus template");
         if value {
             tree.next_primary_focused = Some(Some(self));
         } else if
@@ -790,6 +877,7 @@ impl Window {
     }
 
     pub fn set_focused_secondary(self, tree: &mut WindowTree, value: bool) {
+        assert!(!self.is_template(tree), "cannot focus template");
         if value {
             tree.next_secondary_focused = Some(Some(self));
         } else if
@@ -808,6 +896,10 @@ impl Window {
         let res = f(&mut tree.arena[self.0].palette);
         self.invalidate_render(tree);
         res
+    }
+
+    pub fn set_palette(self, tree: &mut WindowTree, value: Palette) {
+        self.palette_mut(tree, |palette| replace(palette, value));
     }
 
     pub fn color(self, tree: &WindowTree, i: u8) -> (Fg, Bg) {

@@ -150,12 +150,14 @@ macro_rules! widget {
                 #[allow(unused_variables)]
                 source: $crate::tuifw_window_Window,
                 #[allow(unused_variables)]
-                dest: $crate::tuifw_window_Window
+                dest: $crate::tuifw_window_Window,
+                #[allow(unused_variables)]
+                clone_window: Box<dyn Fn(&WindowTree, Window) -> Window>,
             ) {
                 $($($crate::widget_impl! {
                     @clone
                     $(#[property($($($attrs)*)?)])?
-                    $field_name tree source dest : $field_ty
+                    $field_name tree source dest clone_window : $field_ty
                 })+)?
             }
         }
@@ -167,13 +169,26 @@ macro_rules! widget {
 macro_rules! widget_impl {
     (
         @clone
-        $name:ident $tree:ident $source:ident $dest:ident : $ty:ty
+        $name:ident $tree:ident $source:ident $dest:ident $clone_window:ident : $ty:ty
     ) => {
     };
     (
         @clone
+        #[property(window $($x:tt)*)]
+        $name:ident $tree:ident $source:ident $dest:ident $clone_window:ident : $ty:ty
+    ) => {
+        $crate::paste_paste! {
+            Self:: [< set_ $name >] (
+                $tree,
+                $dest,
+                Self::$name($tree, $source).map(|x| $clone_window($tree, x))
+            );
+        }
+    };
+    (
+        @clone
         #[property(value $($x:tt)*)]
-        $name:ident $tree:ident $source:ident $dest:ident : $ty:ty
+        $name:ident $tree:ident $source:ident $dest:ident $clone_window:ident : $ty:ty
     ) => {
         $crate::paste_paste! {
             Self:: [< set_ $name >] ($tree, $dest, Self::$name($tree, $source));
@@ -182,7 +197,7 @@ macro_rules! widget_impl {
     (
         @clone
         #[property($($x:tt)*)]
-        $name:ident $tree:ident $source:ident $dest:ident : $ty:ty
+        $name:ident $tree:ident $source:ident $dest:ident $clone_window:ident : $ty:ty
     ) => {
         $crate::paste_paste! {
             Self:: [< set_ $name >] ($tree, $dest, <$ty as Clone>::clone(Self::$name($tree, $source)));
@@ -192,6 +207,80 @@ macro_rules! widget_impl {
         @property
         $vis:vis $field_name:ident : $field_ty:ty
     ) => {
+    };
+    (
+        @property
+        #[property(window, measure $(, on_changed=$on_changed:ident)?)]
+        $vis:vis $name:ident : $ty:ty
+    ) => {
+        $crate::paste_paste! {
+            $vis fn $name(
+                tree: &$crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window
+            ) -> $ty {
+                window.data::<Self>(tree).$name
+            }
+
+            $vis fn [< set_ $name >] (
+                tree: &mut $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window,
+                value: $ty
+            ) {
+                let data = window.data_mut::<Self>(tree);
+                data.$name = value;
+                window.invalidate_measure(tree);
+                $(Self::$on_changed(tree, window);)?
+            }
+        }
+    };
+    (
+        @property
+        #[property(window, render $(, on_changed=$on_changed:ident)?)]
+        $vis:vis $name:ident : $ty:ty
+    ) => {
+        $crate::paste_paste! {
+            $vis fn $name(
+                tree: &$crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window
+            ) -> $ty {
+                window.data::<Self>(tree).$name
+            }
+
+            $vis fn [< set_ $name >] (
+                tree: &mut $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window,
+                value: $ty
+            ) {
+                let data = window.data_mut::<Self>(tree);
+                data.$name = value;
+                window.invalidate_render(tree);
+                $(Self::$on_changed(tree, window);)?
+            }
+        }
+    };
+    (
+        @property
+        #[property(window $(, on_changed=$on_changed:ident)?)]
+        $vis:vis $name:ident : $ty:ty
+    ) => {
+        $crate::paste_paste! {
+            $vis fn $name(
+                tree: &$crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window
+            ) -> $ty {
+                window.data::<Self>(tree).$name
+            }
+
+            $vis fn [< set_ $name >] (
+                tree: &mut $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window,
+                value: $ty
+            ) {
+                let data = window.data_mut::<Self>(tree);
+                data.$name = value;
+                $(Self::$on_changed(tree, window);)?
+            }
+        }
     };
     (
         @property

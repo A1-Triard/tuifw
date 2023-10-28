@@ -6,6 +6,7 @@ use tuifw_window::{Event, Layout, RenderPort, Widget, WidgetData, Window, Window
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum Dock { Left, Top, Right, Bottom }
 
+#[derive(Clone)]
 struct DockLayout {
     dock: Option<Dock>,
 }
@@ -35,8 +36,14 @@ impl Widget for DockPanelWidget {
         Box::new(DockPanel { })
     }
 
-    fn clone_data(&self, tree: &mut WindowTree, source: Window, dest: Window) {
-        DockPanel::clone(tree, source, dest);
+    fn clone_data(
+        &self,
+        tree: &mut WindowTree,
+        source: Window,
+        dest: Window,
+        clone_window: Box<dyn Fn(&WindowTree, Window) -> Window>,
+    ) {
+        DockPanel::clone(tree, source, dest, clone_window);
     }
 
     fn render(
