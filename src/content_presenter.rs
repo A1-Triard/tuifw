@@ -17,6 +17,7 @@ widget! {
         #[property(copy, on_changed=update)]
         content_template: Option<Window>,
         update_timer: Option<Timer>,
+        error: bool,
     }
 }
 
@@ -31,43 +32,52 @@ impl ContentPresenter {
     }
 
     fn error_text(tree: &WindowTree, window: Window) -> Window {
-        let child = window.first_child(tree).unwrap();
-        child.next(tree)
+        let first_child = window.first_child(tree).unwrap();
+        first_child.next(tree)
     }
 
     fn content_window(tree: &WindowTree, window: Window) -> Option<Window> {
-        let child = window.first_child(tree).unwrap();
-        if child.next(tree) == child {
+        let first_child = window.first_child(tree).unwrap();
+        if first_child.next(tree) == first_child {
             None
         } else {
-            Some(child)
+            Some(first_child)
         }
+    }
+
+    fn show_error(tree: &mut WindowTree, window: Window, error: Error) {
+        window.data_mut::<ContentPresenter>(tree).error = true;
+        let error_text = Self::error_text(tree, window);
+        StaticText::set_text(tree, error_text, error.to_string());
+        error_text.set_visibility(tree, Visibility::Visible);
     }
 
     fn update(tree: &mut WindowTree, window: Window) {
         let update_timer = Timer::new(tree, 0, Box::new(move |tree, app| {
             let data = window.data_mut::<ContentPresenter>(tree);
             data.update_timer = None;
+            if data.error { return; }
             if let Some(content_window) = Self::content_window(tree, window) {
                 content_window.raise(tree, Event::Cmd(CMD_CONTENT_PRESENTER_UNBIND), app);
                 content_window.set_source(tree, None);
                 content_window.drop_window(tree, app);
             }
-            if let Some(content_template) = ContentPresenter::content_template(tree, window) {
-                match content_template.new_instance(tree, Some(window), None) {
-                    Ok(content_window) => {
-                        Self::error_text(tree, window).set_visibility(tree, Visibility::Collapsed);
-                        content_window.set_source(tree, ContentPresenter::content(tree, window).clone());
-                        content_window.raise(tree, Event::Cmd(CMD_CONTENT_PRESENTER_BIND), app);
-                    },
-                    Err(error) => {
-                        let error_text = Self::error_text(tree, window);
-                        StaticText::set_text(tree, error_text, error.to_string());
-                        error_text.set_visibility(tree, Visibility::Visible);
+            if let Some(content) = ContentPresenter::content(tree, window).clone() {
+                let content_window =
+                    if let Some(content_template) = ContentPresenter::content_template(tree, window) {
+                        match content_template.new_instance(tree, Some(window), None) {
+                            Ok(content_window) => content_window,
+                            Err(error) => return Self::show_error(tree, window, error),
+                        }
+                    } else {
+                        match StaticText::new(tree, Some(window), None) {
+                            Ok(content_window) => content_window,
+                            Err(error) => return Self::show_error(tree, window, error),
+                        }
                     }
-                }
-            } else {
-                Self::error_text(tree, window).set_visibility(tree, Visibility::Collapsed);
+                ;
+                content_window.set_source(tree, Some(content));
+                content_window.raise(tree, Event::Cmd(CMD_CONTENT_PRESENTER_BIND), app);
             }
         }));
         let data = window.data_mut::<ContentPresenter>(tree);
@@ -83,7 +93,7 @@ pub struct ContentPresenterWidget;
 impl Widget for ContentPresenterWidget {
     fn new(&self) -> Box<dyn WidgetData> {
         Box::new(ContentPresenter {
-            content: None, content_template: None, update_timer: None
+            content: None, content_template: None, update_timer: None, error: false
         })
     }
 
