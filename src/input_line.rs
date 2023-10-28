@@ -71,7 +71,7 @@ impl Validator for FloatValidator {
 widget! {
     #[widget(InputLineWidget, init=init_palette, drop=drop_timers)]
     pub struct InputLine {
-        #[property(obj, render)]
+        #[property(ref, render)]
         validator: Option<Box<dyn Validator>>,
         #[property(str, render, on_changed=on_text_changed)]
         text: String,

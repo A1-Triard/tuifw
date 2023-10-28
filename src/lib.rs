@@ -471,7 +471,7 @@ macro_rules! widget_impl {
     };
     (
         @property
-        #[property(obj, measure $(, on_changed=$on_changed:ident)?)]
+        #[property(ref, measure $(, on_changed=$on_changed:ident)?)]
         $vis:vis $name:ident : $ty:ty
     ) => {
         $crate::paste_paste! {
@@ -509,7 +509,7 @@ macro_rules! widget_impl {
     };
     (
         @property
-        #[property(obj, render $(, on_changed=$on_changed:ident)?)]
+        #[property(ref, render $(, on_changed=$on_changed:ident)?)]
         $vis:vis $name:ident : $ty:ty
     ) => {
         $crate::paste_paste! {
@@ -547,7 +547,7 @@ macro_rules! widget_impl {
     };
     (
         @property
-        #[property(obj $(, on_changed=$on_changed:ident)?)]
+        #[property(ref $(, on_changed=$on_changed:ident)?)]
         $vis:vis $name:ident : $ty:ty
     ) => {
         $crate::paste_paste! {

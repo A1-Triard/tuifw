@@ -12,9 +12,9 @@ pub const CMD_CONTENT_PRESENTER_UNBIND: u16 = 131;
 widget! {
     #[widget(ContentPresenterWidget, init=init)]
     pub struct ContentPresenter {
-        #[property(obj, on_changed=update_tree)]
+        #[property(ref, on_changed=update_tree)]
         content: Option<Box<dyn Data>>,
-        #[property(window, on_changed=update_tree)]
+        #[property(copy, on_changed=update_tree)]
         content_template: Option<Window>,
         update_tree_timer: Option<Timer>,
     }
