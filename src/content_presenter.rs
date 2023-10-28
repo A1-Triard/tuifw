@@ -123,12 +123,17 @@ impl Widget for ContentPresenterWidget {
         available_height: Option<i16>,
         app: &mut dyn App,
     ) -> Vector {
-        if let Some(child) = window.first_child(tree) {
-            child.measure(tree, available_width, available_height, app);
-            child.desired_size(tree)
-        } else {
-            Vector::null()
+        let mut size = Vector::null();
+        if let Some(first_child) = window.first_child(tree) {
+            let mut child = first_child;
+            loop {
+                child.measure(tree, available_width, available_height, app);
+                size = size.max(child.desired_size(tree));
+                child = child.next(tree);
+                if child == first_child { break; }
+            }
         }
+        size
     }
 
     fn arrange(
@@ -138,12 +143,17 @@ impl Widget for ContentPresenterWidget {
         final_inner_bounds: Rect,
         app: &mut dyn App,
     ) -> Vector {
-        if let Some(child) = window.first_child(tree) {
-            child.arrange(tree, final_inner_bounds, app);
-            child.render_bounds(tree).size
-        } else {
-            Vector::null()
+        let mut size = Vector::null();
+        if let Some(first_child) = window.first_child(tree) {
+            let mut child = first_child;
+            loop {
+                child.arrange(tree, final_inner_bounds, app);
+                size = size.max(child.render_bounds(tree).size);
+                child = child.next(tree);
+                if child == first_child { break; }
+            }
         }
+        size
     }
 
     fn update(

@@ -50,6 +50,9 @@ pub use radio_button::*;
 mod content_presenter;
 pub use content_presenter::*;
 
+mod items_presenter;
+pub use items_presenter::*;
+
 #[doc(hidden)]
 pub use alloc::boxed::Box as alloc_boxed_Box;
 #[doc(hidden)]
