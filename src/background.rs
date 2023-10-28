@@ -9,11 +9,11 @@ use tuifw_window::COLOR_BACKGROUND;
 widget! {
     #[widget(BackgroundWidget, init=init_palette)]
     pub struct Background {
-        #[property(ref, render)]
+        #[property(str, render)]
         pattern_even: String,
-        #[property(ref, render)]
+        #[property(str, render)]
         pattern_odd: String,
-        #[property(value, render)]
+        #[property(copy, render)]
         show_pattern: bool,
     }
 }

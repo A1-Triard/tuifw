@@ -12,13 +12,13 @@ pub const CMD_RADIO_BUTTON_CLICK: u16 = 120;
 widget! {
     #[widget(RadioButtonWidget, init=init_palette)]
     pub struct RadioButton {
-        #[property(value, render)]
+        #[property(copy, render)]
         is_on: bool,
-        #[property(value)]
+        #[property(copy)]
         allow_turn_off: bool,
-        #[property(value)]
+        #[property(copy)]
         cmd: u16,
-        #[property(ref, measure)]
+        #[property(str, measure)]
         text: String,
     }
 }

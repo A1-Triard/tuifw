@@ -11,10 +11,10 @@ pub const CMD_LABEL_CLICK: u16 = 110;
 widget! {
     #[widget(LabelWidget, init=init_palette, drop=drop_timers)]
     pub struct Label {
-        #[property(ref, measure)]
+        #[property(str, measure)]
         text: String,
         click_timer: Option<Timer>,
-        #[property(value)]
+        #[property(copy)]
         cmd: u16,
         #[property(window)]
         focus: Option<Window>,

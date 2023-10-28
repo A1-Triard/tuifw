@@ -9,7 +9,7 @@ use tuifw_window::{COLOR_TEXT, COLOR_DISABLED};
 widget! {
     #[widget(StaticTextWidget, init=init_palette)]
     pub struct StaticText {
-        #[property(ref, measure)]
+        #[property(str, measure)]
         text: String,
     }
 }

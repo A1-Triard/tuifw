@@ -187,7 +187,7 @@ macro_rules! widget_impl {
     };
     (
         @clone
-        #[property(value $($x:tt)*)]
+        #[property(copy $($x:tt)*)]
         $name:ident $tree:ident $source:ident $dest:ident $clone_window:ident : $ty:ty
     ) => {
         $crate::paste_paste! {
@@ -284,7 +284,7 @@ macro_rules! widget_impl {
     };
     (
         @property
-        #[property(value, measure $(, on_changed=$on_changed:ident)?)]
+        #[property(copy, measure $(, on_changed=$on_changed:ident)?)]
         $vis:vis $name:ident : $ty:ty
     ) => {
         $crate::paste_paste! {
@@ -309,7 +309,7 @@ macro_rules! widget_impl {
     };
     (
         @property
-        #[property(value, render $(, on_changed=$on_changed:ident)?)]
+        #[property(copy, render $(, on_changed=$on_changed:ident)?)]
         $vis:vis $name:ident : $ty:ty
     ) => {
         $crate::paste_paste! {
@@ -334,7 +334,7 @@ macro_rules! widget_impl {
     };
     (
         @property
-        #[property(value $(, on_changed=$on_changed:ident)?)]
+        #[property(copy $(, on_changed=$on_changed:ident)?)]
         $vis:vis $name:ident : $ty:ty
     ) => {
         $crate::paste_paste! {
@@ -358,7 +358,7 @@ macro_rules! widget_impl {
     };
     (
         @property
-        #[property(ref, measure $(, on_changed=$on_changed:ident)?)]
+        #[property(str, measure $(, on_changed=$on_changed:ident)?)]
         $vis:vis $name:ident : $ty:ty
     ) => {
         $crate::paste_paste! {
@@ -396,7 +396,7 @@ macro_rules! widget_impl {
     };
     (
         @property
-        #[property(ref, render $(, on_changed=$on_changed:ident)?)]
+        #[property(str, render $(, on_changed=$on_changed:ident)?)]
         $vis:vis $name:ident : $ty:ty
     ) => {
         $crate::paste_paste! {
@@ -434,7 +434,7 @@ macro_rules! widget_impl {
     };
     (
         @property
-        #[property(ref $(, on_changed=$on_changed:ident)?)]
+        #[property(str $(, on_changed=$on_changed:ident)?)]
         $vis:vis $name:ident : $ty:ty
     ) => {
         $crate::paste_paste! {

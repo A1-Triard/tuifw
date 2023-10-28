@@ -14,7 +14,7 @@ widget! {
     pub struct ContentPresenter {
         #[property(obj, on_changed=update_tree)]
         content: Option<Box<dyn Data>>,
-        #[property(value, on_changed=update_tree)]
+        #[property(window, on_changed=update_tree)]
         content_template: Option<Window>,
         update_tree_timer: Option<Timer>,
     }

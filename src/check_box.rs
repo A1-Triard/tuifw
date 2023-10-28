@@ -12,11 +12,11 @@ pub const CMD_CHECK_BOX_CLICK: u16 = 110;
 widget! {
     #[widget(CheckBoxWidget, init=init_palette)]
     pub struct CheckBox {
-        #[property(value, render)]
+        #[property(copy, render)]
         is_on: bool,
-        #[property(value)]
+        #[property(copy)]
         cmd: u16,
-        #[property(ref, measure)]
+        #[property(str, measure)]
         text: String,
     }
 }

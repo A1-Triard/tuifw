@@ -73,7 +73,7 @@ widget! {
     pub struct InputLine {
         #[property(obj, render)]
         validator: Option<Box<dyn Validator>>,
-        #[property(ref, render, on_changed=on_text_changed)]
+        #[property(str, render, on_changed=on_text_changed)]
         text: String,
         is_valid: bool,
         editing: bool,

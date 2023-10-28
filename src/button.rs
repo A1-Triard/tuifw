@@ -14,11 +14,11 @@ pub const CMD_BUTTON_CLICK: u16 = 100;
 widget! {
     #[widget(ButtonWidget, init=init_palette, drop=drop_timers)]
     pub struct Button {
-        #[property(ref, measure)]
+        #[property(str, measure)]
         text: String,
         click_timer: Option<Timer>,
         release_timer: Option<Timer>,
-        #[property(value)]
+        #[property(copy)]
         cmd: u16,
     }
 }

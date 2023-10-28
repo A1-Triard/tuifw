@@ -9,11 +9,11 @@ use tuifw_window::{COLOR_FRAME, COLORS, COLOR_IN_FRAME};
 widget! {
     #[widget(FrameWidget, init=init_palette)]
     pub struct Frame {
-        #[property(value, render)]
+        #[property(copy, render)]
         double: bool,
-        #[property(ref, render)]
+        #[property(str, render)]
         text: String,
-        #[property(value, render)]
+        #[property(copy, render)]
         text_align: HAlign,
     }
 }

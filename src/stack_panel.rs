@@ -6,7 +6,7 @@ use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, Ap
 widget! {
     #[widget(StackPanelWidget)]
     pub struct StackPanel {
-        #[property(value, measure)]
+        #[property(copy, measure)]
         vertical: bool,
     }
 }
