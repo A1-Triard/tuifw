@@ -140,6 +140,10 @@ pub struct Registered {
 
     pub content_presenter: XamlStruct,
     pub content_presenter_content_template: XamlProperty,
+
+    pub items_presenter: XamlStruct,
+    pub items_presenter_panel_template: XamlProperty,
+    pub items_presenter_item_template: XamlProperty,
 }
 
 pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
@@ -270,6 +274,14 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
     let content_presenter = XamlStruct::new(xaml, Some(widget), XMLNS, "ContentPresenter");
     let content_presenter_content_template = XamlProperty::new(
         xaml, content_presenter, "ContentTemplate", XamlType::Struct(widget), true, false
+    );
+
+    let items_presenter = XamlStruct::new(xaml, Some(widget), XMLNS, "ItemsPresenter");
+    let items_presenter_panel_template = XamlProperty::new(
+        xaml, items_presenter, "PanelTemplate", XamlType::Struct(widget), false, false
+    );
+    let items_presenter_item_template = XamlProperty::new(
+        xaml, items_presenter, "ItemTemplate", XamlType::Struct(widget), true, false
     );
 
     boolean.set_ctor(xaml, Some(Box::new(|x| match x {
@@ -547,6 +559,20 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
         " }, obj, value)))
     );
 
+    set_widget_ctor(xaml, items_presenter, "tuifw::ItemsPresenter", widget_children);
+    items_presenter_panel_template.set_setter(
+        xaml,
+        Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+            tuifw::ItemsPresenter::set_panel_template(tree, {}, Some({}));
+        " }, obj, value)))
+    );
+    items_presenter_item_template.set_setter(
+        xaml,
+        Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+            tuifw::ItemsPresenter::set_item_template(tree, {}, Some({}));
+        " }, obj, value)))
+    );
+
     Registered {
         boolean,
         string,
@@ -636,5 +662,9 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
 
         content_presenter,
         content_presenter_content_template,
+
+        items_presenter,
+        items_presenter_panel_template,
+        items_presenter_item_template,
     }
 }
