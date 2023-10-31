@@ -868,6 +868,14 @@ impl Window {
         }
     }
 
+    pub fn is_primary_focused(self, tree: &WindowTree) -> bool {
+        tree.primary_focused == Some(self)
+    }
+
+    pub fn is_secondary_focused(self, tree: &WindowTree) -> bool {
+        tree.secondary_focused == Some(self)
+    }
+
     pub fn is_focused(self, tree: &WindowTree) -> bool {
         tree.primary_focused == Some(self) || tree.secondary_focused == Some(self)
     }

@@ -3,7 +3,7 @@ use alloc::boxed::Box;
 use alloc::string::ToString;
 use alloc::vec::Vec;
 use either::Right;
-use tuifw_screen_base::{Rect, Vector, Error, Fg, Bg};
+use tuifw_screen_base::{Rect, Vector, Error, Fg, Bg, Key};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App, Timer, Data};
 use tuifw_window::Visibility;
 
@@ -22,6 +22,8 @@ widget! {
         update_timer: Option<Timer>,
         templates_changed: bool,
         error: bool,
+        #[property(copy)]
+        tab_navigation: bool,
     }
 }
 
@@ -167,6 +169,7 @@ impl Widget for ItemsPresenterWidget {
             error: false,
             items: Vec::new(),
             templates_changed: false,
+            tab_navigation: false,
         })
     }
 
@@ -231,12 +234,30 @@ impl Widget for ItemsPresenterWidget {
 
     fn update(
         &self,
-        _tree: &mut WindowTree,
-        _window: Window,
-        _event: Event,
-        _event_source: Window,
+        tree: &mut WindowTree,
+        window: Window,
+        event: Event,
+        event_source: Window,
         _app: &mut dyn App,
     ) -> bool {
-        false
+        match event {
+            Event::Key(Key::Tab) => {
+                let data = window.data::<ItemsPresenter>(tree);
+                if data.tab_navigation {
+                    if event_source.is_secondary_focused(tree) {
+                        event_source.next(tree).set_focused_secondary(tree, true);
+                        true
+                    } else if event_source.is_primary_focused(tree) {
+                        event_source.next(tree).set_focused_primary(tree, true);
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            },
+            _ => false,
+        }
     }
 }

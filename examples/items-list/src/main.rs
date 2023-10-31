@@ -64,6 +64,7 @@ use tuifw::{CheckBox, ItemsPresenter, CMD_ITEMS_PRESENTER_BIND};
 
 #[derive(Clone)]
 struct Item {
+    is_first: bool,
     label: String,
 }
 
@@ -91,8 +92,13 @@ impl EventHandler for RootEventHandler {
                 true
             },
             Event::Cmd(CMD_ITEMS_PRESENTER_BIND) => {
-                let label = event_source.source::<Item>(tree).unwrap().label.clone();
+                let item = event_source.source::<Item>(tree).unwrap();
+                let is_first = item.is_first;
+                let label = item.label.clone();
                 CheckBox::set_text(tree, event_source, label);
+                if is_first {
+                    event_source.set_focused_primary(tree, true);
+                }
                 true
             },
             _ => false
@@ -107,8 +113,8 @@ fn start() -> Result<(), Error> {
     let names = ui::build(tree)?;
     names.root.set_event_handler(tree, Some(Box::new(RootEventHandler)));
     ItemsPresenter::items_mut(tree, names.items, |items| {
-        items.push(Box::new(Item { label: "Item ~1~".to_string() }));
-        items.push(Box::new(Item { label: "Item ~2~".to_string() }));
+        items.push(Box::new(Item { is_first: true, label: "Item ~1~".to_string() }));
+        items.push(Box::new(Item { is_first: false, label: "Item ~2~".to_string() }));
     });
     let state = &mut State;
     tree.run(state)
