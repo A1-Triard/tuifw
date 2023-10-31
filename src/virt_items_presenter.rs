@@ -115,14 +115,14 @@ impl VirtItemsPresenter {
                     loop {
                         let item = window.data::<VirtItemsPresenter>(tree).items.get(item_index).cloned();
                         if let Some(item) = item {
-                            if item_window.source(tree).is_some() {
+                            if item_window.source_raw(tree).is_some() {
                                 item_window.raise(tree, Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_UNBIND), app);
                             } else {
                                 item_window.set_visibility(tree, Visibility::Visible);
                             }
                             item_window.set_source(tree, Some(item));
                             item_window.raise(tree, Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_BIND), app);
-                        } else if item_window.source(tree).is_some() {
+                        } else if item_window.source_raw(tree).is_some() {
                             item_window.raise(tree, Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_UNBIND), app);
                             item_window.set_visibility(tree, Visibility::Collapsed);
                         }

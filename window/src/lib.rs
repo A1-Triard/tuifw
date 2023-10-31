@@ -617,9 +617,17 @@ impl Window {
         Ok(window)
     }
 
-    pub fn source<'a>(self, tree: &'a WindowTree) -> &'a Option<Box<dyn Data>> {
+    pub fn source_raw<'a>(self, tree: &'a WindowTree) -> &'a Option<Box<dyn Data>> {
         &tree.arena[self.0].source
     }
+
+    pub fn source<'a, T: Data + 'static>(
+        self,
+        tree: &'a WindowTree<'_>
+    ) -> Option<&'a T> {
+        tree.arena[self.0].source.as_ref().and_then(|x| x.downcast_ref::<T>())
+    }
+
 
     pub fn source_mut<T>(self, tree: &mut WindowTree, f: impl FnOnce(&mut Option<Box<dyn Data>>) -> T) -> T {
         let source = &mut tree.arena[self.0].source;
