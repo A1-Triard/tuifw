@@ -53,6 +53,9 @@ pub use content_presenter::*;
 mod items_presenter;
 pub use items_presenter::*;
 
+mod virt_items_presenter;
+pub use virt_items_presenter::*;
+
 #[doc(hidden)]
 pub use alloc::boxed::Box as alloc_boxed_Box;
 #[doc(hidden)]
