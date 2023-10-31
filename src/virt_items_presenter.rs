@@ -2,6 +2,7 @@ use crate::{widget, StaticText, StackPanel};
 use alloc::boxed::Box;
 use alloc::string::ToString;
 use alloc::vec::Vec;
+use core::cmp::max;
 use either::Right;
 use tuifw_screen_base::{Rect, Vector, Error, Fg, Bg};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App, Timer, Data};
@@ -15,13 +16,14 @@ widget! {
     pub struct VirtItemsPresenter {
         #[property(ref, on_changed=update)]
         items: Vec<Box<dyn Data>>,
-        #[property(copy, on_changed=on_templates_changed)]
+        #[property(copy, measure, on_changed=on_templates_changed)]
         vertical: bool,
         #[property(copy, on_changed=on_templates_changed)]
         item_template: Option<Window>,
         update_timer: Option<Timer>,
         templates_changed: bool,
         error: bool,
+        max_items_count: usize,
     }
 }
 
@@ -84,67 +86,50 @@ impl VirtItemsPresenter {
                 let data = window.data::<VirtItemsPresenter>(tree);
                 if let Some(item_template) = data.item_template {
                     let vertical = data.vertical;
+                    let max_items_count = data.max_items_count;
                     let panel = match StackPanel::new(tree, Some(window), None) {
                         Ok(panel) => panel,
                         Err(error) => return Self::show_error(tree, window, error),
                     };
                     StackPanel::set_vertical(tree, panel, vertical);
-                    let mut item_index = 0;
                     let mut prev = None;
-                    while
-                        let Some(item) = window.data::<VirtItemsPresenter>(tree).items.get(item_index).cloned()
-                    {
+                    for item_index in 0 .. max_items_count {
+                        let item = window.data::<VirtItemsPresenter>(tree).items.get(item_index).cloned();
                         let item_window = match item_template.new_instance(tree, Some(panel), prev) {
                             Ok(item_window) => item_window,
                             Err(error) => return Self::show_error(tree, window, error),
                         };
-                        item_window.set_source(tree, Some(item));
-                        item_window.raise(tree, Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_BIND), app);
-                        item_index += 1;
+                        if let Some(item) = item {
+                            item_window.set_source(tree, Some(item));
+                            item_window.raise(tree, Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_BIND), app);
+                        } else {
+                            item_window.set_visibility(tree, Visibility::Collapsed);
+                        }
                         prev = Some(item_window);
                     }
                 }
             } else if let Some(panel) = Self::panel(tree, window) {
-                let mut last_item_window = None;
-                let mut item_index = 0;
                 if let Some(first_item_window) = panel.first_child(tree) {
+                    let mut item_index = 0;
                     let mut item_window = first_item_window;
-                    let drop_tail = loop {
+                    loop {
                         let item = window.data::<VirtItemsPresenter>(tree).items.get(item_index).cloned();
                         if let Some(item) = item {
-                            item_window.raise(tree, Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_UNBIND), app);
+                            if item_window.source(tree).is_some() {
+                                item_window.raise(tree, Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_UNBIND), app);
+                            } else {
+                                item_window.set_visibility(tree, Visibility::Visible);
+                            }
                             item_window.set_source(tree, Some(item));
                             item_window.raise(tree, Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_BIND), app);
-                            item_index += 1;
-                        } else {
-                            break true;
-                        }
-                        last_item_window = Some(item_window);
-                        item_window = item_window.next(tree);
-                        if item_window == first_item_window { break false; }
-                    };
-                    if drop_tail {
-                        loop {
+                        } else if item_window.source(tree).is_some() {
                             item_window.raise(tree, Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_UNBIND), app);
-                            item_window.set_source(tree, None);
-                            let next = item_window.next(tree);
-                            item_window.drop_window(tree, app);
-                            item_window = next;
-                            if item_window == first_item_window { break; }
+                            item_window.set_visibility(tree, Visibility::Collapsed);
                         }
-                    }
-                }
-                let mut prev = last_item_window;
-                let item_template = window.data::<VirtItemsPresenter>(tree).item_template.unwrap();
-                while let Some(item) = window.data::<VirtItemsPresenter>(tree).items.get(item_index).cloned() {
-                    let item_window = match item_template.new_instance(tree, Some(panel), prev) {
-                        Ok(item_window) => item_window,
-                        Err(error) => return Self::show_error(tree, window, error),
+                        item_index += 1;
+                        item_window = item_window.next(tree);
+                        if item_window == first_item_window { break; }
                     };
-                    item_window.set_source(tree, Some(item));
-                    item_window.raise(tree, Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_BIND), app);
-                    item_index += 1;
-                    prev = Some(item_window);
                 }
             }
         }));
@@ -167,6 +152,7 @@ impl Widget for VirtItemsPresenterWidget {
             error: false,
             items: Vec::new(),
             templates_changed: false,
+            max_items_count: 1,
         })
     }
 
@@ -196,6 +182,7 @@ impl Widget for VirtItemsPresenterWidget {
         available_height: Option<i16>,
         app: &mut dyn App,
     ) -> Vector {
+        let vertical = window.data::<VirtItemsPresenter>(tree).vertical;
         let mut size = Vector::null();
         if let Some(first_child) = window.first_child(tree) {
             let mut child = first_child;
@@ -205,6 +192,11 @@ impl Widget for VirtItemsPresenterWidget {
                 child = child.next(tree);
                 if child == first_child { break; }
             }
+        }
+        if vertical {
+            size.y = available_height.unwrap_or(1);
+        } else {
+            size.x = available_width.unwrap_or(1);
         }
         size
     }
@@ -225,6 +217,20 @@ impl Widget for VirtItemsPresenterWidget {
                 child = child.next(tree);
                 if child == first_child { break; }
             }
+        }
+        let data = window.data_mut::<VirtItemsPresenter>(tree);
+        let vertical = data.vertical;
+        let max_items_count = if vertical {
+            size.y = final_inner_bounds.h();
+            usize::from(size.y as u16)
+        } else {
+            size.x = final_inner_bounds.w();
+            usize::from(size.x as u16)
+        };
+        let max_items_count = max(1, max_items_count);
+        if data.max_items_count != max_items_count {
+            data.max_items_count = max_items_count;
+            VirtItemsPresenter::on_templates_changed(tree, window);
         }
         size
     }
