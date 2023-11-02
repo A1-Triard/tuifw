@@ -1476,11 +1476,11 @@ impl<'clock> WindowTree<'clock> {
         self.screen.as_mut().expect("WindowTree is in invalid state").as_mut()
     }
 
-    fn render_window(&mut self, window: Window, offset: Vector, app: &mut dyn App) {
+    fn render_window(&mut self, window: Window, offset: Vector, bounds: Rect, app: &mut dyn App) {
         if window.visibility(self) != Visibility::Visible {
             return;
         }
-        let bounds = self.arena[window.0].window_bounds.offset(offset);
+        let bounds = self.arena[window.0].window_bounds.offset(offset).intersect(bounds);
         let screen = self.screen();
         if !rect_invalidated(screen, bounds) { return; }
         let offset = bounds.tl.offset_from(Point { x: 0, y: 0 });
@@ -1498,7 +1498,7 @@ impl<'clock> WindowTree<'clock> {
         if let Some(first_child) = self.arena[window.0].first_child {
             let mut child = first_child;
             loop {
-                self.render_window(child, offset, app);
+                self.render_window(child, offset, bounds, app);
                 child = self.arena[child.0].next;
                 if child == first_child { break; }
             }
@@ -1563,7 +1563,7 @@ impl<'clock> WindowTree<'clock> {
             loop {
                 let bounds = self.arena[child.0].window_bounds;
                 let offset = bounds.tl.offset_from(Point { x: 0, y: 0 });
-                self.render_window(child, offset, app);
+                self.render_window(child, offset, bounds, app);
                 child = child.next(self);
                 if child == first_child { break; }
             }
