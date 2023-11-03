@@ -145,6 +145,9 @@ pub struct Registered {
     pub items_presenter_panel_template: XamlProperty,
     pub items_presenter_item_template: XamlProperty,
     pub items_presenter_tab_navigation: XamlProperty,
+
+    pub virt_items_presenter: XamlStruct,
+    pub virt_items_presenter_item_template: XamlProperty,
 }
 
 pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
@@ -286,6 +289,11 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
     );
     let items_presenter_tab_navigation = XamlProperty::new(
         xaml, items_presenter, "TabNavigation", XamlType::Literal(boolean), false, false
+    );
+
+    let virt_items_presenter = XamlStruct::new(xaml, Some(widget), XMLNS, "VirtItemsPresenter");
+    let virt_items_presenter_item_template = XamlProperty::new(
+        xaml, virt_items_presenter, "ItemTemplate", XamlType::Struct(widget), true, false
     );
 
     boolean.set_ctor(xaml, Some(Box::new(|x| match x {
@@ -583,6 +591,14 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
         " }, obj, value)))
     );
 
+    set_widget_ctor(xaml, virt_items_presenter, "tuifw::VirtItemsPresenter", widget_children);
+    virt_items_presenter_item_template.set_setter(
+        xaml,
+        Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+            tuifw::VirtItemsPresenter::set_item_template(tree, {}, Some({}));
+        " }, obj, value)))
+    );
+
     Registered {
         boolean,
         string,
@@ -677,5 +693,8 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
         items_presenter_panel_template,
         items_presenter_item_template,
         items_presenter_tab_navigation,
+
+        virt_items_presenter,
+        virt_items_presenter_item_template,
     }
 }

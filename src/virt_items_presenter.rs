@@ -262,8 +262,9 @@ impl Widget for VirtItemsPresenterWidget {
                 if child == first_child { break; }
             }
         }
-        let item_size =
-            window.first_child(tree).map_or(Vector { x: 1, y: 1 }, |child| child.render_bounds(tree).size)
+        let item_size = VirtItemsPresenter::panel(tree, window)
+            .and_then(|x| x.first_child(tree))
+            .map_or(Vector { x: 1, y: 1 }, |item| item.render_bounds(tree).size)
         ;
         let data = window.data::<VirtItemsPresenter>(tree);
         let vertical = data.vertical;

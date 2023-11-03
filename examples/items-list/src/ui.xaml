@@ -1,10 +1,7 @@
 <Background xmlns='https://a1-triard.github.io/tuifw/2023/xaml' Name="root">
   <Frame HAlign="Center" VAlign="Center" Height="6">
-    <ItemsPresenter Name="items" TabNavigation="True">
-      <ItemsPresenter.PanelTemplate>
-        <StackPanel />
-      </ItemsPresenter.PanelTemplate>
+    <VirtItemsPresenter Name="items">
       <CheckBox />
-    </ItemsPresenter>
+    </VirtItemsPresenter>
   </Frame>
 </Background>

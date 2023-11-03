@@ -60,7 +60,7 @@ use alloc::string::{String, ToString};
 use timer_no_std::MonoClock;
 use tuifw_screen::{Error, Key};
 use tuifw_window::{Data, Event, EventHandler, Window, WindowTree, App};
-use tuifw::{CheckBox, ItemsPresenter, CMD_ITEMS_PRESENTER_BIND};
+use tuifw::{CheckBox, VirtItemsPresenter, CMD_VIRT_ITEMS_PRESENTER_BIND};
 
 #[derive(Clone)]
 struct Item {
@@ -91,7 +91,7 @@ impl EventHandler for RootEventHandler {
                 tree.quit();
                 true
             },
-            Event::Cmd(CMD_ITEMS_PRESENTER_BIND) => {
+            Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_BIND) => {
                 let item = event_source.source::<Item>(tree).unwrap();
                 let is_first = item.is_first;
                 let label = item.label.clone();
@@ -112,7 +112,7 @@ fn start() -> Result<(), Error> {
     let tree = &mut WindowTree::new(screen, &clock)?;
     let names = ui::build(tree)?;
     names.root.set_event_handler(tree, Some(Box::new(RootEventHandler)));
-    ItemsPresenter::items_mut(tree, names.items, |items| {
+    VirtItemsPresenter::items_mut(tree, names.items, |items| {
         items.push(Box::new(Item { is_first: true, label: "Item ~1~".to_string() }));
         items.push(Box::new(Item { is_first: false, label: "Item ~2~".to_string() }));
         items.push(Box::new(Item { is_first: false, label: "Item ~3~".to_string() }));
