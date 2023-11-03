@@ -115,6 +115,19 @@ fn start() -> Result<(), Error> {
     ItemsPresenter::items_mut(tree, names.items, |items| {
         items.push(Box::new(Item { is_first: true, label: "Item ~1~".to_string() }));
         items.push(Box::new(Item { is_first: false, label: "Item ~2~".to_string() }));
+        items.push(Box::new(Item { is_first: false, label: "Item ~3~".to_string() }));
+        items.push(Box::new(Item { is_first: false, label: "Item ~4~".to_string() }));
+        items.push(Box::new(Item { is_first: false, label: "Item ~5~".to_string() }));
+        items.push(Box::new(Item { is_first: false, label: "Item ~6~".to_string() }));
+        items.push(Box::new(Item { is_first: false, label: "Item ~7~".to_string() }));
+        items.push(Box::new(Item { is_first: false, label: "Item ~8~".to_string() }));
+        items.push(Box::new(Item { is_first: false, label: "Item ~9~".to_string() }));
+        items.push(Box::new(Item { is_first: false, label: "Item 1~0~".to_string() }));
+        items.push(Box::new(Item { is_first: false, label: "Item 11".to_string() }));
+        items.push(Box::new(Item { is_first: false, label: "Item 12".to_string() }));
+        items.push(Box::new(Item { is_first: false, label: "Item 13".to_string() }));
+        items.push(Box::new(Item { is_first: false, label: "Item 14".to_string() }));
+        items.push(Box::new(Item { is_first: false, label: "Item 15".to_string() }));
     });
     let state = &mut State;
     tree.run(state)

@@ -2,9 +2,10 @@ use crate::{widget, StaticText, StackPanel};
 use alloc::boxed::Box;
 use alloc::string::ToString;
 use alloc::vec::Vec;
-use core::cmp::max;
-use either::Right;
-use tuifw_screen_base::{Rect, Vector, Error, Fg, Bg};
+use core::cmp::min;
+use core::mem::size_of;
+use either::{Left, Right};
+use tuifw_screen_base::{Rect, Vector, Error, Fg, Bg, Thickness};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App, Timer, Data};
 use tuifw_window::Visibility;
 
@@ -20,10 +21,13 @@ widget! {
         vertical: bool,
         #[property(copy, on_changed=on_templates_changed)]
         item_template: Option<Window>,
+        #[property(copy, on_changed=update)]
+        offset: i16,
+        viewport: i16,
+        item_size: i16,
         update_timer: Option<Timer>,
         templates_changed: bool,
         error: bool,
-        max_items_count: usize,
     }
 }
 
@@ -69,6 +73,27 @@ impl VirtItemsPresenter {
             let data = window.data_mut::<VirtItemsPresenter>(tree);
             data.update_timer = None;
             if data.error { return; }
+            let skip_items = data.offset as u16 / data.item_size as u16;
+            let panel_margin = data.offset as u16 - skip_items * data.item_size as u16;
+            let take_items =
+                (data.viewport as u16 as u32 + panel_margin as u32).div_ceil(data.item_size as u16 as u32)
+            ;
+            let panel_margin = Thickness::new(0, -i32::from(panel_margin), 0, 0);
+            let items_range =
+                min(data.items.len(), usize::from(skip_items))
+                ..
+                min(
+                    data.items.len(),
+                    if size_of::<usize>() >= size_of::<u32>() {
+                        usize::try_from(take_items + u32::from(skip_items)).unwrap()
+                    } else {
+                        usize::try_from(min(
+                            u32::try_from(usize::MAX).unwrap(),
+                            take_items + u32::from(skip_items)
+                        )).unwrap()
+                    }
+                )
+            ;
             if data.templates_changed {
                 data.templates_changed = false;
                 if let Some(panel) = Self::panel(tree, window) {
@@ -86,50 +111,67 @@ impl VirtItemsPresenter {
                 let data = window.data::<VirtItemsPresenter>(tree);
                 if let Some(item_template) = data.item_template {
                     let vertical = data.vertical;
-                    let max_items_count = data.max_items_count;
                     let panel = match StackPanel::new(tree, Some(window), None) {
                         Ok(panel) => panel,
                         Err(error) => return Self::show_error(tree, window, error),
                     };
                     StackPanel::set_vertical(tree, panel, vertical);
+                    panel.set_margin(tree, panel_margin);
                     let mut prev = None;
-                    for item_index in 0 .. max_items_count {
-                        let item = window.data::<VirtItemsPresenter>(tree).items.get(item_index).cloned();
+                    for item_index in items_range {
+                        let item = window.data::<VirtItemsPresenter>(tree).items[item_index].clone();
                         let item_window = match item_template.new_instance(tree, Some(panel), prev) {
                             Ok(item_window) => item_window,
                             Err(error) => return Self::show_error(tree, window, error),
                         };
-                        if let Some(item) = item {
-                            item_window.set_source(tree, Some(item));
-                            item_window.raise(tree, Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_BIND), app);
-                        } else {
-                            item_window.set_visibility(tree, Visibility::Collapsed);
-                        }
+                        item_window.set_source(tree, Some(item));
+                        item_window.raise(tree, Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_BIND), app);
                         prev = Some(item_window);
                     }
                 }
             } else if let Some(panel) = Self::panel(tree, window) {
-                if let Some(first_item_window) = panel.first_child(tree) {
-                    let mut item_index = 0;
+                panel.set_margin(tree, panel_margin);
+                let new_tail_or_drop_tail = if let Some(first_item_window) = panel.first_child(tree) {
                     let mut item_window = first_item_window;
+                    let mut item_index = items_range.start;
                     loop {
-                        let item = window.data::<VirtItemsPresenter>(tree).items.get(item_index).cloned();
-                        if let Some(item) = item {
-                            if item_window.source_raw(tree).is_some() {
-                                item_window.raise(tree, Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_UNBIND), app);
-                            } else {
-                                item_window.set_visibility(tree, Visibility::Visible);
-                            }
+                        if item_index == items_range.end { break Left((item_window, first_item_window)); }
+                        let item = window.data::<VirtItemsPresenter>(tree).items[item_index].clone();
+                        item_window.raise(tree, Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_UNBIND), app);
+                        item_window.set_source(tree, Some(item));
+                        item_window.raise(tree, Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_BIND), app);
+                        item_index += 1;
+                        let prev = item_window;
+                        item_window = item_window.next(tree);
+                        if item_window == first_item_window { break Right((Some(prev), item_index)); }
+                    }
+                } else {
+                    Right((None, items_range.start))
+                };
+                match new_tail_or_drop_tail {
+                    Right((mut prev, mut item_index)) => {
+                        let item_template = window.data::<VirtItemsPresenter>(tree).item_template.unwrap();
+                        loop {
+                            if item_index == items_range.end { break; }
+                            let item = window.data::<VirtItemsPresenter>(tree).items[item_index].clone();
+                            let item_window = match item_template.new_instance(tree, Some(panel), prev) {
+                                Ok(item_window) => item_window,
+                                Err(error) => return Self::show_error(tree, window, error),
+                            };
                             item_window.set_source(tree, Some(item));
                             item_window.raise(tree, Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_BIND), app);
-                        } else if item_window.source_raw(tree).is_some() {
-                            item_window.raise(tree, Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_UNBIND), app);
-                            item_window.set_visibility(tree, Visibility::Collapsed);
+                            prev = Some(item_window);
+                            item_index += 1;
                         }
-                        item_index += 1;
-                        item_window = item_window.next(tree);
-                        if item_window == first_item_window { break; }
-                    };
+                    },
+                    Left((mut item_window, first_item_window)) => {
+                        loop {
+                            item_window.raise(tree, Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_UNBIND), app);
+                            item_window.set_source(tree, None);
+                            item_window = item_window.next(tree);
+                            if item_window == first_item_window { break; }
+                        }
+                    }
                 }
             }
         }));
@@ -152,7 +194,9 @@ impl Widget for VirtItemsPresenterWidget {
             error: false,
             items: Vec::new(),
             templates_changed: false,
-            max_items_count: 1,
+            offset: 0,
+            viewport: 0,
+            item_size: 1,
         })
     }
 
@@ -218,19 +262,35 @@ impl Widget for VirtItemsPresenterWidget {
                 if child == first_child { break; }
             }
         }
-        let data = window.data_mut::<VirtItemsPresenter>(tree);
+        let item_size =
+            window.first_child(tree).map_or(Vector { x: 1, y: 1 }, |child| child.render_bounds(tree).size)
+        ;
+        let data = window.data::<VirtItemsPresenter>(tree);
         let vertical = data.vertical;
-        let max_items_count = if vertical {
+        if vertical {
             size.y = final_inner_bounds.h();
-            usize::from(size.y as u16)
+            let data = window.data_mut::<VirtItemsPresenter>(tree);
+            if data.viewport != size.y {
+                data.viewport = size.y;
+                VirtItemsPresenter::update(tree, window);
+            }
+            let data = window.data_mut::<VirtItemsPresenter>(tree);
+            if data.item_size != item_size.y {
+                data.item_size = item_size.y;
+                VirtItemsPresenter::update(tree, window);
+            }
         } else {
             size.x = final_inner_bounds.w();
-            usize::from(size.x as u16)
-        };
-        let max_items_count = max(1, max_items_count);
-        if data.max_items_count != max_items_count {
-            data.max_items_count = max_items_count;
-            VirtItemsPresenter::on_templates_changed(tree, window);
+            let data = window.data_mut::<VirtItemsPresenter>(tree);
+            if data.viewport != size.x {
+                data.viewport = size.x;
+                VirtItemsPresenter::update(tree, window);
+            }
+            let data = window.data_mut::<VirtItemsPresenter>(tree);
+            if data.item_size != item_size.x {
+                data.item_size = item_size.x;
+                VirtItemsPresenter::update(tree, window);
+            }
         }
         size
     }
