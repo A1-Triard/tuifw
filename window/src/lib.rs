@@ -109,21 +109,21 @@ fn rect_invalidated(screen: &dyn Screen, rect: Rect) -> bool {
 pub struct RenderPort {
     screen: Box<dyn Screen>,
     offset: Vector,
-    size: Vector,
+    bounds: Rect,
     cursor: Option<Point>,
 }
 
 impl RenderPort {
     pub fn text(&mut self, p: Point, color: (Fg, Bg), text: &str) {
         let screen_size = self.screen.size();
-        if p.y as u16 >= self.size.y as u16 || self.size.x == 0 { return; }
         let p = p.offset(self.offset);
-        if p.y < 0 || p.y >= self.screen.size().y { return; }
+        if !self.bounds.v_range().contains(p.y) || self.bounds.size.x == 0 { return; }
+        if p.y < 0 || p.y >= screen_size.y { return; }
         let row = self.screen.line_invalidated_range(p.y).clone();
         if p.x >= row.end { return; }
 
-        let window_start = Point { x: 0, y: 0 }.offset(self.offset).x;
-        let window_end = Point { x: 0, y: 0 }.offset(self.size + self.offset).x;
+        let window_start = self.bounds.l();
+        let window_end = self.bounds.r();
         let chunks = if window_start <= window_end {
             if window_end <= 0 || window_start >= screen_size.x { return; }
             [max(0, window_start) .. min(screen_size.x, window_end), 0 .. 0]
@@ -1476,20 +1476,21 @@ impl<'clock> WindowTree<'clock> {
         self.screen.as_mut().expect("WindowTree is in invalid state").as_mut()
     }
 
-    fn render_window(&mut self, window: Window, offset: Vector, bounds: Rect, app: &mut dyn App) {
+    fn render_window(&mut self, window: Window, offset: Vector, clip_bounds: Rect, app: &mut dyn App) {
         if window.visibility(self) != Visibility::Visible {
             return;
         }
-        let bounds = self.arena[window.0].window_bounds.offset(offset).intersect(bounds);
+        let bounds = self.arena[window.0].window_bounds.offset(offset);
+        let clipped_bounds = bounds.intersect(clip_bounds);
         let screen = self.screen();
-        if !rect_invalidated(screen, bounds) { return; }
+        if !rect_invalidated(screen, clipped_bounds) { return; }
         let offset = bounds.tl.offset_from(Point { x: 0, y: 0 });
         let screen = self.screen.take().expect("WindowTree is in invalid state");
         let mut port = RenderPort {
             screen,
             cursor: self.cursor,
             offset,
-            size: bounds.size,
+            bounds: clipped_bounds,
         };
         let widget = self.arena[window.0].widget.clone();
         widget.render(self, window, &mut port, app);
@@ -1498,7 +1499,7 @@ impl<'clock> WindowTree<'clock> {
         if let Some(first_child) = self.arena[window.0].first_child {
             let mut child = first_child;
             loop {
-                self.render_window(child, offset, bounds, app);
+                self.render_window(child, offset, clipped_bounds, app);
                 child = self.arena[child.0].next;
                 if child == first_child { break; }
             }

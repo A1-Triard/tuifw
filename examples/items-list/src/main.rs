@@ -129,6 +129,7 @@ fn start() -> Result<(), Error> {
         items.push(Box::new(Item { is_first: false, label: "Item 14".to_string() }));
         items.push(Box::new(Item { is_first: false, label: "Item 15".to_string() }));
     });
+    VirtItemsPresenter::set_offset(tree, names.items, 1);
     let state = &mut State;
     tree.run(state)
 }

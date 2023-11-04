@@ -241,6 +241,31 @@ macro_rules! widget_impl {
     };
     (
         @property
+        #[property(window, arrange $(, on_changed=$on_changed:ident)?)]
+        $vis:vis $name:ident : $ty:ty
+    ) => {
+        $crate::paste_paste! {
+            $vis fn $name(
+                tree: &$crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window
+            ) -> $ty {
+                window.data::<Self>(tree).$name
+            }
+
+            $vis fn [< set_ $name >] (
+                tree: &mut $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window,
+                value: $ty
+            ) {
+                let data = window.data_mut::<Self>(tree);
+                data.$name = value;
+                window.invalidate_arrange(tree);
+                $(Self::$on_changed(tree, window);)?
+            }
+        }
+    };
+    (
+        @property
         #[property(window, render $(, on_changed=$on_changed:ident)?)]
         $vis:vis $name:ident : $ty:ty
     ) => {
@@ -315,6 +340,31 @@ macro_rules! widget_impl {
     };
     (
         @property
+        #[property(copy, arrange $(, on_changed=$on_changed:ident)?)]
+        $vis:vis $name:ident : $ty:ty
+    ) => {
+        $crate::paste_paste! {
+            $vis fn $name(
+                tree: &$crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window
+            ) -> $ty {
+                window.data::<Self>(tree).$name
+            }
+
+            $vis fn [< set_ $name >] (
+                tree: &mut $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window,
+                value: $ty
+            ) {
+                let data = window.data_mut::<Self>(tree);
+                data.$name = value;
+                window.invalidate_arrange(tree);
+                $(Self::$on_changed(tree, window);)?
+            }
+        }
+    };
+    (
+        @property
         #[property(copy, render $(, on_changed=$on_changed:ident)?)]
         $vis:vis $name:ident : $ty:ty
     ) => {
@@ -383,6 +433,44 @@ macro_rules! widget_impl {
                 let value = &mut window.data_mut::<Self>(tree).$name;
                 let res = f(value);
                 window.invalidate_measure(tree);
+                $(Self::$on_changed(tree, window);)?
+                res
+            }
+
+            $vis fn [< set_ $name >] <'a>(
+                tree: &mut $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window,
+                value: impl Into<$crate::alloc_borrow_Cow<'a, <$ty as $crate::core_ops_Deref>::Target>>
+            ) {
+                Self:: [< $name _mut >] (
+                    tree,
+                    window,
+                    |x| $crate::core_mem_replace(x, value.into().into_owned())
+                );
+            }
+        }
+    };
+    (
+        @property
+        #[property(str, arrange $(, on_changed=$on_changed:ident)?)]
+        $vis:vis $name:ident : $ty:ty
+    ) => {
+        $crate::paste_paste! {
+            $vis fn $name<'a>(
+                tree: &'a $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window
+            ) -> &'a $ty {
+                &window.data::<Self>(tree).$name
+            }
+
+            $vis fn [< $name _mut >] <T>(
+                tree: &mut $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window,
+                f: impl FnOnce(&mut $ty) -> T
+            ) -> T {
+                let value = &mut window.data_mut::<Self>(tree).$name;
+                let res = f(value);
+                window.invalidate_arrange(tree);
                 $(Self::$on_changed(tree, window);)?
                 res
             }
@@ -496,6 +584,44 @@ macro_rules! widget_impl {
                 let value = &mut window.data_mut::<Self>(tree).$name;
                 let res = f(value);
                 window.invalidate_measure(tree);
+                $(Self::$on_changed(tree, window);)?
+                res
+            }
+
+            $vis fn [< set_ $name >] (
+                tree: &mut $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window,
+                value: $ty
+            ) {
+                Self:: [< $name _mut >] (
+                    tree,
+                    window,
+                    |x| $crate::core_mem_replace(x, value)
+                );
+            }
+        }
+    };
+    (
+        @property
+        #[property(ref, arrange $(, on_changed=$on_changed:ident)?)]
+        $vis:vis $name:ident : $ty:ty
+    ) => {
+        $crate::paste_paste! {
+            $vis fn $name<'a>(
+                tree: &'a $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window
+            ) -> &'a $ty {
+                &window.data::<Self>(tree).$name
+            }
+
+            $vis fn [< $name _mut >] <T>(
+                tree: &mut $crate::tuifw_window_WindowTree,
+                window: $crate::tuifw_window_Window,
+                f: impl FnOnce(&mut $ty) -> T
+            ) -> T {
+                let value = &mut window.data_mut::<Self>(tree).$name;
+                let res = f(value);
+                window.invalidate_arrange(tree);
                 $(Self::$on_changed(tree, window);)?
                 res
             }

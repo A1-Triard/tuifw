@@ -15,7 +15,7 @@ pub const CMD_VIRT_ITEMS_PRESENTER_UNBIND: u16 = 151;
 widget! {
     #[widget(VirtItemsPresenterWidget, init=init)]
     pub struct VirtItemsPresenter {
-        #[property(ref, on_changed=update)]
+        #[property(ref, arrange, on_changed=update)]
         items: Vec<Box<dyn Data>>,
         #[property(copy, measure, on_changed=on_templates_changed)]
         vertical: bool,
@@ -73,10 +73,11 @@ impl VirtItemsPresenter {
             let data = window.data_mut::<VirtItemsPresenter>(tree);
             data.update_timer = None;
             if data.error { return; }
-            let skip_items = data.offset as u16 / data.item_size as u16;
+            let skip_items = (data.offset as u16 / data.item_size as u16).saturating_sub(1);
             let panel_margin = data.offset as u16 - skip_items * data.item_size as u16;
             let take_items =
                 (data.viewport as u16 as u32 + panel_margin as u32).div_ceil(data.item_size as u16 as u32)
+                + 1
             ;
             let panel_margin = Thickness::new(0, -i32::from(panel_margin), 0, 0);
             let items_range =
