@@ -632,14 +632,19 @@ impl Window {
         tree.arena[self.0].source.as_ref().and_then(|x| x.downcast_ref::<T>())
     }
 
+    pub fn source_mut_raw<'a>(self, tree: &'a mut WindowTree) -> &'a mut Option<Box<dyn Data>> {
+        &mut tree.arena[self.0].source
+    }
 
-    pub fn source_mut<T>(self, tree: &mut WindowTree, f: impl FnOnce(&mut Option<Box<dyn Data>>) -> T) -> T {
-        let source = &mut tree.arena[self.0].source;
-        f(source)
+    pub fn source_mut<'a, T: Data + 'static>(
+        self,
+        tree: &'a mut WindowTree<'_>
+    ) -> Option<&'a mut T> {
+        tree.arena[self.0].source.as_mut().and_then(|x| x.downcast_mut::<T>())
     }
 
     pub fn set_source(self, tree: &mut WindowTree, value: Option<Box<dyn Data>>) {
-        self.source_mut(tree, |source| replace(source, value));
+        *self.source_mut_raw(tree) = value;
     }
 
     pub fn invalidate_measure(self, tree: &mut WindowTree) {
