@@ -319,6 +319,10 @@ pub trait Widget: DynClone {
     fn pre_process(&self) -> bool { false }
 
     fn post_process(&self) -> bool { false }
+
+    fn bring_into_view(&self, _tree: &mut WindowTree, _window: Window, _rect: Rect) -> bool {
+        false
+    }
 }
 
 clone_trait_object!(Widget);
@@ -1308,6 +1312,34 @@ impl Window {
         let parent = tree.arena[self.0].parent;
         let screen_bounds = bounds.offset(offset_from_root(parent, tree));
         invalidate_rect(tree.screen(), screen_bounds);
+    }
+
+    pub fn bring_into_view(self, tree: &mut WindowTree) {
+        let node = &tree.arena[self.0];
+        if let Some(mut window) = node.parent {
+            let mut rect = node.window_bounds;
+            loop {
+                let node = &tree.arena[window.0];
+                let widget = node.widget.clone();
+                let parent = node.parent;
+                if widget.bring_into_view(tree, window, rect) {
+                    if let Some(parent) = parent {
+                        rect = tree.arena[window.0].window_bounds;
+                        window = parent;
+                    } else {
+                        break;
+                    }
+                } else {
+                    if let Some(parent) = parent {
+                        let offset = tree.arena[window.0].window_bounds.tl.offset_from(Point { x: 0, y: 0 });
+                        rect = rect.offset(offset);
+                        window = parent;
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
     }
 }
 
