@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 use core::cmp::min;
 use core::mem::size_of;
 use either::{Left, Right};
-use tuifw_screen_base::{Rect, Vector, Error, Fg, Bg, Thickness};
+use tuifw_screen_base::{Rect, Vector, Error, Fg, Bg, Thickness, Key};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App, Timer, Data};
 use tuifw_window::Visibility;
 
@@ -28,6 +28,8 @@ widget! {
         update_timer: Option<Timer>,
         templates_changed: bool,
         error: bool,
+        #[property(copy)]
+        tab_navigation: bool,
     }
 }
 
@@ -198,6 +200,7 @@ impl Widget for VirtItemsPresenterWidget {
             offset: 0,
             viewport: 0,
             item_size: 1,
+            tab_navigation: false,
         })
     }
 
@@ -297,14 +300,65 @@ impl Widget for VirtItemsPresenterWidget {
         size
     }
 
+    fn bring_into_view(
+        &self,
+        tree: &mut WindowTree,
+        window: Window,
+        rect: Rect,
+    ) -> bool {
+        let bounds = window.inner_bounds(tree);
+        let data = window.data_mut::<VirtItemsPresenter>(tree);
+        let offset = data.offset;
+        if data.vertical {
+            if rect.v_range().intersect(bounds.v_range()).is_empty() {
+                let from_top = rect.t().wrapping_sub(bounds.t()).checked_abs().map_or(i16::MIN, |x| -x);
+                let from_bottom = rect.b().wrapping_sub(bounds.b()).checked_abs().map_or(i16::MIN, |x| -x);
+                if from_top >= from_bottom {
+                    VirtItemsPresenter::set_offset(tree, window, offset.wrapping_add(from_top));
+                } else {
+                    VirtItemsPresenter::set_offset(tree, window, offset.wrapping_sub(from_bottom));
+                }
+            }
+        } else {
+            if rect.h_range().intersect(bounds.h_range()).is_empty() {
+                let from_left = rect.l().wrapping_sub(bounds.l()).checked_abs().map_or(i16::MIN, |x| -x);
+                let from_right = rect.r().wrapping_sub(bounds.r()).checked_abs().map_or(i16::MIN, |x| -x);
+                if from_left >= from_right {
+                    VirtItemsPresenter::set_offset(tree, window, offset.wrapping_add(from_left));
+                } else {
+                    VirtItemsPresenter::set_offset(tree, window, offset.wrapping_sub(from_right));
+                }
+            }
+        }
+        true
+    }
+
     fn update(
         &self,
-        _tree: &mut WindowTree,
-        _window: Window,
-        _event: Event,
-        _event_source: Window,
+        tree: &mut WindowTree,
+        window: Window,
+        event: Event,
+        event_source: Window,
         _app: &mut dyn App,
     ) -> bool {
-        false
+        match event {
+            Event::Key(Key::Tab) => {
+                let data = window.data::<VirtItemsPresenter>(tree);
+                if data.tab_navigation {
+                    if event_source.is_secondary_focused(tree) {
+                        event_source.next(tree).set_focused_secondary(tree, true);
+                        true
+                    } else if event_source.is_primary_focused(tree) {
+                        event_source.next(tree).set_focused_primary(tree, true);
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            },
+            _ => false,
+        }
     }
 }

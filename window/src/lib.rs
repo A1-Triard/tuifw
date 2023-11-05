@@ -1714,6 +1714,7 @@ impl<'clock> WindowTree<'clock> {
         }
 
         old_focused.map(|x| x.raise(self, Event::Cmd(CMD_LOST_PRIMARY_FOCUS), app));
+        window.map(|x| x.bring_into_view(self));
         true
     }
 
@@ -1729,6 +1730,7 @@ impl<'clock> WindowTree<'clock> {
         window.map(|x| x.raise(self, Event::Cmd(CMD_GOT_SECONDARY_FOCUS), app));
         self.secondary_focused = window;
         old_focused.map(|x| x.raise(self, Event::Cmd(CMD_LOST_SECONDARY_FOCUS), app));
+        window.map(|x| x.bring_into_view(self));
         true
     }
 }
