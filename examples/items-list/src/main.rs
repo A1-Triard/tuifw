@@ -82,21 +82,38 @@ impl EventHandler for RootEventHandler {
         tree: &mut WindowTree,
         _window: Window,
         event: Event,
+        _event_source: Window,
+        _state: &mut dyn App,
+    ) -> bool {
+        if event == Event::Key(Key::Escape) {
+            tree.quit();
+            true
+        } else {
+            false
+        }
+    }
+}
+
+#[derive(Clone)]
+struct ItemsEventHandler;
+
+impl EventHandler for ItemsEventHandler {
+    fn invoke(
+        &self,
+        tree: &mut WindowTree,
+        window: Window,
+        event: Event,
         event_source: Window,
         _state: &mut dyn App,
     ) -> bool {
-        match event {
-            Event::Key(Key::Escape) => {
-                tree.quit();
-                true
-            },
-            Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_BIND) => {
-                let item = event_source.source::<Item>(tree).unwrap();
-                let label = item.label.clone();
-                CheckBox::set_text(tree, event_source, label);
-                true
-            },
-            _ => false
+        if event == Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_BIND) {
+            let item_index = event_source.source_index(tree).unwrap();
+            let item = VirtItemsPresenter::items(tree, window)[item_index].downcast_ref::<Item>().unwrap();
+            let label = item.label.clone();
+            CheckBox::set_text(tree, event_source, label);
+            true
+        } else {
+            false
         }
     }
 }
@@ -107,6 +124,7 @@ fn start() -> Result<(), Error> {
     let tree = &mut WindowTree::new(screen, &clock)?;
     let names = ui::build(tree)?;
     names.root.set_event_handler(tree, Some(Box::new(RootEventHandler)));
+    names.items.set_event_handler(tree, Some(Box::new(ItemsEventHandler)));
     VirtItemsPresenter::items_mut(tree, names.items, |items| {
         items.push(Box::new(Item { label: "Item ~1~".to_string() }));
         items.push(Box::new(Item { label: "Item ~2~".to_string() }));

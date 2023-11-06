@@ -76,7 +76,7 @@ impl ItemsPresenter {
                         let mut item_window = first_item_window;
                         loop {
                             item_window.raise(tree, Event::Cmd(CMD_ITEMS_PRESENTER_UNBIND), app);
-                            item_window.set_source(tree, None);
+                            item_window.set_source_index(tree, None);
                             item_window = item_window.next(tree);
                             if item_window == first_item_window { break; }
                         }
@@ -90,18 +90,14 @@ impl ItemsPresenter {
                             Ok(panel) => panel,
                             Err(error) => return Self::show_error(tree, window, error),
                         };
-                        let mut item_index = 0;
                         let mut prev = None;
-                        while
-                            let Some(item) = window.data::<ItemsPresenter>(tree).items.get(item_index).cloned()
-                        {
+                        for item_index in 0 .. window.data::<ItemsPresenter>(tree).items.len() {
                             let item_window = match item_template.new_instance(tree, Some(panel), prev) {
                                 Ok(item_window) => item_window,
                                 Err(error) => return Self::show_error(tree, window, error),
                             };
-                            item_window.set_source(tree, Some(item));
+                            item_window.set_source_index(tree, Some(item_index));
                             item_window.raise(tree, Event::Cmd(CMD_ITEMS_PRESENTER_BIND), app);
-                            item_index += 1;
                             prev = Some(item_window);
                         }
                     }
@@ -112,10 +108,9 @@ impl ItemsPresenter {
                 if let Some(first_item_window) = panel.first_child(tree) {
                     let mut item_window = first_item_window;
                     let drop_tail = loop {
-                        let item = window.data::<ItemsPresenter>(tree).items.get(item_index).cloned();
-                        if let Some(item) = item {
+                        if item_index != window.data::<ItemsPresenter>(tree).items.len() {
                             item_window.raise(tree, Event::Cmd(CMD_ITEMS_PRESENTER_UNBIND), app);
-                            item_window.set_source(tree, Some(item));
+                            item_window.set_source_index(tree, Some(item_index));
                             item_window.raise(tree, Event::Cmd(CMD_ITEMS_PRESENTER_BIND), app);
                             item_index += 1;
                         } else {
@@ -128,7 +123,7 @@ impl ItemsPresenter {
                     if drop_tail {
                         loop {
                             item_window.raise(tree, Event::Cmd(CMD_ITEMS_PRESENTER_UNBIND), app);
-                            item_window.set_source(tree, None);
+                            item_window.set_source_index(tree, None);
                             let next = item_window.next(tree);
                             item_window.drop_window(tree, app);
                             item_window = next;
@@ -138,12 +133,12 @@ impl ItemsPresenter {
                 }
                 let mut prev = last_item_window;
                 let item_template = window.data::<ItemsPresenter>(tree).item_template.unwrap();
-                while let Some(item) = window.data::<ItemsPresenter>(tree).items.get(item_index).cloned() {
+                while item_index != window.data::<ItemsPresenter>(tree).items.len() {
                     let item_window = match item_template.new_instance(tree, Some(panel), prev) {
                         Ok(item_window) => item_window,
                         Err(error) => return Self::show_error(tree, window, error),
                     };
-                    item_window.set_source(tree, Some(item));
+                    item_window.set_source_index(tree, Some(item_index));
                     item_window.raise(tree, Event::Cmd(CMD_ITEMS_PRESENTER_BIND), app);
                     item_index += 1;
                     prev = Some(item_window);

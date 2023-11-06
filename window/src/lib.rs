@@ -386,7 +386,7 @@ macro_attr! {
     #[derive(Component!)]
     struct WindowNode {
         is_template: bool,
-        source: Option<Box<dyn Data>>,
+        source_index: Option<usize>,
         parent: Option<Window>,
         prev: Window,
         next: Window,
@@ -570,7 +570,7 @@ impl Window {
         let window = tree.arena.insert(move |window| {
             (WindowNode {
                 is_template,
-                source: None,
+                source_index: None,
                 parent,
                 prev: Window(window),
                 next: Window(window),
@@ -621,19 +621,12 @@ impl Window {
         Ok(window)
     }
 
-    pub fn source_raw<'a>(self, tree: &'a WindowTree) -> &'a Option<Box<dyn Data>> {
-        &tree.arena[self.0].source
+    pub fn source_index(self, tree: &WindowTree) -> Option<usize> {
+        tree.arena[self.0].source_index
     }
 
-    pub fn source<'a, T: Data + 'static>(
-        self,
-        tree: &'a WindowTree<'_>
-    ) -> Option<&'a T> {
-        tree.arena[self.0].source.as_ref().and_then(|x| x.downcast_ref::<T>())
-    }
-
-    pub fn set_source(self, tree: &mut WindowTree, value: Option<Box<dyn Data>>) {
-        tree.arena[self.0].source = value;
+    pub fn set_source_index(self, tree: &mut WindowTree, value: Option<usize>) {
+        tree.arena[self.0].source_index = value;
     }
 
     pub fn invalidate_measure(self, tree: &mut WindowTree) {

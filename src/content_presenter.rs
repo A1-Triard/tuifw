@@ -59,16 +59,14 @@ impl ContentPresenter {
             if data.error { return; }
             if let Some(content_window) = Self::content_window(tree, window) {
                 content_window.raise(tree, Event::Cmd(CMD_CONTENT_PRESENTER_UNBIND), app);
-                content_window.set_source(tree, None);
                 content_window.drop_window(tree, app);
             }
-            if let Some(content) = ContentPresenter::content(tree, window).clone() {
+            if ContentPresenter::content(tree, window).is_some() {
                 if let Some(content_template) = ContentPresenter::content_template(tree, window) {
                     let content_window = match content_template.new_instance(tree, Some(window), None) {
                         Ok(content_window) => content_window,
                         Err(error) => return Self::show_error(tree, window, error),
                     };
-                    content_window.set_source(tree, Some(content));
                     content_window.raise(tree, Event::Cmd(CMD_CONTENT_PRESENTER_BIND), app);
                 }
             }
