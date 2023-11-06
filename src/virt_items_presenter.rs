@@ -3,7 +3,7 @@ use alloc::boxed::Box;
 use alloc::string::ToString;
 use alloc::vec::Vec;
 use core::cmp::min;
-use core::mem::size_of;
+use core::mem::{replace, size_of};
 use either::{Left, Right};
 use tuifw_screen_base::{Rect, Vector, Error, Fg, Bg, Thickness, Key};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App, Timer, Data};
@@ -30,6 +30,7 @@ widget! {
         error: bool,
         #[property(copy)]
         tab_navigation: bool,
+        item_focused_primary: bool,
     }
 }
 
@@ -41,6 +42,12 @@ impl VirtItemsPresenter {
             palette.set(0, Right((Fg::BrightRed, Bg::Blue)));
         });
         Ok(())
+    }
+
+    pub fn set_item_focused_primary(tree: &mut WindowTree, window: Window, value: bool) {
+        let data = window.data_mut::<VirtItemsPresenter>(tree);
+        data.item_focused_primary = value;
+        Self::on_templates_changed(tree, window);
     }
 
     fn error_text(tree: &WindowTree, window: Window) -> Window {
@@ -98,6 +105,7 @@ impl VirtItemsPresenter {
                 )
             ;
             if data.templates_changed {
+                let mut item_focused_primary = replace(&mut data.item_focused_primary, false);
                 data.templates_changed = false;
                 if let Some(panel) = Self::panel(tree, window) {
                     if let Some(first_item_window) = panel.first_child(tree) {
@@ -129,6 +137,10 @@ impl VirtItemsPresenter {
                         };
                         item_window.set_source(tree, Some(item));
                         item_window.raise(tree, Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_BIND), app);
+                        if item_focused_primary {
+                            item_focused_primary = false;
+                            item_window.set_focused_primary(tree, true);
+                        }
                         prev = Some(item_window);
                     }
                 }
@@ -201,6 +213,7 @@ impl Widget for VirtItemsPresenterWidget {
             viewport: 0,
             item_size: 1,
             tab_navigation: false,
+            item_focused_primary: false,
         })
     }
 

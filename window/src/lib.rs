@@ -632,19 +632,8 @@ impl Window {
         tree.arena[self.0].source.as_ref().and_then(|x| x.downcast_ref::<T>())
     }
 
-    pub fn source_mut_raw<'a>(self, tree: &'a mut WindowTree) -> &'a mut Option<Box<dyn Data>> {
-        &mut tree.arena[self.0].source
-    }
-
-    pub fn source_mut<'a, T: Data + 'static>(
-        self,
-        tree: &'a mut WindowTree<'_>
-    ) -> Option<&'a mut T> {
-        tree.arena[self.0].source.as_mut().and_then(|x| x.downcast_mut::<T>())
-    }
-
     pub fn set_source(self, tree: &mut WindowTree, value: Option<Box<dyn Data>>) {
-        *self.source_mut_raw(tree) = value;
+        tree.arena[self.0].source = value;
     }
 
     pub fn invalidate_measure(self, tree: &mut WindowTree) {
@@ -1546,6 +1535,12 @@ impl<'clock> WindowTree<'clock> {
     pub fn run(&mut self, app: &mut dyn App) -> Result<(), Error> {
         let mut time = self.clock.time();
         while !self.quit {
+            if let Some(next_primary_focused) = self.next_primary_focused.take() {
+                self.focus_primary_raw(next_primary_focused, app);
+            }
+            if let Some(next_secondary_focused) = self.next_secondary_focused.take() {
+                self.focus_secondary_raw(next_secondary_focused, app);
+            }
             let no_timers = self.timers.items().is_empty();
             let timers_time = self.clock.time();
             loop {
@@ -1590,12 +1585,6 @@ impl<'clock> WindowTree<'clock> {
                 self.cursor = None;
             }
         }
-        if let Some(next_primary_focused) = self.next_primary_focused.take() {
-            self.focus_primary(next_primary_focused, app);
-        }
-        if let Some(next_secondary_focused) = self.next_secondary_focused.take() {
-            self.focus_secondary(next_secondary_focused, app);
-        }
         if let Some(first_child) = self.first_child {
             let mut child = first_child;
             loop {
@@ -1613,47 +1602,47 @@ impl<'clock> WindowTree<'clock> {
                     Key::Tab => {
                         if let Some(primary_focused) = self.primary_focused {
                             let focus = primary_focused.focus_tab(self);
-                            if self.focus_primary(Some(focus), app) { continue; }
+                            if self.focus_primary(focus) { continue; }
                         }
                     },
                     Key::Left => {
                         if let Some(primary_focused) = self.primary_focused {
                             let focus = primary_focused.focus_left(self);
-                            if self.focus_primary(Some(focus), app) { continue; }
+                            if self.focus_primary(focus) { continue; }
                         }
                         if let Some(secondary_focused) = self.secondary_focused {
                             let focus = secondary_focused.focus_left(self);
-                            if self.focus_secondary(Some(focus), app) { continue; }
+                            if self.focus_secondary(focus) { continue; }
                         }
                     },
                     Key::Right => {
                         if let Some(primary_focused) = self.primary_focused {
                             let focus = primary_focused.focus_right(self);
-                            if self.focus_primary(Some(focus), app) { continue; }
+                            if self.focus_primary(focus) { continue; }
                         }
                         if let Some(secondary_focused) = self.secondary_focused {
                             let focus = secondary_focused.focus_right(self);
-                            if self.focus_secondary(Some(focus), app) { continue; }
+                            if self.focus_secondary(focus) { continue; }
                         }
                     },
                     Key::Up => {
                         if let Some(primary_focused) = self.primary_focused {
                             let focus = primary_focused.focus_up(self);
-                            if self.focus_primary(Some(focus), app) { continue; }
+                            if self.focus_primary(focus) { continue; }
                         }
                         if let Some(secondary_focused) = self.secondary_focused {
                             let focus = secondary_focused.focus_up(self);
-                            if self.focus_secondary(Some(focus), app) { continue; }
+                            if self.focus_secondary(focus) { continue; }
                         }
                     },
                     Key::Down => {
                         if let Some(primary_focused) = self.primary_focused {
                             let focus = primary_focused.focus_down(self);
-                            if self.focus_primary(Some(focus), app) { continue; }
+                            if self.focus_primary(focus) { continue; }
                         }
                         if let Some(secondary_focused) = self.secondary_focused {
                             let focus = secondary_focused.focus_down(self);
-                            if self.focus_secondary(Some(focus), app) { continue; }
+                            if self.focus_secondary(focus) { continue; }
                         }
                     },
                     _ => { },
@@ -1689,11 +1678,20 @@ impl<'clock> WindowTree<'clock> {
 
     fn focus_primary(
         &mut self,
+        window: Window,
+    ) -> bool {
+        if Some(window) == self.primary_focused{ return false; }
+        window.set_focused_primary(self, true);
+        true
+    }
+
+    fn focus_primary_raw(
+        &mut self,
         window: Option<Window>,
         app: &mut dyn App
-    ) -> bool {
+    ) {
         let old_focused = self.primary_focused;
-        if window == old_focused { return false; }
+        if window == old_focused { return; }
         window.map(|x| x.raise(self, Event::Cmd(CMD_GOT_PRIMARY_FOCUS), app));
 
         if let Some(mut window) = self.primary_focused {
@@ -1720,22 +1718,31 @@ impl<'clock> WindowTree<'clock> {
 
         old_focused.map(|x| x.raise(self, Event::Cmd(CMD_LOST_PRIMARY_FOCUS), app));
         window.map(|x| x.bring_into_view(self));
-        true
     }
 
     fn focus_secondary(
         &mut self,
+        window: Window,
+    ) -> bool {
+        if Some(window) == self.secondary_focused { return false; }
+        let focusable = self.arena[window.0].widget.secondary_focusable();
+        if !focusable { return false; }
+        window.set_focused_secondary(self, true);
+        true
+    }
+
+    fn focus_secondary_raw(
+        &mut self,
         window: Option<Window>,
         app: &mut dyn App
-    ) -> bool {
+    ) {
         let old_focused = self.secondary_focused;
-        if window == old_focused { return false; }
+        if window == old_focused { return; }
         let focusable = window.map_or(true, |x| self.arena[x.0].widget.secondary_focusable());
-        if !focusable { return false; }
+        if !focusable { return; }
         window.map(|x| x.raise(self, Event::Cmd(CMD_GOT_SECONDARY_FOCUS), app));
         self.secondary_focused = window;
         old_focused.map(|x| x.raise(self, Event::Cmd(CMD_LOST_SECONDARY_FOCUS), app));
         window.map(|x| x.bring_into_view(self));
-        true
     }
 }

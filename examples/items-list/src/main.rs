@@ -57,7 +57,6 @@ mod ui {
 
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
-use core::mem::replace;
 use timer_no_std::MonoClock;
 use tuifw_screen::{Error, Key};
 use tuifw_window::{Data, Event, EventHandler, Window, WindowTree, App};
@@ -65,7 +64,6 @@ use tuifw::{CheckBox, VirtItemsPresenter, CMD_VIRT_ITEMS_PRESENTER_BIND};
 
 #[derive(Clone)]
 struct Item {
-    focus: bool,
     label: String,
 }
 
@@ -93,13 +91,9 @@ impl EventHandler for RootEventHandler {
                 true
             },
             Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_BIND) => {
-                let item = event_source.source_mut::<Item>(tree).unwrap();
-                let focus = replace(&mut item.focus, false);
+                let item = event_source.source::<Item>(tree).unwrap();
                 let label = item.label.clone();
                 CheckBox::set_text(tree, event_source, label);
-                if focus {
-                    event_source.set_focused_primary(tree, true);
-                }
                 true
             },
             _ => false
@@ -114,23 +108,23 @@ fn start() -> Result<(), Error> {
     let names = ui::build(tree)?;
     names.root.set_event_handler(tree, Some(Box::new(RootEventHandler)));
     VirtItemsPresenter::items_mut(tree, names.items, |items| {
-        items.push(Box::new(Item { focus: true, label: "Item ~1~".to_string() }));
-        items.push(Box::new(Item { focus: false, label: "Item ~2~".to_string() }));
-        items.push(Box::new(Item { focus: false, label: "Item ~3~".to_string() }));
-        items.push(Box::new(Item { focus: false, label: "Item ~4~".to_string() }));
-        items.push(Box::new(Item { focus: false, label: "Item ~5~".to_string() }));
-        items.push(Box::new(Item { focus: false, label: "Item ~6~".to_string() }));
-        items.push(Box::new(Item { focus: false, label: "Item ~7~".to_string() }));
-        items.push(Box::new(Item { focus: false, label: "Item ~8~".to_string() }));
-        items.push(Box::new(Item { focus: false, label: "Item ~9~".to_string() }));
-        items.push(Box::new(Item { focus: false, label: "Item 1~0~".to_string() }));
-        items.push(Box::new(Item { focus: false, label: "Item 11".to_string() }));
-        items.push(Box::new(Item { focus: false, label: "Item 12".to_string() }));
-        items.push(Box::new(Item { focus: false, label: "Item 13".to_string() }));
-        items.push(Box::new(Item { focus: false, label: "Item 14".to_string() }));
-        items.push(Box::new(Item { focus: false, label: "Item 15".to_string() }));
+        items.push(Box::new(Item { label: "Item ~1~".to_string() }));
+        items.push(Box::new(Item { label: "Item ~2~".to_string() }));
+        items.push(Box::new(Item { label: "Item ~3~".to_string() }));
+        items.push(Box::new(Item { label: "Item ~4~".to_string() }));
+        items.push(Box::new(Item { label: "Item ~5~".to_string() }));
+        items.push(Box::new(Item { label: "Item ~6~".to_string() }));
+        items.push(Box::new(Item { label: "Item ~7~".to_string() }));
+        items.push(Box::new(Item { label: "Item ~8~".to_string() }));
+        items.push(Box::new(Item { label: "Item ~9~".to_string() }));
+        items.push(Box::new(Item { label: "Item 1~0~".to_string() }));
+        items.push(Box::new(Item { label: "Item 11".to_string() }));
+        items.push(Box::new(Item { label: "Item 12".to_string() }));
+        items.push(Box::new(Item { label: "Item 13".to_string() }));
+        items.push(Box::new(Item { label: "Item 14".to_string() }));
+        items.push(Box::new(Item { label: "Item 15".to_string() }));
     });
-    //VirtItemsPresenter::set_offset(tree, names.items, 1);
+    VirtItemsPresenter::set_item_focused_primary(tree, names.items, true);
     let state = &mut State;
     tree.run(state)
 }
