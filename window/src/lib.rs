@@ -1248,6 +1248,7 @@ impl Window {
         tree: &mut WindowTree,
         app: &mut dyn App,
     ) {
+        self.cleanup(tree, app);
         let parent = self.detach(tree);
         let mut node = tree.arena.remove(self.0);
         if let Some(pre_process) = node.pre_process {
@@ -1262,6 +1263,33 @@ impl Window {
         Self::drop_node_tree(node.first_child, tree, app);
     }
 
+    fn cleanup(
+        self,
+        tree: &mut WindowTree,
+        app: &mut dyn App,
+    ) {
+        if tree.next_primary_focused == Some(Some(self)) {
+            tree.next_primary_focused = Some(None);
+        }
+        if tree.primary_focused == Some(self) {
+            tree.focus_primary_raw(None, app);
+        }
+        if tree.next_secondary_focused == Some(Some(self)) {
+            tree.next_secondary_focused = Some(None);
+        }
+        if tree.secondary_focused == Some(self) {
+            tree.focus_secondary_raw(None, app);
+        }
+        if let Some(first_child) = self.first_child(tree) {
+            let mut child = first_child;
+            loop {
+                child.cleanup(tree, app);
+                child = child.next(tree);
+                if child == first_child { break; }
+            }
+        }
+    }
+
     fn drop_node_tree(
         first_child: Option<Window>,
         tree: &mut WindowTree,
@@ -1271,6 +1299,12 @@ impl Window {
             let mut child = first_child;
             loop {
                 let mut child_node = tree.arena.remove(child.0);
+                if let Some(pre_process) = child_node.pre_process {
+                    tree.pre_process.remove(pre_process);
+                }
+                if let Some(post_process) = child_node.post_process {
+                    tree.post_process.remove(post_process);
+                }
                 child_node.data.drop_widget_data(tree, app);
                 child = child_node.next;
                 Self::drop_node_tree(child_node.first_child, tree, app);
@@ -1673,7 +1707,7 @@ impl<'clock> WindowTree<'clock> {
         &mut self,
         window: Window,
     ) -> bool {
-        if Some(window) == self.primary_focused{ return false; }
+        if Some(window) == self.primary_focused { return false; }
         window.set_focused_primary(self, true);
         true
     }

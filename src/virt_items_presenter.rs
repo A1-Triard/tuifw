@@ -3,7 +3,7 @@ use alloc::boxed::Box;
 use alloc::string::ToString;
 use alloc::vec::Vec;
 use core::cmp::{max, min};
-use core::mem::size_of;
+use core::mem::{replace, size_of};
 use core::ops::Range;
 use either::Right;
 use tuifw_screen_base::{Rect, Vector, Error, Fg, Bg, Thickness, Key};
@@ -34,6 +34,7 @@ widget! {
         #[property(copy, on_changed=on_templates_changed)]
         focus_first_item_primary: bool,
         visible_range: Range<usize>,
+        focus_first_item_primary_once: bool,
     }
 }
 
@@ -103,7 +104,9 @@ impl VirtItemsPresenter {
             ;
             let old_items_range = data.visible_range.clone();
             if data.templates_changed {
-                let mut focus_item_primary = data.focus_first_item_primary;
+                let mut focus_item_primary =
+                    data.focus_first_item_primary | replace(&mut data.focus_first_item_primary_once, false)
+                ;
                 data.templates_changed = false;
                 if let Some(panel) = Self::panel(tree, window) {
                     if let Some(first_item_window) = panel.first_child(tree) {
@@ -226,6 +229,7 @@ impl Widget for VirtItemsPresenterWidget {
             tab_navigation: false,
             focus_first_item_primary: false,
             visible_range: 0 .. 0,
+            focus_first_item_primary_once: false,
         })
     }
 
@@ -370,12 +374,25 @@ impl Widget for VirtItemsPresenterWidget {
             Event::Key(Key::Tab) => {
                 let data = window.data::<VirtItemsPresenter>(tree);
                 if data.tab_navigation {
-                    if event_source.is_secondary_focused(tree) {
-                        event_source.next(tree).set_focused_secondary(tree, true);
-                        true
-                    } else if event_source.is_primary_focused(tree) {
-                        event_source.next(tree).set_focused_primary(tree, true);
-                        true
+                    if event_source.parent(tree).and_then(|x| x.parent(tree)) == Some(window) {
+                        if event_source.is_secondary_focused(tree) {
+                            let focus = event_source.next(tree);
+                            focus.set_focused_secondary(tree, true);
+                            true
+                        } else if event_source.is_primary_focused(tree) {
+                            let focus = event_source.next(tree);
+                            if focus == event_source.parent(tree).unwrap().first_child(tree).unwrap() {
+                                let data = window.data_mut::<VirtItemsPresenter>(tree);
+                                data.focus_first_item_primary_once = true;
+                                data.offset = 0;
+                                VirtItemsPresenter::on_templates_changed(tree, window);
+                            } else {
+                                focus.set_focused_primary(tree, true);
+                            }
+                            true
+                        } else {
+                            false
+                        }
                     } else {
                         false
                     }
