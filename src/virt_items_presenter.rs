@@ -2,10 +2,10 @@ use crate::{widget, StaticText, StackPanel};
 use alloc::boxed::Box;
 use alloc::string::ToString;
 use alloc::vec::Vec;
-use core::cmp::min;
+use core::cmp::{max, min};
 use core::mem::size_of;
 use core::ops::Range;
-use either::{Left, Right};
+use either::Right;
 use tuifw_screen_base::{Rect, Vector, Error, Fg, Bg, Thickness, Key};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App, Timer, Data};
 use tuifw_window::Visibility;
@@ -101,6 +101,7 @@ impl VirtItemsPresenter {
                     }
                 )
             ;
+            let old_items_range = data.visible_range.clone();
             if data.templates_changed {
                 let mut focus_item_primary = data.focus_first_item_primary;
                 data.templates_changed = false;
@@ -141,46 +142,60 @@ impl VirtItemsPresenter {
                     }
                 }
             } else if let Some(panel) = Self::panel(tree, window) {
+                let data = window.data::<VirtItemsPresenter>(tree);
+                let item_template = data.item_template.unwrap();
                 panel.set_margin(tree, panel_margin);
-                let new_tail_or_drop_tail = if let Some(first_item_window) = panel.first_child(tree) {
+                let drop_head_range = old_items_range.start .. min(items_range.start, old_items_range.end);
+                let drop_tail_range = max(items_range.end, old_items_range.start) .. old_items_range.end;
+                let new_head_range = items_range.start .. min(old_items_range.start, items_range.end);
+                let new_tail_range = max(old_items_range.end, items_range.start) .. items_range.end;
+                let drop_head = drop_head_range.end.saturating_sub(drop_head_range.start);
+                let drop_tail = drop_tail_range.end.saturating_sub(drop_tail_range.start);
+                if let Some(first_item_window) = panel.first_child(tree) {
                     let mut item_window = first_item_window;
-                    let mut item_index = items_range.start;
-                    loop {
-                        if item_index == items_range.end { break Left((item_window, first_item_window)); }
+                    for _ in 0 .. drop_head {
+                        let next = item_window.next(tree);
                         item_window.raise(tree, Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_UNBIND), app);
-                        item_window.set_source_index(tree, Some(item_index));
-                        item_window.raise(tree, Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_BIND), app);
-                        item_index += 1;
-                        let prev = item_window;
+                        item_window.set_source_index(tree, None);
+                        item_window.drop_window(tree, app);
+                        item_window = next;
+                    }
+                    for _ in 0 .. (old_items_range.end - old_items_range.start) - drop_head - drop_tail {
                         item_window = item_window.next(tree);
-                        if item_window == first_item_window { break Right((Some(prev), item_index)); }
                     }
-                } else {
-                    Right((None, items_range.start))
-                };
-                match new_tail_or_drop_tail {
-                    Right((mut prev, mut item_index)) => {
-                        let item_template = window.data::<VirtItemsPresenter>(tree).item_template.unwrap();
-                        loop {
-                            if item_index == items_range.end { break; }
-                            let item_window = match item_template.new_instance(tree, Some(panel), prev) {
-                                Ok(item_window) => item_window,
-                                Err(error) => return Self::show_error(tree, window, error),
-                            };
-                            item_window.set_source_index(tree, Some(item_index));
-                            item_window.raise(tree, Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_BIND), app);
-                            prev = Some(item_window);
-                            item_index += 1;
-                        }
-                    },
-                    Left((mut item_window, first_item_window)) => {
-                        loop {
-                            item_window.raise(tree, Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_UNBIND), app);
-                            item_window.set_source_index(tree, None);
-                            item_window = item_window.next(tree);
-                            if item_window == first_item_window { break; }
-                        }
+                    for _ in 0 .. drop_tail {
+                        let next = item_window.next(tree);
+                        item_window.raise(tree, Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_UNBIND), app);
+                        item_window.set_source_index(tree, None);
+                        item_window.drop_window(tree, app);
+                        item_window = next;
                     }
+                }
+                let mut prev = None;
+                if let Some(first_item_window) = panel.first_child(tree) {
+                    let mut item_window = first_item_window;
+                    for _ in 0 .. (old_items_range.end - old_items_range.start) - drop_head - drop_tail {
+                        prev = Some(item_window);
+                        item_window = item_window.next(tree);
+                    }
+                    debug_assert_eq!(item_window, first_item_window);
+                }
+                for item_index in new_tail_range {
+                    let item_window = match item_template.new_instance(tree, Some(panel), prev) {
+                        Ok(item_window) => item_window,
+                        Err(error) => return Self::show_error(tree, window, error),
+                    };
+                    item_window.set_source_index(tree, Some(item_index));
+                    item_window.raise(tree, Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_BIND), app);
+                    prev = Some(item_window);
+                }
+                for item_index in new_head_range.rev() {
+                    let item_window = match item_template.new_instance(tree, Some(panel), None) {
+                        Ok(item_window) => item_window,
+                        Err(error) => return Self::show_error(tree, window, error),
+                    };
+                    item_window.set_source_index(tree, Some(item_index));
+                    item_window.raise(tree, Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_BIND), app);
                 }
             }
             let data = window.data_mut::<VirtItemsPresenter>(tree);

@@ -142,7 +142,7 @@ fn start() -> Result<(), Error> {
         items.push(Box::new(Item { label: "Item 14".to_string() }));
         items.push(Box::new(Item { label: "Item 15".to_string() }));
     });
-    VirtItemsPresenter::set_item_focused_primary(tree, names.items, true);
+    VirtItemsPresenter::set_focus_first_item_primary(tree, names.items, true);
     let state = &mut State;
     tree.run(state)
 }
