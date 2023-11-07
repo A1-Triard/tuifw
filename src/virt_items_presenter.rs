@@ -3,7 +3,8 @@ use alloc::boxed::Box;
 use alloc::string::ToString;
 use alloc::vec::Vec;
 use core::cmp::min;
-use core::mem::{replace, size_of};
+use core::mem::size_of;
+use core::ops::Range;
 use either::{Left, Right};
 use tuifw_screen_base::{Rect, Vector, Error, Fg, Bg, Thickness, Key};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App, Timer, Data};
@@ -30,7 +31,9 @@ widget! {
         error: bool,
         #[property(copy)]
         tab_navigation: bool,
-        item_focused_primary: bool,
+        #[property(copy, on_changed=on_templates_changed)]
+        focus_first_item_primary: bool,
+        visible_range: Range<usize>,
     }
 }
 
@@ -42,12 +45,6 @@ impl VirtItemsPresenter {
             palette.set(0, Right((Fg::BrightRed, Bg::Blue)));
         });
         Ok(())
-    }
-
-    pub fn set_item_focused_primary(tree: &mut WindowTree, window: Window, value: bool) {
-        let data = window.data_mut::<VirtItemsPresenter>(tree);
-        data.item_focused_primary = value;
-        Self::on_templates_changed(tree, window);
     }
 
     fn error_text(tree: &WindowTree, window: Window) -> Window {
@@ -105,7 +102,7 @@ impl VirtItemsPresenter {
                 )
             ;
             if data.templates_changed {
-                let mut item_focused_primary = replace(&mut data.item_focused_primary, false);
+                let mut focus_item_primary = data.focus_first_item_primary;
                 data.templates_changed = false;
                 if let Some(panel) = Self::panel(tree, window) {
                     if let Some(first_item_window) = panel.first_child(tree) {
@@ -129,15 +126,15 @@ impl VirtItemsPresenter {
                     StackPanel::set_vertical(tree, panel, vertical);
                     panel.set_margin(tree, panel_margin);
                     let mut prev = None;
-                    for item_index in items_range {
+                    for item_index in items_range.clone() {
                         let item_window = match item_template.new_instance(tree, Some(panel), prev) {
                             Ok(item_window) => item_window,
                             Err(error) => return Self::show_error(tree, window, error),
                         };
                         item_window.set_source_index(tree, Some(item_index));
                         item_window.raise(tree, Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_BIND), app);
-                        if item_focused_primary {
-                            item_focused_primary = false;
+                        if focus_item_primary {
+                            focus_item_primary = false;
                             item_window.set_focused_primary(tree, true);
                         }
                         prev = Some(item_window);
@@ -186,6 +183,8 @@ impl VirtItemsPresenter {
                     }
                 }
             }
+            let data = window.data_mut::<VirtItemsPresenter>(tree);
+            data.visible_range = items_range;
         }));
         let data = window.data_mut::<VirtItemsPresenter>(tree);
         if let Some(old_update_timer) = data.update_timer.replace(update_timer) {
@@ -210,7 +209,8 @@ impl Widget for VirtItemsPresenterWidget {
             viewport: 0,
             item_size: 1,
             tab_navigation: false,
-            item_focused_primary: false,
+            focus_first_item_primary: false,
+            visible_range: 0 .. 0,
         })
     }
 
