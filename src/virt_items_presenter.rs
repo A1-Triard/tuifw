@@ -31,10 +31,13 @@ widget! {
         error: bool,
         #[property(copy)]
         tab_navigation: bool,
-        #[property(copy, on_changed=on_templates_changed)]
+        #[property(copy, on_changed=on_focus_first_item_changed)]
         focus_first_item_primary: bool,
+        #[property(copy, on_changed=on_focus_first_item_changed)]
+        focus_first_item_secondary: bool,
         visible_range: Range<usize>,
         focus_first_item_primary_once: bool,
+        focus_first_item_secondary_once: bool,
     }
 }
 
@@ -68,6 +71,11 @@ impl VirtItemsPresenter {
         let error_text = Self::error_text(tree, window);
         StaticText::set_text(tree, error_text, error.to_string());
         error_text.set_visibility(tree, Visibility::Visible);
+    }
+
+    fn on_focus_first_item_changed(tree: &mut WindowTree, window: Window) {
+        window.data_mut::<VirtItemsPresenter>(tree).offset = 0;
+        Self::on_templates_changed(tree, window);
     }
 
     fn on_templates_changed(tree: &mut WindowTree, window: Window) {
@@ -107,6 +115,9 @@ impl VirtItemsPresenter {
                 let mut focus_item_primary =
                     data.focus_first_item_primary | replace(&mut data.focus_first_item_primary_once, false)
                 ;
+                let mut focus_item_secondary =
+                    data.focus_first_item_secondary | replace(&mut data.focus_first_item_secondary_once, false)
+                ;
                 data.templates_changed = false;
                 if let Some(panel) = Self::panel(tree, window) {
                     if let Some(first_item_window) = panel.first_child(tree) {
@@ -140,6 +151,10 @@ impl VirtItemsPresenter {
                         if focus_item_primary {
                             focus_item_primary = false;
                             item_window.set_focused_primary(tree, true);
+                        }
+                        if focus_item_secondary {
+                            focus_item_secondary = false;
+                            item_window.set_focused_secondary(tree, true);
                         }
                         prev = Some(item_window);
                     }
@@ -228,8 +243,10 @@ impl Widget for VirtItemsPresenterWidget {
             item_size: 1,
             tab_navigation: false,
             focus_first_item_primary: false,
+            focus_first_item_secondary: false,
             visible_range: 0 .. 0,
             focus_first_item_primary_once: false,
+            focus_first_item_secondary_once: false,
         })
     }
 
@@ -377,7 +394,14 @@ impl Widget for VirtItemsPresenterWidget {
                     if event_source.parent(tree).and_then(|x| x.parent(tree)) == Some(window) {
                         if event_source.is_secondary_focused(tree) {
                             let focus = event_source.next(tree);
-                            focus.set_focused_secondary(tree, true);
+                            if focus == event_source.parent(tree).unwrap().first_child(tree).unwrap() {
+                                let data = window.data_mut::<VirtItemsPresenter>(tree);
+                                data.focus_first_item_secondary_once = true;
+                                data.offset = 0;
+                                VirtItemsPresenter::on_templates_changed(tree, window);
+                            } else {
+                                focus.set_focused_secondary(tree, true);
+                            }
                             true
                         } else if event_source.is_primary_focused(tree) {
                             let focus = event_source.next(tree);
