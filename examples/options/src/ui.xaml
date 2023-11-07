@@ -7,13 +7,13 @@
         <Frame Text="Radio Buttons">
           <StackPanel Margin="1,0,1,0">
             <RadioButton Text="~R~adio Button 1" IsOn="True" Name="r_1" FocusTab="r_2" FocusDown="r_2" />
-            <RadioButton Text="R~a~dio Button 2" Name="r_2" FocusTab="o_1" FocusDown="o_1" />
+            <RadioButton Text="R~a~dio Button 2" Name="r_2" FocusTab="o_1" />
           </StackPanel>
         </Frame>
       </StackPanel>
       <StackPanel Vertical="False" HAlign="Center">
         <Button Text="~O~K" Name="ok" FocusRight="cancel" FocusedSecondary="True" />
-        <Button Text="~C~ancel" Margin="3,0,0,0" Name="cancel" FocusRight="ok" />
+        <Button Text="~C~ancel" Margin="3,0,0,0" Name="cancel" />
       </StackPanel>
     </StackPanel>
   </Frame>

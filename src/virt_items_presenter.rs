@@ -31,6 +31,8 @@ widget! {
         error: bool,
         #[property(copy)]
         tab_navigation: bool,
+        #[property(copy)]
+        up_down_navigation: bool,
         #[property(copy, on_changed=on_focus_first_item_changed)]
         focus_first_item_primary: bool,
         #[property(copy, on_changed=on_focus_first_item_changed)]
@@ -242,6 +244,7 @@ impl Widget for VirtItemsPresenterWidget {
             viewport: 0,
             item_size: 1,
             tab_navigation: false,
+            up_down_navigation: false,
             focus_first_item_primary: false,
             focus_first_item_secondary: false,
             visible_range: 0 .. 0,
@@ -392,8 +395,8 @@ impl Widget for VirtItemsPresenterWidget {
                 let data = window.data::<VirtItemsPresenter>(tree);
                 if data.tab_navigation {
                     if event_source.parent(tree).and_then(|x| x.parent(tree)) == Some(window) {
+                        let focus = event_source.next(tree);
                         if event_source.is_secondary_focused(tree) {
-                            let focus = event_source.next(tree);
                             if focus == event_source.parent(tree).unwrap().first_child(tree).unwrap() {
                                 let data = window.data_mut::<VirtItemsPresenter>(tree);
                                 data.focus_first_item_secondary_once = true;
@@ -404,7 +407,6 @@ impl Widget for VirtItemsPresenterWidget {
                             }
                             true
                         } else if event_source.is_primary_focused(tree) {
-                            let focus = event_source.next(tree);
                             if focus == event_source.parent(tree).unwrap().first_child(tree).unwrap() {
                                 let data = window.data_mut::<VirtItemsPresenter>(tree);
                                 data.focus_first_item_primary_once = true;
@@ -416,6 +418,63 @@ impl Widget for VirtItemsPresenterWidget {
                             true
                         } else {
                             false
+                        }
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            },
+            Event::Key(Key::Down) => {
+                let data = window.data::<VirtItemsPresenter>(tree);
+                if data.up_down_navigation {
+                    if event_source.parent(tree).and_then(|x| x.parent(tree)) == Some(window) {
+                        let focus = event_source.next(tree);
+                        if focus == event_source.parent(tree).unwrap().first_child(tree).unwrap() {
+                            false
+                        } else {
+                            if event_source.is_secondary_focused(tree) {
+                                focus.set_focused_secondary(tree, true);
+                                true
+                            } else if event_source.is_primary_focused(tree) {
+                                focus.set_focused_primary(tree, true);
+                                true
+                            } else {
+                                false
+                            }
+                        }
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            },
+            Event::Key(Key::Up) => {
+                let data = window.data::<VirtItemsPresenter>(tree);
+                if data.up_down_navigation {
+                    if event_source.parent(tree).and_then(|x| x.parent(tree)) == Some(window) {
+                        let focus = {
+                            let mut item = event_source.parent(tree).unwrap().first_child(tree).unwrap();
+                            loop {
+                                let next = item.next(tree);
+                                if next == event_source { break item; }
+                                item = next;
+                            }
+                        };
+                        if focus.next(tree) == event_source.parent(tree).unwrap().first_child(tree).unwrap() {
+                            false
+                        } else {
+                            if event_source.is_secondary_focused(tree) {
+                                focus.set_focused_secondary(tree, true);
+                                true
+                            } else if event_source.is_primary_focused(tree) {
+                                focus.set_focused_primary(tree, true);
+                                true
+                            } else {
+                                false
+                            }
                         }
                     } else {
                         false

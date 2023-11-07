@@ -145,10 +145,12 @@ pub struct Registered {
     pub items_presenter_panel_template: XamlProperty,
     pub items_presenter_item_template: XamlProperty,
     pub items_presenter_tab_navigation: XamlProperty,
+    pub items_presenter_up_down_navigation: XamlProperty,
 
     pub virt_items_presenter: XamlStruct,
     pub virt_items_presenter_item_template: XamlProperty,
     pub virt_items_presenter_tab_navigation: XamlProperty,
+    pub virt_items_presenter_up_down_navigation: XamlProperty,
 }
 
 pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
@@ -291,6 +293,9 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
     let items_presenter_tab_navigation = XamlProperty::new(
         xaml, items_presenter, "TabNavigation", XamlType::Literal(boolean), false, false
     );
+    let items_presenter_up_down_navigation = XamlProperty::new(
+        xaml, items_presenter, "UpDownNavigation", XamlType::Literal(boolean), false, false
+    );
 
     let virt_items_presenter = XamlStruct::new(xaml, Some(widget), XMLNS, "VirtItemsPresenter");
     let virt_items_presenter_item_template = XamlProperty::new(
@@ -298,6 +303,9 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
     );
     let virt_items_presenter_tab_navigation = XamlProperty::new(
         xaml, virt_items_presenter, "TabNavigation", XamlType::Literal(boolean), false, false
+    );
+    let virt_items_presenter_up_down_navigation = XamlProperty::new(
+        xaml, virt_items_presenter, "UpDownNavigation", XamlType::Literal(boolean), false, false
     );
 
     boolean.set_ctor(xaml, Some(Box::new(|x| match x {
@@ -594,6 +602,12 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
             tuifw::ItemsPresenter::set_tab_navigation(tree, {}, {});
         " }, obj, value)))
     );
+    items_presenter_up_down_navigation.set_setter(
+        xaml,
+        Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+            tuifw::ItemsPresenter::set_up_down_navigation(tree, {}, {});
+        " }, obj, value)))
+    );
 
     set_widget_ctor(xaml, virt_items_presenter, "tuifw::VirtItemsPresenter", widget_children);
     virt_items_presenter_item_template.set_setter(
@@ -606,6 +620,12 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
         xaml,
         Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
             tuifw::VirtItemsPresenter::set_tab_navigation(tree, {}, {});
+        " }, obj, value)))
+    );
+    virt_items_presenter_up_down_navigation.set_setter(
+        xaml,
+        Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+            tuifw::VirtItemsPresenter::set_up_down_navigation(tree, {}, {});
         " }, obj, value)))
     );
 
@@ -703,9 +723,11 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
         items_presenter_panel_template,
         items_presenter_item_template,
         items_presenter_tab_navigation,
+        items_presenter_up_down_navigation,
 
         virt_items_presenter,
         virt_items_presenter_item_template,
         virt_items_presenter_tab_navigation,
+        virt_items_presenter_up_down_navigation,
     }
 }

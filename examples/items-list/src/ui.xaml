@@ -1,6 +1,6 @@
 <Background xmlns='https://a1-triard.github.io/tuifw/2023/xaml' Name="root">
   <Frame HAlign="Center" VAlign="Center" Height="6">
-    <VirtItemsPresenter Name="items" TabNavigation="True">
+    <VirtItemsPresenter Name="items" TabNavigation="True" UpDownNavigation="True">
       <CheckBox />
     </VirtItemsPresenter>
   </Frame>

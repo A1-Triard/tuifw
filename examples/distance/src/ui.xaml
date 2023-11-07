@@ -24,7 +24,7 @@
 	      <FloatValidator />
 	    </InputLine.Validator>
 	  </InputLine>
-          <InputLine Text="1" Margin="0,1,0,0" Name="n" FocusTab="a" FocusDown="a">
+          <InputLine Text="1" Margin="0,1,0,0" Name="n" FocusTab="a">
 	    <InputLine.Validator>
 	      <IntValidator Min="1" />
 	    </InputLine.Validator>
@@ -35,7 +35,7 @@
       <DockPanel Margin="0,1,0,0">
         <StaticText Dock="Left" Text="S =" />
         <Background Width="13" Margin="1,0,0,0">
-          <StaticText HAlign="Right" Name="s" />
+          <StaticText HAlign="Right" Name="s" Margin="0,0,1,0" />
         </Background>
       </DockPanel>
     </StackPanel>

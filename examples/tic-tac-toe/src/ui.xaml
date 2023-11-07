@@ -4,17 +4,17 @@
       <StackPanel Vertical="False" HAlign="Center">
         <Button Text=" " Name="tl" FocusTab="t" FocusRight="t" FocusDown="l" FocusedPrimary="True" />
         <Button Text=" " Name="t" FocusTab="tr" FocusRight="tr" FocusDown="c" />
-        <Button Text=" " Name="tr" FocusTab="l" FocusRight="tl" FocusDown="r" />
+        <Button Text=" " Name="tr" FocusTab="l" FocusDown="r" />
       </StackPanel>
       <StackPanel Vertical="False" HAlign="Center">
         <Button Text=" " Name="l" FocusTab="c" FocusRight="c" FocusDown="bl" />
         <Button Text=" " Name="c" FocusTab="r" FocusRight="r" FocusDown="b" />
-        <Button Text=" " Name="r" FocusTab="bl" FocusRight="l" FocusDown="br" />
+        <Button Text=" " Name="r" FocusTab="bl" FocusDown="br" />
       </StackPanel>
       <StackPanel Vertical="False" HAlign="Center">
-        <Button Text=" " Name="bl" FocusTab="b" FocusRight="b" FocusDown="tl" />
-        <Button Text=" " Name="b" FocusTab="br" FocusRight="br" FocusDown="t" />
-        <Button Text=" " Name="br" FocusTab="tl" FocusRight="bl" FocusDown="tr" />
+        <Button Text=" " Name="bl" FocusTab="b" FocusRight="b" />
+        <Button Text=" " Name="b" FocusTab="br" FocusRight="br" />
+        <Button Text=" " Name="br" FocusTab="tl" />
       </StackPanel>
       <StackPanel Vertical="False" Margin="1,1,2,0">
         <Label Text="~N~ew game" Name="new_game" />
