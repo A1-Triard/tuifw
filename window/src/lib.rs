@@ -514,16 +514,16 @@ impl Window {
         clone.set_palette(tree, self.palette(tree).clone());
         clone.set_visibility(tree, self.visibility(tree));
         clone.set_layout(tree, self.layout_raw(tree).clone());
-        clone.set_is_enabled(tree, self.is_enabled(tree).clone());
-        clone.set_h_align(tree, self.h_align(tree).clone());
-        clone.set_v_align(tree, self.v_align(tree).clone());
-        clone.set_margin(tree, self.margin(tree).clone());
-        clone.set_min_width(tree, self.min_width(tree).clone());
-        clone.set_min_height(tree, self.min_height(tree).clone());
-        clone.set_max_width(tree, self.max_width(tree).clone());
-        clone.set_max_height(tree, self.max_height(tree).clone());
-        clone.set_width(tree, self.width(tree).clone());
-        clone.set_height(tree, self.height(tree).clone());
+        clone.set_is_enabled(tree, self.is_enabled(tree));
+        clone.set_h_align(tree, self.h_align(tree));
+        clone.set_v_align(tree, self.v_align(tree));
+        clone.set_margin(tree, self.margin(tree));
+        clone.set_min_width(tree, self.min_width(tree));
+        clone.set_min_height(tree, self.min_height(tree));
+        clone.set_max_width(tree, self.max_width(tree));
+        clone.set_max_height(tree, self.max_height(tree));
+        clone.set_width(tree, self.width(tree));
+        clone.set_height(tree, self.height(tree));
         let clone_window: Box<dyn Fn(&WindowTree, Window) -> Window> =
             Box::new(|tree: &WindowTree, window: Window| tree.arena[window.0].cloning.unwrap_or(window))
         ;

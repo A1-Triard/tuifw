@@ -81,7 +81,7 @@ impl XamlStruct {
         None
     }
 
-    pub fn new<'a>(
+    pub fn new(
         xaml: &mut Xaml,
         parent: Option<XamlStruct>,
         namespace: &str,
@@ -150,7 +150,7 @@ impl XamlProperty {
         xaml.properties[self.0].ty
     }
 
-    pub fn new<'a>(
+    pub fn new(
         xaml: &mut Xaml,
         owner: XamlStruct,
         name: &str,
@@ -210,7 +210,7 @@ impl XamlLiteral {
         &xaml.literals[self.0].name
     }
 
-    pub fn new<'a>(
+    pub fn new(
         xaml: &mut Xaml,
         namespace: &str,
         name: &str,
