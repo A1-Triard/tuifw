@@ -16,7 +16,7 @@ pub const CMD_VIRT_ITEMS_PRESENTER_UNBIND: u16 = 151;
 widget! {
     #[widget(VirtItemsPresenterWidget, init=init)]
     pub struct VirtItemsPresenter {
-        #[property(ref, arrange, on_changed=update)]
+        #[property(ref, arrange, on_changed=on_templates_changed)]
         items: Vec<Box<dyn Data>>,
         #[property(copy, measure, on_changed=on_templates_changed)]
         vertical: bool,
