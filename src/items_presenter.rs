@@ -15,17 +15,20 @@ widget! {
     pub struct ItemsPresenter {
         #[property(ref, on_changed=update)]
         items: Vec<Box<dyn Data>>,
-        #[property(copy, on_changed=on_templates_changed)]
+        #[property(copy, on_changed=update)]
         panel_template: Option<Window>,
-        #[property(copy, on_changed=on_templates_changed)]
+        #[property(copy, on_changed=update)]
         item_template: Option<Window>,
         update_timer: Option<Timer>,
-        templates_changed: bool,
         error: bool,
         #[property(copy)]
         tab_navigation: bool,
         #[property(copy)]
         up_down_navigation: bool,
+        #[property(copy, on_changed=update)]
+        focus_first_item_primary: bool,
+        #[property(copy, on_changed=update)]
+        focus_first_item_secondary: bool,
     }
 }
 
@@ -61,89 +64,50 @@ impl ItemsPresenter {
         error_text.set_visibility(tree, Visibility::Visible);
     }
 
-    fn on_templates_changed(tree: &mut WindowTree, window: Window) {
-        window.data_mut::<ItemsPresenter>(tree).templates_changed = true;
-        Self::update(tree, window);
-    }
-        
     fn update(tree: &mut WindowTree, window: Window) {
         let update_timer = Timer::new(tree, 0, Box::new(move |tree, app| {
             let data = window.data_mut::<ItemsPresenter>(tree);
             data.update_timer = None;
             if data.error { return; }
-            if data.templates_changed {
-                data.templates_changed = false;
-                if let Some(panel) = Self::panel(tree, window) {
-                    if let Some(first_item_window) = panel.first_child(tree) {
-                        let mut item_window = first_item_window;
-                        loop {
-                            item_window.raise(tree, Event::Cmd(CMD_ITEMS_PRESENTER_UNBIND), app);
-                            item_window.set_source_index(tree, None);
-                            item_window = item_window.next(tree);
-                            if item_window == first_item_window { break; }
-                        }
-                    }
-                    panel.drop_window(tree, app);
-                }
-                let data = window.data::<ItemsPresenter>(tree);
-                if let Some(item_template) = data.item_template {
-                    if let Some(panel_template) = data.panel_template {
-                        let panel = match panel_template.new_instance(tree, Some(window), None) {
-                            Ok(panel) => panel,
-                            Err(error) => return Self::show_error(tree, window, error),
-                        };
-                        let mut prev = None;
-                        for item_index in 0 .. window.data::<ItemsPresenter>(tree).items.len() {
-                            let item_window = match item_template.new_instance(tree, Some(panel), prev) {
-                                Ok(item_window) => item_window,
-                                Err(error) => return Self::show_error(tree, window, error),
-                            };
-                            item_window.set_source_index(tree, Some(item_index));
-                            item_window.raise(tree, Event::Cmd(CMD_ITEMS_PRESENTER_BIND), app);
-                            prev = Some(item_window);
-                        }
-                    }
-                }
-            } else if let Some(panel) = Self::panel(tree, window) {
-                let mut last_item_window = None;
-                let mut item_index = 0;
+            if let Some(panel) = Self::panel(tree, window) {
                 if let Some(first_item_window) = panel.first_child(tree) {
                     let mut item_window = first_item_window;
-                    let drop_tail = loop {
-                        if item_index != window.data::<ItemsPresenter>(tree).items.len() {
-                            item_window.raise(tree, Event::Cmd(CMD_ITEMS_PRESENTER_UNBIND), app);
-                            item_window.set_source_index(tree, Some(item_index));
-                            item_window.raise(tree, Event::Cmd(CMD_ITEMS_PRESENTER_BIND), app);
-                            item_index += 1;
-                        } else {
-                            break true;
-                        }
-                        last_item_window = Some(item_window);
+                    loop {
+                        item_window.raise(tree, Event::Cmd(CMD_ITEMS_PRESENTER_UNBIND), app);
+                        item_window.set_source_index(tree, None);
                         item_window = item_window.next(tree);
-                        if item_window == first_item_window { break false; }
-                    };
-                    if drop_tail {
-                        loop {
-                            item_window.raise(tree, Event::Cmd(CMD_ITEMS_PRESENTER_UNBIND), app);
-                            item_window.set_source_index(tree, None);
-                            let next = item_window.next(tree);
-                            item_window.drop_window(tree, app);
-                            item_window = next;
-                            if item_window == first_item_window { break; }
-                        }
+                        if item_window == first_item_window { break; }
                     }
                 }
-                let mut prev = last_item_window;
-                let item_template = window.data::<ItemsPresenter>(tree).item_template.unwrap();
-                while item_index != window.data::<ItemsPresenter>(tree).items.len() {
-                    let item_window = match item_template.new_instance(tree, Some(panel), prev) {
-                        Ok(item_window) => item_window,
+                panel.drop_window(tree, app);
+            }
+            let data = window.data::<ItemsPresenter>(tree);
+            if let Some(item_template) = data.item_template {
+                if let Some(panel_template) = data.panel_template {
+                    let mut focus_item_primary = data.focus_first_item_primary;
+                    let mut focus_item_secondary = data.focus_first_item_secondary;
+                    let panel = match panel_template.new_instance(tree, Some(window), None) {
+                        Ok(panel) => panel,
                         Err(error) => return Self::show_error(tree, window, error),
                     };
-                    item_window.set_source_index(tree, Some(item_index));
-                    item_window.raise(tree, Event::Cmd(CMD_ITEMS_PRESENTER_BIND), app);
-                    item_index += 1;
-                    prev = Some(item_window);
+                    let mut prev = None;
+                    for item_index in 0 .. window.data::<ItemsPresenter>(tree).items.len() {
+                        let item_window = match item_template.new_instance(tree, Some(panel), prev) {
+                            Ok(item_window) => item_window,
+                            Err(error) => return Self::show_error(tree, window, error),
+                        };
+                        item_window.set_source_index(tree, Some(item_index));
+                        item_window.raise(tree, Event::Cmd(CMD_ITEMS_PRESENTER_BIND), app);
+                        if focus_item_primary {
+                            focus_item_primary = false;
+                            item_window.set_focused_primary(tree, true);
+                        }
+                        if focus_item_secondary {
+                            focus_item_secondary = false;
+                            item_window.set_focused_secondary(tree, true);
+                        }
+                        prev = Some(item_window);
+                    }
                 }
             }
         }));
@@ -165,9 +129,10 @@ impl Widget for ItemsPresenterWidget {
             update_timer: None,
             error: false,
             items: Vec::new(),
-            templates_changed: false,
             tab_navigation: false,
             up_down_navigation: false,
+            focus_first_item_primary: false,
+            focus_first_item_secondary: false,
         })
     }
 
