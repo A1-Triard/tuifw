@@ -60,7 +60,7 @@ use alloc::string::{String, ToString};
 use timer_no_std::MonoClock;
 use tuifw_screen::{Error, Key};
 use tuifw_window::{Data, Event, EventHandler, Window, WindowTree, App};
-use tuifw::{CheckBox, ItemsPresenter, CMD_ITEMS_PRESENTER_BIND};
+use tuifw::{CheckBox, VirtItemsPresenter, CMD_VIRT_ITEMS_PRESENTER_BIND};
 
 #[derive(Clone)]
 struct Item {
@@ -106,9 +106,9 @@ impl EventHandler for ItemsEventHandler {
         event_source: Window,
         _state: &mut dyn App,
     ) -> bool {
-        if event == Event::Cmd(CMD_ITEMS_PRESENTER_BIND) {
+        if event == Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_BIND) {
             let item_index = event_source.source_index(tree).unwrap();
-            let item = ItemsPresenter::items(tree, window)[item_index].downcast_ref::<Item>().unwrap();
+            let item = VirtItemsPresenter::items(tree, window)[item_index].downcast_ref::<Item>().unwrap();
             let label = item.label.clone();
             CheckBox::set_text(tree, event_source, label);
             true
@@ -125,7 +125,7 @@ fn start() -> Result<(), Error> {
     let names = ui::build(tree)?;
     names.root.set_event_handler(tree, Some(Box::new(RootEventHandler)));
     names.items.set_event_handler(tree, Some(Box::new(ItemsEventHandler)));
-    ItemsPresenter::items_mut(tree, names.items, |items| {
+    VirtItemsPresenter::items_mut(tree, names.items, |items| {
         items.push(Box::new(Item { label: "Item ~1~".to_string() }));
         items.push(Box::new(Item { label: "Item ~2~".to_string() }));
         items.push(Box::new(Item { label: "Item ~3~".to_string() }));
@@ -142,7 +142,7 @@ fn start() -> Result<(), Error> {
         items.push(Box::new(Item { label: "Item 14".to_string() }));
         items.push(Box::new(Item { label: "Item 15".to_string() }));
     });
-    ItemsPresenter::set_focus_first_item_primary(tree, names.items, true);
+    VirtItemsPresenter::set_focus_first_item_primary(tree, names.items, true);
     let state = &mut State;
     tree.run(state)
 }
