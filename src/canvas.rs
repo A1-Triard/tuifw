@@ -1,5 +1,6 @@
 use crate::widget;
 use alloc::boxed::Box;
+use dynamic_cast::impl_supports_interfaces;
 use tuifw_screen_base::{Rect, Vector, Point};
 use tuifw_window::{Event, Layout, RenderPort, Widget, WidgetData, Window, WindowTree, App};
 
@@ -27,6 +28,8 @@ impl Canvas {
 
 #[derive(Clone, Default)]
 pub struct CanvasWidget;
+
+impl_supports_interfaces!(CanvasWidget);
 
 impl Widget for CanvasWidget {
     fn new(&self) -> Box<dyn WidgetData> {

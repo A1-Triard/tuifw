@@ -1,6 +1,7 @@
 use crate::widget;
 use alloc::boxed::Box;
 use alloc::string::String;
+use dynamic_cast::impl_supports_interfaces;
 use either::Left;
 use tuifw_screen_base::{Rect, Vector, Thickness, text_width, HAlign, VAlign, Error};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App};
@@ -32,6 +33,8 @@ impl Frame {
 
 #[derive(Clone, Default)]
 pub struct FrameWidget;
+
+impl_supports_interfaces!(FrameWidget);
 
 impl Widget for FrameWidget {
     fn new(&self) -> Box<dyn WidgetData> {

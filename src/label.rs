@@ -1,6 +1,7 @@
 use crate::widget;
 use alloc::boxed::Box;
 use alloc::string::String;
+use dynamic_cast::impl_supports_interfaces;
 use either::Left;
 use tuifw_screen_base::{Point, Rect, Vector, Key, Error};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, Timer, label_width, label};
@@ -40,6 +41,8 @@ impl Label {
 
 #[derive(Clone, Default)]
 pub struct LabelWidget;
+
+impl_supports_interfaces!(LabelWidget);
 
 impl Widget for LabelWidget {
     fn new(&self) -> Box<dyn WidgetData> {

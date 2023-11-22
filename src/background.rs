@@ -1,6 +1,7 @@
 use crate::widget;
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
+use dynamic_cast::impl_supports_interfaces;
 use either::Left;
 use tuifw_screen_base::{Rect, Vector, Error};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App};
@@ -27,6 +28,8 @@ impl Background {
 
 #[derive(Clone, Default)]
 pub struct BackgroundWidget;
+
+impl_supports_interfaces!(BackgroundWidget);
 
 impl Widget for BackgroundWidget {
     fn new(&self) -> Box<dyn WidgetData> {

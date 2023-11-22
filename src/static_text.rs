@@ -1,6 +1,7 @@
 use crate::widget;
 use alloc::boxed::Box;
 use alloc::string::String;
+use dynamic_cast::impl_supports_interfaces;
 use either::Left;
 use tuifw_screen_base::{Point, Rect, Vector, text_width, Error};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App};
@@ -26,6 +27,8 @@ impl StaticText {
 
 #[derive(Clone, Default)]
 pub struct StaticTextWidget;
+
+impl_supports_interfaces!(StaticTextWidget);
 
 impl Widget for StaticTextWidget {
     fn new(&self) -> Box<dyn WidgetData> {

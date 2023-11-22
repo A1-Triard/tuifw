@@ -1,5 +1,6 @@
 #![feature(effects)]
 #![feature(never_type)]
+#![feature(ptr_metadata)]
 
 #![deny(warnings)]
 #![doc(test(attr(deny(warnings))))]
@@ -26,8 +27,10 @@ use components_arena::{Arena, Component, Id, NewtypeComponentId};
 use core::cmp::{max, min};
 use core::mem::replace;
 use core::ops::RangeInclusive;
+use core::ptr::{DynMetadata, Pointee};
 use downcast_rs::{Downcast, impl_downcast};
 use dyn_clone::{DynClone, clone_trait_object};
+use dynamic_cast::{SupportsInterfaces, dyn_cast_box};
 use either::{Either, Left, Right};
 use iter_identify_first_last::IteratorIdentifyFirstLastExt;
 use macro_attr_2018::macro_attr;
@@ -267,7 +270,7 @@ pub enum Visibility {
     Collapsed
 }
 
-pub trait Widget: DynClone {
+pub trait Widget: DynClone + SupportsInterfaces {
     #[allow(clippy::wrong_self_convention)]
     #[allow(clippy::new_ret_no_self)]
     fn new(&self) -> Box<dyn WidgetData>;
@@ -619,6 +622,16 @@ impl Window {
             tree.arena[window.0].post_process = Some(id);
         }
         Ok(window)
+    }
+
+    pub fn widget_extension<DynInterface: ?Sized + 'static>(
+        self,
+        tree: &WindowTree
+    ) -> Option<Box<DynInterface>> where
+        DynInterface: Pointee<Metadata=DynMetadata<DynInterface>>
+    {
+        let widget = tree.arena[self.0].widget.clone();
+        dyn_cast_box(widget)
     }
 
     pub fn source_index(self, tree: &WindowTree) -> Option<usize> {

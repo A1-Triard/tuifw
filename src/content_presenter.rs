@@ -1,6 +1,7 @@
 use crate::{widget, StaticText};
 use alloc::boxed::Box;
 use alloc::string::ToString;
+use dynamic_cast::impl_supports_interfaces;
 use either::Right;
 use tuifw_screen_base::{Rect, Vector, Error, Fg, Bg};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App, Timer, Data};
@@ -80,6 +81,8 @@ impl ContentPresenter {
 
 #[derive(Clone, Default)]
 pub struct ContentPresenterWidget;
+
+impl_supports_interfaces!(ContentPresenterWidget);
 
 impl Widget for ContentPresenterWidget {
     fn new(&self) -> Box<dyn WidgetData> {

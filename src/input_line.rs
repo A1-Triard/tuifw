@@ -4,6 +4,7 @@ use alloc::string::String;
 use core::ops::Range;
 use core::str::FromStr;
 use dyn_clone::{DynClone, clone_trait_object};
+use dynamic_cast::impl_supports_interfaces;
 use either::Left;
 use tuifw_screen_base::{Key, Point, Rect, Vector, char_width, text_width};
 use tuifw_screen_base::{Thickness, Error};
@@ -225,6 +226,8 @@ impl InputLine {
 
 #[derive(Clone, Default)]
 pub struct InputLineWidget;
+
+impl_supports_interfaces!(InputLineWidget);
 
 impl Widget for InputLineWidget {
     fn new(&self) -> Box<dyn WidgetData> {

@@ -5,10 +5,17 @@ use alloc::vec::Vec;
 use core::cmp::{max, min};
 use core::mem::{replace, size_of};
 use core::ops::Range;
+use dynamic_cast::impl_supports_interfaces;
 use either::Right;
 use tuifw_screen_base::{Rect, Vector, Error, Fg, Bg, Thickness, Key};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App, Timer, Data};
 use tuifw_window::Visibility;
+
+pub trait VirtScrollViewerWidgetExtension {
+    fn set_offset(&self, tree: &mut WindowTree, window: Window, vertical: bool, value: i16);
+    fn set_viewport(&self, tree: &mut WindowTree, window: Window, vertical: bool, value: i16);
+    fn set_extent(&self, tree: &mut WindowTree, window: Window, vertical: bool, value: i16);
+}
 
 pub const CMD_VIRT_ITEMS_PRESENTER_BIND: u16 = 150;
 pub const CMD_VIRT_ITEMS_PRESENTER_UNBIND: u16 = 151;
@@ -16,13 +23,13 @@ pub const CMD_VIRT_ITEMS_PRESENTER_UNBIND: u16 = 151;
 widget! {
     #[widget(VirtItemsPresenterWidget, init=init)]
     pub struct VirtItemsPresenter {
-        #[property(ref, arrange, on_changed=on_templates_changed)]
+        #[property(ref, arrange, on_changed=on_items_changed)]
         items: Vec<Box<dyn Data>>,
-        #[property(copy, measure, on_changed=on_templates_changed)]
+        #[property(copy, measure, on_changed=on_vertical_changed)]
         vertical: bool,
         #[property(copy, on_changed=on_templates_changed)]
         item_template: Option<Window>,
-        #[property(copy, on_changed=update)]
+        #[property(copy, on_changed=on_offset_changed)]
         offset: i16,
         viewport: i16,
         item_size: i16,
@@ -77,8 +84,53 @@ impl VirtItemsPresenter {
         error_text.set_visibility(tree, Visibility::Visible);
     }
 
+    fn on_items_changed(tree: &mut WindowTree, window: Window) {
+        Self::on_extent_changed(tree, window);
+        Self::on_templates_changed(tree, window);
+    }
+
+    fn on_vertical_changed(tree: &mut WindowTree, window: Window) {
+        let viewport = window.inner_bounds(tree).size;
+        let data = window.data::<VirtItemsPresenter>(tree);
+        let vertical = data.vertical;
+        let offset = data.offset;
+        let viewport = if vertical { viewport.y } else { viewport.x };
+        let extent = (data.items.len() as u16 as i16).wrapping_mul(data.item_size);
+        if let Some(parent) = window.parent(tree) {
+            if let Some(sv) = parent.widget_extension::<dyn VirtScrollViewerWidgetExtension>(tree) {
+                sv.set_extent(tree, parent, vertical, extent);
+                sv.set_offset(tree, parent, vertical, offset);
+                sv.set_viewport(tree, parent, vertical, viewport);
+            }
+        }
+        Self::on_templates_changed(tree, window);
+    }
+
+    fn on_extent_changed(tree: &mut WindowTree, window: Window) {
+        let data = window.data::<VirtItemsPresenter>(tree);
+        let vertical = data.vertical;
+        let extent = (data.items.len() as u16 as i16).wrapping_mul(data.item_size);
+        if let Some(parent) = window.parent(tree) {
+            if let Some(sv) = parent.widget_extension::<dyn VirtScrollViewerWidgetExtension>(tree) {
+                sv.set_extent(tree, parent, vertical, extent);
+            }
+        }
+    }
+
+    fn on_offset_changed(tree: &mut WindowTree, window: Window) {
+        let data = window.data::<VirtItemsPresenter>(tree);
+        let vertical = data.vertical;
+        let offset = data.offset;
+        if let Some(parent) = window.parent(tree) {
+            if let Some(sv) = parent.widget_extension::<dyn VirtScrollViewerWidgetExtension>(tree) {
+                sv.set_offset(tree, parent, vertical, offset);
+            }
+        }
+        Self::update(tree, window);
+    }
+
     fn on_focus_first_item_changed(tree: &mut WindowTree, window: Window) {
-        window.data_mut::<VirtItemsPresenter>(tree).offset = 0;
+        VirtItemsPresenter::set_offset(tree, window, 0);
         Self::on_templates_changed(tree, window);
     }
 
@@ -233,6 +285,8 @@ impl VirtItemsPresenter {
 #[derive(Clone, Default)]
 pub struct VirtItemsPresenterWidget;
 
+impl_supports_interfaces!(VirtItemsPresenterWidget);
+
 impl Widget for VirtItemsPresenterWidget {
     fn new(&self) -> Box<dyn WidgetData> {
         Box::new(VirtItemsPresenter {
@@ -322,31 +376,41 @@ impl Widget for VirtItemsPresenterWidget {
             .and_then(|x| x.first_child(tree))
             .map_or(Vector { x: 1, y: 1 }, |item| item.render_bounds(tree).size)
         ;
-        let data = window.data::<VirtItemsPresenter>(tree);
+        let data = window.data_mut::<VirtItemsPresenter>(tree);
         let vertical = data.vertical;
         if vertical {
             size.y = final_inner_bounds.h();
-            let data = window.data_mut::<VirtItemsPresenter>(tree);
             if data.viewport != size.y {
                 data.viewport = size.y;
+                if let Some(parent) = window.parent(tree) {
+                    if let Some(sv) = parent.widget_extension::<dyn VirtScrollViewerWidgetExtension>(tree) {
+                        sv.set_viewport(tree, parent, vertical, size.y);
+                    }
+                }
                 VirtItemsPresenter::update(tree, window);
             }
             let data = window.data_mut::<VirtItemsPresenter>(tree);
             if data.item_size != item_size.y {
                 data.item_size = item_size.y;
                 VirtItemsPresenter::update(tree, window);
+                VirtItemsPresenter::on_extent_changed(tree, window);
             }
         } else {
             size.x = final_inner_bounds.w();
-            let data = window.data_mut::<VirtItemsPresenter>(tree);
             if data.viewport != size.x {
                 data.viewport = size.x;
+                if let Some(parent) = window.parent(tree) {
+                    if let Some(sv) = parent.widget_extension::<dyn VirtScrollViewerWidgetExtension>(tree) {
+                        sv.set_viewport(tree, parent, vertical, size.x);
+                    }
+                }
                 VirtItemsPresenter::update(tree, window);
             }
             let data = window.data_mut::<VirtItemsPresenter>(tree);
             if data.item_size != item_size.x {
                 data.item_size = item_size.x;
                 VirtItemsPresenter::update(tree, window);
+                VirtItemsPresenter::on_extent_changed(tree, window);
             }
         }
         size
@@ -403,7 +467,7 @@ impl Widget for VirtItemsPresenterWidget {
                             if focus == event_source.parent(tree).unwrap().first_child(tree).unwrap() {
                                 let data = window.data_mut::<VirtItemsPresenter>(tree);
                                 data.focus_first_item_secondary_once = true;
-                                data.offset = 0;
+                                VirtItemsPresenter::set_offset(tree, window, 0);
                                 VirtItemsPresenter::on_templates_changed(tree, window);
                             } else {
                                 focus.set_focused_secondary(tree, true);
@@ -413,7 +477,7 @@ impl Widget for VirtItemsPresenterWidget {
                             if focus == event_source.parent(tree).unwrap().first_child(tree).unwrap() {
                                 let data = window.data_mut::<VirtItemsPresenter>(tree);
                                 data.focus_first_item_primary_once = true;
-                                data.offset = 0;
+                                VirtItemsPresenter::set_offset(tree, window, 0);
                                 VirtItemsPresenter::on_templates_changed(tree, window);
                             } else {
                                 focus.set_focused_primary(tree, true);

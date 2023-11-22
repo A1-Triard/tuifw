@@ -1,6 +1,7 @@
 use crate::widget;
 use alloc::boxed::Box;
 use alloc::string::String;
+use dynamic_cast::impl_supports_interfaces;
 use either::Left;
 use tuifw_screen_base::{Key, Point, Rect, Vector, Error};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App};
@@ -57,6 +58,8 @@ impl RadioButton {
 
 #[derive(Clone, Default)]
 pub struct RadioButtonWidget;
+
+impl_supports_interfaces!(RadioButtonWidget);
 
 impl Widget for RadioButtonWidget {
     fn new(&self) -> Box<dyn WidgetData> {

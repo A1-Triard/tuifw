@@ -1,5 +1,6 @@
 use crate::widget;
 use alloc::boxed::Box;
+use dynamic_cast::impl_supports_interfaces;
 use tuifw_screen_base::{Rect, Vector, Thickness, Point};
 use tuifw_window::{Event, Layout, RenderPort, Widget, WidgetData, Window, WindowTree, App};
 
@@ -30,6 +31,8 @@ impl DockPanel {
 
 #[derive(Clone, Default)]
 pub struct DockPanelWidget;
+
+impl_supports_interfaces!(DockPanelWidget);
 
 impl Widget for DockPanelWidget {
     fn new(&self) -> Box<dyn WidgetData> {
