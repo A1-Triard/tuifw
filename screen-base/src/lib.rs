@@ -24,7 +24,6 @@ use core::alloc::Allocator;
 use core::fmt::{self, Debug, Display, Formatter};
 use core::num::NonZeroU16;
 use core::ops::Range;
-use core::option::{Option};
 use enum_derive_2018::{EnumDisplay, EnumFromStr, IterVariants};
 use macro_attr_2018::macro_attr;
 use unicode_width::UnicodeWidthChar;

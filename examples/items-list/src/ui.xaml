@@ -1,10 +1,10 @@
 <Background xmlns='https://a1-triard.github.io/tuifw/2023/xaml' Name="root">
-  <Frame HAlign="Center" VAlign="Center" Height="6">
+  <ScrollViewer Name="scroll" HAlign="Center" VAlign="Center" Height="6" VScroll="True">
     <ItemsPresenter Name="items" TabNavigation="True" UpDownNavigation="True">
       <ItemsPresenter.PanelTemplate>
         <StackPanel />
       </ItemsPresenter.PanelTemplate>
       <CheckBox />
     </ItemsPresenter>
-  </Frame>
+  </ScrollViewer>
 </Background>

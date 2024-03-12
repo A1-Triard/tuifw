@@ -60,7 +60,7 @@ use alloc::string::{String, ToString};
 use timer_no_std::MonoClock;
 use tuifw_screen::{Error, Key};
 use tuifw_window::{Data, Event, EventHandler, Window, WindowTree, App};
-use tuifw::{CheckBox, ItemsPresenter, CMD_ITEMS_PRESENTER_BIND};
+use tuifw::{CheckBox, ItemsPresenter, CMD_ITEMS_PRESENTER_BIND, ScrollViewer};
 
 #[derive(Clone)]
 struct Item {
@@ -143,6 +143,7 @@ fn start() -> Result<(), Error> {
         items.push(Box::new(Item { label: "Item 15".to_string() }));
     });
     ItemsPresenter::set_focus_first_item_primary(tree, names.items, true);
+    ScrollViewer::set_v_offset(tree, names.scroll, 1);
     let state = &mut State;
     tree.run(state)
 }

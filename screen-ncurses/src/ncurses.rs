@@ -1,7 +1,6 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
-use core::mem::MaybeUninit;
 use libc::*;
 
 include!(concat!(env!("OUT_DIR"), "/curses_types.rs"));
@@ -44,13 +43,6 @@ extern {
 }
 
 pub type attr_t = chtype;
-
-#[repr(C)]
-#[derive(Debug, Clone)]
-pub struct cchar_t {
-    pub attr: attr_t,
-    pub chars: [MaybeUninit<wchar_t>; CCHARW_MAX],
-}
 
 extern "C" {
     pub static mut curscr: *mut WINDOW;

@@ -126,6 +126,12 @@ pub struct Registered {
     pub frame_text: XamlProperty,
     pub frame_text_align: XamlProperty,
 
+    pub scroll_viewer: XamlStruct,
+    pub scroll_viewer_text: XamlProperty,
+    pub scroll_viewer_text_align: XamlProperty,
+    pub scroll_viewer_h_scroll: XamlProperty,
+    pub scroll_viewer_v_scroll: XamlProperty,
+
     pub label: XamlStruct,
     pub label_text: XamlProperty,
     pub label_focus: XamlProperty,
@@ -260,6 +266,20 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
     let frame_text = XamlProperty::new(xaml, frame, "Text", XamlType::Literal(string), false, false);
     let frame_text_align = XamlProperty::new(
         xaml, frame, "TextAlign", XamlType::Literal(h_align), false, false
+    );
+
+    let scroll_viewer = XamlStruct::new(xaml, Some(widget), XMLNS, "ScrollViewer");
+    let scroll_viewer_text = XamlProperty::new(
+        xaml, scroll_viewer, "Text", XamlType::Literal(string), false, false
+    );
+    let scroll_viewer_text_align = XamlProperty::new(
+        xaml, scroll_viewer, "TextAlign", XamlType::Literal(h_align), false, false
+    );
+    let scroll_viewer_h_scroll = XamlProperty::new(
+        xaml, scroll_viewer, "HScroll", XamlType::Literal(boolean), false, false
+    );
+    let scroll_viewer_v_scroll = XamlProperty::new(
+        xaml, scroll_viewer, "VScroll", XamlType::Literal(boolean), false, false
     );
 
     let label = XamlStruct::new(xaml, Some(widget), XMLNS, "Label");
@@ -551,6 +571,20 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
         tuifw::Frame::set_text_align(tree, {}, {});
     " }, obj, value))));
 
+    set_widget_ctor(xaml, scroll_viewer, "tuifw::ScrollViewer", widget_children);
+    scroll_viewer_text.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        tuifw::ScrollViewer::set_text(tree, {}, {});
+    " }, obj, value))));
+    scroll_viewer_text_align.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        tuifw::ScrollViewer::set_text_align(tree, {}, {});
+    " }, obj, value))));
+    scroll_viewer_h_scroll.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        tuifw::ScrollViewer::set_h_scroll(tree, {}, {});
+    " }, obj, value))));
+    scroll_viewer_v_scroll.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        tuifw::ScrollViewer::set_v_scroll(tree, {}, {});
+    " }, obj, value))));
+
     set_widget_ctor(xaml, label, "tuifw::Label", widget_children);
     label_text.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         tuifw::Label::set_text(tree, {}, {});
@@ -703,6 +737,12 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
         frame_double,
         frame_text,
         frame_text_align,
+
+        scroll_viewer,
+        scroll_viewer_text,
+        scroll_viewer_text_align,
+        scroll_viewer_h_scroll,
+        scroll_viewer_v_scroll,
 
         label,
         label_text,

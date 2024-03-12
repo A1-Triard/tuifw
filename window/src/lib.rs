@@ -398,6 +398,7 @@ macro_attr! {
         data: Box<dyn WidgetData>,
         layout: Option<Box<dyn Layout>>,
         palette: Palette,
+        clip: Option<Rect>,
         measure_size: Option<(Option<i16>, Option<i16>)>,
         desired_size: Vector,
         arrange_size: Option<Vector>,
@@ -583,6 +584,7 @@ impl Window {
                 data,
                 layout: None,
                 palette: Palette::new(),
+                clip: None,
                 measure_size: None,
                 desired_size: Vector::null(),
                 arrange_size: None,
@@ -640,6 +642,11 @@ impl Window {
 
     pub fn set_source_index(self, tree: &mut WindowTree, value: Option<usize>) {
         tree.arena[self.0].source_index = value;
+    }
+
+    pub fn set_clip(self, tree: &mut WindowTree, value: Option<Rect>) {
+        tree.arena[self.0].clip = value;
+        self.invalidate_render(tree);
     }
 
     pub fn invalidate_measure(self, tree: &mut WindowTree) {
@@ -1547,10 +1554,14 @@ impl<'clock> WindowTree<'clock> {
             return;
         }
         let bounds = self.arena[window.0].window_bounds.offset(offset);
-        let clipped_bounds = bounds.intersect(clip_bounds);
+        let offset = bounds.tl.offset_from(Point { x: 0, y: 0 });
+        let clip = self.arena[window.0].clip.map(|x| x.offset(offset));
+        let mut clipped_bounds = bounds.intersect(clip_bounds);
+        if let Some(clip) = clip {
+            clipped_bounds = clipped_bounds.intersect(clip);
+        }
         let screen = self.screen();
         if !rect_invalidated(screen, clipped_bounds) { return; }
-        let offset = bounds.tl.offset_from(Point { x: 0, y: 0 });
         let screen = self.screen.take().expect("WindowTree is in invalid state");
         let mut port = RenderPort {
             screen,
