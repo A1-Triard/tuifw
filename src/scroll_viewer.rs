@@ -203,6 +203,43 @@ impl Widget for ScrollViewerWidget {
         final_inner_bounds.size
     }
 
+    fn bring_into_view(
+        &self,
+        tree: &mut WindowTree,
+        window: Window,
+        rect: Rect,
+    ) -> bool {
+        let bounds = window.inner_bounds(tree);
+        let bounds = Thickness::all(1).shrink_rect(bounds);
+        let data = window.data_mut::<ScrollViewer>(tree);
+        if data.v_scroll {
+            let offset = data.v_offset;
+            if rect.v_range().intersect(bounds.v_range()).is_empty() {
+                let from_top = rect.t().wrapping_sub(bounds.t()).checked_abs().map_or(i16::MIN, |x| -x);
+                let from_bottom = rect.b().wrapping_sub(bounds.b()).checked_abs().map_or(i16::MIN, |x| -x);
+                if from_top >= from_bottom {
+                    ScrollViewer::set_v_offset(tree, window, offset.wrapping_add(from_top));
+                } else {
+                    ScrollViewer::set_v_offset(tree, window, offset.wrapping_sub(from_bottom));
+                }
+            }
+        }
+        let data = window.data_mut::<ScrollViewer>(tree);
+        if data.h_scroll {
+            let offset = data.h_offset;
+            if rect.h_range().intersect(bounds.h_range()).is_empty() {
+                let from_left = rect.l().wrapping_sub(bounds.l()).checked_abs().map_or(i16::MIN, |x| -x);
+                let from_right = rect.r().wrapping_sub(bounds.r()).checked_abs().map_or(i16::MIN, |x| -x);
+                if from_left >= from_right {
+                    ScrollViewer::set_h_offset(tree, window, offset.wrapping_add(from_left));
+                } else {
+                    ScrollViewer::set_h_offset(tree, window, offset.wrapping_sub(from_right));
+                }
+            }
+        }
+        true
+    }
+
     fn update(
         &self,
         _tree: &mut WindowTree,
