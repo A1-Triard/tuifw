@@ -2,7 +2,6 @@
 
 use std::env::{self};
 use std::path::PathBuf;
-use tuifw_xaml::{self};
 use tuifw_xaml::xaml::Xaml;
 use tuifw_xaml::preprocessor::preprocess_xaml_file;
 
