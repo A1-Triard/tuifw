@@ -1,4 +1,5 @@
 use alloc::boxed::Box;
+use dynamic_cast::impl_supports_interfaces;
 use tuifw::widget;
 use tuifw_screen::{Point, Rect, Vector, Fg, Bg};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App};
@@ -10,6 +11,8 @@ widget! {
 
 #[derive(Clone, Default)]
 pub struct FloatingFrameWidget;
+
+impl_supports_interfaces!(FloatingFrameWidget);
 
 impl Widget for FloatingFrameWidget {
     fn new(&self) -> Box<dyn WidgetData> {
