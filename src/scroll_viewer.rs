@@ -111,6 +111,35 @@ impl Widget for ScrollViewerWidget {
         rp.tr_edge(bounds.tr_inner(), true, color);
         rp.br_edge(bounds.br_inner(), true, color);
         rp.bl_edge(bounds.bl_inner(), true, color);
+        let indicator_area = Thickness::all(1).shrink_rect(bounds);
+        if data.v_scroll {
+            let v_indicator_range = (indicator_area.h() as u16).saturating_sub(1) as i16;
+            let v_indicator =
+                (
+                    (
+                        i32::from(data.v_offset) * i32::from(v_indicator_range) +
+                        i32::from(data.v_extent - data.v_viewport) / 2
+                    )
+                    /
+                    i32::from(data.v_extent - data.v_viewport)
+                ) as i16
+            ;
+            rp.text(Point { x: bounds.r_inner(), y: indicator_area.t().wrapping_add(v_indicator) }, color, "╬");
+        }
+        if data.h_scroll {
+            let h_indicator_range = (indicator_area.w() as u16).saturating_sub(1) as i16;
+            let h_indicator =
+                (
+                    (
+                        i32::from(data.h_offset) * i32::from(h_indicator_range) +
+                        i32::from(data.h_extent - data.h_viewport) / 2
+                    )
+                    /
+                    i32::from(data.h_extent - data.h_viewport)
+                ) as i16
+            ;
+            rp.text(Point { x: indicator_area.l().wrapping_add(h_indicator), y: bounds.b_inner() }, color, "╩");
+        }
         if !data.text.is_empty() {
             let text_area_bounds = Thickness::new(2, 0, 2, 0).shrink_rect(bounds.t_line());
             let text_width = text_width(&data.text);
