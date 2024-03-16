@@ -1,7 +1,7 @@
 <Background xmlns='https://a1-triard.github.io/tuifw/2023/xaml' Name="root">
   <Frame HAlign="Center" VAlign="Center" TextAlign="Center" Text="Options">
     <StackPanel Margin="1,0,1,0" HAlign="Center">
-      <StackPanel Margin="0,0,0,1">
+      <StackPanel>
         <CheckBox Text="Option ~1~" Name="o_1" FocusTab="o_2" FocusDown="o_2" FocusedPrimary="True" />
         <CheckBox Text="Option ~2~" IsOn="True" Name="o_2" FocusTab="r_1" FocusDown="r_1" />
         <Frame Text="Radio Buttons">
