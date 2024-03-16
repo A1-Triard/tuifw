@@ -1,4 +1,5 @@
 use crate::widget;
+use crate::virt_scroll_viewer::*;
 use alloc::boxed::Box;
 use alloc::string::String;
 use core::cmp::max;
@@ -27,6 +28,7 @@ widget! {
         #[property(copy, arrange)]
         v_offset: i16,
         v_viewport: i16,
+        has_virtual_child: bool,
     }
 }
 
@@ -65,7 +67,39 @@ impl ScrollViewer {
 #[derive(Clone, Default)]
 pub struct ScrollViewerWidget;
 
-impl_supports_interfaces!(ScrollViewerWidget);
+impl_supports_interfaces!(ScrollViewerWidget: VirtScrollViewerWidgetExtension);
+
+impl VirtScrollViewerWidgetExtension for ScrollViewerWidget {
+    fn set_offset(&self, tree: &mut WindowTree, window: Window, vertical: bool, value: i16) {
+        let data = window.data_mut::<ScrollViewer>(tree);
+        if vertical {
+            data.v_offset = value;
+        } else {
+            data.h_offset = value;
+        }
+        window.invalidate_render(tree);
+    }
+
+    fn set_viewport(&self, tree: &mut WindowTree, window: Window, vertical: bool, value: i16) {
+        let data = window.data_mut::<ScrollViewer>(tree);
+        if vertical {
+            data.v_viewport = value;
+        } else {
+            data.h_viewport = value;
+        }
+        window.invalidate_render(tree);
+    }
+
+    fn set_extent(&self, tree: &mut WindowTree, window: Window, vertical: bool, value: i16) {
+        let data = window.data_mut::<ScrollViewer>(tree);
+        if vertical {
+            data.v_extent = value;
+        } else {
+            data.h_extent = value;
+        }
+        window.invalidate_render(tree);
+    }
+}
 
 impl Widget for ScrollViewerWidget {
     fn new(&self) -> Box<dyn WidgetData> {
@@ -79,6 +113,7 @@ impl Widget for ScrollViewerWidget {
             v_extent: 0,
             v_offset: 0,
             v_viewport: 0,
+            has_virtual_child: false,
         })
     }
 
@@ -176,23 +211,39 @@ impl Widget for ScrollViewerWidget {
         let v_scroll = data.v_scroll;
         let available_size = Vector { x: available_width.unwrap_or(0), y: available_height.unwrap_or(0) };
         let children_size = Thickness::all(1).shrink_rect_size(available_size);
-        let children_width = if h_scroll || available_width.is_none() { None } else { Some(children_size.x) };
-        let children_height = if v_scroll || available_height.is_none() { None } else { Some(children_size.y) };
+        let mut virt = false;
         let mut size = Vector::null();
         if let Some(first_child) = window.first_child(tree) {
             let mut child = first_child;
             loop {
-                child.measure(tree, children_width, children_height, app);
+                let virtual_child = child.widget_extension::<dyn VirtItemsPresenterWidgetExtension>(tree)
+                    .is_some()
+                ;
+                if virtual_child { virt = true; }
+                let child_width = if (h_scroll && !virtual_child) || available_width.is_none() {
+                    None
+                } else {
+                    Some(children_size.x)
+                };
+                let child_height = if (v_scroll && !virtual_child) || available_height.is_none() {
+                    None
+                } else {
+                    Some(children_size.y)
+                };
+                child.measure(tree, child_width, child_height, app);
                 size = size.max(child.desired_size(tree));
                 child = child.next(tree);
                 if child == first_child { break; }
             }
         }
         let data = window.data_mut::<ScrollViewer>(tree);
-        data.h_extent = size.x;
-        data.h_viewport = children_size.x;
-        data.v_extent = size.y;
-        data.v_viewport = children_size.y;
+        data.has_virtual_child = virt;
+        if !virt {
+            data.h_extent = size.x;
+            data.h_viewport = children_size.x;
+            data.v_extent = size.y;
+            data.v_viewport = children_size.y;
+        }
         let size = Thickness::all(1).expand_rect_size(size);
         Vector {
             x: if h_scroll { available_size.x } else { size.x },
@@ -208,23 +259,31 @@ impl Widget for ScrollViewerWidget {
         app: &mut dyn App,
     ) -> Vector {
         let base_children_bounds = Thickness::all(1).shrink_rect(final_inner_bounds);
-        let data = window.data::<ScrollViewer>(tree);
-        let offset = -Vector { x: data.h_offset, y: data.v_offset };
-        let mut children_bounds = base_children_bounds.offset(offset);
-        if data.h_scroll {
-            children_bounds.size.x = data.h_extent;
-        }
-        if data.v_scroll {
-            children_bounds.size.y = data.v_extent;
-        }
         if let Some(first_child) = window.first_child(tree) {
             let mut child = first_child;
             loop {
-                child.arrange(tree, children_bounds, app);
-                child.set_clip(tree, Some(Rect {
-                    tl: Point { x: max(0, -offset.x), y: max(0, -offset.y) },
-                    size: base_children_bounds.size
-                }));
+                let virtual_child = child.widget_extension::<dyn VirtItemsPresenterWidgetExtension>(tree)
+                    .is_some()
+                ;
+                let child_bounds = if virtual_child {
+                    base_children_bounds
+                } else {
+                    let data = window.data::<ScrollViewer>(tree);
+                    let offset = -Vector { x: data.h_offset, y: data.v_offset };
+                    let mut child_bounds = base_children_bounds.offset(offset);
+                    if data.h_scroll {
+                        child_bounds.size.x = data.h_extent;
+                    }
+                    if data.v_scroll {
+                        child_bounds.size.y = data.v_extent;
+                    }
+                    child.set_clip(tree, Some(Rect {
+                        tl: Point { x: max(0, -offset.x), y: max(0, -offset.y) },
+                        size: base_children_bounds.size
+                    }));
+                    child_bounds
+                };
+                child.arrange(tree, child_bounds, app);
                 child = child.next(tree);
                 if child == first_child { break; }
             }
@@ -238,6 +297,8 @@ impl Widget for ScrollViewerWidget {
         window: Window,
         rect: Rect,
     ) -> bool {
+        let data = window.data::<ScrollViewer>(tree);
+        if data.has_virtual_child { return false; }
         let bounds = window.inner_bounds(tree);
         let bounds = Thickness::all(1).shrink_rect(bounds);
         let data = window.data_mut::<ScrollViewer>(tree);

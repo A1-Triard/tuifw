@@ -1,4 +1,5 @@
 use crate::{widget, StaticText, StackPanel};
+use crate::virt_scroll_viewer::*;
 use alloc::boxed::Box;
 use alloc::string::ToString;
 use alloc::vec::Vec;
@@ -10,12 +11,6 @@ use either::Right;
 use tuifw_screen_base::{Rect, Vector, Error, Fg, Bg, Thickness, Key};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App, Timer, Data};
 use tuifw_window::Visibility;
-
-pub trait VirtScrollViewerWidgetExtension {
-    fn set_offset(&self, tree: &mut WindowTree, window: Window, vertical: bool, value: i16);
-    fn set_viewport(&self, tree: &mut WindowTree, window: Window, vertical: bool, value: i16);
-    fn set_extent(&self, tree: &mut WindowTree, window: Window, vertical: bool, value: i16);
-}
 
 pub const CMD_VIRT_ITEMS_PRESENTER_BIND: u16 = 150;
 pub const CMD_VIRT_ITEMS_PRESENTER_UNBIND: u16 = 151;
@@ -285,7 +280,9 @@ impl VirtItemsPresenter {
 #[derive(Clone, Default)]
 pub struct VirtItemsPresenterWidget;
 
-impl_supports_interfaces!(VirtItemsPresenterWidget);
+impl_supports_interfaces!(VirtItemsPresenterWidget: VirtItemsPresenterWidgetExtension);
+
+impl VirtItemsPresenterWidgetExtension for VirtItemsPresenterWidget { }
 
 impl Widget for VirtItemsPresenterWidget {
     fn new(&self) -> Box<dyn WidgetData> {

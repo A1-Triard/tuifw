@@ -59,6 +59,8 @@ pub use virt_items_presenter::*;
 mod scroll_viewer;
 pub use scroll_viewer::*;
 
+pub mod virt_scroll_viewer;
+
 #[doc(hidden)]
 pub use alloc::boxed::Box as alloc_boxed_Box;
 #[doc(hidden)]
