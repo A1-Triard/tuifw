@@ -12,6 +12,7 @@ pub mod preprocessor;
 use indent::indent_all_by;
 use indoc::indoc;
 use std::str::FromStr;
+use tuifw_screen_base::{Bg, Fg};
 use xaml::*;
 
 pub const XMLNS: &str = "https://a1-triard.github.io/tuifw/2023/xaml";
@@ -64,6 +65,7 @@ pub struct Registered {
     pub v_align: XamlLiteral,
     pub dock: XamlLiteral,
     pub visibility: XamlLiteral,
+    pub color: XamlLiteral,
 
     pub validator: XamlStruct,
 
@@ -96,6 +98,9 @@ pub struct Registered {
     pub widget_max_height: XamlProperty,
     pub widget_is_enabled: XamlProperty,
     pub widget_visibility: XamlProperty,
+    pub widget_color_0: XamlProperty,
+    pub widget_color_background: XamlProperty,
+    pub widget_color_text: XamlProperty,
 
     pub background: XamlStruct,
     pub background_show_pattern: XamlProperty,
@@ -172,6 +177,7 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
     let v_align = XamlLiteral::new(xaml, XMLNS, "VAlign");
     let dock = XamlLiteral::new(xaml, XMLNS, "Dock");
     let visibility = XamlLiteral::new(xaml, XMLNS, "Visibility");
+    let color = XamlLiteral::new(xaml, XMLNS, "Color");
 
     let validator = XamlStruct::new(xaml, None, XMLNS, "Validator");
 
@@ -223,6 +229,15 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
     );
     let widget_visibility = XamlProperty::new(
         xaml, widget, "Visibility", XamlType::Literal(visibility), false, false
+    );
+    let widget_color_0 = XamlProperty::new(
+        xaml, widget, "Color0", XamlType::Literal(color), false, false
+    );
+    let widget_color_background = XamlProperty::new(
+        xaml, widget, "ColorBackground", XamlType::Literal(color), false, false
+    );
+    let widget_color_text = XamlProperty::new(
+        xaml, widget, "ColorText", XamlType::Literal(color), false, false
     );
 
     let background = XamlStruct::new(xaml, Some(widget), XMLNS, "Background");
@@ -393,6 +408,16 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
             None
         }
     })));
+    color.set_ctor(xaml, Some(Box::new(|x| {
+        let parts = x.split('/').collect::<Vec<_>>();
+        if parts.len() == 2 {
+            let fg = Fg::from_str(parts[0]).ok()?;
+            let bg = Bg::from_str(parts[1]).ok()?;
+            Some(format!("(tuifw_screen_base::Fg::{fg}, tuifw_screen_base::Bg::{bg})"))
+        } else {
+            None
+        }
+    })));
 
     xaml.append_preamble(indoc! { "
         extern crate alloc;
@@ -514,6 +539,15 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
     " }, obj, value))));
     widget_max_height.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_max_height(tree, {});
+    " }, obj, value))));
+    widget_color_0.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_color(tree, 0, {});
+    " }, obj, value))));
+    widget_color_background.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_color(tree, tuifw_window::COLOR_BACKGROUND, {});
+    " }, obj, value))));
+    widget_color_text.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_color(tree, tuifw_window::COLOR_TEXT, {});
     " }, obj, value))));
 
     set_widget_ctor(xaml, background, "tuifw::Background", widget_children);
@@ -676,6 +710,7 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
         v_align,
         dock,
         visibility,
+        color,
 
         validator,
 
@@ -708,6 +743,9 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
         widget_max_height,
         widget_is_enabled,
         widget_visibility,
+        widget_color_0,
+        widget_color_background,
+        widget_color_text,
 
         background,
         background_show_pattern,

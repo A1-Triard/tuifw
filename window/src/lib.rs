@@ -929,6 +929,10 @@ impl Window {
         self.palette_mut(tree, |palette| replace(palette, value));
     }
 
+    pub fn set_color(self, tree: &mut WindowTree, i: u8, color: (Fg, Bg)) {
+        self.palette_mut(tree, |palette| palette.set(i, Right(color)));
+    }
+
     pub fn color(self, tree: &WindowTree, i: u8) -> (Fg, Bg) {
         let mut window = self;
         let mut index = i;

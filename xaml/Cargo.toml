@@ -17,6 +17,7 @@ components-arena = "4.1.1"
 indent = "0.1.1"
 indoc = "2.0.4"
 macro-attr-2018 = "3.0.0"
+tuifw-screen-base = { path = "../screen-base", version = "0.24.0" }
 xml-rs = "0.8.19"
 
 [badges]
