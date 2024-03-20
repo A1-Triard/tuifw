@@ -6,7 +6,7 @@ use core::cmp::max;
 use dynamic_cast::impl_supports_interfaces;
 use tuifw_screen_base::{Point, Rect, Vector, Thickness, text_width, HAlign, VAlign, Error};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App, Color};
-use tuifw_window::{COLOR_FRAME, COLORS, COLOR_IN_FRAME};
+use tuifw_window::{COLOR_FRAME};
 
 widget! {
     #[widget(ScrollViewerWidget, init=init_palette)]
@@ -35,9 +35,6 @@ impl ScrollViewer {
     fn init_palette(tree: &mut WindowTree, window: Window) -> Result<(), Error> {
         window.palette_mut(tree, |palette| {
             palette.set(0, Color::Palette(COLOR_FRAME));
-            for c in COLORS {
-                palette.set(c, Color::Palette(c + COLOR_IN_FRAME));
-            }
         });
         Ok(())
     }

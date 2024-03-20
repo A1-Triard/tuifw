@@ -100,8 +100,30 @@ pub struct Registered {
     pub widget_is_enabled: XamlProperty,
     pub widget_visibility: XamlProperty,
     pub widget_color_0: XamlProperty,
+    pub widget_color_1: XamlProperty,
+    pub widget_color_2: XamlProperty,
+    pub widget_color_3: XamlProperty,
+    pub widget_color_4: XamlProperty,
+    pub widget_color_5: XamlProperty,
+    pub widget_color_6: XamlProperty,
+    pub widget_color_7: XamlProperty,
+    pub widget_color_8: XamlProperty,
+    pub widget_color_9: XamlProperty,
+    pub widget_color_disabled: XamlProperty,
+    pub widget_color_hotkey: XamlProperty,
     pub widget_color_background: XamlProperty,
-    pub widget_color_text: XamlProperty,
+    pub widget_color_label: XamlProperty,
+    pub widget_color_input_line: XamlProperty,
+    pub widget_color_input_line_invalid: XamlProperty,
+    pub widget_color_input_line_focused: XamlProperty,
+    pub widget_color_input_line_focused_invalid: XamlProperty,
+    pub widget_color_input_line_focused_disabled: XamlProperty,
+    pub widget_color_button: XamlProperty,
+    pub widget_color_button_focused: XamlProperty,
+    pub widget_color_button_focused_hotkey: XamlProperty,
+    pub widget_color_button_focused_disabled: XamlProperty,
+    pub widget_color_button_pressed: XamlProperty,
+    pub widget_color_frame: XamlProperty,
 
     pub background: XamlStruct,
     pub background_show_pattern: XamlProperty,
@@ -239,11 +261,77 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
     let widget_color_0 = XamlProperty::new(
         xaml, widget, "Color0", XamlType::Literal(color), false, false
     );
+    let widget_color_1 = XamlProperty::new(
+        xaml, widget, "Color1", XamlType::Literal(color), false, false
+    );
+    let widget_color_2 = XamlProperty::new(
+        xaml, widget, "Color2", XamlType::Literal(color), false, false
+    );
+    let widget_color_3 = XamlProperty::new(
+        xaml, widget, "Color3", XamlType::Literal(color), false, false
+    );
+    let widget_color_4 = XamlProperty::new(
+        xaml, widget, "Color4", XamlType::Literal(color), false, false
+    );
+    let widget_color_5 = XamlProperty::new(
+        xaml, widget, "Color5", XamlType::Literal(color), false, false
+    );
+    let widget_color_6 = XamlProperty::new(
+        xaml, widget, "Color6", XamlType::Literal(color), false, false
+    );
+    let widget_color_7 = XamlProperty::new(
+        xaml, widget, "Color7", XamlType::Literal(color), false, false
+    );
+    let widget_color_8 = XamlProperty::new(
+        xaml, widget, "Color8", XamlType::Literal(color), false, false
+    );
+    let widget_color_9 = XamlProperty::new(
+        xaml, widget, "Color9", XamlType::Literal(color), false, false
+    );
+    let widget_color_disabled = XamlProperty::new(
+        xaml, widget, "ColorDisabled", XamlType::Literal(color), false, false
+    );
+    let widget_color_hotkey = XamlProperty::new(
+        xaml, widget, "ColorHotkey", XamlType::Literal(color), false, false
+    );
     let widget_color_background = XamlProperty::new(
         xaml, widget, "ColorBackground", XamlType::Literal(color), false, false
     );
-    let widget_color_text = XamlProperty::new(
-        xaml, widget, "ColorText", XamlType::Literal(color), false, false
+    let widget_color_label = XamlProperty::new(
+        xaml, widget, "ColorLabel", XamlType::Literal(color), false, false
+    );
+    let widget_color_input_line = XamlProperty::new(
+        xaml, widget, "ColorInputLine", XamlType::Literal(color), false, false
+    );
+    let widget_color_input_line_invalid = XamlProperty::new(
+        xaml, widget, "ColorInputLineInvalid", XamlType::Literal(color), false, false
+    );
+    let widget_color_input_line_focused = XamlProperty::new(
+        xaml, widget, "ColorInputLineFocused", XamlType::Literal(color), false, false
+    );
+    let widget_color_input_line_focused_invalid = XamlProperty::new(
+        xaml, widget, "ColorInputLineFocusedInvalid", XamlType::Literal(color), false, false
+    );
+    let widget_color_input_line_focused_disabled = XamlProperty::new(
+        xaml, widget, "ColorInputLineFocusedDisabled", XamlType::Literal(color), false, false
+    );
+    let widget_color_button = XamlProperty::new(
+        xaml, widget, "ColorButton", XamlType::Literal(color), false, false
+    );
+    let widget_color_button_focused = XamlProperty::new(
+        xaml, widget, "ColorButtonFocused", XamlType::Literal(color), false, false
+    );
+    let widget_color_button_focused_hotkey = XamlProperty::new(
+        xaml, widget, "ColorButtonFocusedHotkey", XamlType::Literal(color), false, false
+    );
+    let widget_color_button_focused_disabled = XamlProperty::new(
+        xaml, widget, "ColorButtonFocusedDisabled", XamlType::Literal(color), false, false
+    );
+    let widget_color_button_pressed = XamlProperty::new(
+        xaml, widget, "ColorButtonPressed", XamlType::Literal(color), false, false
+    );
+    let widget_color_frame = XamlProperty::new(
+        xaml, widget, "ColorFrame", XamlType::Literal(color), false, false
     );
 
     let background = XamlStruct::new(xaml, Some(widget), XMLNS, "Background");
@@ -556,11 +644,77 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
     widget_color_0.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_color(tree, 0, {});
     " }, obj, value))));
+    widget_color_1.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_color(tree, 1, {});
+    " }, obj, value))));
+    widget_color_2.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_color(tree, 2, {});
+    " }, obj, value))));
+    widget_color_3.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_color(tree, 3, {});
+    " }, obj, value))));
+    widget_color_4.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_color(tree, 4, {});
+    " }, obj, value))));
+    widget_color_5.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_color(tree, 5, {});
+    " }, obj, value))));
+    widget_color_6.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_color(tree, 6, {});
+    " }, obj, value))));
+    widget_color_7.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_color(tree, 7, {});
+    " }, obj, value))));
+    widget_color_8.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_color(tree, 8, {});
+    " }, obj, value))));
+    widget_color_9.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_color(tree, 9, {});
+    " }, obj, value))));
+    widget_color_disabled.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_color(tree, tuifw_window::COLOR_DISABLED, {});
+    " }, obj, value))));
+    widget_color_hotkey.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_color(tree, tuifw_window::COLOR_HOTKEY, {});
+    " }, obj, value))));
     widget_color_background.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_color(tree, tuifw_window::COLOR_BACKGROUND, {});
     " }, obj, value))));
-    widget_color_text.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
-        {}.set_color(tree, tuifw_window::COLOR_TEXT, {});
+    widget_color_label.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_color(tree, tuifw_window::COLOR_LABEL, {});
+    " }, obj, value))));
+    widget_color_input_line.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_color(tree, tuifw_window::COLOR_INPUT_LINE, {});
+    " }, obj, value))));
+    widget_color_input_line_invalid.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_color(tree, tuifw_window::COLOR_INPUT_LINE_INVALID, {});
+    " }, obj, value))));
+    widget_color_input_line_focused.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_color(tree, tuifw_window::COLOR_INPUT_LINE_FOCUSED, {});
+    " }, obj, value))));
+    widget_color_input_line_focused_invalid.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_color(tree, tuifw_window::COLOR_INPUT_LINE_FOCUSED_INVALID, {});
+    " }, obj, value))));
+    widget_color_input_line_focused_disabled.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_color(tree, tuifw_window::COLOR_INPUT_LINE_FOCUSED_DISABLED, {});
+    " }, obj, value))));
+    widget_color_button.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_color(tree, tuifw_window::COLOR_BUTTON, {});
+    " }, obj, value))));
+    widget_color_button_focused.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_color(tree, tuifw_window::COLOR_BUTTON_FOCUSED, {});
+    " }, obj, value))));
+    widget_color_button_focused_hotkey.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_color(tree, tuifw_window::COLOR_BUTTON_FOCUSED_HOTKEY, {});
+    " }, obj, value))));
+    widget_color_button_focused_disabled.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_color(tree, tuifw_window::COLOR_BUTTON_FOCUSED_DISABLED, {});
+    " }, obj, value))));
+    widget_color_button_pressed.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_color(tree, tuifw_window::COLOR_BUTTON_PRESSED, {});
+    " }, obj, value))));
+    widget_color_frame.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_color(tree, tuifw_window::COLOR_FRAME, {});
     " }, obj, value))));
 
     set_widget_ctor(xaml, background, "tuifw::Background", widget_children);
@@ -766,8 +920,30 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
         widget_is_enabled,
         widget_visibility,
         widget_color_0,
+        widget_color_1,
+        widget_color_2,
+        widget_color_3,
+        widget_color_4,
+        widget_color_5,
+        widget_color_6,
+        widget_color_7,
+        widget_color_8,
+        widget_color_9,
+        widget_color_disabled,
+        widget_color_hotkey,
         widget_color_background,
-        widget_color_text,
+        widget_color_label,
+        widget_color_input_line,
+        widget_color_input_line_invalid,
+        widget_color_input_line_focused,
+        widget_color_input_line_focused_invalid,
+        widget_color_input_line_focused_disabled,
+        widget_color_button,
+        widget_color_button_focused,
+        widget_color_button_focused_hotkey,
+        widget_color_button_focused_disabled,
+        widget_color_button_pressed,
+        widget_color_frame,
 
         background,
         background_show_pattern,

@@ -9,7 +9,7 @@ use tuifw_screen_base::{Key, Point, Rect, Vector, char_width, text_width};
 use tuifw_screen_base::{Thickness, Error};
 use tuifw_window::{Event, RenderPort, Timer, Widget, WidgetData, Window, WindowTree, App, Color};
 use tuifw_window::{CMD_GOT_PRIMARY_FOCUS, CMD_LOST_PRIMARY_FOCUS, CMD_LOST_ATTENTION};
-use tuifw_window::{COLOR_TEXT, COLOR_DISABLED, COLOR_INPUT_LINE_INVALID};
+use tuifw_window::{COLOR_INPUT_LINE, COLOR_DISABLED, COLOR_INPUT_LINE_INVALID};
 use tuifw_window::{COLOR_INPUT_LINE_FOCUSED, COLOR_INPUT_LINE_FOCUSED_DISABLED};
 use tuifw_window::{COLOR_INPUT_LINE_FOCUSED_INVALID};
 
@@ -88,7 +88,7 @@ widget! {
 impl InputLine {
     fn init_palette(tree: &mut WindowTree, window: Window) -> Result<(), Error> {
         window.palette_mut(tree, |palette| {
-            palette.set(0, Color::Palette(COLOR_TEXT));
+            palette.set(0, Color::Palette(COLOR_INPUT_LINE));
             palette.set(1, Color::Palette(COLOR_INPUT_LINE_INVALID));
             palette.set(2, Color::Palette(COLOR_DISABLED));
             palette.set(3, Color::Palette(COLOR_INPUT_LINE_FOCUSED));

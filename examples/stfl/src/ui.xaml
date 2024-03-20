@@ -1,7 +1,7 @@
 <Background xmlns="https://a1-triard.github.io/tuifw/2023/xaml" Name="root" FocusedPrimary="True">
   <StackPanel>
-    <Background Color0="Black/Brown">
-      <StackPanel Vertical="False" ColorText="Black/Brown">
+    <Background ColorBackground="Black/Brown" ColorLabel="Black/Brown">
+      <StackPanel Vertical="False">
         <Label Text="Little STFL example program" Margin="0,0,16,0" />
         <Label Text="Line number one" Margin="0,0,16,0" />
         <Label Text="Fun! Fun! Fun!" Margin="0,0,16,0" />
@@ -15,7 +15,7 @@
         <Label Text="test" />
       </StackPanel>
       <StackPanel>
-        <Label Text="Field A:" Margin="0,0,0,1" Color0=" />
+        <Label Text="Field A:" Margin="0,0,0,1" />
         <StretchPanel Vertical="False">
           <Label Text="Field B:" />
           <Label Text="Field C:" />

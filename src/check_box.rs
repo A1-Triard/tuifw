@@ -5,7 +5,7 @@ use dynamic_cast::impl_supports_interfaces;
 use tuifw_screen_base::{Key, Point, Rect, Vector, Error};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App, Color};
 use tuifw_window::{CMD_GOT_PRIMARY_FOCUS, CMD_LOST_PRIMARY_FOCUS, label_width, label};
-use tuifw_window::{COLOR_TEXT, COLOR_HOTKEY, COLOR_DISABLED};
+use tuifw_window::{COLOR_LABEL, COLOR_HOTKEY, COLOR_DISABLED};
 
 pub const CMD_CHECK_BOX_CLICK: u16 = 110;
 
@@ -24,7 +24,7 @@ widget! {
 impl CheckBox {
     fn init_palette(tree: &mut WindowTree, window: Window) -> Result<(), Error> {
         window.palette_mut(tree, |palette| {
-            palette.set(0, Color::Palette(COLOR_TEXT));
+            palette.set(0, Color::Palette(COLOR_LABEL));
             palette.set(1, Color::Palette(COLOR_HOTKEY));
             palette.set(2, Color::Palette(COLOR_DISABLED));
         });
