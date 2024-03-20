@@ -14,6 +14,10 @@ struct DockLayout {
 
 impl Layout for DockLayout { }
 
+impl Default for DockLayout {
+    fn default() -> Self { DockLayout { dock: None } }
+}
+
 widget! {
     #[widget(DockPanelWidget)]
     pub struct DockPanel { }
@@ -25,7 +29,7 @@ impl DockPanel {
     }
 
     pub fn set_dock(tree: &mut WindowTree, window: Window, value: Option<Dock>) {
-        window.set_layout(tree, Some(Box::new(DockLayout { dock: value })));
+        window.layout_mut(tree, |x: &mut DockLayout| x.dock = value);
     }
 }
 

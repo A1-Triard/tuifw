@@ -11,6 +11,10 @@ struct CanvasLayout {
 
 impl Layout for CanvasLayout { }
 
+impl Default for CanvasLayout {
+    fn default() -> Self { CanvasLayout { tl: Point { x: 0, y: 0 } } }
+}
+
 widget! {
     #[widget(CanvasWidget)]
     pub struct Canvas { }
@@ -22,7 +26,7 @@ impl Canvas {
     }
 
     pub fn set_tl(tree: &mut WindowTree, window: Window, value: Point) {
-        window.set_layout(tree, Some(Box::new(CanvasLayout { tl: value })));
+        window.layout_mut(tree, |x: &mut CanvasLayout| x.tl = value);
     }
 }
 

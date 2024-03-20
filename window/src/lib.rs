@@ -517,7 +517,8 @@ impl Window {
         let clone = tree.arena[self.0].cloning.unwrap();
         clone.set_palette(tree, self.palette(tree).clone());
         clone.set_visibility(tree, self.visibility(tree));
-        clone.set_layout(tree, self.layout_raw(tree).clone());
+        let layout = self.layout_raw(tree).clone();
+        clone.layout_raw_mut(tree, |x| replace(x, layout));
         clone.set_is_enabled(tree, self.is_enabled(tree));
         clone.set_h_align(tree, self.h_align(tree));
         clone.set_v_align(tree, self.v_align(tree));
@@ -806,7 +807,7 @@ impl Window {
         tree.arena[self.0].layout.as_ref().and_then(|x| x.downcast_ref::<T>())
     }
 
-    pub fn layout_mut<R>(
+    pub fn layout_raw_mut<R>(
         self,
         tree: &mut WindowTree,
         f: impl FnOnce(&mut Option<Box<dyn Layout>>) -> R
@@ -819,12 +820,20 @@ impl Window {
         res
     }
 
-    pub fn set_layout(
+    pub fn layout_mut<T: Layout + Default + 'static, R>(
         self,
         tree: &mut WindowTree,
-        value: Option<Box<dyn Layout>>
-    ) {
-        self.layout_mut(tree, |layout| replace(layout, value));
+        f: impl FnOnce(&mut T) -> R
+    ) -> R {
+        self.layout_raw_mut(tree, |layout| {
+            let layout = if let Some(layout) = layout.as_mut().and_then(|x| x.downcast_mut::<T>()) {
+                layout
+            } else {
+                *layout = Some(Box::new(T::default()));
+                layout.as_mut().unwrap().downcast_mut::<T>().unwrap()
+            };
+            f(layout)
+        })
     }
 
     pub fn focus_tab(self, tree: &WindowTree) -> Self {
