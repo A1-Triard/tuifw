@@ -17,6 +17,9 @@ extern crate alloc;
 mod stack_panel;
 pub use stack_panel::*;
 
+mod stretch_panel;
+pub use stretch_panel::*;
+
 mod dock_panel;
 pub use dock_panel::*;
 

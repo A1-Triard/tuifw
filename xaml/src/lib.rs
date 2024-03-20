@@ -58,6 +58,7 @@ pub struct Registered {
     pub int_16: XamlLiteral,
     pub uint_16: XamlLiteral,
     pub int_32: XamlLiteral,
+    pub float_32: XamlLiteral,
     pub float_64: XamlLiteral,
     pub thickness: XamlLiteral,
     pub point: XamlLiteral,
@@ -109,6 +110,10 @@ pub struct Registered {
 
     pub stack_panel: XamlStruct,
     pub stack_panel_vertical: XamlProperty,
+
+    pub stretch_panel: XamlStruct,
+    pub stretch_panel_vertical: XamlProperty,
+    pub widget_stretch: XamlProperty,
 
     pub dock_panel: XamlStruct,
     pub widget_dock: XamlProperty,
@@ -170,6 +175,7 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
     let int_16 = XamlLiteral::new(xaml, XMLNS, "I16");
     let uint_16 = XamlLiteral::new(xaml, XMLNS, "U16");
     let int_32 = XamlLiteral::new(xaml, XMLNS, "I32");
+    let float_32 = XamlLiteral::new(xaml, XMLNS, "F32");
     let float_64 = XamlLiteral::new(xaml, XMLNS, "F64");
     let thickness = XamlLiteral::new(xaml, XMLNS, "Thickness");
     let point = XamlLiteral::new(xaml, XMLNS, "Point");
@@ -255,6 +261,12 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
     let stack_panel_vertical = XamlProperty::new(
         xaml, stack_panel, "Vertical", XamlType::Literal(boolean), false, false
     );
+
+    let stretch_panel = XamlStruct::new(xaml, Some(widget), XMLNS, "StretchPanel");
+    let stretch_panel_vertical = XamlProperty::new(
+        xaml, stretch_panel, "Vertical", XamlType::Literal(boolean), false, false
+    );
+    let widget_stretch = XamlProperty::new(xaml, widget, "Stretch", XamlType::Literal(float_32), false, false);
 
     let dock_panel = XamlStruct::new(xaml, Some(widget), XMLNS, "DockPanel");
     let widget_dock = XamlProperty::new(xaml, widget, "Dock", XamlType::Literal(dock), false, false);
@@ -352,6 +364,7 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
     int_16.set_ctor(xaml, Some(Box::new(|x| i16::from_str(x).ok().map(|x| x.to_string()))));
     uint_16.set_ctor(xaml, Some(Box::new(|x| u16::from_str(x).ok().map(|x| x.to_string()))));
     int_32.set_ctor(xaml, Some(Box::new(|x| i32::from_str(x).ok().map(|x| x.to_string()))));
+    float_32.set_ctor(xaml, Some(Box::new(|x| f32::from_str(x).ok().map(|x| x.to_string()))));
     float_64.set_ctor(xaml, Some(Box::new(|x| f64::from_str(x).ok().map(|x| x.to_string()))));
     thickness.set_ctor(xaml, Some(Box::new(|x| {
         let parts = x.split(',').collect::<Vec<_>>();
@@ -566,6 +579,14 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
         tuifw::StackPanel::set_vertical(tree, {}, {});
     " }, obj, value))));
 
+    set_widget_ctor(xaml, stretch_panel, "tuifw::StretchPanel", widget_children);
+    stretch_panel_vertical.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        tuifw::StretchPanel::set_vertical(tree, {}, {});
+    " }, obj, value))));
+    widget_stretch.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        tuifw::StretchPanel::set_stretch(tree, {}, {});
+    " }, obj, value))));
+
     set_widget_ctor(xaml, dock_panel, "tuifw::DockPanel", widget_children);
     widget_dock.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         tuifw::DockPanel::set_dock(tree, {}, Some({}));
@@ -703,6 +724,7 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
         int_16,
         uint_16,
         int_32,
+        float_32,
         float_64,
         thickness,
         point,
@@ -754,6 +776,10 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
 
         stack_panel,
         stack_panel_vertical,
+
+        stretch_panel,
+        stretch_panel_vertical,
+        widget_stretch,
 
         dock_panel,
         widget_dock,
