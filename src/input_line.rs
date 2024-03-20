@@ -5,10 +5,9 @@ use core::ops::Range;
 use core::str::FromStr;
 use dyn_clone::{DynClone, clone_trait_object};
 use dynamic_cast::impl_supports_interfaces;
-use either::Left;
 use tuifw_screen_base::{Key, Point, Rect, Vector, char_width, text_width};
 use tuifw_screen_base::{Thickness, Error};
-use tuifw_window::{Event, RenderPort, Timer, Widget, WidgetData, Window, WindowTree, App};
+use tuifw_window::{Event, RenderPort, Timer, Widget, WidgetData, Window, WindowTree, App, Color};
 use tuifw_window::{CMD_GOT_PRIMARY_FOCUS, CMD_LOST_PRIMARY_FOCUS, CMD_LOST_ATTENTION};
 use tuifw_window::{COLOR_TEXT, COLOR_DISABLED, COLOR_INPUT_LINE_INVALID};
 use tuifw_window::{COLOR_INPUT_LINE_FOCUSED, COLOR_INPUT_LINE_FOCUSED_DISABLED};
@@ -89,12 +88,12 @@ widget! {
 impl InputLine {
     fn init_palette(tree: &mut WindowTree, window: Window) -> Result<(), Error> {
         window.palette_mut(tree, |palette| {
-            palette.set(0, Left(COLOR_TEXT));
-            palette.set(1, Left(COLOR_INPUT_LINE_INVALID));
-            palette.set(2, Left(COLOR_DISABLED));
-            palette.set(3, Left(COLOR_INPUT_LINE_FOCUSED));
-            palette.set(4, Left(COLOR_INPUT_LINE_FOCUSED_INVALID));
-            palette.set(5, Left(COLOR_INPUT_LINE_FOCUSED_DISABLED));
+            palette.set(0, Color::Palette(COLOR_TEXT));
+            palette.set(1, Color::Palette(COLOR_INPUT_LINE_INVALID));
+            palette.set(2, Color::Palette(COLOR_DISABLED));
+            palette.set(3, Color::Palette(COLOR_INPUT_LINE_FOCUSED));
+            palette.set(4, Color::Palette(COLOR_INPUT_LINE_FOCUSED_INVALID));
+            palette.set(5, Color::Palette(COLOR_INPUT_LINE_FOCUSED_DISABLED));
         });
         Ok(())
     }

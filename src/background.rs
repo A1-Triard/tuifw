@@ -2,9 +2,8 @@ use crate::widget;
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use dynamic_cast::impl_supports_interfaces;
-use either::Left;
 use tuifw_screen_base::{Rect, Vector, Error};
-use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App};
+use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App, Color};
 use tuifw_window::COLOR_BACKGROUND;
 
 widget! {
@@ -21,7 +20,7 @@ widget! {
 
 impl Background {
     fn init_palette(tree: &mut WindowTree, window: Window) -> Result<(), Error> {
-        window.palette_mut(tree, |palette| palette.set(0, Left(COLOR_BACKGROUND)));
+        window.palette_mut(tree, |palette| palette.set(0, Color::Palette(COLOR_BACKGROUND)));
         Ok(())
     }
 }

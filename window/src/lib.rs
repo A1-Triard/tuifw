@@ -31,7 +31,6 @@ use core::ptr::{DynMetadata, Pointee};
 use downcast_rs::{Downcast, impl_downcast};
 use dyn_clone::{DynClone, clone_trait_object};
 use dynamic_cast::{SupportsInterfaces, dyn_cast_box};
-use either::{Either, Left, Right};
 use iter_identify_first_last::IteratorIdentifyFirstLastExt;
 use macro_attr_2018::macro_attr;
 use timer_no_std::{MonoClock, MonoTime};
@@ -346,21 +345,27 @@ pub trait App: Downcast { }
 
 impl_downcast!(App);
 
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub enum Color {
+    Value((Fg, Bg)),
+    Palette(u8),
+}
+
 #[derive(Clone)]
-pub struct Palette(Vec<Either<u8, (Fg, Bg)>>);
+pub struct Palette(Vec<Color>);
 
 impl Palette {
     pub fn new() -> Palette {
         Palette(Vec::new())
     }
 
-    pub fn get(&self, i: u8) -> Either<u8, (Fg, Bg)> {
-        self.0.get(usize::from(i)).cloned().unwrap_or(Left(i))
+    pub fn get(&self, i: u8) -> Color {
+        self.0.get(usize::from(i)).cloned().unwrap_or(Color::Palette(i))
     }
 
-    pub fn set(&mut self, i: u8, o: Either<u8, (Fg, Bg)>) {
+    pub fn set(&mut self, i: u8, o: Color) {
         for k in self.0.len() ..= usize::from(i) {
-            self.0.push(Left(u8::try_from(k).unwrap()));
+            self.0.push(Color::Palette(u8::try_from(k).unwrap()));
         }
         self.0[usize::from(i)] = o;
     }
@@ -939,7 +944,7 @@ impl Window {
     }
 
     pub fn set_color(self, tree: &mut WindowTree, i: u8, color: (Fg, Bg)) {
-        self.palette_mut(tree, |palette| palette.set(i, Right(color)));
+        self.palette_mut(tree, |palette| palette.set(i, Color::Value(color)));
     }
 
     pub fn color(self, tree: &WindowTree, i: u8) -> (Fg, Bg) {
@@ -947,17 +952,17 @@ impl Window {
         let mut index = i;
         loop {
             match window.palette(tree).get(index) {
-                Left(i) => {
+                Color::Palette(i) => {
                     if let Some(parent) = window.parent(tree) {
                         window = parent;
                         index = i;
-                    } else if let Right(color) = tree.palette().get(i) {
+                    } else if let Color::Value(color) = tree.palette().get(i) {
                         break color;
                     } else {
                         break (Fg::Red, Bg::Green);
                     }
                 },
-                Right(c) => break c,
+                Color::Value(c) => break c,
             }
         }
     }
@@ -1420,33 +1425,33 @@ pub const COLOR_IN_FRAME: u8 = 20;
 fn root_palette() -> Palette {
     let mut p = Palette::new();
 
-    p.set(COLOR_BACKGROUND, Right((Fg::LightGray, Bg::None)));
-    p.set(COLOR_TEXT, Right((Fg::LightGray, Bg::None)));
-    p.set(COLOR_DISABLED, Right((Fg::DarkGray, Bg::None)));
-    p.set(COLOR_HOTKEY, Right((Fg::White, Bg::None)));
-    p.set(COLOR_INPUT_LINE_INVALID, Right((Fg::Red, Bg::None)));
-    p.set(COLOR_INPUT_LINE_FOCUSED, Right((Fg::LightGray, Bg::Blue)));
-    p.set(COLOR_INPUT_LINE_FOCUSED_DISABLED, Right((Fg::DarkGray, Bg::Blue)));
-    p.set(COLOR_INPUT_LINE_FOCUSED_INVALID, Right((Fg::LightGray, Bg::Red)));
-    p.set(COLOR_BUTTON_FOCUSED, Right((Fg::LightGray, Bg::Blue)));
-    p.set(COLOR_BUTTON_FOCUSED_HOTKEY, Right((Fg::White, Bg::Blue)));
-    p.set(COLOR_BUTTON_FOCUSED_DISABLED, Right((Fg::DarkGray, Bg::Blue)));
-    p.set(COLOR_BUTTON_PRESSED, Right((Fg::Blue, Bg::None)));
-    p.set(COLOR_FRAME, Right((Fg::LightGray, Bg::Black)));
+    p.set(COLOR_BACKGROUND, Color::Value((Fg::LightGray, Bg::None)));
+    p.set(COLOR_TEXT, Color::Value((Fg::LightGray, Bg::None)));
+    p.set(COLOR_DISABLED, Color::Value((Fg::DarkGray, Bg::None)));
+    p.set(COLOR_HOTKEY, Color::Value((Fg::White, Bg::None)));
+    p.set(COLOR_INPUT_LINE_INVALID, Color::Value((Fg::Red, Bg::None)));
+    p.set(COLOR_INPUT_LINE_FOCUSED, Color::Value((Fg::LightGray, Bg::Blue)));
+    p.set(COLOR_INPUT_LINE_FOCUSED_DISABLED, Color::Value((Fg::DarkGray, Bg::Blue)));
+    p.set(COLOR_INPUT_LINE_FOCUSED_INVALID, Color::Value((Fg::LightGray, Bg::Red)));
+    p.set(COLOR_BUTTON_FOCUSED, Color::Value((Fg::LightGray, Bg::Blue)));
+    p.set(COLOR_BUTTON_FOCUSED_HOTKEY, Color::Value((Fg::White, Bg::Blue)));
+    p.set(COLOR_BUTTON_FOCUSED_DISABLED, Color::Value((Fg::DarkGray, Bg::Blue)));
+    p.set(COLOR_BUTTON_PRESSED, Color::Value((Fg::Blue, Bg::None)));
+    p.set(COLOR_FRAME, Color::Value((Fg::LightGray, Bg::Black)));
 
-    p.set(COLOR_IN_FRAME + COLOR_BACKGROUND, Right((Fg::LightGray, Bg::Black)));
-    p.set(COLOR_IN_FRAME + COLOR_TEXT, Right((Fg::LightGray, Bg::Black)));
-    p.set(COLOR_IN_FRAME + COLOR_DISABLED, Right((Fg::DarkGray, Bg::Black)));
-    p.set(COLOR_IN_FRAME + COLOR_HOTKEY, Right((Fg::White, Bg::Black)));
-    p.set(COLOR_IN_FRAME + COLOR_INPUT_LINE_INVALID, Right((Fg::Red, Bg::Black)));
-    p.set(COLOR_IN_FRAME + COLOR_INPUT_LINE_FOCUSED, Right((Fg::LightGray, Bg::Blue)));
-    p.set(COLOR_IN_FRAME + COLOR_INPUT_LINE_FOCUSED_DISABLED, Right((Fg::DarkGray, Bg::Blue)));
-    p.set(COLOR_IN_FRAME + COLOR_INPUT_LINE_FOCUSED_INVALID, Right((Fg::LightGray, Bg::Red)));
-    p.set(COLOR_IN_FRAME + COLOR_BUTTON_FOCUSED, Right((Fg::LightGray, Bg::Blue)));
-    p.set(COLOR_IN_FRAME + COLOR_BUTTON_FOCUSED_HOTKEY, Right((Fg::White, Bg::Blue)));
-    p.set(COLOR_IN_FRAME + COLOR_BUTTON_FOCUSED_DISABLED, Right((Fg::DarkGray, Bg::Blue)));
-    p.set(COLOR_IN_FRAME + COLOR_BUTTON_PRESSED, Right((Fg::Blue, Bg::Black)));
-    p.set(COLOR_IN_FRAME + COLOR_FRAME, Right((Fg::LightGray, Bg::Black)));
+    p.set(COLOR_IN_FRAME + COLOR_BACKGROUND, Color::Value((Fg::LightGray, Bg::Black)));
+    p.set(COLOR_IN_FRAME + COLOR_TEXT, Color::Value((Fg::LightGray, Bg::Black)));
+    p.set(COLOR_IN_FRAME + COLOR_DISABLED, Color::Value((Fg::DarkGray, Bg::Black)));
+    p.set(COLOR_IN_FRAME + COLOR_HOTKEY, Color::Value((Fg::White, Bg::Black)));
+    p.set(COLOR_IN_FRAME + COLOR_INPUT_LINE_INVALID, Color::Value((Fg::Red, Bg::Black)));
+    p.set(COLOR_IN_FRAME + COLOR_INPUT_LINE_FOCUSED, Color::Value((Fg::LightGray, Bg::Blue)));
+    p.set(COLOR_IN_FRAME + COLOR_INPUT_LINE_FOCUSED_DISABLED, Color::Value((Fg::DarkGray, Bg::Blue)));
+    p.set(COLOR_IN_FRAME + COLOR_INPUT_LINE_FOCUSED_INVALID, Color::Value((Fg::LightGray, Bg::Red)));
+    p.set(COLOR_IN_FRAME + COLOR_BUTTON_FOCUSED, Color::Value((Fg::LightGray, Bg::Blue)));
+    p.set(COLOR_IN_FRAME + COLOR_BUTTON_FOCUSED_HOTKEY, Color::Value((Fg::White, Bg::Blue)));
+    p.set(COLOR_IN_FRAME + COLOR_BUTTON_FOCUSED_DISABLED, Color::Value((Fg::DarkGray, Bg::Blue)));
+    p.set(COLOR_IN_FRAME + COLOR_BUTTON_PRESSED, Color::Value((Fg::Blue, Bg::Black)));
+    p.set(COLOR_IN_FRAME + COLOR_FRAME, Color::Value((Fg::LightGray, Bg::Black)));
 
     p
 }

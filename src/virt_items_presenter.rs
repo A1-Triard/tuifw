@@ -7,7 +7,6 @@ use core::cmp::{max, min};
 use core::mem::{replace, size_of};
 use core::ops::Range;
 use dynamic_cast::impl_supports_interfaces;
-use either::Right;
 use tuifw_screen_base::{Rect, Vector, Error, Fg, Bg, Thickness, Key};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App, Timer, Data};
 use tuifw_window::Visibility;
@@ -51,9 +50,7 @@ impl VirtItemsPresenter {
     fn init(tree: &mut WindowTree, window: Window) -> Result<(), Error> {
         let error_text = StaticText::new(tree, Some(window), None)?;
         error_text.set_visibility(tree, Visibility::Collapsed);
-        error_text.palette_mut(tree, |palette| {
-            palette.set(0, Right((Fg::BrightRed, Bg::Blue)));
-        });
+        error_text.set_color(tree, 0, (Fg::BrightRed, Bg::Blue));
         Ok(())
     }
 

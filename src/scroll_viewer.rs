@@ -4,9 +4,8 @@ use alloc::boxed::Box;
 use alloc::string::String;
 use core::cmp::max;
 use dynamic_cast::impl_supports_interfaces;
-use either::Left;
 use tuifw_screen_base::{Point, Rect, Vector, Thickness, text_width, HAlign, VAlign, Error};
-use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App};
+use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App, Color};
 use tuifw_window::{COLOR_FRAME, COLORS, COLOR_IN_FRAME};
 
 widget! {
@@ -35,9 +34,9 @@ widget! {
 impl ScrollViewer {
     fn init_palette(tree: &mut WindowTree, window: Window) -> Result<(), Error> {
         window.palette_mut(tree, |palette| {
-            palette.set(0, Left(COLOR_FRAME));
+            palette.set(0, Color::Palette(COLOR_FRAME));
             for c in COLORS {
-                palette.set(c, Left(c + COLOR_IN_FRAME));
+                palette.set(c, Color::Palette(c + COLOR_IN_FRAME));
             }
         });
         Ok(())

@@ -2,7 +2,6 @@ use crate::{widget, StaticText};
 use alloc::boxed::Box;
 use alloc::string::ToString;
 use dynamic_cast::impl_supports_interfaces;
-use either::Right;
 use tuifw_screen_base::{Rect, Vector, Error, Fg, Bg};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App, Timer, Data};
 use tuifw_window::Visibility;
@@ -26,9 +25,7 @@ impl ContentPresenter {
     fn init(tree: &mut WindowTree, window: Window) -> Result<(), Error> {
         let error_text = StaticText::new(tree, Some(window), None)?;
         error_text.set_visibility(tree, Visibility::Collapsed);
-        error_text.palette_mut(tree, |palette| {
-            palette.set(0, Right((Fg::BrightRed, Bg::Blue)));
-        });
+        error_text.set_color(tree, 0, (Fg::BrightRed, Bg::Blue));
         Ok(())
     }
 

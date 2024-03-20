@@ -2,9 +2,8 @@ use crate::widget;
 use alloc::boxed::Box;
 use alloc::string::String;
 use dynamic_cast::impl_supports_interfaces;
-use either::Left;
 use tuifw_screen_base::{Key, Point, Rect, Vector, Error};
-use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App};
+use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, App, Color};
 use tuifw_window::{CMD_GOT_PRIMARY_FOCUS, CMD_LOST_PRIMARY_FOCUS, label_width, label};
 use tuifw_window::{COLOR_TEXT, COLOR_HOTKEY, COLOR_DISABLED};
 
@@ -27,9 +26,9 @@ widget! {
 impl RadioButton {
     fn init_palette(tree: &mut WindowTree, window: Window) -> Result<(), Error> {
         window.palette_mut(tree, |palette| {
-            palette.set(0, Left(COLOR_TEXT));
-            palette.set(1, Left(COLOR_HOTKEY));
-            palette.set(2, Left(COLOR_DISABLED));
+            palette.set(0, Color::Palette(COLOR_TEXT));
+            palette.set(1, Color::Palette(COLOR_HOTKEY));
+            palette.set(2, Color::Palette(COLOR_DISABLED));
         });
         Ok(())
     }
