@@ -9,18 +9,34 @@
       </StackPanel>
     </Background>
     <DockPanel Margin="1">
-      <StackPanel Dock="Right">
-        <Label Text="this" />
-        <Label Text="is a" />
-        <Label Text="test" />
+      <StackPanel Dock="Right" ColorLabel="White/None" Margin="4,0,0,0">
+        <StaticText Text="this" />
+        <StaticText Text="is a" />
+        <StaticText Text="test" />
       </StackPanel>
-      <StackPanel>
-        <Label Text="Field A:" Margin="0,0,0,1" />
+      <StackPanel ColorLabel="Red/None">
+        <DockPanel Margin="0,0,0,1">
+          <Label Text="Field A:" Dock="Left" Margin="0,0,2,0" />
+          <InputLine Text="This is a little" ColorInputLine="White/Blue" />
+        </DockPanel>
         <StretchPanel Vertical="False">
-          <Label Text="Field B:" />
-          <Label Text="Field C:" />
+          <DockPanel>
+            <Label Text="Field B:" Dock="Left" Margin="0,0,2,0" />
+            <InputLine Text="test for STFL!" ColorInputLine="Black/Blue" />
+          </DockPanel>
+          <DockPanel Margin="4,0,0,0">
+            <Label Text="Field C:" Dock="Left" Margin="0,0,2,0" />
+            <InputLine Text="Hello'World!" ColorInputLine="Black/Blue" />
+          </DockPanel>
         </StretchPanel>
       </StackPanel>
     </DockPanel>
+    <StretchPanel Vertical="False" Height="18">
+      <StretchPanel>
+        <Background ColorBackground="Black/Red" />
+        <Background ColorBackground="Black/Blue" />
+      </StretchPanel>
+      <Background ColorBackground="Black/Green" />
+    </StretchPanel>
   </StackPanel>
 </Background>
