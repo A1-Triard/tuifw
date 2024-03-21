@@ -44,7 +44,7 @@ extern "stdcall" fn mainCRTStartup(_: *const PEB) -> u64 {
 
 fn start_and_print_err() -> u64 {
     if let Err(e) = start() {
-        libc_print::libc_eprintln!("{e}");
+        print_no_std::eprintln!("{e}");
         1
     } else {
         0

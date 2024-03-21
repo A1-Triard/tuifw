@@ -18,9 +18,9 @@ strip = true
 
 [dependencies]
 composable-allocators = "0.2.9"
-libc-print = "0.1.22"
 panic-no-std = "0.0.1"
 panicking = { version = "0.4.0", default-features = false, features = ["abort"] }
+print-no-std = "0.1.0"
 rand = { version = "0.8.5", default-features = false, features = ["small_rng", "getrandom"] }
 rlibc = "1.0.0"
 timer-no-std = "0.5.0"
