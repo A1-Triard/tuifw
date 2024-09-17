@@ -1,4 +1,4 @@
-<Background xmlns="https://a1-triard.github.io/tuifw/2023/xaml" Name="root" FocusedPrimary="True">
+<Background xmlns="https://a1-triard.github.io/tuifw/2023/xaml" Name="root">
   <StackPanel>
     <Background ColorBackground="Black/Brown" ColorLabel="Black/Brown">
       <StackPanel Vertical="False">
@@ -17,16 +17,23 @@
       <StackPanel ColorLabel="Red/None">
         <DockPanel Margin="0,0,0,1">
           <Label Text="Field A:" Dock="Left" Margin="0,0,2,0" />
-          <InputLine Text="This is a little" ColorInputLine="White/Blue" />
+          <InputLine
+            Name="a"
+            Text="This is a little"
+            ColorInputLine="White/Blue"
+            FocusedPrimary="True"
+            FocusTab="b"
+            FocusDown="b"
+          />
         </DockPanel>
         <StretchPanel Vertical="False">
           <DockPanel>
             <Label Text="Field B:" Dock="Left" Margin="0,0,2,0" />
-            <InputLine Text="test for STFL!" ColorInputLine="Black/Blue" />
+            <InputLine Name="b" Text="test for STFL!" ColorInputLine="Black/Blue" FocusTab="c" FocusDown="c" />
           </DockPanel>
           <DockPanel Margin="4,0,0,0">
             <Label Text="Field C:" Dock="Left" Margin="0,0,2,0" />
-            <InputLine Text="Hello'World!" ColorInputLine="Black/Blue" />
+            <InputLine Name="c" Text="Hello'World!" ColorInputLine="Black/Blue" FocusTab="a" />
           </DockPanel>
         </StretchPanel>
       </StackPanel>

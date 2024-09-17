@@ -4,6 +4,9 @@ name = "itemlist"
 version = "0.0.0"
 publish = false
 
+[lints.rust]
+unexpected_cfgs = { level = "allow" }
+
 [profile.dev]
 panic = "abort"
 
