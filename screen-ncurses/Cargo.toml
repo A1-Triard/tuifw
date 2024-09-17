@@ -16,7 +16,7 @@ repository = "https://github.com/A1-Triard/tuifw"
 composable-allocators = "0.3.0"
 either = { version = "1.9.0", default-features = false }
 errno-no-std = { version = "0.2.2", default-features = false }
-itertools = { version = "0.12.0", default-features = false }
+itertools = { version = "0.13.0", default-features = false }
 libc = { version = "0.2.147", default-features = false }
 panicking = { version = "0.5.0", default-features = false }
 tuifw-screen-base = { path = "../screen-base", version = "0.25.0" }
