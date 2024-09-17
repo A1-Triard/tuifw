@@ -1,12 +1,9 @@
 #![feature(const_maybe_uninit_as_mut_ptr)]
-#![feature(const_mut_refs)]
 #![feature(const_ptr_write)]
 #![feature(const_trait_impl)]
 #![feature(extern_types)]
 #![feature(generic_arg_infer)]
-#![feature(panic_info_message)]
 #![feature(ptr_metadata)]
-#![feature(raw_ref_op)]
 #![feature(start)]
 #![feature(unsize)]
 
@@ -23,16 +20,17 @@ extern crate rlibc;
 
 mod no_std {
     use composable_allocators::{AsGlobal};
-    use composable_allocators::stacked::{self, Stacked};
+    use composable_allocators::stacked::Stacked;
     use core::mem::MaybeUninit;
+    use core::ptr::addr_of_mut;
 
     const MEM_SIZE: usize = 32;
 
     static mut MEM: [MaybeUninit<u8>; MEM_SIZE] = [MaybeUninit::uninit(); _];
 
     #[global_allocator]
-    static ALLOCATOR: AsGlobal<Stacked<stacked::CtParams<MEM_SIZE>>> =
-        AsGlobal(Stacked::from_static_array(unsafe { &mut MEM }));
+    static ALLOCATOR: AsGlobal<Stacked> =
+        AsGlobal(Stacked::from_static_array(unsafe { &mut *addr_of_mut!(MEM) }));
 
     #[panic_handler]
     fn panic_handler(info: &core::panic::PanicInfo) -> ! { panic_no_std::panic(info, b'P') }
@@ -41,8 +39,8 @@ mod no_std {
 
     static mut ERROR_MEM: [MaybeUninit<u8>; ERROR_MEM_SIZE] = [MaybeUninit::uninit(); _];
 
-    pub static ERROR_ALLOCATOR: Stacked<stacked::CtParams<ERROR_MEM_SIZE>> =
-        Stacked::from_static_array(unsafe { &mut ERROR_MEM });
+    pub static ERROR_ALLOCATOR: Stacked =
+        Stacked::from_static_array(unsafe { &mut *addr_of_mut!(ERROR_MEM) });
 }
 
 mod dos {
