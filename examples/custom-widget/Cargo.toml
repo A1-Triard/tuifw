@@ -4,6 +4,9 @@ name = "cstmwdgt"
 version = "0.0.0"
 publish = false
 
+[lints.rust]
+unexpected_cfgs = { level = "allow" }
+
 [profile.dev]
 panic = "abort"
 
@@ -17,17 +20,22 @@ strip = true
 [workspace]
 
 [dependencies]
-composable-allocators = "0.2.9"
+composable-allocators = "0.3.0"
 dynamic-cast = "0.1.3"
-panic-no-std = "0.0.1"
-panicking = { version = "0.4.0", default-features = false, features = ["abort"] }
-print-no-std = "0.1.0"
+panic-no-std = "0.1.0"
+panicking = { version = "0.5.0", default-features = false, features = ["abort"] }
+print-no-std = "0.2.0"
 rlibc = "1.0.0"
-timer-no-std = "0.5.0"
+timer-no-std = "0.6.0"
 tuifw = { path = "../.." }
 tuifw-screen = { path = "../../screen" }
 tuifw-screen-base = { path = "../../screen-base" }
 tuifw-window = { path = "../../window" }
 
+[target.'cfg(target_os="dos")'.dependencies]
+dos-cp = "0.7.0"
+pc-atomics = "0.0.2"
+
 [build-dependencies]
+dos-cp-generator = "0.7.0"
 tuifw-xaml = { path = "../../xaml" }

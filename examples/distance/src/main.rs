@@ -1,3 +1,4 @@
+#![feature(extern_types)]
 #![feature(start)]
 
 #![windows_subsystem = "windows"]

@@ -1,12 +1,11 @@
-#![feature(effects)]
-
 #![deny(warnings)]
 #![doc(test(attr(deny(warnings))))]
 #![doc(test(attr(allow(dead_code))))]
 #![doc(test(attr(allow(unused_variables))))]
-#![allow(clippy::blocks_in_if_conditions)]
+#![allow(clippy::blocks_in_conditions)]
 #![allow(clippy::collapsible_else_if)]
 #![allow(clippy::collapsible_if)]
+#![allow(clippy::derivable_impls)]
 #![allow(clippy::nonminimal_bool)]
 #![allow(clippy::type_complexity)]
 

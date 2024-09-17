@@ -1,7 +1,6 @@
 #![cfg(windows)]
 
 #![feature(allocator_api)]
-#![feature(effects)]
 
 #![deny(warnings)]
 #![doc(test(attr(deny(warnings))))]
@@ -36,7 +35,6 @@ use winapi::shared::minwindef::*;
 use winapi::shared::ntdef::{WCHAR, HANDLE};
 use winapi::um::synchapi::Sleep;
 use winapi::um::wincontypes::*;
-use winapi::um::wincontypes::INPUT_RECORD_Event;
 use winapi::um::wincon::*;
 use winapi::um::winnt::*;
 use winapi::um::fileapi::*;

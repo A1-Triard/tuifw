@@ -1,5 +1,4 @@
 #![feature(allocator_api)]
-#![feature(effects)]
 
 #![deny(warnings)]
 #![doc(test(attr(deny(warnings))))]
@@ -178,9 +177,9 @@ impl base_Screen for Screen {
             ))
             .take(text_end as u16 as usize)
         ;
-        let mut before_hard_start = min(p.x, hard.start);
+        let mut before_hard_start = min(hard.start, p.x);
         let mut before_text_start = 0i16;
-        let x0 = max(hard.start, p.x);
+        let x0 = p.x;
         let mut x = x0;
         for c in text {
             if x >= hard.end { break; }
@@ -201,7 +200,7 @@ impl base_Screen for Screen {
             }
             x += 1;
         }
-        x0 .. x
+        max(p.x, hard.start) .. x
     }
 
     fn update(&mut self, _cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Error> {

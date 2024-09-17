@@ -11,11 +11,11 @@ panic = "abort"
 panic = "abort"
 
 [dependencies]
-composable-allocators = "0.2.8"
-exit-no-std = "0.2.0"
-panicking = { version = "0.4.0", default-features = false, features = ["abort"] }
+composable-allocators = "0.3.0"
+exit-no-std = "0.2.1"
+panicking = { version = "0.5.0", default-features = false, features = ["abort"] }
+timer-no-std = "0.6.0"
 tuifw-screen-test = { path = "../screen-test" }
 tuifw-screen = { path = "../screen" }
 tuifw-window = { path = "../window" }
 tuifw = { path = ".." }
-timer-no-std = "0.5.0"

@@ -1,6 +1,6 @@
 #![deny(warnings)]
 
-use std::env::{self};
+use std::env::{self, var};
 use std::path::PathBuf;
 use tuifw_xaml::xaml::{XamlStruct, Xaml};
 use tuifw_xaml::preprocessor::preprocess_xaml_file;
@@ -21,4 +21,7 @@ fn main() {
     );
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     preprocess_xaml_file(&xaml, "src/ui.xaml", out_dir.join("ui.rs")).unwrap();
+    if var("CARGO_CFG_TARGET_OS").unwrap() == "dos" {
+        dos_cp_generator::build();
+    }
 }

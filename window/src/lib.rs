@@ -1,4 +1,3 @@
-#![feature(effects)]
 #![feature(never_type)]
 #![feature(ptr_metadata)]
 
@@ -7,9 +6,10 @@
 #![doc(test(attr(allow(dead_code))))]
 #![doc(test(attr(allow(unused_variables))))]
 #![allow(clippy::assertions_on_constants)]
-#![allow(clippy::blocks_in_if_conditions)]
+#![allow(clippy::blocks_in_conditions)]
 #![allow(clippy::collapsible_else_if)]
 #![allow(clippy::collapsible_if)]
+#![allow(clippy::multiple_bound_locations)]
 #![allow(clippy::non_canonical_partial_ord_impl)]
 #![allow(clippy::option_map_unit_fn)]
 #![allow(clippy::partialeq_to_none)]

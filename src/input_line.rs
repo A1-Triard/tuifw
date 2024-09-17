@@ -55,7 +55,7 @@ impl Validator for FloatValidator {
         if editing && (text.is_empty() || text == "-") { return true; }
         let text = if editing && (text.ends_with('e') || text.ends_with('E')) {
             let text = &text[.. text.len() - 1];
-            if text.contains(|c| c == 'e' || c == 'E') { return false; }
+            if text.contains(['e', 'E']) { return false; }
             text
         } else {
             text
