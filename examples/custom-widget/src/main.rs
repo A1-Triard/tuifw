@@ -12,7 +12,7 @@
 extern crate alloc;
 #[cfg(target_os="dos")]
 extern crate pc_atomics;
-extern crate rlibc;
+extern crate rlibc_ext;
 
 #[cfg(all(windows, not(target_os="dos")))]
 #[link(name="msvcrt")]
@@ -39,22 +39,7 @@ mod no_std {
     fn panic_handler(info: &core::panic::PanicInfo) -> ! { panic_no_std::panic(info, b'P') }
 
     #[no_mangle]
-    extern fn rust_eh_personality() { }
-}
-
-mod link {
-    #[cfg(target_os="dos")]
-    #[no_mangle]
-    extern "C" fn __chkstk() { }
-    #[cfg(target_os="dos")]
-    #[no_mangle]
-    #[used]
-    static mut _fltused: core::ffi::c_int = 0;
-    #[cfg(any(target_os="dos", windows))]
-    #[no_mangle]
-    extern "C" fn strlen(_s: *const core::ffi::c_char) -> usize {
-        0
-    }
+    extern "C" fn rust_eh_personality() { }
 }
 
 #[cfg(any(target_os="dos", windows))]

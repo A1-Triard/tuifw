@@ -24,7 +24,7 @@ mod no_std {
     }
 
     #[no_mangle]
-    extern fn rust_eh_personality() { }
+    extern "C" fn rust_eh_personality() { }
 }
 
 use alloc::boxed::Box;

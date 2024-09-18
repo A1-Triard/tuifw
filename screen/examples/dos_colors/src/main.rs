@@ -16,7 +16,7 @@
 
 extern crate alloc;
 extern crate pc_atomics;
-extern crate rlibc;
+extern crate rlibc_ext;
 
 mod no_std {
     use composable_allocators::{AsGlobal};
@@ -41,19 +41,6 @@ mod no_std {
 
     pub static ERROR_ALLOCATOR: Stacked =
         Stacked::from_static_array(unsafe { &mut *addr_of_mut!(ERROR_MEM) });
-}
-
-mod dos {
-    #[no_mangle]
-    extern "C" fn _aulldiv() -> ! { panic!("10") }
-    #[no_mangle]
-    extern "C" fn _aullrem() -> ! { panic!("11") }
-    #[no_mangle]
-    extern "C" fn _chkstk() { }
-    #[no_mangle]
-    extern "C" fn _fltused() -> ! { panic!("13") }
-    #[no_mangle]
-    extern "C" fn strlen() -> ! { panic!("14") }
 }
 
 use tuifw_screen_base::{Bg, Fg, Screen, Point, Event, Key};

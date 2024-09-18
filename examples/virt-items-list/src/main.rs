@@ -20,7 +20,7 @@ mod no_std {
     fn panic_handler(info: &core::panic::PanicInfo) -> ! { panic_no_std::panic(info, b'P') }
 
     #[no_mangle]
-    extern fn rust_eh_personality() { }
+    extern "C" fn rust_eh_personality() { }
 }
 
 #[cfg(any(target_os="dos", windows))]

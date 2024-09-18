@@ -20,9 +20,9 @@ strip = true
 composable-allocators = "0.3.0"
 panic-no-std = "0.1.0"
 panicking = { version = "0.5.0", default-features = false, features = ["abort"] }
-rlibc = "1.0.0"
 tuifw-screen-base = { path = "../../../screen-base" }
 tuifw-screen = { path = "../.." }
+rlibc-ext = "0.1.0"
 
 [target.'cfg(target_os="dos")'.dependencies]
 pc-atomics = "0.0.2"
