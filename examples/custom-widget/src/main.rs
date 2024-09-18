@@ -22,14 +22,18 @@ mod no_std {
     #[cfg(not(target_os="dos"))]
     use composable_allocators::{AsGlobal, System};
     #[cfg(target_os="dos")]
-    use composable_allocators::global_freelist_allocator_128_KiB_align_8;
+    use composable_allocators::{AsGlobal, freelist_allocator_128_KiB_align_8};
 
     #[cfg(not(target_os="dos"))]
     #[global_allocator]
     static ALLOCATOR: AsGlobal<System> = AsGlobal(System);
 
     #[cfg(target_os="dos")]
-    global_freelist_allocator_128_KiB_align_8!();
+    freelist_allocator_128_KiB_align_8!(FREELIST: Freelist);
+
+    #[cfg(target_os="dos")]
+    #[global_allocator]
+    static ALLOCATOR: AsGlobal<&'static Freelist> = AsGlobal(&FREELIST);
 
     #[panic_handler]
     fn panic_handler(info: &core::panic::PanicInfo) -> ! { panic_no_std::panic(info, b'P') }

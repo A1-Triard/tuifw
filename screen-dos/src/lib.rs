@@ -71,6 +71,7 @@ impl Screen {
 impl Drop for Screen {
     #[allow(clippy::panicking_unwrap)]
     fn drop(&mut self) {
+        int_10h_ah_02h_set_cursor_position(0, 25, 0);
         if self.original_mode != 0x03 {
             let e = int_10h_ah_00h_set_video_mode(self.original_mode)
                 .map_err(|_| Error::System(Box::new_in("cannot switch video mode back", self.error_alloc)));
@@ -203,7 +204,7 @@ impl base_Screen for Screen {
         max(p.x, hard.start) .. x
     }
 
-    fn update(&mut self, _cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Error> {
+    fn update(&mut self, cursor: Option<Point>, wait: bool) -> Result<Option<Event>, Error> {
         let video_ptr = (0xB800usize << 4) as *mut u16;
         for i in 0 .. 80 * 25 {
             unsafe {
@@ -211,6 +212,11 @@ impl base_Screen for Screen {
                 ptr::write_volatile(video_ptr.add(i), c);
             }
         }
+        int_10h_ah_02h_set_cursor_position(
+            0,
+            cursor.map_or(25, |c| if c.y < 0 || c.y > 25 { 25 } else { c.y as i8 as u8 }),
+            cursor.map_or(80, |c| if c.x < 0 || c.x > 80 { 80 } else { c.x as i8 as u8 })
+        );
         loop {
             if let Some(c) = self.code_page.inkey().map_err(|_| Error::System(Box::new_in("read key error", self.error_alloc)))? {
                 break Ok(dos_key(c).map(|c| Event::Key(NonZeroU16::new(1).unwrap(), c)));
