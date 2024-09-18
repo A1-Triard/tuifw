@@ -7,14 +7,33 @@
 
 #![no_std]
 
+#![cfg_attr(any(target_os="dos", windows), no_main)]
+
 extern crate alloc;
-extern crate rlibc;
+#[cfg(target_os="dos")]
+extern crate pc_atomics;
+extern crate rlibc_ext;
+
+#[cfg(all(windows, not(target_os="dos")))]
+#[link(name="msvcrt")]
+extern { }
 
 mod no_std {
+    #[cfg(not(target_os="dos"))]
     use composable_allocators::{AsGlobal, System};
+    #[cfg(target_os="dos")]
+    use composable_allocators::{AsGlobal, freelist_allocator_128_KiB_align_8};
 
+    #[cfg(not(target_os="dos"))]
     #[global_allocator]
     static ALLOCATOR: AsGlobal<System> = AsGlobal(System);
+
+    #[cfg(target_os="dos")]
+    freelist_allocator_128_KiB_align_8!(FREELIST: Freelist);
+
+    #[cfg(target_os="dos")]
+    #[global_allocator]
+    static ALLOCATOR: AsGlobal<&'static Freelist> = AsGlobal(&FREELIST);
 
     #[panic_handler]
     fn panic_handler(info: &core::panic::PanicInfo) -> ! { panic_no_std::panic(info, b'P') }
@@ -39,7 +58,7 @@ fn main(_: isize, _: *const *const u8) -> isize {
 #[no_mangle]
 extern "stdcall" fn mainCRTStartup(_: *const PEB) -> u64 {
     #[cfg(target_os="dos")]
-    CodePage::load_or_exit_with_msg(99);
+    dos_cp::CodePage::load_or_exit_with_msg(99);
     start_and_print_err()
 }
 
