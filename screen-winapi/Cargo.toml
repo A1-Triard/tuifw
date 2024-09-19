@@ -1,7 +1,7 @@
 [package]
 edition = "2021"
 name = "tuifw-screen-winapi"
-version = "0.25.0"
+version = "0.25.1"
 #rust-version = "nightly"
 authors = ["warlock <internalmike@gmail.com>"]
 description = "Text User Interface Framework. Basic text screen implementation for Win platform."

@@ -259,6 +259,9 @@ impl<A: Allocator> Screen<A> {
         });
         self.cursor_is_visible = cursor.is_some();
         self.set_cursor_is_visible(self.h_output, self.cursor_is_visible)?;
+        if let Some(cursor) = cursor {
+            unsafe { SetConsoleCursorPosition(self.h_output, COORD { X: cursor.x, Y: cursor.y }); }
+        }
         let (count, key, c, ctrl, alt) = loop {
             pump_messages();
             if !wait {
