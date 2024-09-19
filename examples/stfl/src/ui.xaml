@@ -21,6 +21,7 @@
             Name="a"
             Text="This is a little"
             ColorInputLine="White/Blue"
+            ColorInputLineFocused="White/Blue"
             FocusedPrimary="True"
             FocusTab="b"
             FocusDown="b"
@@ -29,11 +30,24 @@
         <StretchPanel Vertical="False">
           <DockPanel>
             <Label Text="Field B:" Dock="Left" Margin="0,0,2,0" />
-            <InputLine Name="b" Text="test for STFL!" ColorInputLine="Black/Blue" FocusTab="c" FocusDown="c" />
+            <InputLine
+              Name="b"
+              Text="test for STFL!"
+              ColorInputLine="Black/Blue"
+              ColorInputLineFocused="Black/Blue"
+              FocusTab="c"
+              FocusDown="c"
+            />
           </DockPanel>
           <DockPanel Margin="4,0,0,0">
             <Label Text="Field C:" Dock="Left" Margin="0,0,2,0" />
-            <InputLine Name="c" Text="Hello'World!" ColorInputLine="Black/Blue" FocusTab="a" />
+            <InputLine
+              Name="c"
+              Text="Hello'World!"
+              ColorInputLine="Black/Blue"
+              ColorInputLineFocused="Black/Blue"
+              FocusTab="a"
+            />
           </DockPanel>
         </StretchPanel>
       </StackPanel>
