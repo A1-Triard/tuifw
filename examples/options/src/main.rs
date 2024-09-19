@@ -23,24 +23,9 @@ mod no_std {
     extern "C" fn rust_eh_personality() { }
 }
 
-#[cfg(any(target_os="dos", windows))]
-extern {
-    type PEB;
-}
-
-#[cfg(all(not(target_os="dos"), not(windows)))]
 #[start]
 fn main(_: isize, _: *const *const u8) -> isize {
     start_and_print_err() as _
-}
-
-#[cfg(any(target_os="dos", windows))]
-#[allow(non_snake_case)]
-#[no_mangle]
-extern "stdcall" fn mainCRTStartup(_: *const PEB) -> u64 {
-    #[cfg(target_os="dos")]
-    CodePage::load_or_exit_with_msg(99);
-    start_and_print_err()
 }
 
 fn start_and_print_err() -> u64 {

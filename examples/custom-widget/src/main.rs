@@ -7,16 +7,12 @@
 
 #![no_std]
 
-#![cfg_attr(any(target_os="dos", windows), no_main)]
+#![cfg_attr(target_os="dos", no_main)]
 
 extern crate alloc;
 #[cfg(target_os="dos")]
 extern crate pc_atomics;
 extern crate rlibc_ext;
-
-#[cfg(all(windows, not(target_os="dos")))]
-#[link(name="msvcrt")]
-extern { }
 
 mod no_std {
     #[cfg(not(target_os="dos"))]
@@ -42,22 +38,21 @@ mod no_std {
     extern "C" fn rust_eh_personality() { }
 }
 
-#[cfg(any(target_os="dos", windows))]
+#[cfg(target_os="dos")]
 extern {
     type PEB;
 }
 
-#[cfg(all(not(target_os="dos"), not(windows)))]
+#[cfg(not(target_os="dos"))]
 #[start]
 fn main(_: isize, _: *const *const u8) -> isize {
     start_and_print_err() as _
 }
 
-#[cfg(any(target_os="dos", windows))]
+#[cfg(target_os="dos")]
 #[allow(non_snake_case)]
 #[no_mangle]
 extern "stdcall" fn mainCRTStartup(_: *const PEB) -> u64 {
-    #[cfg(target_os="dos")]
     dos_cp::CodePage::load_or_exit_with_msg(99);
     start_and_print_err()
 }
