@@ -6,7 +6,7 @@ use tuifw_screen_base::{Point, Rect, Vector, Key, Error};
 use tuifw_window::{Event, RenderPort, Widget, WidgetData, Window, WindowTree, Timer, label_width, label};
 use tuifw_window::{COLOR_LABEL, COLOR_HOTKEY, COLOR_DISABLED, App, Color};
 
-pub const CMD_LABEL_CLICK: u16 = 110;
+pub const CMD_LABEL_CLICK: u16 = 160;
 
 widget! {
     #[widget(LabelWidget, init=init_palette, drop=drop_timers)]
