@@ -10,8 +10,6 @@
 #![cfg_attr(target_os="dos", no_main)]
 
 extern crate alloc;
-#[cfg(target_os="dos")]
-extern crate pc_atomics;
 extern crate rlibc_ext;
 
 mod no_std {

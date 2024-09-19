@@ -74,12 +74,10 @@ target/$(TARGET)/release/$(BIN)$(EXE_SUFFIX): $(SRC)
 		--target $(TARGET) --release
 
 target/$(DOS_JSON_TARGET)/debug/$(BIN).exe: $(SRC)
-	RUSTFLAGS="--cfg pc_atomics" \
 	cargo +nightly build \
 		--verbose -Z build-std=alloc,core,panic_abort --target $(DOS_JSON_TARGET).json
 
 target/$(DOS_JSON_TARGET)/release/$(BIN).exe: $(SRC)
-	RUSTFLAGS="--cfg pc_atomics" \
 	cargo +nightly build \
 		--verbose -Z build-std=alloc,core,panic_abort -Z build-std-features=panic_immediate_abort \
 		--target $(DOS_JSON_TARGET).json --release
@@ -90,7 +88,6 @@ clippy:
 		--target $(TARGET)
 
 dosclippy:
-	RUSTFLAGS="--cfg pc_atomics" \
 	cargo +nightly clippy \
 		--verbose -Z build-std=alloc,core,panic_abort -Z build-std-features=panic_immediate_abort \
 		--target $(DOS_JSON_TARGET).json

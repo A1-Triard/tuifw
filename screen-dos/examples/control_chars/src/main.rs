@@ -15,7 +15,6 @@
 #![no_main]
 
 extern crate alloc;
-extern crate pc_atomics;
 extern crate rlibc_ext;
 
 mod no_std {
