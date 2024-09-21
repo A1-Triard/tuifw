@@ -54,6 +54,10 @@ pub struct ButtonController<Button: IsButton> {
     _phantom: PhantomType<Button>,
 }
 
+impl<Button: IsButton> Default for ButtonController<Button> {
+    fn default() -> Self { ButtonController::new() }
+}
+
 impl<Button: IsButton> ButtonController<Button> {
     pub fn new() -> Self {
         ButtonController {
