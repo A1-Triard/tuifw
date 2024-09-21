@@ -118,5 +118,5 @@ fn start() -> Result<(), Error> {
         calc: names.calc,
     };
     Button::set_cmd(tree, names.calc, CMD_CALC);
-    tree.run(state)
+    tree.run(state, None)
 }

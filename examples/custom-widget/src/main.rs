@@ -128,5 +128,5 @@ fn start() -> Result<(), Error> {
     let state = &mut State {
         floating_frame: names.floating_frame,
     };
-    tree.run(state)
+    tree.run(state, None)
 }

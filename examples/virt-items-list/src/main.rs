@@ -130,5 +130,5 @@ fn start() -> Result<(), Error> {
     });
     VirtItemsPresenter::set_focus_first_item_primary(tree, names.items, true);
     let state = &mut State;
-    tree.run(state)
+    tree.run(state, None)
 }

@@ -79,5 +79,5 @@ fn start() -> Result<(), Error> {
     let names = ui::build(tree)?;
     names.root.set_event_handler(tree, Some(Box::new(RootEventHandler)));
     let state = &mut State;
-    tree.run(state)
+    tree.run(state, None)
 }

@@ -131,5 +131,5 @@ fn start() -> Result<(), Error> {
     ItemsPresenter::set_focus_first_item_primary(tree, names.items, true);
     ScrollViewer::set_v_offset(tree, names.scroll, 1);
     let state = &mut State;
-    tree.run(state)
+    tree.run(state, None)
 }

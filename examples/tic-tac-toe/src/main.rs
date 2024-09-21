@@ -222,5 +222,5 @@ fn start() -> Result<(), Error> {
     Label::set_cmd(tree, names.new_game, CMD_NEW_GAME);
     Label::set_cmd(tree, names.exit, CMD_EXIT);
     state.ai_move(tree);
-    tree.run(state)
+    tree.run(state, None)
 }
