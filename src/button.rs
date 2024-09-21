@@ -225,7 +225,7 @@ impl Widget for ButtonWidget {
         final_inner_bounds: Rect,
         _app: &mut dyn App,
     ) -> Vector {
-        final_inner_bounds.size
+        Vector { x: final_inner_bounds.size.x, y: 1 }
     }
 
     fn secondary_focusable(&self) -> bool { true }

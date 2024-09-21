@@ -1,7 +1,7 @@
 [package]
 edition = "2021"
 name = "tuifw-screen-base"
-version = "0.25.0"
+version = "0.26.0"
 #rust-version = "nightly"
 authors = ["warlock <internalmike@gmail.com>"]
 description = "Text User Interface Framework. Basic platform-independent text screen interface."
@@ -16,7 +16,7 @@ repository = "https://github.com/A1-Triard/tuifw"
 enum-derive-2018 = { version = "3.0.2", default-features = false }
 int-vec-2d = "0.1.4"
 macro-attr-2018 = "3.0.1"
-unicode-width = "0.1.10"
+unicode-width = "0.2.0"
 
 [badges]
 maintenance = { status = "experimental" }

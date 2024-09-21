@@ -1,7 +1,7 @@
 [package]
 edition = "2021"
 name = "tuifw-xaml"
-version = "0.25.0"
+version = "0.26.0"
 #rust-version = "nightly"
 authors = ["warlock <internalmike@gmail.com>"]
 description = "Text User Interface Framework. XAML preprocesser."
@@ -17,7 +17,7 @@ components-arena = "4.2.0"
 indent = "0.1.1"
 indoc = "2.0.4"
 macro-attr-2018 = "3.0.1"
-tuifw-screen-base = { path = "../screen-base", version = "0.25.0" }
+tuifw-screen-base = { path = "../screen-base", version = "0.26.0" }
 xml-rs = "0.8.19"
 
 [badges]

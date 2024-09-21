@@ -1592,7 +1592,11 @@ impl<'clock> WindowTree<'clock> {
         }
     }
 
-    pub fn run(&mut self, app: &mut dyn App) -> Result<(), Error> {
+    pub fn run(
+        &mut self,
+        app: &mut dyn App,
+        mut action: Option<Box<dyn FnMut(&mut WindowTree, &mut dyn App) -> Result<(), Error>>>
+    ) -> Result<(), Error> {
         let mut time = self.clock.time();
         while !self.quit {
             if let Some(next_primary_focused) = self.next_primary_focused.take() {
@@ -1601,7 +1605,7 @@ impl<'clock> WindowTree<'clock> {
             if let Some(next_secondary_focused) = self.next_secondary_focused.take() {
                 self.focus_secondary_raw(next_secondary_focused, app);
             }
-            let no_timers = self.timers.items().is_empty();
+            let no_timers = self.timers.items().is_empty() && action.is_none();
             let timers_time = self.clock.time();
             loop {
                 let timer = self.timers.items().iter()
@@ -1615,6 +1619,7 @@ impl<'clock> WindowTree<'clock> {
                     break;
                 }
             }
+            action.as_mut().map_or(Ok(()), |x| x(self, app))?;
             if no_timers {
                 self.update(true, app)?;
             } else {
