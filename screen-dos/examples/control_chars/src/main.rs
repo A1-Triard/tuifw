@@ -1,4 +1,3 @@
-#![feature(const_maybe_uninit_as_mut_ptr)]
 #![feature(const_ptr_write)]
 #![feature(const_trait_impl)]
 #![feature(extern_types)]
