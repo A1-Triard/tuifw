@@ -1,12 +1,12 @@
 <Background xmlns="https://a1-triard.github.io/tuifw/2023/xaml" Name="root">
   <StackPanel>
     <Background ColorBackground="Black/Brown" ColorLabel="Black/Brown">
-      <StackPanel Vertical="False">
-        <Label Text="Little STFL example program" Margin="0,0,16,0" />
-        <Label Text="Line number one" Margin="0,0,16,0" />
-        <Label Text="Fun! Fun! Fun!" Margin="0,0,16,0" />
-        <Label Text="Whatever" Margin="0,0,16,0" />
-      </StackPanel>
+      <StretchPanel Vertical="False">
+        <Label Text="Little STFL example program" />
+        <Label Text="Line number one" />
+        <Label Text="Fun! Fun! Fun!" />
+        <Label Text="Whatever" />
+      </StretchPanel>
     </Background>
     <DockPanel Margin="1">
       <StackPanel Dock="Right" ColorLabel="White/None" Margin="4,0,0,0">
