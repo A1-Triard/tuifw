@@ -56,7 +56,7 @@ impl RadioButton {
 }
 
 #[derive(Clone, Default)]
-pub struct RadioButtonWidget;
+struct RadioButtonWidget;
 
 impl_supports_interfaces!(RadioButtonWidget);
 

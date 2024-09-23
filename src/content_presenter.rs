@@ -77,7 +77,7 @@ impl ContentPresenter {
 }
 
 #[derive(Clone, Default)]
-pub struct ContentPresenterWidget;
+struct ContentPresenterWidget;
 
 impl_supports_interfaces!(ContentPresenterWidget);
 

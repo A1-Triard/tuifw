@@ -25,7 +25,7 @@ impl StaticText {
 }
 
 #[derive(Clone, Default)]
-pub struct StaticTextWidget;
+struct StaticTextWidget;
 
 impl_supports_interfaces!(StaticTextWidget);
 

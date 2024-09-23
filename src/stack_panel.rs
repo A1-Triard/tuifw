@@ -13,7 +13,7 @@ widget! {
 }
 
 #[derive(Clone, Default)]
-pub struct StackPanelWidget;
+struct StackPanelWidget;
 
 impl_supports_interfaces!(StackPanelWidget);
 

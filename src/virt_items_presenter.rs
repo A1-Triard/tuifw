@@ -275,7 +275,7 @@ impl VirtItemsPresenter {
 }
 
 #[derive(Clone, Default)]
-pub struct VirtItemsPresenterWidget;
+struct VirtItemsPresenterWidget;
 
 impl_supports_interfaces!(VirtItemsPresenterWidget: VirtItemsPresenterWidgetExtension);
 

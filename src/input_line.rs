@@ -224,7 +224,7 @@ impl InputLine {
 }
 
 #[derive(Clone, Default)]
-pub struct InputLineWidget;
+struct InputLineWidget;
 
 impl_supports_interfaces!(InputLineWidget);
 

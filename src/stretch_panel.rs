@@ -38,7 +38,7 @@ impl StretchPanel {
 }
 
 #[derive(Clone, Default)]
-pub struct StretchPanelWidget;
+struct StretchPanelWidget;
 
 impl_supports_interfaces!(StretchPanelWidget);
 

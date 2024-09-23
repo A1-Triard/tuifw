@@ -39,7 +39,7 @@ impl Label {
 }
 
 #[derive(Clone, Default)]
-pub struct LabelWidget;
+struct LabelWidget;
 
 impl_supports_interfaces!(LabelWidget);
 

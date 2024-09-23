@@ -34,7 +34,7 @@ impl DockPanel {
 }
 
 #[derive(Clone, Default)]
-pub struct DockPanelWidget;
+struct DockPanelWidget;
 
 impl_supports_interfaces!(DockPanelWidget);
 

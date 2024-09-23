@@ -28,7 +28,7 @@ impl Frame {
 }
 
 #[derive(Clone, Default)]
-pub struct FrameWidget;
+struct FrameWidget;
 
 impl_supports_interfaces!(FrameWidget);
 

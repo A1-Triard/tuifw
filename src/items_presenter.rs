@@ -119,7 +119,7 @@ impl ItemsPresenter {
 }
 
 #[derive(Clone, Default)]
-pub struct ItemsPresenterWidget;
+struct ItemsPresenterWidget;
 
 impl_supports_interfaces!(ItemsPresenterWidget);
 

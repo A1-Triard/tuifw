@@ -26,7 +26,7 @@ impl Background {
 }
 
 #[derive(Clone, Default)]
-pub struct BackgroundWidget;
+struct BackgroundWidget;
 
 impl_supports_interfaces!(BackgroundWidget);
 

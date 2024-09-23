@@ -160,7 +160,7 @@ impl Button {
 }
 
 #[derive(Clone, Default)]
-pub struct ButtonWidget;
+struct ButtonWidget;
 
 impl_supports_interfaces!(ButtonWidget);
 

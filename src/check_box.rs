@@ -135,7 +135,7 @@ impl CheckBox {
 }
 
 #[derive(Clone, Default)]
-pub struct CheckBoxWidget;
+struct CheckBoxWidget;
 
 impl_supports_interfaces!(CheckBoxWidget);
 

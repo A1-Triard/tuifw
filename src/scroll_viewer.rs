@@ -61,7 +61,7 @@ impl ScrollViewer {
 }
 
 #[derive(Clone, Default)]
-pub struct ScrollViewerWidget;
+struct ScrollViewerWidget;
 
 impl_supports_interfaces!(ScrollViewerWidget: VirtScrollViewerWidgetExtension);
 

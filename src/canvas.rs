@@ -31,7 +31,7 @@ impl Canvas {
 }
 
 #[derive(Clone, Default)]
-pub struct CanvasWidget;
+struct CanvasWidget;
 
 impl_supports_interfaces!(CanvasWidget);
 
