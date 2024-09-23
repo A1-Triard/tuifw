@@ -10,7 +10,7 @@ widget! {
 }
 
 #[derive(Clone, Default)]
-pub struct FloatingFrameWidget;
+struct FloatingFrameWidget;
 
 impl_supports_interfaces!(FloatingFrameWidget);
 

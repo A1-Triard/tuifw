@@ -171,11 +171,16 @@ pub enum Key {
     F12,
 }
 
-#[derive(Eq, PartialEq, Debug, Hash, Clone, Copy, Ord, PartialOrd)]
+#[derive(Eq, PartialEq, Debug, Hash, Clone, Copy)]
 #[non_exhaustive]
 pub enum Event {
     Resize,
     Key(NonZeroU16, Key),
+    MouseMove(Point),
+    LmbPressed(Point),
+    LmbReleased(Point),
+    RmbPressed(Point),
+    RmbReleased(Point),
 }
 
 pub enum Error {
