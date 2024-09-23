@@ -1,7 +1,7 @@
 use crate::ncurses::*;
 use alloc::boxed::Box;
 use core::alloc::Allocator;
-use core::ptr::NonNull;
+use core::ptr::{NonNull, null_mut};
 use core::num::NonZeroU16;
 use either::{Either, Left, Right};
 use libc::*;
@@ -66,6 +66,7 @@ pub unsafe fn init_settings(error_alloc: &'static dyn Allocator) -> Result<(), E
     register_colors(error_alloc)?;
     set_escdelay(0);
     set_err(non_err(keypad(stdscr, true)), "keypad", error_alloc)?;
+    mousemask(ALL_MOUSE_EVENTS | REPORT_MOUSE_POSITION, null_mut());
     Ok(())
 }
 
@@ -136,6 +137,32 @@ pub fn read_event(
             KEY_F10 => Some(Event::Key(ONCE, Key::F10)),
             KEY_F11 => Some(Event::Key(ONCE, Key::F11)),
             KEY_F12 => Some(Event::Key(ONCE, Key::F12)),
+            KEY_MOUSE => {
+                let mut e = MEVENT {
+                    id: 0, x: 0, y: 0, z: 0, bstate: 0
+                };
+                let m = unsafe { getmouse(&mut e as *mut _) };
+                if m == ERR {
+                    None
+                } else {
+                    let lmb_pressed = e.bstate & BUTTON1_PRESSED != 0;
+                    let lmb_released = e.bstate & BUTTON1_RELEASED != 0;
+                    let rmb_pressed = e.bstate & BUTTON2_PRESSED != 0;
+                    let rmb_released = e.bstate & BUTTON2_RELEASED != 0;
+                    let point = Point { x: e.x as i16, y: e.y as i16 };
+                    if lmb_pressed {
+                        Some(Event::LmbPressed(point))
+                    } else if lmb_released {
+                        Some(Event::LmbReleased(point))
+                    } else if rmb_pressed {
+                        Some(Event::RmbPressed(point))
+                    } else if rmb_released {
+                        Some(Event::RmbReleased(point))
+                    } else {
+                        Some(Event::MouseMove(point))
+                    }
+                }
+            },
             _ => None
         }),
         Right(c) => Ok(match c {

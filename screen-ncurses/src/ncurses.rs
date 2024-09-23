@@ -37,6 +37,7 @@ pub const KEY_NPAGE: c_int = 338;
 pub const KEY_PPAGE: c_int = 339;
 pub const KEY_END: c_int = 360;
 pub const KEY_RESIZE: c_int = 410;
+pub const KEY_MOUSE: c_int = 0o631;
 
 extern {
     pub type WINDOW;
@@ -49,6 +50,15 @@ extern "C" {
     pub static mut stdscr: *mut WINDOW;
     pub static mut COLS: c_int;
     pub static mut LINES: c_int;
+}
+
+#[repr(C)]
+pub struct MEVENT {
+    pub id: c_short,
+    pub x: c_int,
+    pub y: c_int,
+    pub z: c_int,
+    pub bstate: c_ulong,
 }
 
 extern "C" {
@@ -112,4 +122,6 @@ extern "C" {
         arg3: c_int,
     ) -> c_int;
     pub fn wget_wch(arg1: *mut WINDOW, arg2: *mut wint_t) -> c_int;
+    pub fn mousemask(newmask: c_ulong, oldmask: *mut c_ulong) -> c_ulong;
+    pub fn getmouse(event: *mut MEVENT) -> c_int;
 }
