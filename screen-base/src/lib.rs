@@ -176,11 +176,7 @@ pub enum Key {
 pub enum Event {
     Resize,
     Key(NonZeroU16, Key),
-    MouseMove(Point),
-    LmbPressed(Point),
-    LmbReleased(Point),
-    RmbPressed(Point),
-    RmbReleased(Point),
+    MouseClick(Point),
 }
 
 pub enum Error {
