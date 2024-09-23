@@ -48,8 +48,8 @@ int main() {
     printf("pub const REPORT_MOUSE_POSITION: c_ulong = %lu;\n", (unsigned long)REPORT_MOUSE_POSITION);
     printf("pub const BUTTON1_PRESSED: c_ulong = %lu;\n", (unsigned long)BUTTON1_PRESSED);
     printf("pub const BUTTON1_RELEASED: c_ulong = %lu;\n", (unsigned long)BUTTON1_RELEASED);
-    printf("pub const BUTTON2_PRESSED: c_ulong = %lu;\n", (unsigned long)BUTTON2_PRESSED);
-    printf("pub const BUTTON2_RELEASED: c_ulong = %lu;\n", (unsigned long)BUTTON2_RELEASED);
+    printf("pub const BUTTON3_PRESSED: c_ulong = %lu;\n", (unsigned long)BUTTON3_PRESSED);
+    printf("pub const BUTTON3_RELEASED: c_ulong = %lu;\n", (unsigned long)BUTTON3_RELEASED);
     return 0;
 }
 "##).unwrap_or_else(|_| panic!("cannot write {c_file_display}"));

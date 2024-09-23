@@ -147,8 +147,8 @@ pub fn read_event(
                 } else {
                     let lmb_pressed = e.bstate & BUTTON1_PRESSED != 0;
                     let lmb_released = e.bstate & BUTTON1_RELEASED != 0;
-                    let rmb_pressed = e.bstate & BUTTON2_PRESSED != 0;
-                    let rmb_released = e.bstate & BUTTON2_RELEASED != 0;
+                    let rmb_pressed = e.bstate & BUTTON3_PRESSED != 0;
+                    let rmb_released = e.bstate & BUTTON3_RELEASED != 0;
                     let point = Point { x: e.x as i16, y: e.y as i16 };
                     if lmb_pressed {
                         Some(Event::LmbPressed(point))
