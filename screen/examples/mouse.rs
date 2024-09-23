@@ -16,7 +16,7 @@ fn main() {
         if let Some(e) = screen.update(None, true).unwrap() {
             match e {
                 Event::Key(_, Key::Escape) => break,
-                Event::MouseClick(p) => draw(screen, p),
+                Event::Click(p) => draw(screen, p),
                 _ => { },
             }
         }

@@ -145,7 +145,7 @@ pub fn read_event(
                 if m == ERR {
                     None
                 } else {
-                    Some(Event::MouseClick(Point { x: e.x as i16, y: e.y as i16 }))
+                    Some(Event::Click(Point { x: e.x as i16, y: e.y as i16 }))
                 }
             },
             _ => None
