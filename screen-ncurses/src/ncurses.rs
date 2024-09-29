@@ -52,6 +52,7 @@ extern "C" {
     pub static mut LINES: c_int;
 }
 
+#[allow(clippy::upper_case_acronyms)]
 #[repr(C)]
 pub struct MEVENT {
     pub id: c_short,
