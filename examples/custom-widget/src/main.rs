@@ -1,7 +1,9 @@
 #![feature(extern_types)]
 #![feature(start)]
 
-#![windows_subsystem = "windows"]
+#![cfg_attr(not(target_os="dos"), windows_subsystem="windows")]
+
+#![cfg_attr(target_os="dos", windows_subsystem="console")]
 
 #![deny(warnings)]
 
@@ -36,11 +38,6 @@ mod no_std {
     extern "C" fn rust_eh_personality() { }
 }
 
-#[cfg(target_os="dos")]
-extern {
-    type PEB;
-}
-
 #[cfg(not(target_os="dos"))]
 #[start]
 fn main(_: isize, _: *const *const u8) -> isize {
@@ -50,12 +47,12 @@ fn main(_: isize, _: *const *const u8) -> isize {
 #[cfg(target_os="dos")]
 #[allow(non_snake_case)]
 #[no_mangle]
-extern "stdcall" fn mainCRTStartup(_: *const PEB) -> u64 {
+extern "C" fn mainCRTStartup() -> ! {
     dos_cp::CodePage::load_or_exit_with_msg(99);
-    start_and_print_err()
+    exit_no_std::exit(start_and_print_err())
 }
 
-fn start_and_print_err() -> u64 {
+fn start_and_print_err() -> u8 {
     if let Err(e) = start() {
         print_no_std::eprintln!("{e}");
         1

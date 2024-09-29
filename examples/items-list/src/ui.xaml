@@ -4,7 +4,7 @@
       <ItemsPresenter.PanelTemplate>
         <StackPanel />
       </ItemsPresenter.PanelTemplate>
-      <CheckBox />
+      <CheckBox FocusClick="Primary" />
     </ItemsPresenter>
   </ScrollViewer>
 </Background>

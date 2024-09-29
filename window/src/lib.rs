@@ -37,7 +37,7 @@ use tuifw_screen_base::{Bg, Error, Fg, Key, Point, Rect, Screen, Vector};
 use tuifw_screen_base::Event as screen_Event;
 use tuifw_screen_base::{HAlign, VAlign, Thickness, Range1d, text_width};
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum Event {
     Key(Key),
     PreviewKey(Key),
@@ -45,6 +45,8 @@ pub enum Event {
     PostProcessKey(Key),
     Cmd(u16),
     PreviewCmd(u16),
+    Click(Point),
+    PreviewClick(Point),
 }
 
 impl Event {
@@ -56,6 +58,8 @@ impl Event {
             Event::PreviewCmd(_) => true,
             Event::PreProcessKey(_) => false,
             Event::PostProcessKey(_) => false,
+            Event::Click(_) => false,
+            Event::PreviewClick(_) => true,
         }
     }
 
@@ -63,6 +67,7 @@ impl Event {
         match self {
             Event::Key(k) => Event::PreviewKey(k),
             Event::Cmd(n) => Event::PreviewCmd(n),
+            Event::Click(p) => Event::PreviewClick(p),
             _ => unreachable!(),
         }
     }
@@ -345,6 +350,12 @@ pub trait App: Downcast { }
 impl_downcast!(App);
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub enum Focus {
+    Primary,
+    Secondary
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum Color {
     Parent,
     Value((Fg, Bg)),
@@ -429,6 +440,7 @@ macro_attr! {
         focus_up: Window,
         focus_down: Window,
         contains_primary_focus: bool,
+        focus_click: Option<Focus>,
         name: String,
         pre_process: Option<Id<PrePostProcess>>,
         post_process: Option<Id<PrePostProcess>>,
@@ -545,6 +557,7 @@ impl Window {
         clone.set_focus_left(tree, clone_window(tree, self.focus_left(tree)));
         clone.set_focus_up(tree, clone_window(tree, self.focus_up(tree)));
         clone.set_focus_down(tree, clone_window(tree, self.focus_down(tree)));
+        clone.set_focus_click(tree, self.focus_click(tree));
         let widget = tree.arena[self.0].widget.clone();
         widget.clone_data(tree, self, clone, clone_window);
         if let Some(first_child) = self.first_child(tree) {
@@ -615,6 +628,7 @@ impl Window {
                 focus_up: Window(window),
                 focus_down: Window(window),
                 contains_primary_focus: false,
+                focus_click: None,
                 name: String::new(),
                 pre_process: None,
                 post_process: None,
@@ -842,6 +856,14 @@ impl Window {
             };
             f(layout)
         })
+    }
+
+    pub fn focus_click(self, tree: &WindowTree) -> Option<Focus> {
+        tree.arena[self.0].focus_click
+    }
+
+    pub fn set_focus_click(self, tree: &mut WindowTree, value: Option<Focus>) {
+        tree.arena[self.0].focus_click = value;
     }
 
     pub fn focus_tab(self, tree: &WindowTree) -> Self {
@@ -1086,6 +1108,13 @@ impl Window {
             }
         }
         if !*handled {
+            if matches!(event, Event::Click(_)) {
+                match self.focus_click(tree) {
+                    Some(Focus::Primary) => self.set_focused_primary(tree, true),
+                    Some(Focus::Secondary) => self.set_focused_secondary(tree, true),
+                    None => { },
+                }
+            }
             *handled = self.raise_core(tree, event, event_source, app);
         }
         if !*handled && !event.is_preview() {
@@ -1405,6 +1434,23 @@ impl Window {
             }
         }
     }
+
+    fn hit_test(self, point: Point, tree: &WindowTree) -> Option<Window> {
+        let bounds = tree.arena[self.0].window_bounds;
+        if !bounds.contains(point) { return None; }
+        let offset = bounds.tl.offset_from(Point { x: 0, y: 0 });
+        let point = point.offset(-offset);
+        if let Some(first_child) = self.first_child(tree) {
+            let mut child = first_child;
+            loop {
+                let child_hit_test = child.hit_test(point, tree);
+                if child_hit_test.is_some() { return child_hit_test; }
+                child = child.next(tree);
+                if child == first_child { break; }
+            }
+        }
+        Some(self)
+    }
 }
 
 const FPS: u16 = 40;
@@ -1661,84 +1707,105 @@ impl<'clock> WindowTree<'clock> {
             }
         }
         let screen = self.screen.as_mut().expect("WindowTree is in invalid state");
-        if let Some(screen_Event::Key(n, key)) = screen.update(self.cursor, wait)? {
-            for _ in 0 .. n.get() {
-                match key {
-                    Key::Tab => {
-                        if let Some(primary_focused) = self.primary_focused {
-                            let focus = primary_focused.focus_tab(self);
-                            if self.focus_primary(focus) { continue; }
-                        }
-                    },
-                    Key::Left => {
-                        if let Some(primary_focused) = self.primary_focused {
-                            let focus = primary_focused.focus_left(self);
-                            if self.focus_primary(focus) { continue; }
-                        }
-                        if let Some(secondary_focused) = self.secondary_focused {
-                            let focus = secondary_focused.focus_left(self);
-                            if self.focus_secondary(focus) { continue; }
-                        }
-                    },
-                    Key::Right => {
-                        if let Some(primary_focused) = self.primary_focused {
-                            let focus = primary_focused.focus_right(self);
-                            if self.focus_primary(focus) { continue; }
-                        }
-                        if let Some(secondary_focused) = self.secondary_focused {
-                            let focus = secondary_focused.focus_right(self);
-                            if self.focus_secondary(focus) { continue; }
-                        }
-                    },
-                    Key::Up => {
-                        if let Some(primary_focused) = self.primary_focused {
-                            let focus = primary_focused.focus_up(self);
-                            if self.focus_primary(focus) { continue; }
-                        }
-                        if let Some(secondary_focused) = self.secondary_focused {
-                            let focus = secondary_focused.focus_up(self);
-                            if self.focus_secondary(focus) { continue; }
-                        }
-                    },
-                    Key::Down => {
-                        if let Some(primary_focused) = self.primary_focused {
-                            let focus = primary_focused.focus_down(self);
-                            if self.focus_primary(focus) { continue; }
-                        }
-                        if let Some(secondary_focused) = self.secondary_focused {
-                            let focus = secondary_focused.focus_down(self);
-                            if self.focus_secondary(focus) { continue; }
-                        }
-                    },
-                    _ => { },
-                }
-                let mut handled = false;
-                for pre_process in self.pre_process.items().clone().values() {
-                    handled = pre_process.0.raise_core(self, Event::PreProcessKey(key), pre_process.0, app);
-                    if handled { break; }
-                }
-                if handled { continue; }
-                handled = self.primary_focused.map_or(false, |x|
-                    x.raise_priv(self, Event::Key(key), false, app)
-                );
-                if handled { continue; }
-                handled = self.secondary_focused.map_or(false, |x|
-                    x.raise_priv(self, Event::Key(key), true, app)
-                );
-                if handled {
-                    self.primary_focused.map(|x|
-                        x.raise_priv(self, Event::Cmd(CMD_LOST_ATTENTION), false, app)
+        match screen.update(self.cursor, wait)? {
+            Some(screen_Event::Key(n, key)) => {
+                for _ in 0 .. n.get() {
+                    match key {
+                        Key::Tab => {
+                            if let Some(primary_focused) = self.primary_focused {
+                                let focus = primary_focused.focus_tab(self);
+                                if self.focus_primary(focus) { continue; }
+                            }
+                        },
+                        Key::Left => {
+                            if let Some(primary_focused) = self.primary_focused {
+                                let focus = primary_focused.focus_left(self);
+                                if self.focus_primary(focus) { continue; }
+                            }
+                            if let Some(secondary_focused) = self.secondary_focused {
+                                let focus = secondary_focused.focus_left(self);
+                                if self.focus_secondary(focus) { continue; }
+                            }
+                        },
+                        Key::Right => {
+                            if let Some(primary_focused) = self.primary_focused {
+                                let focus = primary_focused.focus_right(self);
+                                if self.focus_primary(focus) { continue; }
+                            }
+                            if let Some(secondary_focused) = self.secondary_focused {
+                                let focus = secondary_focused.focus_right(self);
+                                if self.focus_secondary(focus) { continue; }
+                            }
+                        },
+                        Key::Up => {
+                            if let Some(primary_focused) = self.primary_focused {
+                                let focus = primary_focused.focus_up(self);
+                                if self.focus_primary(focus) { continue; }
+                            }
+                            if let Some(secondary_focused) = self.secondary_focused {
+                                let focus = secondary_focused.focus_up(self);
+                                if self.focus_secondary(focus) { continue; }
+                            }
+                        },
+                        Key::Down => {
+                            if let Some(primary_focused) = self.primary_focused {
+                                let focus = primary_focused.focus_down(self);
+                                if self.focus_primary(focus) { continue; }
+                            }
+                            if let Some(secondary_focused) = self.secondary_focused {
+                                let focus = secondary_focused.focus_down(self);
+                                if self.focus_secondary(focus) { continue; }
+                            }
+                        },
+                        _ => { },
+                    }
+                    let mut handled = false;
+                    for pre_process in self.pre_process.items().clone().values() {
+                        handled = pre_process.0.raise_core(self, Event::PreProcessKey(key), pre_process.0, app);
+                        if handled { break; }
+                    }
+                    if handled { continue; }
+                    handled = self.primary_focused.map_or(false, |x|
+                        x.raise_priv(self, Event::Key(key), false, app)
                     );
-                    continue;
+                    if handled { continue; }
+                    handled = self.secondary_focused.map_or(false, |x|
+                        x.raise_priv(self, Event::Key(key), true, app)
+                    );
+                    if handled {
+                        self.primary_focused.map(|x|
+                            x.raise_priv(self, Event::Cmd(CMD_LOST_ATTENTION), false, app)
+                        );
+                        continue;
+                    }
+                    for post_process in self.post_process.items().clone().values() {
+                        handled =
+                            post_process.0.raise_core(self, Event::PostProcessKey(key), post_process.0, app);
+                        if handled { break; }
+                    }
                 }
-                for post_process in self.post_process.items().clone().values() {
-                    handled =
-                        post_process.0.raise_core(self, Event::PostProcessKey(key), post_process.0, app);
-                    if handled { break; }
+            },
+            Some(screen_Event::Click(point)) => {
+                if let Some(window) = self.hit_test(point) {
+                    window.raise_priv(self, Event::Click(point), false, app);
                 }
-            }
+            },
+            _ => { }
         }
         Ok(())
+    }
+
+    fn hit_test(&self, point: Point) -> Option<Window> {
+        if let Some(first_child) = self.first_child {
+            let mut child = first_child;
+            loop {
+                let hit_test = child.hit_test(point, self);
+                if hit_test.is_some() { return hit_test; }
+                child = child.next(self);
+                if child == first_child { break; }
+            }
+        }
+        None
     }
 
     fn focus_primary(

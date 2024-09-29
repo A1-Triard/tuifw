@@ -9,22 +9,22 @@
           <Label Text="~N~ =" Margin="0,1,0,0" Focus="n" />
         </StackPanel>
         <StackPanel Width="13" Margin="1,0,0,0">
-          <InputLine Text="0" Name="a" FocusTab="v" FocusDown="v" FocusedPrimary="True">
+          <InputLine Text="0" Name="a" FocusTab="v" FocusDown="v" FocusClick="Primary" FocusedPrimary="True">
 	    <InputLine.Validator>
 	      <FloatValidator />
 	    </InputLine.Validator>
 	  </InputLine>
-          <InputLine Text="0" Margin="0,1,0,0" Name="v" FocusTab="t" FocusDown="t">
+          <InputLine Text="0" Margin="0,1,0,0" Name="v" FocusTab="t" FocusDown="t" FocusClick="Primary">
 	    <InputLine.Validator>
 	      <FloatValidator />
 	    </InputLine.Validator>
 	  </InputLine>
-          <InputLine Text="0" Margin="0,1,0,0" Name="t" FocusTab="n" FocusDown="n">
+          <InputLine Text="0" Margin="0,1,0,0" Name="t" FocusTab="n" FocusDown="n" FocusClick="Primary">
 	    <InputLine.Validator>
 	      <FloatValidator />
 	    </InputLine.Validator>
 	  </InputLine>
-          <InputLine Text="1" Margin="0,1,0,0" Name="n" FocusTab="a">
+          <InputLine Text="1" Margin="0,1,0,0" Name="n" FocusTab="a" FocusClick="Primary">
 	    <InputLine.Validator>
 	      <IntValidator Min="1" />
 	    </InputLine.Validator>

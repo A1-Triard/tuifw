@@ -25,6 +25,7 @@
             FocusedPrimary="True"
             FocusTab="b"
             FocusDown="b"
+            FocusClick="Primary"
           />
         </DockPanel>
         <StretchPanel Vertical="False">
@@ -37,6 +38,7 @@
               ColorInputLineFocused="Black/Blue"
               FocusTab="c"
               FocusDown="c"
+              FocusClick="Primary"
             />
           </DockPanel>
           <DockPanel Margin="4,0,0,0">
@@ -47,6 +49,7 @@
               ColorInputLine="Black/Blue"
               ColorInputLineFocused="Black/Blue"
               FocusTab="a"
+              FocusClick="Primary"
             />
           </DockPanel>
         </StretchPanel>

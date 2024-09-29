@@ -2,19 +2,27 @@
   <Frame HAlign="Center" VAlign="Center" TextAlign="Center" Text="Tic-Tac-Toe">
     <StackPanel Margin="2,1,2,1">
       <StackPanel Vertical="False" HAlign="Center">
-        <Button Text=" " Name="tl" FocusTab="t" FocusRight="t" FocusDown="l" FocusedPrimary="True" />
-        <Button Text=" " Name="t" FocusTab="tr" FocusRight="tr" FocusDown="c" />
-        <Button Text=" " Name="tr" FocusTab="l" FocusDown="r" />
+        <Button
+          Text=" "
+          Name="tl"
+          FocusTab="t"
+          FocusRight="t"
+          FocusDown="l"
+          FocusClick="Primary"
+          FocusedPrimary="True"
+        />
+        <Button Text=" " Name="t" FocusTab="tr" FocusRight="tr" FocusDown="c" FocusClick="Primary" />
+        <Button Text=" " Name="tr" FocusTab="l" FocusDown="r" FocusClick="Primary" />
       </StackPanel>
       <StackPanel Vertical="False" HAlign="Center">
-        <Button Text=" " Name="l" FocusTab="c" FocusRight="c" FocusDown="bl" />
-        <Button Text=" " Name="c" FocusTab="r" FocusRight="r" FocusDown="b" />
-        <Button Text=" " Name="r" FocusTab="bl" FocusDown="br" />
+        <Button Text=" " Name="l" FocusTab="c" FocusRight="c" FocusDown="bl" FocusClick="Primary" />
+        <Button Text=" " Name="c" FocusTab="r" FocusRight="r" FocusDown="b" FocusClick="Primary" />
+        <Button Text=" " Name="r" FocusTab="bl" FocusDown="br" FocusClick="Primary" />
       </StackPanel>
       <StackPanel Vertical="False" HAlign="Center">
-        <Button Text=" " Name="bl" FocusTab="b" FocusRight="b" />
-        <Button Text=" " Name="b" FocusTab="br" FocusRight="br" />
-        <Button Text=" " Name="br" FocusTab="tl" />
+        <Button Text=" " Name="bl" FocusTab="b" FocusRight="b" FocusClick="Primary" />
+        <Button Text=" " Name="b" FocusTab="br" FocusRight="br" FocusClick="Primary" />
+        <Button Text=" " Name="br" FocusTab="tl" FocusClick="Primary" />
       </StackPanel>
       <StackPanel Vertical="False" Margin="1,1,2,0">
         <Label Text="~N~ew game" Name="new_game" />

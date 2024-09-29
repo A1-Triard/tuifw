@@ -41,6 +41,7 @@ mod no_std {
         Stacked::from_static_array(unsafe { &mut *addr_of_mut!(ERROR_MEM) });
 }
 
+use exit_no_std::exit;
 use tuifw_screen_base::{Bg, Fg, Screen, Point, Event, Key};
 
 fn draw(screen: &mut dyn Screen) {
@@ -54,13 +55,9 @@ fn draw(screen: &mut dyn Screen) {
     }
 }
 
-extern {
-    type PEB;
-}
-
 #[allow(non_snake_case)]
 #[no_mangle]
-extern "stdcall" fn mainCRTStartup(_: *const PEB) -> u64 {
+extern "C" fn mainCRTStartup() -> ! {
     let mut screen = unsafe { tuifw_screen::init(None, Some(&no_std::ERROR_ALLOCATOR)) }.unwrap();
     let screen = screen.as_mut();
     draw(screen);
@@ -78,5 +75,5 @@ extern "stdcall" fn mainCRTStartup(_: *const PEB) -> u64 {
             }
         }
     }
-    0
+    exit(0)
 }

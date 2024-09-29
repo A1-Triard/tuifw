@@ -65,6 +65,7 @@ pub struct Registered {
     pub h_align: XamlLiteral,
     pub v_align: XamlLiteral,
     pub dock: XamlLiteral,
+    pub focus: XamlLiteral,
     pub visibility: XamlLiteral,
     pub color: XamlLiteral,
 
@@ -86,6 +87,7 @@ pub struct Registered {
     pub widget_focus_left: XamlProperty,
     pub widget_focus_up: XamlProperty,
     pub widget_focus_down: XamlProperty,
+    pub widget_focus_click: XamlProperty,
     pub widget_focused_primary: XamlProperty,
     pub widget_focused_secondary: XamlProperty,
     pub widget_h_align: XamlProperty,
@@ -204,6 +206,7 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
     let h_align = XamlLiteral::new(xaml, XMLNS, "HAlign");
     let v_align = XamlLiteral::new(xaml, XMLNS, "VAlign");
     let dock = XamlLiteral::new(xaml, XMLNS, "Dock");
+    let focus = XamlLiteral::new(xaml, XMLNS, "Focus");
     let visibility = XamlLiteral::new(xaml, XMLNS, "Visibility");
     let color = XamlLiteral::new(xaml, XMLNS, "Color");
 
@@ -233,6 +236,9 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
     let widget_focus_left = XamlProperty::new(xaml, widget, "FocusLeft", XamlType::Ref, false, false);
     let widget_focus_up = XamlProperty::new(xaml, widget, "FocusUp", XamlType::Ref, false, false);
     let widget_focus_down = XamlProperty::new(xaml, widget, "FocusDown", XamlType::Ref, false, false);
+    let widget_focus_click = XamlProperty::new(
+        xaml, widget, "FocusClick", XamlType::Literal(focus), false, false
+    );
     let widget_focused_primary = XamlProperty::new(
         xaml, widget, "FocusedPrimary", XamlType::Literal(boolean), false, false
     );
@@ -493,6 +499,11 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
         "Bottom" => Some("tuifw::Dock::Bottom".to_string()),
         _ => None,
     })));
+    focus.set_ctor(xaml, Some(Box::new(|x| match x {
+        "Primary" => Some("tuifw_window::Focus::Primary".to_string()),
+        "Secondary" => Some("tuifw_window::Focus::Secondary".to_string()),
+        _ => None,
+    })));
     visibility.set_ctor(xaml, Some(Box::new(|x| match x {
         "Visible" => Some("tuifw_window::Visibility::Visible".to_string()),
         "Hidden" => Some("tuifw_window::Visibility::Hidden".to_string()),
@@ -607,6 +618,9 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
     " }, obj, value))));
     widget_focus_down.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_focus_down(tree, {});
+    " }, obj, value))));
+    widget_focus_click.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        {}.set_focus_click(tree, Some({}));
     " }, obj, value))));
     widget_focused_primary.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         {}.set_focused_primary(tree, {});
@@ -885,6 +899,7 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
         h_align,
         v_align,
         dock,
+        focus,
         visibility,
         color,
 
@@ -906,6 +921,7 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
         widget_focus_left,
         widget_focus_up,
         widget_focus_down,
+        widget_focus_click,
         widget_focused_primary,
         widget_focused_secondary,
         widget_h_align,

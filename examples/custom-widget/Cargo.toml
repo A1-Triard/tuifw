@@ -34,6 +34,7 @@ tuifw-window = { path = "../../window" }
 
 [target.'cfg(target_os="dos")'.dependencies]
 dos-cp = "0.7.0"
+exit-no-std = "0.2.1"
 
 [build-dependencies]
 dos-cp-generator = "0.7.0"

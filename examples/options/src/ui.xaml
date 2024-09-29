@@ -2,18 +2,44 @@
   <Frame HAlign="Center" VAlign="Center" TextAlign="Center" Text="Options">
     <StackPanel Margin="1,0,1,0" HAlign="Center">
       <StackPanel>
-        <CheckBox Text="Option ~1~" Name="o_1" FocusTab="o_2" FocusDown="o_2" FocusedPrimary="True" />
-        <CheckBox Text="Option ~2~" IsOn="True" Name="o_2" FocusTab="r_1" FocusDown="r_1" />
+        <CheckBox
+          Text="Option ~1~"
+          Name="o_1"
+          FocusTab="o_2"
+          FocusDown="o_2"
+          FocusClick="Primary"
+          FocusedPrimary="True"
+        />
+        <CheckBox
+          Text="Option ~2~"
+          IsOn="True"
+          Name="o_2"
+          FocusTab="r_1"
+          FocusDown="r_1"
+          FocusClick="Primary"
+        />
         <Frame Text="Radio Buttons">
           <StackPanel Margin="1,0,1,0">
-            <RadioButton Text="~R~adio Button 1" IsOn="True" Name="r_1" FocusTab="r_2" FocusDown="r_2" />
-            <RadioButton Text="R~a~dio Button 2" Name="r_2" FocusTab="o_1" />
+            <RadioButton
+              Text="~R~adio Button 1"
+              IsOn="True"
+              Name="r_1"
+              FocusTab="r_2"
+              FocusDown="r_2"
+              FocusClick="Primary"
+            />
+            <RadioButton
+              Text="R~a~dio Button 2"
+              Name="r_2"
+              FocusTab="o_1"
+              FocusClick="Primary"
+            />
           </StackPanel>
         </Frame>
       </StackPanel>
       <StackPanel Vertical="False" HAlign="Center">
-        <Button Text="~O~K" Name="ok" FocusRight="cancel" FocusedSecondary="True" />
-        <Button Text="~C~ancel" Margin="3,0,0,0" Name="cancel" />
+        <Button Text="~O~K" Name="ok" FocusRight="cancel" FocusClick="Secondary" FocusedSecondary="True" />
+        <Button Text="~C~ancel" Margin="3,0,0,0" Name="cancel" FocusClick="Secondary" />
       </StackPanel>
     </StackPanel>
   </Frame>
