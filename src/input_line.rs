@@ -441,6 +441,24 @@ impl Widget for InputLineWidget {
                 window.invalidate_render(tree);
                 true
             },
+            Event::Click(point) => {
+                let offset = window.inner_point(point, tree).offset(Vector { x: -1, y: 0 }).x;
+                let data = window.data_mut::<InputLine>(tree);
+                let offset = offset.wrapping_sub(data.view_padding);
+                let index = 'r: {
+                    let mut width = 0;
+                    for (i, c) in data.text[data.view.clone()].char_indices() {
+                        width += char_width(c);
+                        if offset < width {
+                            break 'r i;
+                        }
+                    }
+                    data.view.len()
+                };
+                data.cursor = data.view.start + index;
+                window.invalidate_render(tree);
+                true
+            },
             _ => false,
         }
     }

@@ -801,6 +801,17 @@ impl Window {
         Rect { tl: Point { x: 0, y: 0 }, size: window_bounds.size }
     }
 
+    pub fn screen_bounds(self, tree: &WindowTree) -> Rect {
+        let bounds = tree.arena[self.0].window_bounds;
+        let parent = tree.arena[self.0].parent;
+        bounds.offset(offset_from_root(parent, tree))
+    }
+
+    pub fn inner_point(self, screen_point: Point, tree: &WindowTree) -> Point {
+        let offset = screen_point.offset_from(self.screen_bounds(tree).tl);
+        Point { x: offset.x, y: offset.y }
+    }
+
     pub fn data<'a, T: WidgetData + 'static>(
         self,
         tree: &'a WindowTree<'_>
