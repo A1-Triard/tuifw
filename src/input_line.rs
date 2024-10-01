@@ -274,7 +274,7 @@ impl Widget for InputLineWidget {
             }
         };
         let color = window.color(tree, color);
-        rp.fill_bg(color.1);
+        rp.fill_bg(color);
         rp.text(
             Point { x: data.view_padding.wrapping_add(1), y: 0 },
             color,

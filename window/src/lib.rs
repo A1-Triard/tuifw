@@ -192,8 +192,8 @@ impl RenderPort {
         }
     }
 
-    pub fn fill_bg(&mut self, bg: Bg) {
-        self.fill(|rp, p| rp.text(p, (Fg::LightGray, bg), " "));
+    pub fn fill_bg(&mut self, color: (Fg, Bg)) {
+        self.fill(|rp, p| rp.text(p, color, " "));
     }
 
     pub fn h_line(&mut self, start: Point, len: i16, double: bool, color: (Fg, Bg)) {

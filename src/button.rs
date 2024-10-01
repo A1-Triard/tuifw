@@ -212,7 +212,7 @@ impl Widget for ButtonWidget {
         };
         let color = window.color(tree, color);
         let color_hotkey = window.color(tree, color_hotkey);
-        rp.fill_bg(color.1);
+        rp.fill_bg(color);
         rp.label(Point { x: 1, y: 0 }, color, color_hotkey, &data.text);
         rp.text(Point { x: 0, y: 0 }, color, if pressed { " " } else { "[" });
         rp.text(Point { x: bounds.r_inner(), y: 0 }, color, if pressed { " " } else { "]" });

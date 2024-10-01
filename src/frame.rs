@@ -59,7 +59,7 @@ impl Widget for FrameWidget {
         let color = window.color(tree, 0);
         let bounds = window.inner_bounds(tree);
         let data = window.data::<Frame>(tree);
-        rp.fill_bg(color.1);
+        rp.fill_bg(color);
         rp.h_line(bounds.tl, bounds.w(), data.double, color);
         rp.h_line(bounds.bl_inner(), bounds.w(), data.double, color);
         rp.v_line(bounds.tl, bounds.h(), data.double, color);

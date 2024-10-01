@@ -133,7 +133,7 @@ impl Widget for ScrollViewerWidget {
         let color = window.color(tree, 0);
         let bounds = window.inner_bounds(tree);
         let data = window.data::<ScrollViewer>(tree);
-        rp.fill_bg(color.1);
+        rp.fill_bg(color);
         rp.h_line(bounds.tl, bounds.w(), true, color);
         rp.h_line(bounds.bl_inner(), bounds.w(), true, color);
         rp.v_line(bounds.tl, bounds.h(), true, color);
