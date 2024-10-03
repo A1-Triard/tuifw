@@ -118,25 +118,38 @@ impl VirtItemsPresenter {
                 sv.set_offset(tree, parent, vertical, offset);
             }
         }
-        Self::update(tree, window);
+        Self::update(tree, window, true);
+    }
+
+    fn set_offset_raw(tree: &mut WindowTree, window: Window, offset: i16, focus_first_visible_item_if_needed: bool) {
+        let data = window.data_mut::<VirtItemsPresenter>(tree);
+        let vertical = data.vertical;
+        data.offset = offset;
+        if let Some(parent) = window.parent(tree) {
+            if let Some(sv) = parent.widget_extension::<dyn VirtScrollViewerWidgetExtension>(tree) {
+                sv.set_offset(tree, parent, vertical, offset);
+            }
+        }
+        Self::update(tree, window, focus_first_visible_item_if_needed);
     }
 
     fn on_focus_first_item_changed(tree: &mut WindowTree, window: Window) {
-        VirtItemsPresenter::set_offset(tree, window, 0);
+        VirtItemsPresenter::set_offset_raw(tree, window, 0, false);
         Self::on_templates_changed(tree, window);
     }
 
     fn on_templates_changed(tree: &mut WindowTree, window: Window) {
         window.data_mut::<VirtItemsPresenter>(tree).templates_changed = true;
-        Self::update(tree, window);
+        Self::update(tree, window, false);
     }
-        
-    fn update(tree: &mut WindowTree, window: Window) {
+
+    fn update(tree: &mut WindowTree, window: Window, focus_first_visible_item_if_needed: bool) {
         let update_timer = Timer::new(tree, 0, Box::new(move |tree, app| {
             let data = window.data_mut::<VirtItemsPresenter>(tree);
             data.update_timer = None;
             if data.error { return; }
             let skip_items = (data.offset as u16 / data.item_size as u16).saturating_sub(1);
+            let first_item_is_invisible = data.offset as u16 / data.item_size as u16 != 0;
             let panel_margin = data.offset as u16 - skip_items * data.item_size as u16;
             let take_items =
                 (data.viewport as u16 as u32 + panel_margin as u32).div_ceil(data.item_size as u16 as u32)
@@ -208,6 +221,7 @@ impl VirtItemsPresenter {
                     }
                 }
             } else if let Some(panel) = Self::panel(tree, window) {
+                let focus_first_visible_item = focus_first_visible_item_if_needed && tree.primary_focused().map_or(false, |x| x.parent(tree) == Some(panel));
                 let data = window.data::<VirtItemsPresenter>(tree);
                 let item_template = data.item_template.unwrap();
                 panel.set_margin(tree, panel_margin);
@@ -263,6 +277,15 @@ impl VirtItemsPresenter {
                     item_window.set_source_index(tree, Some(item_index));
                     item_window.raise(tree, Event::Cmd(CMD_VIRT_ITEMS_PRESENTER_BIND), app);
                 }
+                if focus_first_visible_item {
+                    if let Some(first_child) = panel.first_child(tree) {
+                        let mut child = first_child;
+                        if first_item_is_invisible {
+                            child = child.next(tree);
+                        }
+                        child.set_focused_primary(tree, true);
+                    }
+                }
             }
             let data = window.data_mut::<VirtItemsPresenter>(tree);
             data.visible_range = items_range;
@@ -279,7 +302,14 @@ struct VirtItemsPresenterWidget;
 
 impl_supports_interfaces!(VirtItemsPresenterWidget: VirtItemsPresenterWidgetExtension);
 
-impl VirtItemsPresenterWidgetExtension for VirtItemsPresenterWidget { }
+impl VirtItemsPresenterWidgetExtension for VirtItemsPresenterWidget {
+    fn set_offset(&self, tree: &mut WindowTree, window: Window, vertical: bool, value: i16) {
+        let data = window.data::<VirtItemsPresenter>(tree);
+        if data.vertical == vertical {
+            VirtItemsPresenter::set_offset_raw(tree, window, value, true);
+        }
+    }
+}
 
 impl Widget for VirtItemsPresenterWidget {
     fn new(&self) -> Box<dyn WidgetData> {
@@ -381,12 +411,12 @@ impl Widget for VirtItemsPresenterWidget {
                         sv.set_viewport(tree, parent, vertical, size.y);
                     }
                 }
-                VirtItemsPresenter::update(tree, window);
+                VirtItemsPresenter::update(tree, window, false);
             }
             let data = window.data_mut::<VirtItemsPresenter>(tree);
             if data.item_size != item_size.y {
                 data.item_size = item_size.y;
-                VirtItemsPresenter::update(tree, window);
+                VirtItemsPresenter::update(tree, window, false);
                 VirtItemsPresenter::on_extent_changed(tree, window);
             }
         } else {
@@ -398,12 +428,12 @@ impl Widget for VirtItemsPresenterWidget {
                         sv.set_viewport(tree, parent, vertical, size.x);
                     }
                 }
-                VirtItemsPresenter::update(tree, window);
+                VirtItemsPresenter::update(tree, window, false);
             }
             let data = window.data_mut::<VirtItemsPresenter>(tree);
             if data.item_size != item_size.x {
                 data.item_size = item_size.x;
-                VirtItemsPresenter::update(tree, window);
+                VirtItemsPresenter::update(tree, window, false);
                 VirtItemsPresenter::on_extent_changed(tree, window);
             }
         }
@@ -424,9 +454,9 @@ impl Widget for VirtItemsPresenterWidget {
                 let from_top = rect.t().wrapping_sub(bounds.t()).checked_abs().map_or(i16::MIN, |x| -x);
                 let from_bottom = rect.b().wrapping_sub(bounds.b()).checked_abs().map_or(i16::MIN, |x| -x);
                 if from_top >= from_bottom {
-                    VirtItemsPresenter::set_offset(tree, window, offset.wrapping_add(from_top));
+                    VirtItemsPresenter::set_offset_raw(tree, window, offset.wrapping_add(from_top), false);
                 } else {
-                    VirtItemsPresenter::set_offset(tree, window, offset.wrapping_sub(from_bottom));
+                    VirtItemsPresenter::set_offset_raw(tree, window, offset.wrapping_sub(from_bottom), false);
                 }
             }
         } else {
@@ -434,9 +464,9 @@ impl Widget for VirtItemsPresenterWidget {
                 let from_left = rect.l().wrapping_sub(bounds.l()).checked_abs().map_or(i16::MIN, |x| -x);
                 let from_right = rect.r().wrapping_sub(bounds.r()).checked_abs().map_or(i16::MIN, |x| -x);
                 if from_left >= from_right {
-                    VirtItemsPresenter::set_offset(tree, window, offset.wrapping_add(from_left));
+                    VirtItemsPresenter::set_offset_raw(tree, window, offset.wrapping_add(from_left), false);
                 } else {
-                    VirtItemsPresenter::set_offset(tree, window, offset.wrapping_sub(from_right));
+                    VirtItemsPresenter::set_offset_raw(tree, window, offset.wrapping_sub(from_right), false);
                 }
             }
         }
@@ -461,7 +491,7 @@ impl Widget for VirtItemsPresenterWidget {
                             if focus == event_source.parent(tree).unwrap().first_child(tree).unwrap() {
                                 let data = window.data_mut::<VirtItemsPresenter>(tree);
                                 data.focus_first_item_secondary_once = true;
-                                VirtItemsPresenter::set_offset(tree, window, 0);
+                                VirtItemsPresenter::set_offset_raw(tree, window, 0, false);
                                 VirtItemsPresenter::on_templates_changed(tree, window);
                             } else {
                                 focus.set_focused_secondary(tree, true);
@@ -471,7 +501,7 @@ impl Widget for VirtItemsPresenterWidget {
                             if focus == event_source.parent(tree).unwrap().first_child(tree).unwrap() {
                                 let data = window.data_mut::<VirtItemsPresenter>(tree);
                                 data.focus_first_item_primary_once = true;
-                                VirtItemsPresenter::set_offset(tree, window, 0);
+                                VirtItemsPresenter::set_offset_raw(tree, window, 0, false);
                                 VirtItemsPresenter::on_templates_changed(tree, window);
                             } else {
                                 focus.set_focused_primary(tree, true);

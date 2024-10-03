@@ -328,12 +328,85 @@ impl Widget for ScrollViewerWidget {
 
     fn update(
         &self,
-        _tree: &mut WindowTree,
-        _window: Window,
-        _event: Event,
+        tree: &mut WindowTree,
+        window: Window,
+        event: Event,
         _event_source: Window,
         _app: &mut dyn App,
     ) -> bool {
-        false
+        if let Event::Click(point) = event {
+            let point = window.inner_point(point, tree); // TODO swap args
+            let bounds = window.inner_bounds(tree);
+            let data = window.data::<ScrollViewer>(tree);
+            if point.x == bounds.r_inner() && data.v_scroll {
+                let indicator_area = Thickness::all(1).shrink_rect(bounds);
+                if indicator_area.v_range().contains(point.y) {
+                    let new_indicator_pos = point.offset_from(indicator_area.tl).y;
+                    let v_indicator_range = (indicator_area.h() as u16).saturating_sub(1) as i16;
+                    let offset = if v_indicator_range == 0 {
+                        0
+                    } else {
+                        ((
+                            i32::from(new_indicator_pos) * i32::from(data.v_extent - data.v_viewport) +
+                            i32::from(v_indicator_range) / 2
+                        ) / i32::from(v_indicator_range)) as i16
+                    };
+                    let mut has_virtual_child = false;
+                    if let Some(first_child) = window.first_child(tree) {
+                        let mut child = first_child;
+                        loop {
+                            if let Some(virtual_child) = child.widget_extension::<dyn VirtItemsPresenterWidgetExtension>(tree) {
+                                virtual_child.set_offset(tree, child, true, offset);
+                                has_virtual_child = true;
+                            }
+                            child = child.next(tree);
+                            if child == first_child { break; }
+                        }
+                    }
+                    if !has_virtual_child {
+                        ScrollViewer::set_v_offset(tree, window, offset);
+                    }
+                    true
+                } else {
+                    false
+                }
+            } else if point.y == bounds.b_inner() && data.h_scroll {
+                let indicator_area = Thickness::all(1).shrink_rect(bounds);
+                if indicator_area.h_range().contains(point.x) {
+                    let new_indicator_pos = point.offset_from(indicator_area.tl).x;
+                    let h_indicator_range = (indicator_area.w() as u16).saturating_sub(1) as i16;
+                    let offset = if h_indicator_range == 0 {
+                        0
+                    } else {
+                        ((
+                            i32::from(new_indicator_pos) * i32::from(data.h_extent - data.h_viewport) +
+                            i32::from(h_indicator_range) / 2
+                        ) / i32::from(h_indicator_range)) as i16
+                    };
+                    let mut has_virtual_child = false;
+                    if let Some(first_child) = window.first_child(tree) {
+                        let mut child = first_child;
+                        loop {
+                            if let Some(virtual_child) = child.widget_extension::<dyn VirtItemsPresenterWidgetExtension>(tree) {
+                                virtual_child.set_offset(tree, child, false, offset);
+                                has_virtual_child = true;
+                            }
+                            child = child.next(tree);
+                            if child == first_child { break; }
+                        }
+                    }
+                    if !has_virtual_child {
+                        ScrollViewer::set_h_offset(tree, window, offset);
+                    }
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        } else {
+            false
+        }
     }
 }

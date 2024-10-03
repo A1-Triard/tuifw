@@ -6,4 +6,6 @@ pub trait VirtScrollViewerWidgetExtension {
     fn set_extent(&self, tree: &mut WindowTree, window: Window, vertical: bool, value: i16);
 }
 
-pub trait VirtItemsPresenterWidgetExtension { }
+pub trait VirtItemsPresenterWidgetExtension {
+    fn set_offset(&self, tree: &mut WindowTree, window: Window, vertical: bool, value: i16);
+}
