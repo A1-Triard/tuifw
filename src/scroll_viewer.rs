@@ -334,7 +334,7 @@ impl Widget for ScrollViewerWidget {
         _event_source: Window,
         _app: &mut dyn App,
     ) -> bool {
-        if let Event::Click(point) = event {
+        if let Event::LmbDown(point) = event {
             let point = window.inner_point(point, tree); // TODO swap args
             let bounds = window.inner_bounds(tree);
             let data = window.data::<ScrollViewer>(tree);

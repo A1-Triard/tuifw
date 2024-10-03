@@ -66,7 +66,7 @@ pub unsafe fn init_settings(error_alloc: &'static dyn Allocator) -> Result<(), E
     register_colors(error_alloc)?;
     set_escdelay(0);
     set_err(non_err(keypad(stdscr, true)), "keypad", error_alloc)?;
-    mousemask(BUTTON1_CLICKED, null_mut());
+    mousemask(BUTTON1_PRESSED | BUTTON1_RELEASED, null_mut());
     Ok(())
 }
 
@@ -144,8 +144,10 @@ pub fn read_event(
                 let m = unsafe { getmouse(&mut e as *mut _) };
                 if m == ERR {
                     None
+                } else if e.bstate & BUTTON1_PRESSED != 0 {
+                    Some(Event::LmbDown(Point { x: e.x as i16, y: e.y as i16 }))
                 } else {
-                    Some(Event::Click(Point { x: e.x as i16, y: e.y as i16 }))
+                    Some(Event::LmbUp(Point { x: e.x as i16, y: e.y as i16 }))
                 }
             },
             _ => None

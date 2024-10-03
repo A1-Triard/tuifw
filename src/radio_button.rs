@@ -119,7 +119,7 @@ impl<RadioButton: IsRadioButton> RadioButtonController<RadioButton> {
                     false
                 }
             },
-            Event::Click(_) => {
+            Event::LmbDown(_) => {
                 if window.actual_is_enabled(tree) {
                     Self::click(tree, window, app)
                 } else {

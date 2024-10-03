@@ -45,8 +45,10 @@ pub enum Event {
     PostProcessKey(Key),
     Cmd(u16),
     PreviewCmd(u16),
-    Click(Point),
-    PreviewClick(Point),
+    LmbDown(Point),
+    PreviewLmbDown(Point),
+    LmbUp,
+    PreviewLmbUp,
 }
 
 impl Event {
@@ -58,8 +60,10 @@ impl Event {
             Event::PreviewCmd(_) => true,
             Event::PreProcessKey(_) => false,
             Event::PostProcessKey(_) => false,
-            Event::Click(_) => false,
-            Event::PreviewClick(_) => true,
+            Event::LmbDown(_) => false,
+            Event::PreviewLmbDown(_) => true,
+            Event::LmbUp => false,
+            Event::PreviewLmbUp => true,
         }
     }
 
@@ -67,7 +71,8 @@ impl Event {
         match self {
             Event::Key(k) => Event::PreviewKey(k),
             Event::Cmd(n) => Event::PreviewCmd(n),
-            Event::Click(p) => Event::PreviewClick(p),
+            Event::LmbDown(p) => Event::PreviewLmbDown(p),
+            Event::LmbUp => Event::PreviewLmbUp,
             _ => unreachable!(),
         }
     }
@@ -1119,7 +1124,7 @@ impl Window {
             }
         }
         if !*handled {
-            if matches!(event, Event::Click(_)) {
+            if matches!(event, Event::LmbDown(_)) {
                 match self.focus_click(tree) {
                     Some(Focus::Primary) => self.set_focused_primary(tree, true),
                     Some(Focus::Secondary) => self.set_focused_secondary(tree, true),
@@ -1351,6 +1356,9 @@ impl Window {
         tree: &mut WindowTree,
         app: &mut dyn App,
     ) {
+        if tree.click == Some(self) {
+            tree.click = None;
+        }
         if tree.next_primary_focused == Some(Some(self)) {
             tree.next_primary_focused = Some(None);
         }
@@ -1552,6 +1560,7 @@ pub struct WindowTree<'clock> {
     secondary_focused: Option<Window>,
     next_primary_focused: Option<Option<Window>>,
     next_secondary_focused: Option<Option<Window>>,
+    click: Option<Window>,
     cursor: Option<Point>,
     quit: bool,
     timers: Arena<TimerData>,
@@ -1574,6 +1583,7 @@ impl<'clock> WindowTree<'clock> {
             secondary_focused: None,
             next_primary_focused: None,
             next_secondary_focused: None,
+            click: None,
             cursor: None,
             quit: false,
             clock,
@@ -1796,9 +1806,18 @@ impl<'clock> WindowTree<'clock> {
                     }
                 }
             },
-            Some(screen_Event::Click(point)) => {
+            Some(screen_Event::LmbUp(point)) => {
+                if let Some(window) = self.click.take() {
+                    window.raise_priv(self, Event::LmbUp, false, app);
+                } else if let Some(window) = self.hit_test(point) {
+                    window.raise_priv(self, Event::LmbDown(point), false, app);
+                    window.raise_priv(self, Event::LmbUp, false, app);
+                }
+            },
+            Some(screen_Event::LmbDown(point)) => {
                 if let Some(window) = self.hit_test(point) {
-                    window.raise_priv(self, Event::Click(point), false, app);
+                    self.click = Some(window);
+                    window.raise_priv(self, Event::LmbDown(point), false, app);
                 }
             },
             _ => { }

@@ -44,7 +44,8 @@ int main() {
     printf("pub type chtype = u%zd;\n", sizeof(chtype) * CHAR_BIT);
     printf("pub type wint_t = u%zd;\n", sizeof(wint_t) * CHAR_BIT);
     printf("pub const CCHARW_MAX: usize = %d;\n", CCHARW_MAX);
-    printf("pub const BUTTON1_CLICKED: c_ulong = %lu;\n", (unsigned long)BUTTON1_CLICKED);
+    printf("pub const BUTTON1_PRESSED: c_ulong = %lu;\n", (unsigned long)BUTTON1_PRESSED);
+    printf("pub const BUTTON1_RELEASED: c_ulong = %lu;\n", (unsigned long)BUTTON1_RELEASED);
     return 0;
 }
 "##).unwrap_or_else(|_| panic!("cannot write {c_file_display}"));

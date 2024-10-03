@@ -176,7 +176,8 @@ pub enum Key {
 pub enum Event {
     Resize,
     Key(NonZeroU16, Key),
-    Click(Point),
+    LmbDown(Point),
+    LmbUp(Point),
 }
 
 pub enum Error {

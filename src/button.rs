@@ -51,6 +51,7 @@ impl IsButton for Button {
 pub struct ButtonController<Button: IsButton> {
     click_timer: Option<Timer>,
     release_timer: Option<Timer>,
+    pressed_by_mouse: bool,
     _phantom: PhantomType<Button>,
 }
 
@@ -63,6 +64,7 @@ impl<Button: IsButton> ButtonController<Button> {
         ButtonController {
             click_timer: None,
             release_timer: None,
+            pressed_by_mouse: false,
             _phantom: PhantomType::new(),
         }
     }
@@ -77,7 +79,7 @@ impl<Button: IsButton> ButtonController<Button> {
     }
 
     pub fn is_pressed(&self) -> bool {
-        self.release_timer.is_some()
+        self.release_timer.is_some() || self.pressed_by_mouse
     }
 
     fn click(tree: &mut WindowTree, window: Window) {
@@ -121,13 +123,38 @@ impl<Button: IsButton> ButtonController<Button> {
                     false
                 }
             },
-            Event::Click(_) => {
+            Event::LmbDown(_) => {
                 if window.actual_is_enabled(tree) {
-                    Self::click(tree, window);
+                    let click_timer = Timer::new(tree, 0, Box::new(move |tree, app| {
+                        let data = window.data_mut::<Button>(tree);
+                        data.controller_mut().click_timer = None;
+                        if window.actual_is_enabled(tree) {
+                            let data = window.data_mut::<Button>(tree);
+                            data.controller_mut().pressed_by_mouse = true;
+                            let cmd = data.cmd();
+                            window.invalidate_render(tree);
+                            window.raise(tree, Event::Cmd(cmd), app);
+                        }
+                    }));
+                    let data = window.data_mut::<Button>(tree);
+                    if let Some(old_click_timer) = data.controller_mut().click_timer.replace(click_timer) {
+                        old_click_timer.drop_timer(tree);
+                    }
                     true
                 } else {
                     false
                 }
+            },
+            Event::LmbUp => {
+                let data = window.data_mut::<Button>(tree);
+                if let Some(click_timer) = data.controller_mut().click_timer.take() {
+                    click_timer.drop_timer(tree);
+                    Self::click(tree, window);
+                } else {
+                    data.controller_mut().pressed_by_mouse = false;
+                    window.invalidate_render(tree);
+                }
+                true
             },
             Event::PostProcessKey(Key::Alt(c)) | Event::PostProcessKey(Key::Char(c)) => {
                 if window.actual_is_enabled(tree) {
