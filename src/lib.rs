@@ -63,6 +63,9 @@ pub use scroll_viewer::*;
 
 pub mod virt_scroll_viewer;
 
+mod text_edit;
+pub use text_edit::*;
+
 #[doc(hidden)]
 pub use alloc::boxed::Box as alloc_boxed_Box;
 #[doc(hidden)]

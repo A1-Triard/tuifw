@@ -1,66 +1,77 @@
 <Background xmlns="https://a1-triard.github.io/tuifw/2023/xaml" Name="root">
-  <StackPanel>
-    <Background ColorBackground="Black/Brown" ColorLabel="Black/Brown">
-      <StretchPanel Vertical="False">
-        <Label Text="Little STFL example program" />
-        <Label Text="Line number one" />
-        <Label Text="Fun! Fun! Fun!" />
-        <Label Text="Whatever" />
-      </StretchPanel>
-    </Background>
-    <DockPanel Margin="1">
-      <StackPanel Dock="Right" ColorLabel="White/None" Margin="4,0,0,0">
-        <StaticText Text="this" />
-        <StaticText Text="is a" />
-        <StaticText Text="test" />
-      </StackPanel>
-      <StackPanel ColorLabel="Red/None">
-        <DockPanel Margin="0,0,0,1">
-          <Label Text="Field A:" Dock="Left" Margin="0,0,2,0" />
-          <InputLine
-            Name="a"
-            Text="This is a little"
-            ColorInputLine="White/Blue"
-            ColorInputLineFocused="White/Blue"
-            FocusedPrimary="True"
-            FocusTab="b"
-            FocusDown="b"
-            FocusClick="Primary"
-          />
-        </DockPanel>
+  <DockPanel>
+    <StackPanel Dock="Top">
+      <Background ColorBackground="Black/Brown" ColorLabel="Black/Brown">
         <StretchPanel Vertical="False">
-          <DockPanel>
-            <Label Text="Field B:" Dock="Left" Margin="0,0,2,0" />
-            <InputLine
-              Name="b"
-              Text="test for STFL!"
-              ColorInputLine="Black/Blue"
-              ColorInputLineFocused="Black/Blue"
-              FocusTab="c"
-              FocusDown="c"
-              FocusClick="Primary"
-            />
-          </DockPanel>
-          <DockPanel Margin="4,0,0,0">
-            <Label Text="Field C:" Dock="Left" Margin="0,0,2,0" />
-            <InputLine
-              Name="c"
-              Text="Hello'World!"
-              ColorInputLine="Black/Blue"
-              ColorInputLineFocused="Black/Blue"
-              FocusTab="a"
-              FocusClick="Primary"
-            />
-          </DockPanel>
+          <Label Text="Little STFL example program" />
+          <Label Text="Line number one" />
+          <Label Text="Fun! Fun! Fun!" />
+          <Label Text="Whatever" />
         </StretchPanel>
-      </StackPanel>
-    </DockPanel>
-    <StretchPanel Vertical="False" Height="18">
+      </Background>
+      <DockPanel Margin="1">
+        <StackPanel Dock="Right" ColorLabel="White/None" Margin="4,0,0,0">
+          <StaticText Text="this" />
+          <StaticText Text="is a" />
+          <StaticText Text="test" />
+        </StackPanel>
+        <StackPanel ColorLabel="Red/None">
+          <DockPanel Margin="0,0,0,1">
+            <Label Text="Field A:" Dock="Left" Margin="0,0,2,0" />
+            <InputLine
+              Name="a"
+              Text="This is a little"
+              ColorInputLine="White/Blue"
+              ColorInputLineFocused="White/Blue"
+              FocusedPrimary="True"
+              FocusTab="b"
+              FocusDown="b"
+              FocusClick="Primary"
+            />
+          </DockPanel>
+          <StretchPanel Vertical="False">
+            <DockPanel>
+              <Label Text="Field B:" Dock="Left" Margin="0,0,2,0" />
+              <InputLine
+                Name="b"
+                Text="test for STFL!"
+                ColorInputLine="Black/Blue"
+                ColorInputLineFocused="Black/Blue"
+                FocusTab="c"
+                FocusDown="c"
+                FocusClick="Primary"
+              />
+            </DockPanel>
+            <DockPanel Margin="4,0,0,0">
+              <Label Text="Field C:" Dock="Left" Margin="0,0,2,0" />
+              <InputLine
+                Name="c"
+                Text="Hello'World!"
+                ColorInputLine="Black/Blue"
+                ColorInputLineFocused="Black/Blue"
+                FocusTab="text"
+                FocusDown="text"
+                FocusClick="Primary"
+              />
+            </DockPanel>
+          </StretchPanel>
+        </StackPanel>
+      </DockPanel>
+    </StackPanel>
+    <TextEdit
+      Name="text"
+      Dock="Bottom"
+      Height="5"
+      Text="This is the first line&#x0a;This is the second line"
+      FocusTab="a"
+      FocusClick="Primary"
+    />
+    <StretchPanel Vertical="False">
       <StretchPanel>
         <Background ColorBackground="Black/Red" />
         <Background ColorBackground="Black/Blue" />
       </StretchPanel>
       <Background ColorBackground="Black/Green" />
     </StretchPanel>
-  </StackPanel>
+  </DockPanel>
 </Background>

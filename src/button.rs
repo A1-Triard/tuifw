@@ -11,6 +11,7 @@ use tuifw_window::{COLOR_BUTTON, COLOR_HOTKEY, COLOR_DISABLED, COLOR_BUTTON_FOCU
 use tuifw_window::{COLOR_BUTTON_FOCUSED_HOTKEY, COLOR_BUTTON_FOCUSED_DISABLED, COLOR_BUTTON_PRESSED};
 
 pub const CMD_BUTTON_CLICK: u16 = 100;
+pub const CMD_BUTTON_IS_PRESSED_CHANGED: u16 = 101;
 
 widget! {
     #[widget(ButtonWidget, init=init_palette, drop=drop_controller)]
@@ -87,10 +88,11 @@ impl<Button: IsButton> ButtonController<Button> {
             let data = window.data_mut::<Button>(tree);
             data.controller_mut().click_timer = None;
             if window.actual_is_enabled(tree) {
-                let release_timer = Timer::new(tree, 100, Box::new(move |tree, _app| {
+                let release_timer = Timer::new(tree, 100, Box::new(move |tree, app| {
                     let data = window.data_mut::<Button>(tree);
                     data.controller_mut().release_timer = None;
                     window.invalidate_render(tree);
+                    window.raise(tree, Event::Cmd(CMD_BUTTON_IS_PRESSED_CHANGED), app);
                 }));
                 let data = window.data_mut::<Button>(tree);
                 let cmd = data.cmd();
@@ -99,6 +101,7 @@ impl<Button: IsButton> ButtonController<Button> {
                 }
                 window.invalidate_render(tree);
                 window.raise(tree, Event::Cmd(cmd), app);
+                window.raise(tree, Event::Cmd(CMD_BUTTON_IS_PRESSED_CHANGED), app);
             }
         }));
         let data = window.data_mut::<Button>(tree);
@@ -112,7 +115,7 @@ impl<Button: IsButton> ButtonController<Button> {
         window: Window,
         event: Event,
         _event_source: Window,
-        _app: &mut dyn App,
+        app: &mut dyn App,
     ) -> bool {
         match event {
             Event::Key(Key::Enter) => {
@@ -134,6 +137,7 @@ impl<Button: IsButton> ButtonController<Button> {
                             let cmd = data.cmd();
                             window.invalidate_render(tree);
                             window.raise(tree, Event::Cmd(cmd), app);
+                            window.raise(tree, Event::Cmd(CMD_BUTTON_IS_PRESSED_CHANGED), app);
                         }
                     }));
                     let data = window.data_mut::<Button>(tree);
@@ -153,6 +157,7 @@ impl<Button: IsButton> ButtonController<Button> {
                 } else {
                     data.controller_mut().pressed_by_mouse = false;
                     window.invalidate_render(tree);
+                    window.raise(tree, Event::Cmd(CMD_BUTTON_IS_PRESSED_CHANGED), app);
                 }
                 true
             },
@@ -191,6 +196,11 @@ impl Button {
 
     fn drop_controller(&mut self, tree: &mut WindowTree, app: &mut dyn App) {
         self.controller.drop_controller(tree, app);
+    }
+
+    pub fn is_pressed(tree: &WindowTree, window: Window) -> bool {
+        let data = window.data::<Button>(tree);
+        data.controller.is_pressed()
     }
 }
 

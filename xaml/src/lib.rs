@@ -155,6 +155,10 @@ pub struct Registered {
     pub input_line_text: XamlProperty,
     pub input_line_validator: XamlProperty,
 
+    pub text_edit: XamlStruct,
+    pub text_edit_text: XamlProperty,
+    pub text_edit_line_break: XamlProperty,
+
     pub frame: XamlStruct,
     pub frame_double: XamlProperty,
     pub frame_text: XamlProperty,
@@ -380,6 +384,12 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
     let input_line_text = XamlProperty::new(xaml, input_line, "Text", XamlType::Literal(string), false, false);
     let input_line_validator = XamlProperty::new(
         xaml, input_line, "Validator", XamlType::Struct(validator), false, false
+    );
+
+    let text_edit = XamlStruct::new(xaml, Some(widget), XMLNS, "TextEdit");
+    let text_edit_text = XamlProperty::new(xaml, text_edit, "Text", XamlType::Literal(string), false, false);
+    let text_edit_line_break = XamlProperty::new(
+        xaml, text_edit, "LineBreak", XamlType::Literal(string), false, false
     );
 
     let frame = XamlStruct::new(xaml, Some(widget), XMLNS, "Frame");
@@ -783,6 +793,14 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
         tuifw::InputLine::set_validator(tree, {}, Some(alloc::boxed::Box::new({})));
     " }, obj, value))));
 
+    set_widget_ctor(xaml, text_edit, "tuifw::TextEdit", widget_children);
+    text_edit_text.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        tuifw::TextEdit::set_text(tree, {}, {});
+    " }, obj, value))));
+    text_edit_line_break.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
+        tuifw::TextEdit::set_line_break(tree, {}, {});
+    " }, obj, value))));
+
     set_widget_ctor(xaml, frame, "tuifw::Frame", widget_children);
     frame_double.set_setter(xaml, Box::new(|obj, value| indent_all_by(4, format!(indoc! { "
         tuifw::Frame::set_double(tree, {}, {});
@@ -988,6 +1006,10 @@ pub fn reg_widgets(xaml: &mut Xaml) -> Registered {
         input_line,
         input_line_text,
         input_line_validator,
+
+        text_edit,
+        text_edit_text,
+        text_edit_line_break,
 
         frame,
         frame_double,

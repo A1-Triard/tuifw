@@ -38,6 +38,7 @@ phantom-type = { version = "0.5.0", default-features = false }
 timer-no-std = "0.6.0"
 tuifw-screen-base = { path = "screen-base", version = "0.26.0" }
 tuifw-window = { path = "window", version = "0.26.0" }
+unicode-width = "0.2.0"
 
 [dev-dependencies]
 panicking = "0.5.0"
