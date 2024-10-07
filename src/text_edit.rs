@@ -1,6 +1,7 @@
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
+use core::cmp::Ordering;
 use core::ops::Range;
 use dynamic_cast::impl_supports_interfaces;
 use tuifw_screen_base::{Vector, Rect, Point, Fg, Bg, text_width, Key};
@@ -13,6 +14,7 @@ struct Line {
     view: Range<usize>,
     has_line_break: bool,
     padding: u16,
+    right_padding: u16,
     has_line_break_place: bool,
 }
 
@@ -27,6 +29,7 @@ widget! {
         lines: Vec<Line>,
         column: u64,
         cursor: usize,
+        cursor_line: Option<usize>,
     }
 }
 
@@ -36,17 +39,19 @@ impl TextEdit {
         data.cursor = 0;
         data.column = 0;
         data.lines.clear();
-        Self::recalc_view(tree, window);
+        Self::recalc_view(tree, window, None);
     }
 
-    fn recalc_view(tree: &mut WindowTree, window: Window) {
+    fn recalc_view(tree: &mut WindowTree, window: Window, start: Option<usize>) {
         let data = window.data_mut::<TextEdit>(tree);
-        let text = if size_of::<usize>() <= size_of::<u32>() || data.text.len() <= usize::try_from(u32::MAX).unwrap() {
+        let text = if
+            size_of::<usize>() <= size_of::<u32>() || data.text.len() <= usize::try_from(u32::MAX).unwrap()
+        {
             &data.text[..]
         } else {
             &data.text[.. usize::try_from(u32::MAX).unwrap()]
         };
-        let mut line_start = data.lines.first().map_or(0, |x| x.range.start);
+        let mut line_start = start.unwrap_or_else(|| data.lines.first().map_or(0, |x| x.range.start));
         data.lines.clear();
         for _ in 0 .. data.size.y as u16 {
             let (line_end, has_line_break) = text[line_start ..]
@@ -74,17 +79,24 @@ impl TextEdit {
                 width += c_width;
             }
             let mut has_line_break_place = false;
+            let line_right_padding;
             let mut line_view_end = line_view_start;
             let mut width = 0;
             loop {
-                if width >= data.size.x as u16 as u64 {
+                if width == data.size.x as u16 as u64 {
+                    line_right_padding = 0;
                     break;
                 }
                 let Some(c) = text[line_view_end .. line_end].chars().next() else {
                     has_line_break_place = true;
+                    line_right_padding = data.size.x as u16 as u64 - width;
                     break;
                 };
                 let c_width = if c == '\0' { 0 } else { c.width().unwrap_or(0) as u64 };
+                if width + c_width > data.size.x as u16 as u64 {
+                    line_right_padding = data.size.x as u16 as u64 - width;
+                    break;
+                }
                 line_view_end += c.len_utf8();
                 width += c_width;
             }
@@ -93,11 +105,41 @@ impl TextEdit {
                 view: line_view_start .. line_view_end,
                 has_line_break,
                 padding: u16::try_from(line_padding).unwrap(),
+                right_padding: u16::try_from(line_right_padding).unwrap(),
                 has_line_break_place,
             });
             line_start = line_end + if has_line_break { data.line_break.len() } else { 0 };
         }
+        data.cursor_line = data.lines.binary_search_by(|line| {
+            if line.range.contains(&data.cursor) || line.has_line_break && data.cursor == line.range.end {
+                Ordering::Equal
+            } else if data.cursor >= line.range.start {
+                Ordering::Less
+            } else {
+                Ordering::Greater
+            }
+        }).ok();
         window.invalidate_render(tree);
+    }
+
+    fn cursor_right(tree: &mut WindowTree, window: Window) -> bool {
+        let data = window.data_mut::<TextEdit>(tree);
+        let text = if
+            size_of::<usize>() <= size_of::<u32>() || data.text.len() <= usize::try_from(u32::MAX).unwrap()
+        {
+            &data.text[..]
+        } else {
+            &data.text[.. usize::try_from(u32::MAX).unwrap()]
+        };
+        if data.cursor_line.is_none() {
+            let line_start =
+                text[.. data.cursor].rfind(&data.line_break).map_or(0, |x| x + data.line_break.len());
+            data.lines.clear();
+            Self::recalc_view(tree, window, Some(line_start));
+        }
+        let data = window.data_mut::<TextEdit>(tree);
+        let line = data.cursor_line.unwrap();
+        //text[data.cursor ..
     }
 }
 
@@ -115,6 +157,7 @@ impl Widget for TextEditWidget {
             lines: Vec::new(),
             column: 0,
             cursor: 0,
+            cursor_line: None,
         })
     }
 
@@ -191,7 +234,7 @@ impl Widget for TextEditWidget {
         _app: &mut dyn App,
     ) -> Vector {
         window.data_mut::<TextEdit>(tree).size = final_inner_bounds.size;
-        TextEdit::recalc_view(tree, window);
+        TextEdit::recalc_view(tree, window, None);
         final_inner_bounds.size
     }
 

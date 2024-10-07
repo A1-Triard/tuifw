@@ -68,7 +68,12 @@
     />
     <StretchPanel Vertical="False">
       <StretchPanel>
-        <Background ColorBackground="Black/Red" />
+        <DockPanel ColorLabel="Black/LightGray">
+          <Background ColorBackground="Black/Red" />
+          <StaticText Text="A rather long text label" HAlign="Center" />
+          <StaticText Text="Short (left)" VAlign="Center" />
+          <StaticText Text="Short (right)" HAlign="Right" VAlign="Bottom" />
+        </DockPanel>
         <Background ColorBackground="Black/Blue" />
       </StretchPanel>
       <Background ColorBackground="Black/Green" />
