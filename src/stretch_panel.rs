@@ -91,14 +91,19 @@ impl Widget for StretchPanelWidget {
             if let Some(first_child) = window.first_child(tree) {
                 let mut child = first_child;
                 loop {
-                    let child_stretch = StretchPanel::stretch(tree, child) / stretch_sum;
-                    let child_height = available_height.map(|x|
-                        (f32::from(x as u16) * child_stretch).min(f32::from(u16::MAX)) as u16 as i16
-                    );
+                    let next = child.next(tree);
+                    let child_height = if next == first_child {
+                        available_height.map(|x| x.wrapping_sub(size.y))
+                    } else {
+                        let child_stretch = StretchPanel::stretch(tree, child) / stretch_sum;
+                        available_height.map(|x|
+                            (f32::from(x as u16) * child_stretch).min(f32::from(u16::MAX)) as u16 as i16
+                        )
+                    };
                     child.measure(tree, available_width, child_height, app);
                     size += Vector { x: 0, y: child.desired_size(tree).y };
                     size = size.max(Vector { x: child.desired_size(tree).x, y: 0 });
-                    child = child.next(tree);
+                    child = next;
                     if child == first_child { break; }
                 }
             }
@@ -108,14 +113,19 @@ impl Widget for StretchPanelWidget {
             if let Some(first_child) = window.first_child(tree) {
                 let mut child = first_child;
                 loop {
-                    let child_stretch = StretchPanel::stretch(tree, child) / stretch_sum;
-                    let child_width = available_width.map(|x|
-                        (f32::from(x as u16) * child_stretch).min(f32::from(u16::MAX)) as u16 as i16
-                    );
+                    let next = child.next(tree);
+                    let child_width = if next == first_child {
+                        available_width.map(|x| x.wrapping_sub(size.x))
+                    } else {
+                        let child_stretch = StretchPanel::stretch(tree, child) / stretch_sum;
+                        available_width.map(|x|
+                            (f32::from(x as u16) * child_stretch).min(f32::from(u16::MAX)) as u16 as i16
+                        )
+                    };
                     child.measure(tree, child_width, available_height, app);
                     size += Vector { x: child.desired_size(tree).x, y: 0 };
                     size = size.max(Vector { x: 0, y: child.desired_size(tree).y });
-                    child = child.next(tree);
+                    child = next;
                     if child == first_child { break; }
                 }
             }
@@ -147,17 +157,20 @@ impl Widget for StretchPanelWidget {
             if let Some(first_child) = window.first_child(tree) {
                 let mut child = first_child;
                 loop {
-                    let child_stretch = StretchPanel::stretch(tree, child) / stretch_sum;
-                    let child_height =
+                    let next = child.next(tree);
+                    let child_height = if next == first_child {
+                        final_inner_bounds.h().wrapping_sub(size.y)
+                    } else {
+                        let child_stretch = StretchPanel::stretch(tree, child) / stretch_sum;
                         (f32::from(final_inner_bounds.h() as u16) * child_stretch)
                             .min(f32::from(u16::MAX)) as u16 as i16
-                    ;
+                    };
                     let child_size = Vector { x: final_inner_bounds.w(), y: child_height };
                     child.arrange(tree, Rect { tl: pos, size: child_size }, app);
                     pos = pos.offset(Vector { x: 0, y: child_size.y });
                     size += Vector { x: 0, y: child_size.y };
                     size = size.max(Vector { x: child_size.x, y: 0 });
-                    child = child.next(tree);
+                    child = next;
                     if child == first_child { break; }
                 }
             }
@@ -168,17 +181,20 @@ impl Widget for StretchPanelWidget {
             if let Some(first_child) = window.first_child(tree) {
                 let mut child = first_child;
                 loop {
-                    let child_stretch = StretchPanel::stretch(tree, child) / stretch_sum;
-                    let child_width =
+                    let next = child.next(tree);
+                    let child_width = if next == first_child {
+                        final_inner_bounds.w().wrapping_sub(size.x)
+                    } else {
+                        let child_stretch = StretchPanel::stretch(tree, child) / stretch_sum;
                         (f32::from(final_inner_bounds.w() as u16) * child_stretch)
                             .min(f32::from(u16::MAX)) as u16 as i16
-                    ;
+                    };
                     let child_size = Vector { x: child_width, y: final_inner_bounds.h() };
                     child.arrange(tree, Rect { tl: pos, size: child_size }, app);
                     pos = pos.offset(Vector { x: child_size.x, y: 0 });
                     size += Vector { x: child_size.x, y: 0 };
                     size = size.max(Vector { x: 0, y: child_size.y });
-                    child = child.next(tree);
+                    child = next;
                     if child == first_child { break; }
                 }
             }
