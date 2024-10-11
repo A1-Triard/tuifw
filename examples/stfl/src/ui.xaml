@@ -15,14 +15,12 @@
           <StaticText Text="is a" />
           <StaticText Text="test" />
         </StackPanel>
-        <StackPanel ColorLabel="Red/None">
+        <StackPanel ColorLabel="Red/None" ColorInputLine="Black/Blue" ColorInputLineFocused="White/Blue">
           <DockPanel Margin="0,0,0,1">
             <Label Text="Field A:" Dock="Left" Margin="0,0,2,0" />
             <InputLine
               Name="a"
               Text="This is a little"
-              ColorInputLine="White/Blue"
-              ColorInputLineFocused="White/Blue"
               FocusedPrimary="True"
               FocusTab="b"
               FocusDown="b"
@@ -35,8 +33,6 @@
               <InputLine
                 Name="b"
                 Text="test for STFL!"
-                ColorInputLine="Black/Blue"
-                ColorInputLineFocused="Black/Blue"
                 FocusTab="c"
                 FocusDown="c"
                 FocusClick="Primary"
@@ -47,8 +43,6 @@
               <InputLine
                 Name="c"
                 Text="Hello'World!"
-                ColorInputLine="Black/Blue"
-                ColorInputLineFocused="Black/Blue"
                 FocusTab="text"
                 FocusDown="text"
                 FocusClick="Primary"
@@ -66,17 +60,29 @@
       FocusTab="a"
       FocusClick="Primary"
     />
-    <StretchPanel Vertical="False">
+    <StretchPanel Vertical="False" ColorLabel="Black/LightGray">
       <StretchPanel>
-        <DockPanel ColorLabel="Black/LightGray">
+        <DockPanel>
           <Background ColorBackground="Black/Red" />
           <StaticText Text="A rather long text label" HAlign="Center" />
           <StaticText Text="Short (left)" VAlign="Center" />
           <StaticText Text="Short (right)" HAlign="Right" VAlign="Bottom" />
         </DockPanel>
-        <Background ColorBackground="Black/Blue" />
+        <DockPanel>
+          <Background ColorBackground="Black/Blue" />
+          <StaticText Text="A rather long text label" HAlign="Center" VAlign="Bottom" Margin="0,0,0,2" />
+          <StaticText Text="Short (left)" VAlign="Bottom" Margin="0,0,0,1" />
+          <StaticText Text="Short (right)" HAlign="Right" VAlign="Bottom" />
+        </DockPanel>
       </StretchPanel>
-      <Background ColorBackground="Black/Green" />
+      <DockPanel>
+        <Background ColorBackground="Black/Green" />
+        <StackPanel HAlign="Right" VAlign="Center">
+          <StaticText Text="A rather long text label" />
+          <StaticText Text="Short (left)" />
+          <StaticText Text="Short (right)" HAlign="Right" />
+        </StackPanel>
+      </DockPanel>
     </StretchPanel>
   </DockPanel>
 </Background>
