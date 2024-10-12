@@ -94,3 +94,4 @@ dosclippy:
 
 Cargo.lock: Cargo.toml
 	cargo update
+	touch Cargo.lock
