@@ -28,6 +28,7 @@ widget! {
         column: u64,
         cursor: usize,
         cursor_line: Option<usize>,
+        cursor_column: u64,
     }
 }
 
@@ -88,6 +89,7 @@ impl TextEdit {
     fn reset_view(tree: &mut WindowTree, window: Window) {
         let data = window.data_mut::<TextEdit>(tree);
         data.cursor = 0;
+        data.cursor_column = 0;
         data.column = 0;
         data.lines.clear();
         Self::recalc_view(tree, window, None);
@@ -152,6 +154,7 @@ impl TextEdit {
             line_start = line_end;
         }
         data.cursor_line = data.lines.binary_search_by(|line| {
+            if text[line.range.clone()].is_empty() { return Ordering::Greater; }
             if line.range.contains(&data.cursor) || !text[line.range.clone()].ends_with(&data.line_break) && data.cursor == line.range.end {
                 Ordering::Equal
             } else if data.cursor >= line.range.start {
@@ -183,6 +186,7 @@ impl TextEdit {
         let line = &data.lines[data.cursor_line.unwrap()];
         let Some(Char::Char(c)) = last_char(&text[line.range.start .. data.cursor], &data.line_break) else { return false; };
         data.cursor -= c.len_utf8();
+        data.cursor_column = text[line.range.start .. data.cursor].chars().map(|x| if x == '\0' { 0 } else { x.width().unwrap_or(0) as u64 }).sum();
         if data.cursor < line.view.start {
             let offset = text[data.cursor .. line.view.start].chars().map(|x| if x == '\0' { 0 } else { x.width().unwrap_or(0) as u64 }).sum();
             Self::scroll_left(tree, window, offset);
@@ -211,6 +215,7 @@ impl TextEdit {
         let line = &data.lines[data.cursor_line.unwrap()];
         let Some(Char::Char(c)) = first_char(&text[data.cursor .. line.range.end], &data.line_break) else { return false; };
         data.cursor += c.len_utf8();
+        data.cursor_column = text[line.range.start .. data.cursor].chars().map(|x| if x == '\0' { 0 } else { x.width().unwrap_or(0) as u64 }).sum();
         if data.cursor > line.view.end || data.cursor == line.view.end && line.filled {
             let mut offset = text[line.view.end .. data.cursor].chars().map(|x| if x == '\0' { 0 } else { x.width().unwrap_or(0) as u64 }).sum();
             offset += first_char(&text[data.cursor .. line.range.end], &data.line_break).map_or(1, |x| x.width());
@@ -232,31 +237,33 @@ impl TextEdit {
         }
         let data = window.data_mut::<TextEdit>(tree);
         let line = &data.lines[data.cursor_line.unwrap()];
-        if !line.view.contains(&data.cursor) {
+        if !line.view.contains(&data.cursor) && (data.cursor != line.view.end || line.filled) {
             let text = actual_text(&data.text);
             data.column = text[line.range.start .. data.cursor].chars().map(|x| if x == '\0' { 0 } else { x.width().unwrap_or(0) as u64 }).sum();
             Self::recalc_view(tree, window, None);
         }
         let data = window.data_mut::<TextEdit>(tree);
-        if data.cursor_line.unwrap() == data.lines.len() - 1 || data.lines[data.cursor_line.unwrap() + 1].range.is_empty() {
+        let scrolled = if data.cursor_line.unwrap() == data.lines.len() - 1 {
             if !Self::scroll_down(tree, window) { return false; }
-        }
+            true
+        } else {
+            false
+        };
         let data = window.data_mut::<TextEdit>(tree);
+        if data.lines[data.cursor_line.unwrap() + 1].range.is_empty() { return scrolled; }
         let text = actual_text(&data.text);
-        let line = &data.lines[data.cursor_line.unwrap()];
-        let cursor_column = text[line.range.start .. data.cursor].chars().map(|x| if x == '\0' { 0 } else { x.width().unwrap_or(0) as u64 }).sum();
         let next_line = &data.lines[data.cursor_line.unwrap() + 1];
         let mut new_cursor = next_line.range.start;
         let mut width = 0;
         loop {
-            if width == cursor_column {
+            if width == data.cursor_column {
                 break;
             }
             let Some(Char::Char(c)) = first_char(&text[new_cursor .. next_line.range.end], &data.line_break) else {
                 break;
             };
             let c_width = if c == '\0' { 0 } else { c.width().unwrap_or(0) as u64 };
-            if width + c_width > cursor_column {
+            if width + c_width > data.cursor_column {
                 break;
             }
             new_cursor += c.len_utf8();
@@ -268,8 +275,187 @@ impl TextEdit {
         true
     }
 
-    fn scroll_down(_tree: &mut WindowTree, _window: Window) -> bool {
-        false
+    fn cursor_up(tree: &mut WindowTree, window: Window) -> bool {
+        let data = window.data_mut::<TextEdit>(tree);
+        let text = actual_text(&data.text);
+        if data.cursor_line.is_none() {
+            let line_start =
+                text[.. data.cursor].rfind(&data.line_break).map_or(0, |x| x + data.line_break.len());
+            Self::recalc_view(tree, window, Some(line_start));
+        }
+        let data = window.data_mut::<TextEdit>(tree);
+        let line = &data.lines[data.cursor_line.unwrap()];
+        if !line.view.contains(&data.cursor) && (data.cursor != line.view.end || line.filled) {
+            let text = actual_text(&data.text);
+            data.column = text[line.range.start .. data.cursor].chars().map(|x| if x == '\0' { 0 } else { x.width().unwrap_or(0) as u64 }).sum();
+            Self::recalc_view(tree, window, None);
+        }
+        let data = window.data_mut::<TextEdit>(tree);
+        if data.cursor_line.unwrap() == 0 {
+            if !Self::scroll_up(tree, window) { return false; }
+        }
+        let data = window.data_mut::<TextEdit>(tree);
+        let text = actual_text(&data.text);
+        let prev_line = &data.lines[data.cursor_line.unwrap() - 1];
+        let mut new_cursor = prev_line.range.start;
+        let mut width = 0;
+        loop {
+            if width == data.cursor_column {
+                break;
+            }
+            let Some(Char::Char(c)) = first_char(&text[new_cursor .. prev_line.range.end], &data.line_break) else {
+                break;
+            };
+            let c_width = if c == '\0' { 0 } else { c.width().unwrap_or(0) as u64 };
+            if width + c_width > data.cursor_column {
+                break;
+            }
+            new_cursor += c.len_utf8();
+            width += c_width;
+        }
+        data.cursor = new_cursor;
+        data.cursor_line = Some(data.cursor_line.unwrap() - 1);
+        window.invalidate_render(tree);
+        true
+    }
+
+    fn scroll_up(tree: &mut WindowTree, window: Window) -> bool {
+        let data = window.data_mut::<TextEdit>(tree);
+        let Some(first_line) = data.lines.first() else { return false; };
+        let new_line_end = first_line.range.start;
+        if new_line_end == 0 { return false; }
+        data.lines.remove(data.lines.len() - 1);
+        let text = actual_text(&data.text);
+        let new_line_start = text[.. new_line_end - data.line_break.len()]
+            .rfind(&data.line_break)
+            .map_or(0, |x| x + data.line_break.len());
+        let mut line_view_start = new_line_start;
+        let line_padding;
+        let mut width = 0;
+        loop {
+            if width == data.column {
+                line_padding = 0;
+                break;
+            }
+            let Some(c) = first_char(&text[line_view_start .. new_line_end], &data.line_break) else {
+                line_padding = 0;
+                break;
+            };
+            let c_width = c.width();
+            if width + c_width > data.column {
+                line_padding = width + c_width - data.column;                    
+                line_view_start += c.len(&data.line_break);
+                break;
+            }
+            line_view_start += c.len(&data.line_break);
+            width += c_width;
+        }
+        let line_filled;
+        let mut line_view_end = line_view_start;
+        let mut width = 0;
+        loop {
+            if width == data.size.x as u16 as u64 {
+                line_filled = true;
+                break;
+            }
+            let Some(c) = first_char(&text[line_view_end .. new_line_end], &data.line_break) else {
+                line_filled = false;
+                break;
+            };
+            let c_width = c.width();
+            if width + c_width > data.size.x as u16 as u64 {
+                line_filled = true;
+                break;
+            }
+            line_view_end += c.len(&data.line_break);
+            width += c_width;
+        }
+        data.lines.insert(0, Line {
+            range: new_line_start .. new_line_end,
+            view: line_view_start .. line_view_end,
+            filled: line_filled,
+            padding: u16::try_from(line_padding).unwrap(),
+        });
+        data.cursor_line = data.lines.binary_search_by(|line| {
+            if text[line.range.clone()].is_empty() { return Ordering::Greater; }
+            if line.range.contains(&data.cursor) || !text[line.range.clone()].ends_with(&data.line_break) && data.cursor == line.range.end {
+                Ordering::Equal
+            } else if data.cursor >= line.range.start {
+                Ordering::Less
+            } else {
+                Ordering::Greater
+            }
+        }).ok();
+        true
+    }
+
+    fn scroll_down(tree: &mut WindowTree, window: Window) -> bool {
+        let data = window.data_mut::<TextEdit>(tree);
+        let Some(last_line) = data.lines.last() else { return false; };
+        let new_line_start = last_line.range.end;
+        data.lines.remove(0);
+        let text = actual_text(&data.text);
+        let new_line_end = text[new_line_start ..]
+            .find(&data.line_break)
+            .map_or(text.len(), |x| new_line_start + x + data.line_break.len());
+        let mut line_view_start = new_line_start;
+        let line_padding;
+        let mut width = 0;
+        loop {
+            if width == data.column {
+                line_padding = 0;
+                break;
+            }
+            let Some(c) = first_char(&text[line_view_start .. new_line_end], &data.line_break) else {
+                line_padding = 0;
+                break;
+            };
+            let c_width = c.width();
+            if width + c_width > data.column {
+                line_padding = width + c_width - data.column;                    
+                line_view_start += c.len(&data.line_break);
+                break;
+            }
+            line_view_start += c.len(&data.line_break);
+            width += c_width;
+        }
+        let line_filled;
+        let mut line_view_end = line_view_start;
+        let mut width = 0;
+        loop {
+            if width == data.size.x as u16 as u64 {
+                line_filled = true;
+                break;
+            }
+            let Some(c) = first_char(&text[line_view_end .. new_line_end], &data.line_break) else {
+                line_filled = false;
+                break;
+            };
+            let c_width = c.width();
+            if width + c_width > data.size.x as u16 as u64 {
+                line_filled = true;
+                break;
+            }
+            line_view_end += c.len(&data.line_break);
+            width += c_width;
+        }
+        data.lines.push(Line {
+            range: new_line_start .. new_line_end,
+            view: line_view_start .. line_view_end,
+            filled: line_filled,
+            padding: u16::try_from(line_padding).unwrap(),
+        });
+        data.cursor_line = data.lines.binary_search_by(|line| {
+            if text[line.range.clone()].is_empty() { return Ordering::Greater; }
+            if line.range.contains(&data.cursor) || !text[line.range.clone()].ends_with(&data.line_break) && data.cursor == line.range.end {
+                Ordering::Equal
+            } else if data.cursor >= line.range.start {
+                Ordering::Less
+            } else {
+                Ordering::Greater
+            }
+        }).ok();
+        true
     }
 
     fn scroll_left(tree: &mut WindowTree, window: Window, delta: u64) {
@@ -449,6 +635,7 @@ impl Widget for TextEditWidget {
             lines: Vec::new(),
             column: 0,
             cursor: 0,
+            cursor_column: 0,
             cursor_line: None,
         })
     }
@@ -544,6 +731,7 @@ impl Widget for TextEditWidget {
             Event::Key(Key::Right) => TextEdit::cursor_right(tree, window),
             Event::Key(Key::Left) => TextEdit::cursor_left(tree, window),
             Event::Key(Key::Down) => TextEdit::cursor_down(tree, window),
+            Event::Key(Key::Up) => TextEdit::cursor_up(tree, window),
             Event::Key(Key::Char(c)) => {
                 let mut b = [0; 4];
                 let s = c.encode_utf8(&mut b);

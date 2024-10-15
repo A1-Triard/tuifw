@@ -1731,6 +1731,31 @@ impl<'clock> WindowTree<'clock> {
         match screen.update(self.cursor, wait)? {
             Some(screen_Event::Key(n, key)) => {
                 for _ in 0 .. n.get() {
+                    let mut handled = false;
+                    for pre_process in self.pre_process.items().clone().values() {
+                        handled = pre_process.0.raise_core(self, Event::PreProcessKey(key), pre_process.0, app);
+                        if handled { break; }
+                    }
+                    if handled { continue; }
+                    handled = self.primary_focused.map_or(false, |x|
+                        x.raise_priv(self, Event::Key(key), false, app)
+                    );
+                    if handled { continue; }
+                    handled = self.secondary_focused.map_or(false, |x|
+                        x.raise_priv(self, Event::Key(key), true, app)
+                    );
+                    if handled {
+                        self.primary_focused.map(|x|
+                            x.raise_priv(self, Event::Cmd(CMD_LOST_ATTENTION), false, app)
+                        );
+                        continue;
+                    }
+                    for post_process in self.post_process.items().clone().values() {
+                        handled =
+                            post_process.0.raise_core(self, Event::PostProcessKey(key), post_process.0, app);
+                        if handled { break; }
+                    }
+                    if handled { continue; }
                     match key {
                         Key::Tab => {
                             if let Some(primary_focused) = self.primary_focused {
@@ -1779,30 +1804,6 @@ impl<'clock> WindowTree<'clock> {
                             }
                         },
                         _ => { },
-                    }
-                    let mut handled = false;
-                    for pre_process in self.pre_process.items().clone().values() {
-                        handled = pre_process.0.raise_core(self, Event::PreProcessKey(key), pre_process.0, app);
-                        if handled { break; }
-                    }
-                    if handled { continue; }
-                    handled = self.primary_focused.map_or(false, |x|
-                        x.raise_priv(self, Event::Key(key), false, app)
-                    );
-                    if handled { continue; }
-                    handled = self.secondary_focused.map_or(false, |x|
-                        x.raise_priv(self, Event::Key(key), true, app)
-                    );
-                    if handled {
-                        self.primary_focused.map(|x|
-                            x.raise_priv(self, Event::Cmd(CMD_LOST_ATTENTION), false, app)
-                        );
-                        continue;
-                    }
-                    for post_process in self.post_process.items().clone().values() {
-                        handled =
-                            post_process.0.raise_core(self, Event::PostProcessKey(key), post_process.0, app);
-                        if handled { break; }
                     }
                 }
             },
