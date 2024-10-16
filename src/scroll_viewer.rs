@@ -19,14 +19,14 @@ widget! {
         h_scroll: bool,
         #[property(copy, measure)]
         v_scroll: bool,
-        h_extent: i16,
+        h_extent: u32,
         #[property(copy, arrange)]
-        h_offset: i16,
-        h_viewport: i16,
-        v_extent: i16,
+        h_offset: u32,
+        h_viewport: u32,
+        v_extent: u32,
         #[property(copy, arrange)]
-        v_offset: i16,
-        v_viewport: i16,
+        v_offset: u32,
+        v_viewport: u32,
         has_virtual_child: bool,
     }
 }
@@ -39,22 +39,22 @@ impl ScrollViewer {
         Ok(())
     }
 
-    pub fn h_extent(tree: &WindowTree, window: Window) -> i16 {
+    pub fn h_extent(tree: &WindowTree, window: Window) -> u32 {
         let data = window.data::<ScrollViewer>(tree);
         data.h_extent
     }
 
-    pub fn h_viewport(tree: &WindowTree, window: Window) -> i16 {
+    pub fn h_viewport(tree: &WindowTree, window: Window) -> u32 {
         let data = window.data::<ScrollViewer>(tree);
         data.h_viewport
     }
 
-    pub fn v_extent(tree: &WindowTree, window: Window) -> i16 {
+    pub fn v_extent(tree: &WindowTree, window: Window) -> u32 {
         let data = window.data::<ScrollViewer>(tree);
         data.v_extent
     }
 
-    pub fn v_viewport(tree: &WindowTree, window: Window) -> i16 {
+    pub fn v_viewport(tree: &WindowTree, window: Window) -> u32 {
         let data = window.data::<ScrollViewer>(tree);
         data.v_viewport
     }
@@ -66,7 +66,7 @@ struct ScrollViewerWidget;
 impl_supports_interfaces!(ScrollViewerWidget: VirtScrollViewerWidgetExtension);
 
 impl VirtScrollViewerWidgetExtension for ScrollViewerWidget {
-    fn set_offset(&self, tree: &mut WindowTree, window: Window, vertical: bool, value: i16) {
+    fn set_offset(&self, tree: &mut WindowTree, window: Window, vertical: bool, value: u32) {
         let data = window.data_mut::<ScrollViewer>(tree);
         if vertical {
             data.v_offset = value;
@@ -76,7 +76,7 @@ impl VirtScrollViewerWidgetExtension for ScrollViewerWidget {
         window.invalidate_render(tree);
     }
 
-    fn set_viewport(&self, tree: &mut WindowTree, window: Window, vertical: bool, value: i16) {
+    fn set_viewport(&self, tree: &mut WindowTree, window: Window, vertical: bool, value: u32) {
         let data = window.data_mut::<ScrollViewer>(tree);
         if vertical {
             data.v_viewport = value;
@@ -86,7 +86,7 @@ impl VirtScrollViewerWidgetExtension for ScrollViewerWidget {
         window.invalidate_render(tree);
     }
 
-    fn set_extent(&self, tree: &mut WindowTree, window: Window, vertical: bool, value: i16) {
+    fn set_extent(&self, tree: &mut WindowTree, window: Window, vertical: bool, value: u32) {
         let data = window.data_mut::<ScrollViewer>(tree);
         if vertical {
             data.v_extent = value;
@@ -148,11 +148,11 @@ impl Widget for ScrollViewerWidget {
             let v_indicator =
                 (
                     (
-                        i32::from(data.v_offset) * i32::from(v_indicator_range) +
-                        i32::from(data.v_extent - data.v_viewport) / 2
+                        i64::from(data.v_offset) * i64::from(v_indicator_range) +
+                        i64::from(data.v_extent - data.v_viewport) / 2
                     )
                     /
-                    i32::from(data.v_extent - data.v_viewport)
+                    i64::from(data.v_extent - data.v_viewport)
                 ) as i16
             ;
             rp.text(Point { x: bounds.r_inner(), y: indicator_area.t().wrapping_add(v_indicator) }, color, "╬");
@@ -162,11 +162,11 @@ impl Widget for ScrollViewerWidget {
             let h_indicator =
                 (
                     (
-                        i32::from(data.h_offset) * i32::from(h_indicator_range) +
-                        i32::from(data.h_extent - data.h_viewport) / 2
+                        i64::from(data.h_offset) * i64::from(h_indicator_range) +
+                        i64::from(data.h_extent - data.h_viewport) / 2
                     )
                     /
-                    i32::from(data.h_extent - data.h_viewport)
+                    i64::from(data.h_extent - data.h_viewport)
                 ) as i16
             ;
             rp.text(Point { x: indicator_area.l().wrapping_add(h_indicator), y: bounds.b_inner() }, color, "╩");
@@ -235,10 +235,10 @@ impl Widget for ScrollViewerWidget {
         let data = window.data_mut::<ScrollViewer>(tree);
         data.has_virtual_child = virt;
         if !virt {
-            data.h_extent = size.x;
-            data.h_viewport = children_size.x;
-            data.v_extent = size.y;
-            data.v_viewport = children_size.y;
+            data.h_extent = (size.x as u16).into();
+            data.h_viewport = (children_size.x as u16).into();
+            data.v_extent = (size.y as u16).into();
+            data.v_viewport = (children_size.y as u16).into();
         }
         let size = Thickness::all(1).expand_rect_size(size);
         Vector {
@@ -265,13 +265,16 @@ impl Widget for ScrollViewerWidget {
                     base_children_bounds
                 } else {
                     let data = window.data::<ScrollViewer>(tree);
-                    let offset = -Vector { x: data.h_offset, y: data.v_offset };
+                    let offset = -Vector {
+                        x: u16::try_from(data.h_offset).unwrap() as i16,
+                        y: u16::try_from(data.v_offset).unwrap() as i16
+                    };
                     let mut child_bounds = base_children_bounds.offset(offset);
                     if data.h_scroll {
-                        child_bounds.size.x = data.h_extent;
+                        child_bounds.size.x = u16::try_from(data.h_extent).unwrap() as i16;
                     }
                     if data.v_scroll {
-                        child_bounds.size.y = data.v_extent;
+                        child_bounds.size.y = u16::try_from(data.v_extent).unwrap() as i16;
                     }
                     child.set_clip(tree, Some(Rect {
                         tl: Point { x: max(0, -offset.x), y: max(0, -offset.y) },
@@ -304,9 +307,9 @@ impl Widget for ScrollViewerWidget {
                 let from_top = rect.t().wrapping_sub(bounds.t()).checked_abs().map_or(i16::MIN, |x| -x);
                 let from_bottom = rect.b().wrapping_sub(bounds.b()).checked_abs().map_or(i16::MIN, |x| -x);
                 if from_top >= from_bottom {
-                    ScrollViewer::set_v_offset(tree, window, offset.wrapping_add(from_top));
+                    ScrollViewer::set_v_offset(tree, window, offset.wrapping_add((from_top as u16).into()));
                 } else {
-                    ScrollViewer::set_v_offset(tree, window, offset.wrapping_sub(from_bottom));
+                    ScrollViewer::set_v_offset(tree, window, offset.wrapping_sub((from_bottom as u16).into()));
                 }
             }
         }
@@ -317,9 +320,9 @@ impl Widget for ScrollViewerWidget {
                 let from_left = rect.l().wrapping_sub(bounds.l()).checked_abs().map_or(i16::MIN, |x| -x);
                 let from_right = rect.r().wrapping_sub(bounds.r()).checked_abs().map_or(i16::MIN, |x| -x);
                 if from_left >= from_right {
-                    ScrollViewer::set_h_offset(tree, window, offset.wrapping_add(from_left));
+                    ScrollViewer::set_h_offset(tree, window, offset.wrapping_add((from_left as u16).into()));
                 } else {
-                    ScrollViewer::set_h_offset(tree, window, offset.wrapping_sub(from_right));
+                    ScrollViewer::set_h_offset(tree, window, offset.wrapping_sub((from_right as u16).into()));
                 }
             }
         }
@@ -347,9 +350,9 @@ impl Widget for ScrollViewerWidget {
                         0
                     } else {
                         ((
-                            i32::from(new_indicator_pos) * i32::from(data.v_extent - data.v_viewport) +
-                            i32::from(v_indicator_range) / 2
-                        ) / i32::from(v_indicator_range)) as i16
+                            u64::from(new_indicator_pos as u16) * u64::from(data.v_extent - data.v_viewport) +
+                            u64::from(v_indicator_range as u16) / 2
+                        ) / u64::from(v_indicator_range as u16)) as u32
                     };
                     let mut has_virtual_child = false;
                     if let Some(first_child) = window.first_child(tree) {
@@ -379,9 +382,9 @@ impl Widget for ScrollViewerWidget {
                         0
                     } else {
                         ((
-                            i32::from(new_indicator_pos) * i32::from(data.h_extent - data.h_viewport) +
-                            i32::from(h_indicator_range) / 2
-                        ) / i32::from(h_indicator_range)) as i16
+                            u64::from(new_indicator_pos as u16) * u64::from(data.h_extent - data.h_viewport) +
+                            u64::from(h_indicator_range as u16) / 2
+                        ) / u64::from(h_indicator_range as u16)) as u32
                     };
                     let mut has_virtual_child = false;
                     if let Some(first_child) = window.first_child(tree) {
